@@ -1,11 +1,10 @@
-from typing import ( Union, Optional, List )
+from typing import List, Optional, Union
 
 import numpy as np
-
 import qibo
+from qibo.backends import construct_backend
 from qibo.config import raise_error
 from qibo.hamiltonians.abstract import AbstractHamiltonian
-from qibo.backends import GlobalBackend
 
 
 def parameter_shift(
@@ -15,6 +14,7 @@ def parameter_shift(
     initial_state=None,
     scale_factor=1,
     nshots=None,
+    backend="qibojit",
 ):
     """In this method the parameter shift rule (PSR) is implemented.
     Given a circuit U and an observable H, the PSR allows to calculate the derivative
@@ -49,6 +49,7 @@ def parameter_shift(
         nshots (int, optional): number of shots if derivative is evaluated on
             hardware. If ``None``, the simulation mode is executed.
             Default is ``None``.
+        execution_backend (str): Qibo backend on which the circuits are executed.
 
     Returns:
         (float): Value of the derivative of the expectation value of the hamiltonian
@@ -104,8 +105,7 @@ def parameter_shift(
             "hamiltonian must be a qibo.hamiltonians.Hamiltonian or qibo.hamiltonians.SymbolicHamiltonian object",
         )
 
-    # inheriting hamiltonian's backend
-    backend = hamiltonian.backend
+    exec_backend = construct_backend(backend)
 
     # getting the gate's type
     gate = circuit.associate_gates_with_parameters()[parameter_index]
@@ -127,7 +127,7 @@ def parameter_shift(
     if nshots is None:
         # forward evaluation
         forward = hamiltonian.expectation(
-            backend.execute_circuit(
+            exec_backend.execute_circuit(
                 circuit=circuit, initial_state=initial_state
             ).state()
         )
@@ -137,21 +137,21 @@ def parameter_shift(
         circuit.set_parameters(shifted)
 
         backward = hamiltonian.expectation(
-            backend.execute_circuit(
+            exec_backend.execute_circuit(
                 circuit=circuit, initial_state=initial_state
             ).state()
         )
 
     # same but using expectation from samples
     else:
-        forward = backend.execute_circuit(
+        forward = exec_backend.execute_circuit(
             circuit=circuit, initial_state=initial_state, nshots=nshots
         ).expectation_from_samples(hamiltonian)
 
         shifted[parameter_index] -= 2 * s
         circuit.set_parameters(shifted)
 
-        backward = backend.execute_circuit(
+        backward = exec_backend.execute_circuit(
             circuit=circuit, initial_state=initial_state, nshots=nshots
         ).expectation_from_samples(hamiltonian)
 
@@ -163,45 +163,50 @@ def parameter_shift(
     return result
 
 
-
-
 def expectation_on_backend(
-        observable: qibo.hamiltonians.Hamiltonian, 
-        circuit: qibo.Circuit, 
-        initial_state: Optional[Union[List, qibo.Circuit]] = None, 
-        nshots: int = 1000, 
-        backend: str = "qibojit"
-    ):
-    
+    observable: qibo.hamiltonians.Hamiltonian,
+    circuit: qibo.Circuit,
+    initial_state: Optional[Union[List, qibo.Circuit]] = None,
+    nshots: int = 1000,
+    backend: str = "qibojit",
+):
+
     params = circuit.get_parameters()
     nparams = len(params)
 
     # read the frontend user choice
     frontend = observable.backend
     # construct differentiation backend
-    backend = GlobalBackend()
+    exec_backend = construct_backend(backend)
 
     if "tensorflow" in frontend.name:
         import tensorflow as tf
+
         @tf.custom_gradient
         def _expectation_with_tf(params):
             params = tf.Variable(params)
+
             def grad(upstream):
                 gradients = []
                 for p in range(nparams):
-                    gradients.append(upstream * parameter_shift(
-                        circuit=circuit,
-                        hamiltonian=observable,
-                        parameter_index=p,
-                        nshots=nshots,
+                    gradients.append(
+                        upstream
+                        * parameter_shift(
+                            circuit=circuit,
+                            hamiltonian=observable,
+                            parameter_index=p,
+                            nshots=nshots,
+                            backend=backend,
+                        )
                     )
-                )
                 return gradients
-            expval = backend.execute_circuit(
-                circuit=circuit, initial_state=initial_state, nshots=nshots 
-                ).expectation_from_samples(observable)
+
+            expval = exec_backend.execute_circuit(
+                circuit=circuit, initial_state=initial_state, nshots=nshots
+            ).expectation_from_samples(observable)
             return expval, grad
+
         return _expectation_with_tf(params)
-    
+
     else:
         raise_error(NotImplementedError, "Only tensorflow supported at this time.")
