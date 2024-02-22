@@ -1,9 +1,11 @@
+from typing import ( Union, Optional, List )
+
 import numpy as np
 
-import tensorflow as tf
-
+import qibo
 from qibo.config import raise_error
 from qibo.hamiltonians.abstract import AbstractHamiltonian
+from qibo.backends import GlobalBackend
 
 
 def parameter_shift(
@@ -163,28 +165,43 @@ def parameter_shift(
 
 
 
-def expectation_with_tf(observable, circuit, initial_state=None, nshots=1000):
-    backend = observable.backend
+def expectation_on_backend(
+        observable: qibo.hamiltonians.Hamiltonian, 
+        circuit: qibo.Circuit, 
+        initial_state: Optional[Union[List, qibo.Circuit]] = None, 
+        nshots: int = 1000, 
+        backend: str = "qibojit"
+    ):
+    
     params = circuit.get_parameters()
     nparams = len(params)
 
-    @tf.custom_gradient
-    def _expectation_with_tf(params):
-        params = tf.Variable(params)
-        def grad(upstream):
-            gradients = []
-            for p in range(nparams):
-                gradients.append(upstream * parameter_shift(
-                    circuit=circuit,
-                    hamiltonian=observable,
-                    parameter_index=p,
-                    nshots=nshots,
+    # read the frontend user choice
+    frontend = observable.backend
+    # construct differentiation backend
+    backend = GlobalBackend()
+
+    if "tensorflow" in frontend.name:
+        import tensorflow as tf
+        @tf.custom_gradient
+        def _expectation_with_tf(params):
+            params = tf.Variable(params)
+            def grad(upstream):
+                gradients = []
+                for p in range(nparams):
+                    gradients.append(upstream * parameter_shift(
+                        circuit=circuit,
+                        hamiltonian=observable,
+                        parameter_index=p,
+                        nshots=nshots,
+                    )
                 )
-            )
-            return gradients
-        expval = backend.execute_circuit(
-            circuit=circuit, initial_state=initial_state, nshots=nshots 
-            ).expectation_from_samples(observable)
-        return expval, grad
-    return _expectation_with_tf(params)
+                return gradients
+            expval = backend.execute_circuit(
+                circuit=circuit, initial_state=initial_state, nshots=nshots 
+                ).expectation_from_samples(observable)
+            return expval, grad
+        return _expectation_with_tf(params)
     
+    else:
+        raise_error(NotImplementedError, "Only tensorflow supported at this time.")
