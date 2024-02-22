@@ -8,8 +8,6 @@ from qibo.backends.npmatrices import NumpyMatrices
 from qibo.backends.numpy import NumpyBackend
 from qibo.config import TF_LOG_LEVEL, log, raise_error
 
-from qiboml.differentiation.psr import expectation_with_tf
-
 
 class TensorflowMatrices(NumpyMatrices):
     # Redefine parametrized gate matrices for backpropagation to work
@@ -208,19 +206,7 @@ class TensorflowBackend(NumpyBackend):
                 "Cannot multiply Hamiltonian with " "rank-{} tensor.".format(rank),
             )
 
-    # def expectation_from_samples(
-    #         self, 
-    #         observable, 
-    #         circuit, 
-    #         initial_state=None, 
-    #         nshots=1000
-    #     ):
-    #     return expectation_with_tf(
-    #         observable=observable, 
-    #         circuit=circuit,
-    #         initial_state=initial_state,
-    #         nshots=nshots
-    #     )
+        return expectation_with_custom_gradient(params)
 
     def test_regressions(self, name):
         if name == "test_measurementresult_apply_bitflips":
