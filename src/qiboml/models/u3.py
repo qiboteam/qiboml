@@ -31,7 +31,7 @@ class ReuploadingU3(ReuploadingCircuit):
             for q in range(self.nqubits):
                 c.add(gates.U3(q=q, theta=0, phi=0, lam=0))
             if self.nqubits >= 2:
-                self.build_entangling_layer()
+                c += self.build_entangling_layer()
         c.add(gates.M(*range(self.nqubits)))
         return c
 

@@ -34,7 +34,7 @@ class ReuploadingCircuit(ABC):
     def build_entangling_layer(self):
         """Build circuit's entangling layer structure."""
         c = Circuit(self.nqubits)
-        for q in range(1, self.nqubits - 1, 1):
+        for q in range(0, self.nqubits - 1, 1):
             c.add(gates.CNOT(q0=q, q1=q + 1))
         c.add(gates.CNOT(q0=self.nqubits - 1, q1=0))
         return c
