@@ -1,34 +1,100 @@
-import qibo
-from qibo import hamiltonians, Circuit, gates
+import time
 
-from qiboml.differentiation import psr
+import numpy as np
+import qibo
+from qibo import Circuit, gates, hamiltonians
+
 from qiboml.ansatze import reuploading_circuit
+from qiboml.differentiation import psr
 
 qibo.set_backend("tensorflow")
 
-h = hamiltonians.Z(2)
-backend = h.backend
 
-c = reuploading_circuit(nqubits=2, nlayers=2)
-nparams = len(c.get_parameters())
-print(nparams)
-p = backend.tf.Variable([1., 0.4, 2., 0.1, 0.9, 0.2, 0.1, 0.1], dtype=backend.tf.float64)
-nepochs = 200
+Nqubits = np.arange(2, 10, 1)
+nepochs = 10
+nmessage = 1
+nshots = None
 
-for k in range(nepochs):
-     with backend.tf.GradientTape() as tape:
-          c.set_parameters(p)
-          exp = psr.expectation_on_backend(
-               observable=h,
-               circuit=c,
-               nshots=5000,
-               backend="numpy"
-          )
-     grads = tape.gradient(exp, p)
-     p.assign_sub(0.05 * grads)
-     if k%10 == 0:
-          print(f"Epoch {k+1}/{nepochs}\t Exp: {exp}")
+times = []
 
+for nqubits in Nqubits:
+    print(f"nqubits: {nqubits}")
+    n_times = []
 
+    nqubits = int(nqubits)
 
+    h = hamiltonians.Z(nqubits)
+    backend = h.backend
 
+    print("(tf, psr, tf)")
+    # (tf, psr, tf)
+    c = reuploading_circuit(nqubits=nqubits, nlayers=3)
+    nparams = len(c.get_parameters())
+    p = backend.tf.Variable(np.random.randn(nparams), dtype=backend.tf.float64)
+
+    t1 = time.time()
+    for k in range(nepochs):
+        with backend.tf.GradientTape() as tape:
+            c.set_parameters(p)
+            exp = psr.expectation_on_backend(
+                observable=h,
+                circuit=c,
+                # nshots=nshots,
+                backend="tensorflow",
+            )
+        grads = tape.gradient(exp, p)
+        p.assign_sub(0.05 * grads)
+        if k % nmessage == 0:
+            print(f"Epoch {k+1}/{nepochs}\t Exp: {exp}")
+    t2 = time.time()
+    exec_time = t2 - t1
+    n_times.append(exec_time)
+
+    print("(tf, psr, numpy)")
+
+    # (tf, psr, numpy)
+    c = reuploading_circuit(nqubits=nqubits, nlayers=3)
+    nparams = len(c.get_parameters())
+    p = backend.tf.Variable(np.random.randn(nparams), dtype=backend.tf.float64)
+
+    t1 = time.time()
+    for k in range(nepochs):
+        with backend.tf.GradientTape() as tape:
+            c.set_parameters(p)
+            exp = psr.expectation_on_backend(
+                observable=h,
+                circuit=c,
+                # nshots=nshots,
+                backend="numpy",
+            )
+        grads = tape.gradient(exp, p)
+        p.assign_sub(0.05 * grads)
+        if k % nmessage == 0:
+            print(f"Epoch {k+1}/{nepochs}\t Exp: {exp}")
+    t2 = time.time()
+    exec_time = t2 - t1
+    n_times.append(exec_time)
+
+    print("(tf, sim, tf)")
+
+    # (tf, psr, numpy)
+    c = reuploading_circuit(nqubits=nqubits, nlayers=3)
+    nparams = len(c.get_parameters())
+    p = backend.tf.Variable(np.random.randn(nparams), dtype=backend.tf.float64)
+
+    t1 = time.time()
+    for k in range(nepochs):
+        with backend.tf.GradientTape() as tape:
+            c.set_parameters(p)
+            exp = h.expectation(c().state())
+        grads = tape.gradient(exp, p)
+        p.assign_sub(0.05 * grads)
+        if k % nmessage == 0:
+            print(f"Epoch {k+1}/{nepochs}\t Exp: {exp}")
+    t2 = time.time()
+    exec_time = t2 - t1
+    n_times.append(exec_time)
+
+    times.append(n_times)
+
+np.save(arr=times, file="times")
