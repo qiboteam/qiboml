@@ -1,6 +1,7 @@
 from math import exp, log
 from typing import Callable, Tuple
 
+import numpy as np
 from qibo import Circuit, gates
 
 from qiboml.models.abstract import ReuploadingCircuit
@@ -23,6 +24,14 @@ class ReuploadingU3(ReuploadingCircuit):
         self.actf2 = actf2
         self.actf3 = actf3
         self.circuit = self.build_circuit()
+        self.parameters = self._init_parameters()
+
+    def _init_parameters(self):
+        """
+        Initialize parameters using random numbers.
+        In ReuploadingU3 we need 2 trainable parameters for each circuit's parameter.
+        """
+        return np.random.randn(2 * len(self.circuit.get_parameters(format="flatlist")))
 
     def build_circuit(self):
         c = Circuit(self.nqubits)

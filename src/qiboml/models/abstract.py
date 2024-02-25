@@ -20,10 +20,13 @@ class ReuploadingCircuit(ABC):
         self.datadim = data_dimensionality
         self.circuit = Circuit(nqubits)
 
-    @property
-    def parameters(self):
-        """Trainable parameters."""
-        return self.circuit.get_parameters(format="flatlist")
+    @abstractmethod
+    def _init_parameters(self):
+        """
+        Initialize the trainable parameters, which don't correspond in general
+        to the circuit's parameters.
+        """
+        raise_error(NotImplementedError)
 
     @property
     def nparams(self):
@@ -32,7 +35,7 @@ class ReuploadingCircuit(ABC):
 
     def set_parameters(self, parameters):
         """Set trainable parameters into the circuit."""
-        self.circuit.set_parameters(parameters)
+        self.parameters = parameters
 
     @abstractmethod
     def build_circuit(self):
