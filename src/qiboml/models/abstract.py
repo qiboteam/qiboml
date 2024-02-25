@@ -19,12 +19,20 @@ class ReuploadingCircuit(ABC):
         self.nlayers = nlayers
         self.datadim = data_dimensionality
         self.circuit = Circuit(nqubits)
-        self.parameters = self.circuit.get_parameters()
+
+    @property
+    def parameters(self):
+        """Trainable parameters."""
+        return self.circuit.get_parameters(format="flatlist")
 
     @property
     def nparams(self):
         """Number of trainable parameters."""
         return len(self.parameters)
+
+    def set_parameters(self, parameters):
+        """Set trainable parameters into the circuit."""
+        self.circuit.set_parameters(parameters)
 
     @abstractmethod
     def build_circuit(self):
@@ -38,10 +46,6 @@ class ReuploadingCircuit(ABC):
             c.add(gates.CNOT(q0=q, q1=q + 1))
         c.add(gates.CNOT(q0=self.nqubits - 1, q1=0))
         return c
-
-    def set_parameters(self, parameters):
-        """Set trainable parameters into the circuit."""
-        self.circuit.set_parameters(parameters)
 
     @abstractmethod
     def inject_data(self, x):

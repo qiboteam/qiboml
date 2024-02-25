@@ -23,7 +23,6 @@ class ReuploadingU3(ReuploadingCircuit):
         self.actf2 = actf2
         self.actf3 = actf3
         self.circuit = self.build_circuit()
-        self.parameters = self.circuit.get_parameters()
 
     def build_circuit(self):
         c = Circuit(self.nqubits)
