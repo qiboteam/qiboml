@@ -24,6 +24,76 @@ class Bloch():
         plt.tight_layout()
         plt.show()
 
+    
+    def label_states(self, nclasses):
+        "Function which returns the label states sphere."
+        if nclasses == 2:
+            targets = tf.constant(
+                [np.array([1, 0], dtype="complex"), np.array([0, 1], dtype="complex")]
+            )
+
+        if nclasses == 3:
+            targets = tf.constant(
+                [
+                np.array([1, 0], dtype="complex"), 
+                np.array([np.cos(np.pi / 3), np.sin(np.pi / 3)], dtype="complex"), 
+                np.array([np.cos(np.pi / 3), -np.sin(np.pi / 3)], dtype="complex"),
+                ],
+                dtype=tf.complex64,
+            )
+
+        if nclasses == 4:
+            phi = np.arctan(1 / np.sqrt(3))
+            theta = np.arctan(np.sqrt(2))
+            targets = tf.constant(
+                [
+                    np.array([np.cos(theta / 2), np.sin(theta / 2)], dtype="complex"),
+                    np.array([np.cos(theta / 2), 1j * np.sin(theta / 2)], dtype="complex"),
+                    np.array([np.cos(theta / 2), -np.sin(theta / 2)], dtype="complex"),
+                    np.array([np.cos(theta / 2), -1j * np.sin(theta / 2)], dtype="complex"),
+                ]
+            )
+        if nclasses == 6:
+            theta = [0, np.pi, np.pi/2, np.pi/2, np.pi/2, np.pi/2]
+            phi = [0, 0, 0, np.pi/2, np.pi, np.pi/2*3]     
+            
+            targets = tf.constant(
+                [
+                    np.array([np.cos(theta[0] / 2), np.sin(theta[0] / 2)* np.exp(1j*phi[0])], dtype="complex"),
+                    np.array([np.cos(theta[1] / 2), np.sin(theta[1] / 2)* np.exp(1j*phi[1])], dtype="complex"),
+                    np.array([np.cos(theta[2] / 2), np.sin(theta[2] / 2)* np.exp(1j*phi[2])], dtype="complex"),
+                    np.array([np.cos(theta[3] / 2), np.sin(theta[3] / 2)* np.exp(1j*phi[3])], dtype="complex"),
+                    np.array([np.cos(theta[4] / 2), np.sin(theta[4] / 2)* np.exp(1j*phi[4])], dtype="complex"),
+                    np.array([np.cos(theta[5] / 2), np.sin(theta[5] / 2)* np.exp(1j*phi[5])], dtype="complex"),
+                    
+                ],
+            )
+        
+        if nclasses == 8:
+            theta = [np.pi/4, np.pi/4, 3*np.pi/4, 3*np.pi/4, -np.pi/4, -np.pi/4, -3*np.pi/4, -3*np.pi/4]
+            phi = [np.pi/4, 3*np.pi/4, 3*np.pi/4, np.pi/4, np.pi/4, 3*np.pi/4, 3*np.pi/4, np.pi/4]
+            targets = tf.constant(
+                [
+                np.array([np.cos(theta[0] / 2), np.sin(theta[0] / 2)* np.exp(1j*phi[0])], dtype="complex"),
+                np.array([np.cos(theta[1] / 2), np.sin(theta[1] / 2)* np.exp(1j*phi[1])], dtype="complex"),
+
+                np.array([np.cos(theta[2] / 2), np.sin(theta[2] / 2) * np.exp(1j*phi[2])], dtype="complex"),
+                np.array([np.cos(theta[3] / 2), np.sin(theta[3] / 2) * np.exp(1j*phi[3])], dtype="complex"),
+
+                np.array([np.cos(theta[4] / 2), np.sin(theta[4] / 2)* np.exp(1j*phi[4])], dtype="complex"),
+                np.array([np.cos(theta[5] / 2), np.sin(theta[5] / 2)* np.exp(1j*phi[5])], dtype="complex"),
+
+                np.array([np.cos(theta[6] / 2), np.sin(theta[6] / 2)* np.exp(1j*phi[6])], dtype="complex"),
+                np.array([np.cos(theta[7] / 2), np.sin(theta[7] / 2)* np.exp(1j*phi[7])], dtype="complex"),
+            ],
+            )
+
+
+        if nclasses == 10:
+            targets = 0
+
+        return targets
+
 
     def coordinates(self, state, mode):    
         "Function to determine the coordinates of a qubit in the sphere." 
