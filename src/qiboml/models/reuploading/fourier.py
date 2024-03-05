@@ -3,7 +3,7 @@ from typing import Tuple
 import numpy as np
 from qibo import Circuit, gates
 
-from qiboml.models.abstract import ReuploadingCircuit
+from qiboml.models.reuploading.abstract import ReuploadingCircuit
 
 
 class FourierReuploading(ReuploadingCircuit):
@@ -26,10 +26,10 @@ class FourierReuploading(ReuploadingCircuit):
     def build_circuit(self):
         c = Circuit(self.nqubits)
         for _ in range(self.nlayers):
-            self.build_encoding_layer()
+            c += self.build_encoding_layer()
             if self.nqubits >= 2:
                 c += self.build_entangling_layer()
-            self.build_training_layer()
+            c += self.build_training_layer()
         c.add(gates.M(*range(self.nqubits)))
         return c
 

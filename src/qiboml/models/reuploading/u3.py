@@ -4,7 +4,7 @@ from typing import Callable, Tuple
 import numpy as np
 from qibo import Circuit, gates
 
-from qiboml.models.abstract import ReuploadingCircuit
+from qiboml.models.reuploading.abstract import ReuploadingCircuit
 
 
 class ReuploadingU3(ReuploadingCircuit):
