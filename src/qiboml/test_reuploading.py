@@ -54,8 +54,10 @@ mse_list = []
 
 for run in range(nruns):
     print(f"Running training {run+1}/{nruns}")
-    model = ReuploadingU3(nqubits=nqubits, nlayers=nlayers, data_dimensionality=(1,))
-    # model = FourierReuploading(nqubits=nqubits, nlayers=nlayers, data_dimensionality=(1,))
+    # model = ReuploadingU3(nqubits=nqubits, nlayers=nlayers, data_dimensionality=(1,))
+    model = FourierReuploading(
+        nqubits=nqubits, nlayers=nlayers, data_dimensionality=(1,)
+    )
 
     print(model.parameters)
 
