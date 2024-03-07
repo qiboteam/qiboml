@@ -3,6 +3,7 @@ from typing import Callable, Tuple
 
 import numpy as np
 from qibo import Circuit, gates
+from qibo.config import raise_error
 
 from qiboml.models.reuploading.abstract import ReuploadingCircuit
 
@@ -47,15 +48,15 @@ class ReuploadingU3(ReuploadingCircuit):
         new_parameters = []
         k = 0
         for _ in range(self.nlayers):
-            for _ in range(self.nqubits):
+            for q in range(self.nqubits):
                 new_parameters.append(
-                    self.parameters[k] * self.actf1(x) + self.parameters[k + 1]
+                    self.parameters[k] * self.actf1(x[q]) + self.parameters[k + 1]
                 )
                 new_parameters.append(
-                    self.parameters[k + 2] * self.actf2(x) + self.parameters[k + 3]
+                    self.parameters[k + 2] * self.actf2(x[q]) + self.parameters[k + 3]
                 )
                 new_parameters.append(
-                    self.parameters[k + 4] * self.actf3(x) + self.parameters[k + 5]
+                    self.parameters[k + 4] * self.actf3(x[q]) + self.parameters[k + 5]
                 )
             k += 6
         self.circuit.set_parameters(new_parameters)
