@@ -27,14 +27,16 @@ class PQC(Circuit):
 
     def add(self, gate):
         super().add(gate)
-        self.parameters.extend(gate.parameters)
-        self.nparams += gate.nparams
+        if len(gate.parameters) != 0:
+            self.parameters.extend(gate.parameters)
+            self.nparams += gate.nparams
 
     def compile(
         self,
         optimizer: Optimizer,
         loss: callable,
         observable: Union[Hamiltonian, List[Hamiltonian]],
+        encoding_config: Circuit,
     ):
         """
         Compile the PQC to perform a training.
@@ -48,7 +50,7 @@ class PQC(Circuit):
         self.optimizer = optimizer
         self.loss = loss
         self.observable = observable
-        self.encoding_config = encoding
+        self.encoding_circuit = encoding_config
         self.compiled = True
 
     def fit(
@@ -81,7 +83,10 @@ class PQC(Circuit):
             return loss_value
 
         results = self.optimizer.fit(
-            parameters=self.parameters, loss=_loss, args=(x_data, y_data) ** fit_options
+            initial_parameters=self.parameters,
+            loss=_loss,
+            args=(x_data, y_data),
+            **fit_options
         )
 
         return results
@@ -95,6 +100,9 @@ class PQC(Circuit):
                 "Please compile the model through the `PQC.compile` method to perform predictions.",
             )
 
-        self.inject_data(x)
+        print(self.compiled)
 
-        return self.observable.expectation(self.execute(nshots=nshots).state())
+        encoding_state = self.encoding_circuit.inject_data(x)().state()
+        return self.observable.expectation(
+            self(initial_state=encoding_state, nshots=nshots).state()
+        )
