@@ -6,8 +6,9 @@ from typing import List, Optional, Tuple, Union
 import numpy as np
 from numpy import ndarray
 from qibo.config import log
-from qibo.optimizers.abstract import Optimizer
 from scipy.optimize import Bounds, minimize, show_options
+
+from qiboml.optimizers.abstract import Optimizer
 
 
 @dataclass

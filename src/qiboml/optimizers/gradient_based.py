@@ -5,7 +5,8 @@ from typing import List, Optional, Tuple, Union
 from numpy import ndarray
 from qibo.backends import construct_backend
 from qibo.config import log
-from qibo.optimizers.abstract import Optimizer
+
+from qiboml.optimizers.abstract import Optimizer
 
 
 class TensorflowSGD(Optimizer):
