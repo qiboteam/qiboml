@@ -93,8 +93,8 @@ class CMAES(Optimizer):
 @dataclass
 class BasinHopping(Optimizer):
     """
-    Global optimizer based on: https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.basinhopping.html.
-    Note that the Basin-Hopping optimizer combines a global stepping algorithm
+    Global optimizer based on: :func:`scipy.optimize.basinhopping`.
+    Note that the basin-hopping optimizer combines a global stepping algorithm
     together with a local minimization (which is implemented using an extra scipy minimizer).
     It is designed to mimic the natural process of energy minimization of clusters
     of atoms and it works well for similar problems with “funnel-like, but rugged” energy landscapes.
