@@ -25,6 +25,9 @@ pytest-benchmark = { version = "^4.0.0", extras = ["histogram"] }
 
 [tool.poe.tasks]
 bench = "pytest benchmarks/"
+test = "pytest"
+lint = "pylint src/**/*.py -E"
+lint-warnings = "pylint src/**/*.py --exit-zero"
 
 [tool.pytest.ini_options]
 testpaths = ['tests/', 'benchmarks/']
