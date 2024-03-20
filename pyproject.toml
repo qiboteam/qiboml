@@ -46,4 +46,9 @@ addopts = [
   "--benchmark-warmup-iterations=100000",
   "--benchmark-disable-gc",
   "--benchmark-histogram=bench-hists/bench",
+  '--cov=qiboml',
+  '--cov-append',
+  '--cov-report=xml',
+  '--cov-report=html',
+  '--durations=60',
 ]
