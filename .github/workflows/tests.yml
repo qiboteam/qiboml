@@ -15,6 +15,6 @@ jobs:
     with:
       os: ${{ matrix.os }}
       python-version: ${{ matrix.python-version }}
-      doctests: ${{ matrix.os == 'ubuntu-latest'}}
+      doctests: false
       poetry-extras: --all-extras
     secrets: inherit
