@@ -21,7 +21,6 @@ qibo = "^0.2.6"
 
 [tool.poetry.group.dev.dependencies]
 ipython = "^7.34"
-pdbpp = "^0.10.3"
 
 [tool.poetry.group.benchmark.dependencies]
 pytest = "^7.1.2"
