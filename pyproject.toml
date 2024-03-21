@@ -19,8 +19,12 @@ tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux' or sys_pl
 # the tensorflow requirements
 qibo = "^0.2.6"
 
+[tool.poetry.group.dev]
+optional = true
+
 [tool.poetry.group.dev.dependencies]
 ipython = "^7.34"
+pdbpp = "^0.10.3"
 
 [tool.poetry.group.benchmark.dependencies]
 pytest = "^7.1.2"
