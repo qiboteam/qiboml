@@ -180,7 +180,7 @@ def expectation_on_backend(
     exec_backend = construct_backend(backend)
 
     if "tensorflow" in frontend.name:
-        import tensorflow as tf
+        import tensorflow as tf  # pylint: disable=import-error
 
         @tf.custom_gradient
         def _expectation_with_tf(params):
