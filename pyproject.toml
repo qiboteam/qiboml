@@ -11,20 +11,33 @@ readme = "README.md"
 packages = [{ include = "qiboml", from = "src" }]
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = ">=3.9,<3.12"
 numpy = "^1.26.4"
 numba = "^0.59.0"
+tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux' or sys_platform == 'darwin'" }
+# TODO: the marker is a temporary solution due to the lack of the tensorflow-io 0.32.0's wheels for Windows, this package is one of
+# the tensorflow requirements
+qibo = "^0.2.6"
+
+[tool.poetry.group.dev]
+optional = true
 
 [tool.poetry.group.dev.dependencies]
 ipython = "^7.34"
 pdbpp = "^0.10.3"
 
 [tool.poetry.group.benchmark.dependencies]
-pytest = "^8.0.0"
+pytest = "^7.1.2"
+pylint = "^2.17"
+pytest-cov = "^3.0.0"
+pytest-env = "^0.8.1"
 pytest-benchmark = { version = "^4.0.0", extras = ["histogram"] }
 
 [tool.poe.tasks]
 bench = "pytest benchmarks/"
+test = "pytest"
+lint = "pylint src/**/*.py -E"
+lint-warnings = "pylint src/**/*.py --exit-zero"
 
 [tool.pytest.ini_options]
 testpaths = ['tests/', 'benchmarks/']
@@ -36,4 +49,9 @@ addopts = [
   "--benchmark-warmup-iterations=100000",
   "--benchmark-disable-gc",
   "--benchmark-histogram=bench-hists/bench",
+  '--cov=qiboml',
+  '--cov-append',
+  '--cov-report=xml',
+  '--cov-report=html',
+  '--durations=60',
 ]
