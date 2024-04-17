@@ -84,8 +84,7 @@ def expectation(
 
         return _expectation_with_tf(params)
 
-    else:
-        raise_error(
-            NotImplementedError,
-            "Only tensorflow automatic differentiation is supported at this moment.",
-        )
+    raise_error(
+        NotImplementedError,
+        "Only tensorflow automatic differentiation is supported at this moment.",
+    )
