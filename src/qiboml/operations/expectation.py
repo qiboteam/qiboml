@@ -9,7 +9,7 @@ from qibo.config import raise_error
 from qiboml.operations.differentiation import parameter_shift
 
 
-def expectation_on_backend(
+def expectation(
     observable: qibo.hamiltonians.Hamiltonian,
     circuit: qibo.Circuit,
     initial_state: Optional[Union[List, qibo.Circuit]] = None,
@@ -54,7 +54,7 @@ def expectation_on_backend(
     # construct differentiation backend
     exec_backend = construct_backend(backend)
 
-    if "tensorflow" in frontend.name:
+    if isinstance(frontend.name, "tensorflow"):
         import tensorflow as tf
 
         @tf.custom_gradient
