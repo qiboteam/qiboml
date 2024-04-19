@@ -12,3 +12,13 @@ def test_reuloading_u3():
     model.inject_data((0.4, 0.5, 0.6))
     new_angles = model.circuit.get_parameters()
     assert init_angles != new_angles
+
+
+def test_reuloading_fourier():
+    model = FourierReuploading(
+        nqubits=NQUBITS, nlayers=NLAYERS, data_dimensionality=DATADIM
+    )
+    init_angles = model.circuit.get_parameters()
+    model.inject_data((0.4, 0.5, 0.6))
+    new_angles = model.circuit.get_parameters()
+    assert init_angles != new_angles
