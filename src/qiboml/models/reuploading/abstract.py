@@ -1,6 +1,8 @@
+import random
 from abc import ABC, abstractmethod
 from typing import Tuple
 
+import numpy as np
 from qibo import Circuit, gates
 from qibo.config import raise_error
 
@@ -54,3 +56,23 @@ class ReuploadingCircuit(ABC):
     def inject_data(self, x):
         """Inject data ``x`` into the circuit according to the chosen strategy."""
         raise_error(NotImplementedError)
+
+    def perturbated_circuit(self, ngates, gate=gates.U3):
+        """Perturbate model's circuit adding ``gate`` ``ngates`` times."""
+
+        init_n_gates = len(self.circuit.queue)
+        new_circuit = Circuit(self.nqubits)
+        insert_positions = random.sample(range(0, init_n_gates), ngates)
+        # TODO: customize the position
+        print(f"Added new gate in queue position {insert_positions}")
+
+        for i, g in enumerate(self.circuit.queue):
+            if i in insert_positions:
+                r = np.random.uniform(-0.3, 0.3, 3)
+                target_qubit = self.circuit.queue[i].target_qubits[0]
+                new_circuit.add(
+                    gate(target_qubit, theta=r[0], phi=r[1], lam=r[2], trainable=False)
+                )
+            new_circuit.add(g)
+
+        return new_circuit
