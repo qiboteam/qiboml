@@ -3,7 +3,7 @@
 from typing import List, Optional, Union
 
 import qibo
-from qibo.backends import construct_backend
+from qibo.backends import TensorflowBackend, construct_backend
 from qibo.config import raise_error
 
 from qiboml.operations.differentiation import parameter_shift
@@ -54,7 +54,7 @@ def expectation(
     # construct differentiation backend
     exec_backend = construct_backend(backend)
 
-    if isinstance(frontend.name, "tensorflow"):
+    if isinstance(frontend, TensorflowBackend):
         import tensorflow as tf
 
         @tf.custom_gradient
