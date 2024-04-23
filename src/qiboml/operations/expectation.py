@@ -3,6 +3,7 @@
 from typing import List, Optional, Union
 
 import qibo
+import tensorflow as tf
 from qibo.backends import TensorflowBackend, construct_backend
 from qibo.config import raise_error
 
@@ -46,45 +47,65 @@ def expectation(
             ``qiboml.differentiation``.
     """
 
-    params = circuit.get_parameters()
-    nparams = len(params)
-
     # read the frontend user choice
     frontend = observable.backend
-    # construct differentiation backend
-    exec_backend = construct_backend(backend)
 
     if isinstance(frontend, TensorflowBackend):
-        import tensorflow as tf
-
-        @tf.custom_gradient
-        def _expectation_with_tf(params):
-            params = tf.Variable(params)
-
-            def grad(upstream):
-                gradients = []
-                for p in range(nparams):
-                    gradients.append(
-                        upstream
-                        * differentiation_rule(
-                            circuit=circuit,
-                            hamiltonian=observable,
-                            parameter_index=p,
-                            initial_state=initial_state,
-                            nshots=nshots,
-                            backend=backend,
-                        )
-                    )
-                return gradients
-
-            expval = exec_backend.execute_circuit(
-                circuit=circuit, initial_state=initial_state, nshots=nshots
-            ).expectation_from_samples(observable)
-            return expval, grad
-
-        return _expectation_with_tf(params)
+        return expectation_with_tf(
+            observable=observable,
+            circuit=circuit,
+            initial_state=initial_state,
+            nshots=nshots,
+            backend=backend,
+            differentiation_rule=differentiation_rule,
+        )
 
     raise_error(
         NotImplementedError,
         "Only tensorflow automatic differentiation is supported at this moment.",
     )
+
+
+def expectation_with_tf(
+    observable: qibo.hamiltonians.Hamiltonian,
+    circuit: qibo.Circuit,
+    initial_state: Optional[Union[List, qibo.Circuit]] = None,
+    nshots: int = 1000,
+    backend: str = "qibojit",
+    differentiation_rule: Optional[callable] = parameter_shift,
+):
+    """
+    Compute expectation sample integrating the custom differentiation rule with
+    TensorFlow's automatic differentiation.
+    """
+    params = circuit.get_parameters()
+    nparams = len(params)
+
+    exec_backend = construct_backend(backend)
+
+    @tf.custom_gradient
+    def _expectation_with_tf(params):
+        params = tf.Variable(params)
+
+        def grad(upstream):
+            gradients = []
+            for p in range(nparams):
+                gradients.append(
+                    upstream
+                    * differentiation_rule(
+                        circuit=circuit,
+                        hamiltonian=observable,
+                        parameter_index=p,
+                        initial_state=initial_state,
+                        nshots=nshots,
+                        backend=backend,
+                    )
+                )
+            return gradients
+
+        expval = exec_backend.execute_circuit(
+            circuit=circuit, initial_state=initial_state, nshots=nshots
+        ).expectation_from_samples(observable)
+        return expval, grad
+
+    return _expectation_with_tf(params)
