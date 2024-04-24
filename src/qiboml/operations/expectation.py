@@ -51,13 +51,13 @@ def expectation(
     frontend = observable.backend
 
     kwargs = dict(
-            observable=observable,
-            circuit=circuit,
-            initial_state=initial_state,
-            nshots=nshots,
-            backend=backend,
-            differentiation_rule=differentiation_rule,
-        )
+        observable=observable,
+        circuit=circuit,
+        initial_state=initial_state,
+        nshots=nshots,
+        backend=backend,
+        differentiation_rule=differentiation_rule,
+    )
     if isinstance(frontend, TensorflowBackend):
         return expectation_with_tf(**kwargs)
 
@@ -68,12 +68,12 @@ def expectation(
 
 
 def expectation_with_tf(
-    observable: qibo.hamiltonians.Hamiltonian,
-    circuit: qibo.Circuit,
-    initial_state: Optional[Union[List, qibo.Circuit]] = None,
-    nshots: int = 1000,
-    backend: str = "qibojit",
-    differentiation_rule: Optional[callable] = parameter_shift,
+    observable,
+    circuit,
+    initial_state,
+    nshots,
+    backend,
+    differentiation_rule,
 ):
     """
     Compute expectation sample integrating the custom differentiation rule with
