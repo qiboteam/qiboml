@@ -59,7 +59,7 @@ def expectation(
         differentiation_rule=differentiation_rule,
     )
     if isinstance(frontend, TensorflowBackend):
-        return expectation_with_tf(**kwargs)
+        return _with_tf(**kwargs)
 
     raise_error(
         NotImplementedError,
@@ -67,7 +67,7 @@ def expectation(
     )
 
 
-def expectation_with_tf(
+def _with_tf(
     observable,
     circuit,
     initial_state,
@@ -85,7 +85,7 @@ def expectation_with_tf(
     exec_backend = construct_backend(backend)
 
     @tf.custom_gradient
-    def _expectation_with_tf(params):
+    def _expectation(params):
         params = tf.Variable(params)
 
         def grad(upstream):
@@ -109,4 +109,4 @@ def expectation_with_tf(
         ).expectation_from_samples(observable)
         return expval, grad
 
-    return _expectation_with_tf(params)
+    return _expectation(params)
