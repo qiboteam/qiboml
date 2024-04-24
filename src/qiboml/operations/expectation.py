@@ -7,16 +7,14 @@ import tensorflow as tf
 from qibo.backends import TensorflowBackend, construct_backend
 from qibo.config import raise_error
 
-from qiboml.operations.differentiation import parameter_shift
-
 
 def expectation(
     observable: qibo.hamiltonians.Hamiltonian,
     circuit: qibo.Circuit,
     initial_state: Optional[Union[List, qibo.Circuit]] = None,
-    nshots: int = 1000,
+    nshots: int = None,
     backend: str = "qibojit",
-    differentiation_rule: Optional[callable] = parameter_shift,
+    differentiation_rule: Optional[callable] = None,
 ):
     """
     Compute the expectation value of ``observable`` over the state obtained by
@@ -67,6 +65,22 @@ def expectation(
     )
 
 
+def _exact(observable, circuit, initial_state, exec_backend):
+    """Helper function to compute exact expectation values."""
+    return observable.expectation(
+        exec_backend.execute_circuit(
+            circuit=circuit, initial_state=initial_state
+        ).state()
+    )
+
+
+def _with_shots(observable, circuit, initial_state, nshots, exec_backend):
+    """Helper function to compute expectation values from samples."""
+    return exec_backend.execute_circuit(
+        circuit=circuit, initial_state=initial_state, nshots=nshots
+    ).expectation_from_samples(observable)
+
+
 def _with_tf(
     observable,
     circuit,
@@ -104,9 +118,20 @@ def _with_tf(
                 )
             return gradients
 
-        expval = exec_backend.execute_circuit(
-            circuit=circuit, initial_state=initial_state, nshots=nshots
-        ).expectation_from_samples(observable)
+        if nshots is None:
+            expval = _exact(observable, circuit, initial_state, exec_backend)
+        else:
+            expval = _with_shots(
+                observable, circuit, initial_state, nshots, exec_backend
+            )
+
         return expval, grad
 
-    return _expectation(params)
+    if differentiation_rule is not None:
+        return _expectation(params)
+
+    elif nshots is None:
+        return _exact(observable, circuit, initial_state, exec_backend)
+
+    else:
+        return _with_shots(observable, circuit, initial_state, nshots, exec_backend)
