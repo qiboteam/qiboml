@@ -50,8 +50,7 @@ def expectation(
     # read the frontend user choice
     frontend = observable.backend
 
-    if isinstance(frontend, TensorflowBackend):
-        return expectation_with_tf(
+    kwargs = dict(
             observable=observable,
             circuit=circuit,
             initial_state=initial_state,
@@ -59,6 +58,8 @@ def expectation(
             backend=backend,
             differentiation_rule=differentiation_rule,
         )
+    if isinstance(frontend, TensorflowBackend):
+        return expectation_with_tf(**kwargs)
 
     raise_error(
         NotImplementedError,
