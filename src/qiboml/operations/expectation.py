@@ -3,7 +3,6 @@
 from typing import List, Optional, Union
 
 import qibo
-import tensorflow as tf
 from qibo.backends import TensorflowBackend, construct_backend
 from qibo.config import raise_error
 
@@ -93,6 +92,8 @@ def _with_tf(
     Compute expectation sample integrating the custom differentiation rule with
     TensorFlow's automatic differentiation.
     """
+    import tensorflow as tf  # pylint: disable=import-error
+
     params = circuit.get_parameters()
     nparams = len(params)
 
