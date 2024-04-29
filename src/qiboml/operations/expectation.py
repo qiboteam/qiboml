@@ -3,8 +3,10 @@
 from typing import List, Optional, Union
 
 import qibo
-from qibo.backends import TensorflowBackend, construct_backend
+from qibo.backends import construct_backend
 from qibo.config import raise_error
+
+from qiboml.backends import TensorflowBackend
 
 
 def expectation(
@@ -46,6 +48,7 @@ def expectation(
 
     # read the frontend user choice
     frontend = observable.backend
+    exec_backend = construct_backend(backend)
 
     kwargs = dict(
         observable=observable,
@@ -54,9 +57,17 @@ def expectation(
         nshots=nshots,
         backend=backend,
         differentiation_rule=differentiation_rule,
+        exec_backend=exec_backend,
     )
-    if isinstance(frontend, TensorflowBackend):
-        return _with_tf(**kwargs)
+
+    if differentiation_rule is not None:
+        if isinstance(frontend, TensorflowBackend):
+            return _with_tf(**kwargs)
+
+    elif nshots is None:
+        return _exact(observable, circuit, initial_state, exec_backend)
+    else:
+        return _with_shots(observable, circuit, initial_state, nshots, exec_backend)
 
     raise_error(
         NotImplementedError,
@@ -128,11 +139,4 @@ def _with_tf(
 
         return expval, grad
 
-    if differentiation_rule is not None:
-        return _expectation(params)
-
-    elif nshots is None:
-        return _exact(observable, circuit, initial_state, exec_backend)
-
-    else:
-        return _with_shots(observable, circuit, initial_state, nshots, exec_backend)
+    return _expectation(params)
