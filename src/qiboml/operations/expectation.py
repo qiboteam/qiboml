@@ -57,7 +57,7 @@ def expectation(
         nshots=nshots,
         backend=backend,
         differentiation_rule=differentiation_rule,
-        exec_backend=exec_backend,
+        backend=exec_backend,
     )
 
     if differentiation_rule is not None:
