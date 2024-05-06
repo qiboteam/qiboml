@@ -46,8 +46,8 @@ def expectation(
             ``qiboml.differentiation``.
     """
 
-    # read the frontend user choice
-    frontend = observable.backend
+    # read the qibo_backend user choice
+    qibo_backend = observable.backend
     exec_backend = construct_backend(backend)
 
     kwargs = dict(
@@ -60,10 +60,10 @@ def expectation(
     )
 
     if differentiation_rule is not None:
-        if isinstance(frontend, TensorflowBackend):
+        if isinstance(qibo_backend, TensorflowBackend):
             return _with_tf(**kwargs)
 
-        if isinstance(frontend, JaxBackend):
+        if isinstance(qibo_backend, JaxBackend):
             return _with_jax(**kwargs)
 
     elif nshots is None:
