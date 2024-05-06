@@ -1,17 +1,20 @@
+from typing import Optional, Union
+
 import numpy as np
+import qibo
 from qibo.backends import construct_backend
 from qibo.config import raise_error
 from qibo.hamiltonians.abstract import AbstractHamiltonian
 
 
 def parameter_shift(
-    hamiltonian,
-    circuit,
-    parameter_index,
-    initial_state=None,
-    scale_factor=1,
-    nshots=None,
-    backend="qibojit",
+    hamiltonian: qibo.hamiltonians.Hamiltonian,
+    circuit: qibo.Circuit,
+    parameter_index: int,
+    initial_state: Optional[Union[np.ndarray, qibo.Circuit]] = None,
+    scale_factor: float = 1.0,
+    nshots: int = None,
+    backend: str = "qibojit",
 ):
     """In this method the parameter shift rule (PSR) is implemented.
     Given a circuit U and an observable H, the PSR allows to calculate the derivative

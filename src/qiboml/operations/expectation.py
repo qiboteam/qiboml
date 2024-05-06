@@ -6,7 +6,7 @@ import qibo
 from qibo.backends import construct_backend
 from qibo.config import raise_error
 
-from qiboml.backends import TensorflowBackend
+from qiboml.backends import JaxBackend, TensorflowBackend
 
 
 def expectation(
@@ -63,6 +63,9 @@ def expectation(
     if differentiation_rule is not None:
         if isinstance(frontend, TensorflowBackend):
             return _with_tf(**kwargs)
+
+        if isinstance(frontend, JaxBackend):
+            return _with_jax(**kwargs)
 
     elif nshots is None:
         return _exact(observable, circuit, initial_state, exec_backend)
@@ -138,5 +141,51 @@ def _with_tf(
             )
 
         return expval, grad
+
+    return _expectation(params)
+
+
+def _with_jax(
+    observable,
+    circuit,
+    initial_state,
+    nshots,
+    backend,
+    differentiation_rule,
+):
+    """
+    Compute expectation sample integrating the custom differentiation rule with
+    TensorFlow's automatic differentiation.
+    """
+    import jax  # pylint: disable=import-error
+
+    params = circuit.get_parameters()
+    exec_backend = construct_backend(backend)
+
+    @jax.custom_gradient
+    def _expectation(params):
+        def grad(params):
+            gradients = []
+            for p in range(len(params)):
+                gradients.append(
+                    differentiation_rule(
+                        circuit=circuit,
+                        hamiltonian=observable,
+                        parameter_index=p,
+                        initial_state=initial_state,
+                        nshots=nshots,
+                        backend=backend,
+                    )
+                )
+            return gradients
+
+        if nshots is None:
+            expval = _exact(observable, circuit, initial_state, exec_backend)
+        else:
+            expval = _with_shots(
+                observable, circuit, initial_state, nshots, exec_backend
+            )
+
+        return expval, lambda g: g * grad(params)
 
     return _expectation(params)
