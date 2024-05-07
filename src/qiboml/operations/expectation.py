@@ -163,6 +163,8 @@ def _with_jax(
 
     @jax.custom_gradient
     def _expectation(params):
+        params = jax.numpy.array(params)
+
         def grad(params):
             gradients = []
             for p in range(len(params)):
@@ -176,7 +178,8 @@ def _with_jax(
                         backend=backend,
                     )
                 )
-            return gradients
+                print("ciao")
+            return jax.numpy.array(gradients)
 
         if nshots is None:
             expval = _exact(observable, circuit, initial_state, exec_backend)
