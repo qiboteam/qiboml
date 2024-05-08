@@ -2,9 +2,11 @@ from typing import Optional, Union
 
 import numpy as np
 import qibo
+import qibo.backends
 from qibo.backends import construct_backend
 from qibo.config import raise_error
 from qibo.hamiltonians.abstract import AbstractHamiltonian
+from qibojit.backends import NumbaBackend
 
 
 def parameter_shift(
@@ -14,7 +16,7 @@ def parameter_shift(
     initial_state: Optional[Union[np.ndarray, qibo.Circuit]] = None,
     scale_factor: float = 1.0,
     nshots: int = None,
-    backend: str = "qibojit",
+    exec_backend: qibo.backends.Backend = NumbaBackend,
 ):
     """In this method the parameter shift rule (PSR) is implemented.
     Given a circuit U and an observable H, the PSR allows to calculate the derivative
@@ -49,7 +51,8 @@ def parameter_shift(
         nshots (int, optional): number of shots if derivative is evaluated on
             hardware. If ``None``, the simulation mode is executed.
             Default is ``None``.
-        execution_backend (str): Qibo backend on which the circuits are executed.
+        exec_backend (qibo.backends.Backend): Qibo backend on which the circuits
+            are executed.
 
     Returns:
         (float): Value of the derivative of the expectation value of the hamiltonian
@@ -62,13 +65,12 @@ def parameter_shift(
             import qibo
             import numpy as np
             from qibo import Circuit, gates, hamiltonians
-            from qibo.derivative import parameter_shift
+            from qiboml.operations.differentiation import parameter_shift
 
             # defining an observable
             def hamiltonian(nqubits = 1):
                 m0 = (1/nqubits)*hamiltonians.Z(nqubits).matrix
                 ham = hamiltonians.Hamiltonian(nqubits, m0)
-
                 return ham
 
             # defining a dummy circuit
@@ -77,7 +79,6 @@ def parameter_shift(
                 c.add(gates.RY(q = 0, theta = 0))
                 c.add(gates.RX(q = 0, theta = 0))
                 c.add(gates.M(0))
-
                 return c
 
             # initializing the circuit
@@ -104,8 +105,6 @@ def parameter_shift(
             TypeError,
             "hamiltonian must be a qibo.hamiltonians.Hamiltonian or qibo.hamiltonians.SymbolicHamiltonian object",
         )
-
-    exec_backend = construct_backend(backend)
 
     # getting the gate's type
     gate = circuit.associate_gates_with_parameters()[parameter_index]
