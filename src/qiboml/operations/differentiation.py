@@ -3,6 +3,8 @@ from qibo.backends import construct_backend
 from qibo.config import raise_error
 from qibo.hamiltonians.abstract import AbstractHamiltonian
 
+from qiboml.operations.expectation import _exact, _with_shots
+
 
 def parameter_shift(
     hamiltonian,
@@ -158,3 +160,27 @@ def parameter_shift(
     result = float(generator_eigenval * (forward - backward) * scale_factor)
 
     return result
+
+
+def symbolical(
+    hamiltonian,
+    circuit,
+    initial_state=None,
+    backend="qibojit",
+):
+    import tensorflow as tf  # pylint: disable=import-error
+
+    exec_backend = construct_backend(backend)
+    circuit_parameters = tf.Variable(circuit.get_parameters(), dtype="float64")
+
+    with tf.GradientTape() as tape:
+        circuit.set_parameters(circuit_parameters)
+        expval = hamiltonian.expectation(
+            exec_backend.execute_circuit(
+                circuit=circuit, initial_state=initial_state
+            ).state()
+        )
+
+    grad = tape.gradient(expval, circuit_parameters)
+
+    return grad
