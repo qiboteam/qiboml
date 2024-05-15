@@ -3,10 +3,10 @@
 from typing import List, Optional, Union
 
 import qibo
-from qibo.backends import construct_backend
-from qibo.config import raise_error
+from qibo.backends import TensorflowBackend
+from qibojit.backends import NumbaBackend
 
-from qiboml.backends import TensorflowBackend
+from qiboml.operations.differentiation import symbolical
 
 
 def expectation(
@@ -14,7 +14,7 @@ def expectation(
     circuit: qibo.Circuit,
     initial_state: Optional[Union[List, qibo.Circuit]] = None,
     nshots: int = None,
-    backend: str = "qibojit",
+    exec_backend: qibo.backends.Backend = NumbaBackend(),
     differentiation_rule: Optional[callable] = None,
 ):
     """
@@ -48,31 +48,23 @@ def expectation(
 
     # read the frontend user choice
     frontend = observable.backend
-    exec_backend = construct_backend(backend)
 
     kwargs = dict(
         observable=observable,
         circuit=circuit,
         initial_state=initial_state,
         nshots=nshots,
-        backend=backend,
         differentiation_rule=differentiation_rule,
         exec_backend=exec_backend,
     )
 
-    if differentiation_rule is not None:
-        if isinstance(frontend, TensorflowBackend):
-            return _with_tf(**kwargs)
+    if isinstance(frontend, TensorflowBackend):
+        return _with_tf(**kwargs)
 
     elif nshots is None:
         return _exact(observable, circuit, initial_state, exec_backend)
     else:
         return _with_shots(observable, circuit, initial_state, nshots, exec_backend)
-
-    raise_error(
-        NotImplementedError,
-        "Only tensorflow automatic differentiation is supported at this moment.",
-    )
 
 
 def _exact(observable, circuit, initial_state, exec_backend):
@@ -92,12 +84,12 @@ def _with_shots(observable, circuit, initial_state, nshots, exec_backend):
 
 
 def _with_tf(
-    observable,
-    circuit,
-    initial_state,
-    nshots,
-    backend,
-    differentiation_rule,
+    observable: qibo.hamiltonians.Hamiltonian,
+    circuit: qibo.Circuit,
+    initial_state: Optional[Union[List, qibo.Circuit]] = None,
+    nshots: int = None,
+    exec_backend: qibo.backends.Backend = NumbaBackend(),
+    differentiation_rule: Optional[callable] = symbolical,
 ):
     """
     Compute expectation sample integrating the custom differentiation rule with
@@ -106,29 +98,23 @@ def _with_tf(
     import tensorflow as tf  # pylint: disable=import-error
 
     params = circuit.get_parameters()
-    nparams = len(params)
 
-    exec_backend = construct_backend(backend)
+    kwargs = dict(
+        hamiltonian=observable,
+        circuit=circuit,
+        initial_state=initial_state,
+        exec_backend=exec_backend,
+    )
+
+    if nshots is not None:
+        kwargs.update({"nshots": nshots})
 
     @tf.custom_gradient
     def _expectation(params):
-        params = tf.Variable(params)
 
         def grad(upstream):
-            gradients = []
-            for p in range(nparams):
-                gradients.append(
-                    upstream
-                    * differentiation_rule(
-                        circuit=circuit,
-                        hamiltonian=observable,
-                        parameter_index=p,
-                        initial_state=initial_state,
-                        nshots=nshots,
-                        backend=backend,
-                    )
-                )
-            return gradients
+            gradients = upstream * tf.stack(differentiation_rule(**kwargs))
+            return tf.unstack(gradients)
 
         if nshots is None:
             expval = _exact(observable, circuit, initial_state, exec_backend)
