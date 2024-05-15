@@ -1,19 +1,21 @@
+from typing import Optional, Union
+
 import numpy as np
-from qibo.backends import construct_backend
+import qibo
+import qibo.backends
 from qibo.config import raise_error
 from qibo.hamiltonians.abstract import AbstractHamiltonian
+from qibojit.backends import NumbaBackend
 
-from qiboml.operations.expectation import _exact, _with_shots
 
-
-def parameter_shift(
-    hamiltonian,
-    circuit,
-    parameter_index,
-    initial_state=None,
-    scale_factor=1,
-    nshots=None,
-    backend="qibojit",
+def one_parameter_shift(
+    hamiltonian: qibo.hamiltonians.Hamiltonian,
+    circuit: qibo.Circuit,
+    parameter_index: int,
+    initial_state: Optional[Union[np.ndarray, qibo.Circuit]] = None,
+    scale_factor: float = 1.0,
+    nshots: int = None,
+    exec_backend: qibo.backends.Backend = NumbaBackend(),
 ):
     """In this method the parameter shift rule (PSR) is implemented.
     Given a circuit U and an observable H, the PSR allows to calculate the derivative
@@ -104,8 +106,6 @@ def parameter_shift(
             "hamiltonian must be a qibo.hamiltonians.Hamiltonian or qibo.hamiltonians.SymbolicHamiltonian object",
         )
 
-    exec_backend = construct_backend(backend)
-
     # getting the gate's type
     gate = circuit.associate_gates_with_parameters()[parameter_index]
 
@@ -162,15 +162,41 @@ def parameter_shift(
     return result
 
 
+def parameter_shift(
+    hamiltonian: qibo.hamiltonians.Hamiltonian,
+    circuit: qibo.Circuit,
+    initial_state: Optional[Union[np.ndarray, qibo.Circuit]] = None,
+    nshots: int = None,
+    exec_backend: qibo.backends.Backend = NumbaBackend(),
+):
+    """Perform the parameter shift rule for all the parameters of a circuit."""
+    nparams = len(circuit.get_parameters())
+    gradients = []
+
+    for i in range(nparams):
+        gradients.append(
+            one_parameter_shift(
+                hamiltonian=hamiltonian,
+                circuit=circuit,
+                parameter_index=i,
+                initial_state=initial_state,
+                nshots=nshots,
+                exec_backend=exec_backend,
+            )
+        )
+
+    return gradients
+
+
 def symbolical(
-    hamiltonian,
-    circuit,
-    initial_state=None,
-    backend="qibojit",
+    hamiltonian: qibo.hamiltonians.Hamiltonian,
+    circuit: qibo.Circuit,
+    initial_state: Optional[Union[np.ndarray, qibo.Circuit]] = None,
+    exec_backend: qibo.backends.Backend = NumbaBackend(),
 ):
     import tensorflow as tf  # pylint: disable=import-error
 
-    exec_backend = construct_backend(backend)
+    # TODO: how to fix this at lower level?
     circuit_parameters = tf.Variable(circuit.get_parameters(), dtype="float64")
 
     with tf.GradientTape() as tape:
@@ -181,6 +207,6 @@ def symbolical(
             ).state()
         )
 
-    grad = tape.gradient(expval, circuit_parameters)
+    gradients = tape.gradient(expval, circuit_parameters)
 
-    return grad
+    return tf.squeeze(gradients)
