@@ -12,9 +12,9 @@ def _one_parameter_shift(
     hamiltonian: qibo.hamiltonians.Hamiltonian,
     circuit: qibo.Circuit,
     parameter_index: int,
-    initial_state: Optional[Union[np.ndarray, qibo.Circuit]] = None,
-    nshots: int = None,
-    exec_backend: qibo.backends.Backend = NumbaBackend(),
+    initial_state: Optional[Union[np.ndarray, qibo.Circuit]],
+    nshots: int,
+    exec_backend: qibo.backends.Backend,
 ):
     """
     Helper method to compute the derivative of the expectation value of
