@@ -55,7 +55,6 @@ def expectation(
         circuit=circuit,
         initial_state=initial_state,
         nshots=nshots,
-        backend=backend,
         differentiation_rule=differentiation_rule,
         exec_backend=exec_backend,
     )
