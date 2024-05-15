@@ -84,12 +84,12 @@ def _with_shots(observable, circuit, initial_state, nshots, exec_backend):
 
 
 def _with_tf(
-    observable: qibo.hamiltonians.Hamiltonian,
-    circuit: qibo.Circuit,
-    initial_state: Optional[Union[List, qibo.Circuit]] = None,
-    nshots: int = None,
-    exec_backend: qibo.backends.Backend = NumbaBackend(),
-    differentiation_rule: Optional[callable] = symbolical,
+    observable,
+    circuit,
+    initial_state,
+    nshots,
+    exec_backend,
+    differentiation_rule,
 ):
     """
     Compute expectation sample integrating the custom differentiation rule with
