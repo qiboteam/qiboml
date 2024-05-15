@@ -96,7 +96,7 @@ def _with_tf(
     circuit,
     initial_state,
     nshots,
-    backend,
+    exec_backend,
     differentiation_rule,
 ):
     """
@@ -107,8 +107,6 @@ def _with_tf(
 
     params = circuit.get_parameters()
     nparams = len(params)
-
-    exec_backend = construct_backend(backend)
 
     @tf.custom_gradient
     def _expectation(params):
@@ -125,7 +123,7 @@ def _with_tf(
                         parameter_index=p,
                         initial_state=initial_state,
                         nshots=nshots,
-                        backend=backend,
+                        exec_backend=exec_backend,
                     )
                 )
             return gradients

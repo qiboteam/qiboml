@@ -8,10 +8,10 @@ def parameter_shift(
     hamiltonian,
     circuit,
     parameter_index,
+    exec_backend,
     initial_state=None,
     scale_factor=1,
     nshots=None,
-    backend="qibojit",
 ):
     """In this method the parameter shift rule (PSR) is implemented.
     Given a circuit U and an observable H, the PSR allows to calculate the derivative
@@ -101,8 +101,6 @@ def parameter_shift(
             TypeError,
             "hamiltonian must be a qibo.hamiltonians.Hamiltonian or qibo.hamiltonians.SymbolicHamiltonian object",
         )
-
-    exec_backend = construct_backend(backend)
 
     # getting the gate's type
     gate = circuit.associate_gates_with_parameters()[parameter_index]
