@@ -163,18 +163,18 @@ def one_parameter_shift(
 
 
 def parameter_shift(
-    hamiltonian: qibo.hamiltonians.Hamiltonian,
-    circuit: qibo.Circuit,
-    initial_state: Optional[Union[np.ndarray, qibo.Circuit]] = None,
-    nshots: int = None,
-    exec_backend: qibo.backends.Backend = NumbaBackend(),
+    hamiltonian,
+    circuit,
+    initial_state,
+    nshots,
+    exec_backend,
 ):
     """Perform the parameter shift rule for all the parameters of a circuit."""
     nparams = len(circuit.get_parameters())
-    gradients = []
+    gradient = []
 
     for i in range(nparams):
-        gradients.append(
+        gradient.append(
             one_parameter_shift(
                 hamiltonian=hamiltonian,
                 circuit=circuit,
@@ -185,14 +185,14 @@ def parameter_shift(
             )
         )
 
-    return gradients
+    return gradient
 
 
 def symbolical(
-    hamiltonian: qibo.hamiltonians.Hamiltonian,
-    circuit: qibo.Circuit,
-    initial_state: Optional[Union[np.ndarray, qibo.Circuit]] = None,
-    exec_backend: qibo.backends.Backend = NumbaBackend(),
+    hamiltonian,
+    circuit,
+    initial_state,
+    exec_backend,
 ):
     import tensorflow as tf  # pylint: disable=import-error
 
