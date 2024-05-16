@@ -4,19 +4,29 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 from qibo import Circuit
+from qibo.config import raise_error
 
-from qiboml.backends import JaxBackend
+from qiboml.backends import TensorflowBackend as JaxBackend
 
 
 @dataclass
 class QuantumCircuitLayer(ABC):
 
+    nqubits: int = None
+    qubits: list[int] = None
     circuit: Circuit = None
+    initial_state: "ndarray" = None
     backend: "qibo.backends.Backend" = JaxBackend()
 
-    @abstractmethod
     def __post_init__(self):
-        pass
+        if self.nqubits is None and self.qubits is not None:
+            self.qubits = sorted(self.qubits)
+            self.nqubits = max(self.qubits)
+        elif self.nqubits is not None and self.qubits is None:
+            self.qubits = range(self.nqubits)
+        else:
+            raise_error(ValueError, "Please provide either `qubits` or `nqubits`.")
+        self.circuit = Circuit(self.nqubits)
 
     @abstractmethod
     def _feed_input(self, x):
@@ -43,10 +53,12 @@ class QuantumCircuitLayer(ABC):
 @dataclass
 class SequentialQuantumModel(QuantumCircuitLayer):
 
-    layers: list[QuantumCircuitLayer] = []
+    layers: list[QuantumCircuitLayer] = None
 
     def __post_init__(self):
         # in principle differently sized circuits might be passed
+        if self.layers is None:
+            self.layers = []
         nqubits = max([layer.circuit.nqubits for layer in self.layers])
         self.circuit = Circuit(nqubits)
         for layer in self.layers:
