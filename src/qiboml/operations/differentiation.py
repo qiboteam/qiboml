@@ -5,7 +5,6 @@ import qibo
 import qibo.backends
 from qibo.config import raise_error
 from qibo.hamiltonians.abstract import AbstractHamiltonian
-from qibojit.backends import NumbaBackend
 
 
 def _one_parameter_shift(
@@ -14,7 +13,7 @@ def _one_parameter_shift(
     parameter_index: int,
     initial_state: Optional[Union[np.ndarray, qibo.Circuit]],
     nshots: int,
-    exec_backend: qibo.backends.Backend,
+    exec_backend: qibo.backends.abstract.Backend,
 ):
     """
     Helper method to compute the derivative of the expectation value of
@@ -88,7 +87,7 @@ def _one_parameter_shift(
 def parameter_shift(
     hamiltonian: qibo.hamiltonians.Hamiltonian,
     circuit: qibo.Circuit,
-    exec_backend: qibo.backends.Backend,
+    exec_backend: qibo.backends.abstract.Backend,
     initial_state: Optional[Union[np.ndarray, qibo.Circuit]] = None,
     nshots: int = None,
 ):
@@ -140,7 +139,7 @@ def parameter_shift(
 def symbolical(
     hamiltonian: qibo.hamiltonians.Hamiltonian,
     circuit: qibo.Circuit,
-    exec_backend: qibo.backends.Backend,
+    exec_backend: qibo.backends.abstract.Backend,
     initial_state: Optional[Union[np.ndarray, qibo.Circuit]] = None,
 ):
     """
