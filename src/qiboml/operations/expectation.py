@@ -14,7 +14,7 @@ def expectation(
     circuit: qibo.Circuit,
     initial_state: Optional[Union[List, qibo.Circuit]] = None,
     nshots: int = None,
-    exec_backend: qibo.backends.Backend = NumbaBackend(),
+    exec_backend: qibo.backends.abstract.Backend = NumbaBackend(),
     differentiation_rule: Optional[callable] = None,
 ):
     """
