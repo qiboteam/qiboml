@@ -119,12 +119,8 @@ def parameter_shift(
             with respect to circuit's variational parameters.
 
     """
-    nparams = len(circuit.get_parameters())
-    gradient = []
-
-    for i in range(nparams):
-        gradient.append(
-            _one_parameter_shift(
+    return [
+        _one_parameter_shift(
                 hamiltonian=hamiltonian,
                 circuit=circuit,
                 parameter_index=i,
@@ -132,9 +128,8 @@ def parameter_shift(
                 nshots=nshots,
                 exec_backend=exec_backend,
             )
-        )
-
-    return gradient
+        for i in range(len(circuit.get_parameters()))
+    ]
 
 
 def symbolical(
