@@ -54,11 +54,11 @@ def compute_derivatives(
 
 print(
     compute_derivatives(
-        nqubits=7,
-        nlayers=7,
+        nqubits=6,
+        nlayers=6,
         differentiation_rule=symbolical_with_jax,
         nshots=None,
-        frontend="jax",
+        frontend="tensorflow",
         backend="jax",
     )
 )
