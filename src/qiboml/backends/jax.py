@@ -1,7 +1,24 @@
 from qibo import __version__
 from qibo.backends import einsum_utils
+from qibo.backends.npmatrices import NumpyMatrices
 from qibo.backends.numpy import NumpyBackend
 from qibo.config import raise_error
+
+
+class JaxMatrices(NumpyMatrices):
+    def __init__(self, dtype):
+        super().__init__(dtype)
+        import jax  # pylint: disable=import-error
+        import jax.numpy as jnp  # pylint: disable=import-error
+
+        self.jax = jax
+        self.np = jnp
+
+    def _cast(self, x, dtype):
+        return self.np.array(x, dtype=dtype)
+
+    def Unitary(self, u):
+        return self._cast(u, dtype=self.dtype)
 
 
 class JaxBackend(NumpyBackend):
@@ -11,15 +28,23 @@ class JaxBackend(NumpyBackend):
 
         import jax
         import jax.numpy as jnp  # pylint: disable=import-error
-        import numpy
+        import numpy as np
 
         jax.config.update("jax_enable_x64", True)
 
         self.jax = jax
-        self.numpy = numpy
+        self.numpy = np
 
         self.np = jnp
-        self.tensor_types = (jnp.ndarray, numpy.ndarray)
+
+        self.versions = {
+            "qibo": __version__,
+            "numpy": np.__version__,
+            "tensorflow": jax.__version__,
+        }
+
+        self.matrices = JaxMatrices(self.dtype)
+        self.tensor_types = (jnp.ndarray, np.ndarray)
 
     def set_precision(self, precision):
         if precision != self.precision:
@@ -71,6 +96,18 @@ class JaxBackend(NumpyBackend):
         state = self.np.ones(2 * (2**nqubits,), dtype=self.dtype)
         state /= 2**nqubits
         return state
+
+    def matrix(self, gate):
+        npmatrix = super().matrix(gate)
+        return self.np.array(npmatrix, dtype=self.dtype)
+
+    def matrix_parametrized(self, gate):
+        npmatrix = super().matrix_parametrized(gate)
+        return self.np.array(npmatrix, dtype=self.dtype)
+
+    def matrix_fused(self, gate):
+        npmatrix = super().matrix_fused(gate)
+        return self.np.array(npmatrix, dtype=self.dtype)
 
     def update_frequencies(self, frequencies, probabilities, nsamples):
         samples = self.sample_shots(probabilities, nsamples)
