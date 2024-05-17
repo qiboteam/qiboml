@@ -1,11 +1,11 @@
 from typing import Optional, Union
 
+import jax
 import numpy as np
 import qibo
 import qibo.backends
 from qibo.config import raise_error
 from qibo.hamiltonians.abstract import AbstractHamiltonian
-from qibojit.backends import NumbaBackend
 
 
 def _one_parameter_shift(
@@ -121,13 +121,13 @@ def parameter_shift(
     """
     return [
         _one_parameter_shift(
-                hamiltonian=hamiltonian,
-                circuit=circuit,
-                parameter_index=i,
-                initial_state=initial_state,
-                nshots=nshots,
-                exec_backend=exec_backend,
-            )
+            hamiltonian=hamiltonian,
+            circuit=circuit,
+            parameter_index=i,
+            initial_state=initial_state,
+            nshots=nshots,
+            exec_backend=exec_backend,
+        )
         for i in range(len(circuit.get_parameters()))
     ]
 
@@ -176,3 +176,24 @@ def symbolical(
     gradients = tape.gradient(expval, circuit_parameters)
 
     return tf.squeeze(gradients)
+
+
+def symbolical_with_jax(
+    hamiltonian: qibo.hamiltonians.Hamiltonian,
+    circuit: qibo.Circuit,
+    exec_backend: qibo.backends.Backend,
+    initial_state: Optional[Union[np.ndarray, qibo.Circuit]] = None,
+):
+    def _expectation(params):
+        params = jax.numpy.array(params)
+        circuit.set_parameters(params)
+        return hamiltonian.expectation(
+            exec_backend.execute_circuit(
+                circuit=circuit, initial_state=initial_state
+            ).state()
+        )
+
+    print(jax.grad(_expectation)(circuit.get_parameters()))
+    exit()
+
+    return jax.grad(_expectation)(circuit.get_parameters())

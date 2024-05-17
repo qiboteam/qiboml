@@ -4,7 +4,11 @@ import qibo
 from qibo import Circuit, gates, hamiltonians
 from qibo.backends import construct_backend
 
-from qiboml.operations.differentiation import parameter_shift, symbolical
+from qiboml.operations.differentiation import (
+    parameter_shift,
+    symbolical,
+    symbolical_with_jax,
+)
 
 
 def build_parametric_circuit(nqubits, nlayers):
@@ -52,9 +56,9 @@ print(
     compute_derivatives(
         nqubits=7,
         nlayers=7,
-        differentiation_rule=parameter_shift,
+        differentiation_rule=symbolical_with_jax,
         nshots=None,
-        frontend="tensorflow",
-        backend="numpy",
+        frontend="jax",
+        backend="jax",
     )
 )
