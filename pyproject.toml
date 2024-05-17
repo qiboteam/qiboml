@@ -15,10 +15,10 @@ python = ">=3.9,<3.12"
 numpy = "^1.26.4"
 numba = "^0.59.0"
 tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux' or sys_platform == 'darwin'" }
-torch = "^2.2.0"
-jax = "^0.4.25"
 # TODO: the marker is a temporary solution due to the lack of the tensorflow-io 0.32.0's wheels for Windows, this package is one of
 # the tensorflow requirements
+torch = "^2.2.0"
+jax = "^0.4.25"
 qibo = "^0.2.6"
 
 [tool.poetry.group.dev]
