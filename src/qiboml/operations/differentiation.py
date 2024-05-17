@@ -7,6 +7,8 @@ import qibo.backends
 from qibo.config import raise_error
 from qibo.hamiltonians.abstract import AbstractHamiltonian
 
+from qiboml.operations import expectation
+
 
 def _one_parameter_shift(
     hamiltonian: qibo.hamiltonians.Hamiltonian,
@@ -22,7 +24,6 @@ def _one_parameter_shift(
     ``initial_state`` w.r.t. to a target ``parameter_index``.
     """
 
-    # some raise_error
     if parameter_index > len(circuit.get_parameters()):
         raise_error(ValueError, """This index is out of bounds.""")
 
@@ -32,42 +33,26 @@ def _one_parameter_shift(
             "hamiltonian must be a qibo.hamiltonians.Hamiltonian or qibo.hamiltonians.SymbolicHamiltonian object",
         )
 
-    # getting the gate's type
     gate = circuit.associate_gates_with_parameters()[parameter_index]
-
-    # getting the generator_eigenvalue
     generator_eigenval = gate.generator_eigenvalue()
 
-    # defining the shift according to the psr
     s = np.pi / (4 * generator_eigenval)
 
-    # saving original parameters and making a copy
     original = np.asarray(circuit.get_parameters()).copy()
     shifted = original.copy()
 
-    # forward shift
     shifted[parameter_index] += s
     circuit.set_parameters(shifted)
 
     if nshots is None:
-        # forward evaluation
-        forward = hamiltonian.expectation(
-            exec_backend.execute_circuit(
-                circuit=circuit, initial_state=initial_state
-            ).state()
-        )
 
-        # backward shift and evaluation
+        forward = expectation._exact(hamiltonian, circuit, initial_state, exec_backend)
+
         shifted[parameter_index] -= 2 * s
         circuit.set_parameters(shifted)
 
-        backward = hamiltonian.expectation(
-            exec_backend.execute_circuit(
-                circuit=circuit, initial_state=initial_state
-            ).state()
-        )
+        backward = expectation._exact(hamiltonian, circuit, initial_state, exec_backend)
 
-    # same but using expectation from samples
     else:
         forward = exec_backend.execute_circuit(
             circuit=circuit, initial_state=initial_state, nshots=nshots
@@ -167,11 +152,7 @@ def symbolical(
 
     with tf.GradientTape() as tape:
         circuit.set_parameters(circuit_parameters)
-        expval = hamiltonian.expectation(
-            exec_backend.execute_circuit(
-                circuit=circuit, initial_state=initial_state
-            ).state()
-        )
+        expval = expectation._exact(hamiltonian, circuit, initial_state, exec_backend)
 
     gradients = tape.gradient(expval, circuit_parameters)
 
@@ -187,13 +168,8 @@ def symbolical_with_jax(
     def _expectation(params):
         params = jax.numpy.array(params)
         circuit.set_parameters(params)
-        return hamiltonian.expectation(
-            exec_backend.execute_circuit(
-                circuit=circuit, initial_state=initial_state
-            ).state()
-        )
+        return expectation._exact(hamiltonian, circuit, initial_state, exec_backend)
 
-    print(jax.grad(_expectation)(circuit.get_parameters()))
-    exit()
-
-    return jax.grad(_expectation)(circuit.get_parameters())
+    return jax.numpy.array(
+        [g[0].item() for g in jax.grad(_expectation)(circuit.get_parameters())]
+    )

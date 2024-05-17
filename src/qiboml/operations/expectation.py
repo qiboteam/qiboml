@@ -3,10 +3,9 @@
 from typing import List, Optional, Union
 
 import qibo
-from qibo.backends import TensorflowBackend
 from qibojit.backends import NumbaBackend
 
-from qiboml.operations.differentiation import symbolical
+from qiboml.backends import JaxBackend, TensorflowBackend
 
 
 def expectation(
@@ -61,8 +60,8 @@ def expectation(
     if isinstance(frontend, TensorflowBackend):
         return _with_tf(**kwargs)
 
-        if isinstance(frontend, JaxBackend):
-            return _with_jax(**kwargs)
+    if isinstance(frontend, JaxBackend):
+        return _with_jax(**kwargs)
 
     elif nshots is None:
         return _exact(observable, circuit, initial_state, exec_backend)
@@ -72,10 +71,12 @@ def expectation(
 
 def _exact(observable, circuit, initial_state, exec_backend):
     """Helper function to compute exact expectation values."""
-    return observable.expectation(
-        exec_backend.execute_circuit(
+    return exec_backend.calculate_expectation_state(
+        hamiltonian=exec_backend.cast(observable.matrix),
+        state=exec_backend.execute_circuit(
             circuit=circuit, initial_state=initial_state
-        ).state()
+        ).state(),
+        normalize=False,
     )
 
 
@@ -147,33 +148,30 @@ def _with_jax(
 
     params = circuit.get_parameters()
 
+    kwargs = dict(
+        hamiltonian=observable,
+        circuit=circuit,
+        initial_state=initial_state,
+        exec_backend=exec_backend,
+    )
+
+    if nshots is not None:
+        kwargs.update({"nshots": nshots})
+
     @jax.custom_gradient
     def _expectation(params):
         params = jax.numpy.array(params)
 
         def grad(params):
-            gradients = []
-            for p in range(len(params)):
-                gradients.append(
-                    differentiation_rule(
-                        circuit=circuit,
-                        hamiltonian=observable,
-                        parameter_index=p,
-                        initial_state=initial_state,
-                        nshots=nshots,
-                        exec_backend=exec_backend,
-                    )
-                )
-                print("ciao")
-            return jax.numpy.array(gradients)
+            return differentiation_rule(**kwargs)
 
         if nshots is None:
-            expval = jax.jit(_exact(observable, circuit, initial_state, exec_backend))
+            expval = _exact(observable, circuit, initial_state, exec_backend)
         else:
-            expval = jax.jit(
-                _with_shots(observable, circuit, initial_state, nshots, exec_backend)
+            expval = _with_shots(
+                observable, circuit, initial_state, nshots, exec_backend
             )
 
-        return expval, lambda g: g * jax.jit(grad(params))
+        return expval, lambda g: g * grad(params)
 
-    return jax.jit(_expectation(params))
+    return _expectation(params)
