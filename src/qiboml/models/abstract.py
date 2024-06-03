@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from qibo import Circuit
 from qibo.config import raise_error
+from qibo.gates import abstract
 
 from qiboml.backends import TensorflowBackend as JaxBackend
 
@@ -29,13 +30,8 @@ class QuantumCircuitLayer(ABC):
         self.circuit = Circuit(self.nqubits)
 
     @abstractmethod
-    def _feed_input(self, x):
-        pass
-
     def forward(self, x):
-        """Performs the forward pass: prepares the input and execute the circuit."""
-        self._feed_input(x)
-        return self.backend.execute_circuit(self.circuit)
+        pass
 
     @abstractmethod
     def backward(self, input_grad: "ndarray"):

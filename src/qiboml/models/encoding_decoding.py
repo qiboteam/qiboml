@@ -17,19 +17,22 @@ class QuantumEncodingLayer(QuantumCircuitLayer):
 @dataclass
 class BinaryEncodingLayer(QuantumEncodingLayer):
 
-    def _feed_input(self, x: "ndarray"):
+    def forward(self, x: "ndarray") -> Circuit:
+        if isinstance(x, Circuit):
+            raise_error(RuntimeError, "Passed a `Circuit` as input data.")
         if x.shape[-1] != self.nqubits:
             raise_error(
                 RuntimeError,
                 f"Invalid input dimension {x.shape[-1]}, but nqubits is {self.nqubits}.",
             )
-        self.circuit = Circuit(self.nqubits)
-        for i, bit in enumerate(x):
+        circuit = self.circuit.copy()
+        for q, bit in zip(self.qubits, x):
             if bit:
-                self.circuit.add(gates.X(i))
+                circuit.add(gates.X(q))
+        return circuit
 
-    def backward(self):
-        raise_error(NotImplementedError, "TO DO")
+    def backward(self, input_grad: "ndarray") -> "ndarray":
+        return input_grad
 
 
 class PhaseEncodingLayer(QuantumEncodingLayer):
@@ -48,29 +51,31 @@ class AmplitudeEncodingLayer(QuantumEncodingLayer):
 """
 
 
+@dataclass
 class QuantumDecodingLayer(QuantumCircuitLayer):
-    pass
+
+    nshots: int = 1000
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.circuit.add(gates.M(*self.qubits))
+
+    def forward(self, x: Circuit) -> Circuit:
+        return self.backend.execute_circuit(x + self.circuit, nshots=self.nshots)
+
+    def backward(self):
+        raise_error(NotImplementedError, "TO DO")
 
 
 @dataclass
 class ExpectationLayer(QuantumDecodingLayer):
 
-    observable: Union["ndarray", "qibo.models.Hamiltonian"]
+    observable: Union["ndarray", "qibo.models.Hamiltonian"] = None
 
-    def _feed_input(self, x):
-        if isinstance(x, Circuit):
-            self.circuit = x
-
-    def forward(self, x):
-        if isinstance(x, Circuit):
-            return self.observable.expectation_from_samples(
-                super().forward(x).frequencies()
-            )
-        else:
-            return self.observable.expectation(x)
-
-    def backward(self):
-        raise_error(NotImplementedError, "TO DO")
+    def forward(self, x: Circuit) -> "ndarray":
+        return self.observable.expectation_from_samples(
+            super().forward(x).frequencies()
+        )
 
 
 """
