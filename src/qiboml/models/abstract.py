@@ -13,20 +13,15 @@ from qiboml.backends import TensorflowBackend as JaxBackend
 @dataclass
 class QuantumCircuitLayer(ABC):
 
-    nqubits: int = None
+    nqubits: int
     qubits: list[int] = None
     circuit: Circuit = None
     initial_state: "ndarray" = None
     backend: "qibo.backends.Backend" = JaxBackend()
 
-    def __post_init__(self):
-        if self.nqubits is None and self.qubits is not None:
-            self.qubits = sorted(self.qubits)
-            self.nqubits = max(self.qubits)
-        elif self.nqubits is not None and self.qubits is None:
+    def __post_init__(self) -> None:
+        if self.qubits is None:
             self.qubits = range(self.nqubits)
-        else:
-            raise_error(ValueError, "Please provide either `qubits` or `nqubits`.")
         self.circuit = Circuit(self.nqubits)
 
     @abstractmethod
@@ -38,11 +33,11 @@ class QuantumCircuitLayer(ABC):
         pass
 
     @property
-    def parameters(self):
+    def parameters(self) -> "ndarray":
         return self.circuit.get_parameters()
 
     @parameters.setter
-    def parameters(self, x: "ndarray"):
+    def parameters(self, x: "ndarray") -> None:
         self.circuit.set_parameters(x)
 
 

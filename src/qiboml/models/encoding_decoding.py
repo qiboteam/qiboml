@@ -11,15 +11,15 @@ from qiboml.models.abstract import QuantumCircuitLayer
 
 @dataclass
 class QuantumEncodingLayer(QuantumCircuitLayer):
-    pass
+
+    def backward(self, input_grad: "ndarray") -> "ndarray":
+        return input_grad
 
 
 @dataclass
 class BinaryEncodingLayer(QuantumEncodingLayer):
 
     def forward(self, x: "ndarray") -> Circuit:
-        if isinstance(x, Circuit):
-            raise_error(RuntimeError, "Passed a `Circuit` as input data.")
         if x.shape[-1] != self.nqubits:
             raise_error(
                 RuntimeError,
@@ -31,12 +31,22 @@ class BinaryEncodingLayer(QuantumEncodingLayer):
                 circuit.add(gates.X(q))
         return circuit
 
-    def backward(self, input_grad: "ndarray") -> "ndarray":
-        return input_grad
 
-
+@dataclass
 class PhaseEncodingLayer(QuantumEncodingLayer):
-    pass
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.circuit.add(gates.H(0))
+        for q in self.qubits:
+            if q != 0:
+                self.circuit.add(gates.CNOT(0, q))
+        for q in self.qubits:
+            self.circuit.add(gates.RZ(q, theta=0.0))
+
+    def forward(self, x: "ndarray") -> Circuit:
+        self.circuit.set_parameters(x)
+        return self.circuit
 
 
 class AmplitudeEncodingLayer(QuantumEncodingLayer):
@@ -71,6 +81,14 @@ class QuantumDecodingLayer(QuantumCircuitLayer):
 class ExpectationLayer(QuantumDecodingLayer):
 
     observable: Union["ndarray", "qibo.models.Hamiltonian"] = None
+
+    def __post_init__(self):
+        if self.observable is None:
+            raise_error(
+                RuntimeError,
+                "Please provide an observable for expectation value calculation.",
+            )
+        super().__post_init__()
 
     def forward(self, x: Circuit) -> "ndarray":
         return self.observable.expectation_from_samples(
