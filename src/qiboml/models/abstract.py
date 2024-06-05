@@ -21,7 +21,7 @@ class QuantumCircuitLayer(ABC):
 
     def __post_init__(self) -> None:
         if self.qubits is None:
-            self.qubits = range(self.nqubits)
+            self.qubits = list(range(self.nqubits))
         self.circuit = Circuit(self.nqubits)
 
     @abstractmethod
