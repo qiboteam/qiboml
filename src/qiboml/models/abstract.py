@@ -37,7 +37,7 @@ class QuantumCircuitLayer(ABC):
         return self.circuit.get_parameters()
 
     @parameters.setter
-    def parameters(self, x: "ndarray") -> None:
+    def parameters(self, x: list) -> None:
         self.circuit.set_parameters(x)
 
 
