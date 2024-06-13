@@ -39,29 +39,3 @@ class QuantumCircuitLayer(ABC):
     @parameters.setter
     def parameters(self, x: list) -> None:
         self.circuit.set_parameters(x)
-
-
-@dataclass
-class SequentialQuantumModel(QuantumCircuitLayer):
-
-    layers: list[QuantumCircuitLayer] = None
-
-    def __post_init__(self):
-        # in principle differently sized circuits might be passed
-        if self.layers is None:
-            self.layers = []
-        nqubits = max([layer.circuit.nqubits for layer in self.layers])
-        self.circuit = Circuit(nqubits)
-        for layer in self.layers:
-            circ = Circuit(nqubits)
-            circ.add(layer.circuit.on_qubits(*range(layer.circuit.nqubits)))
-            self.circuit = self.circuit + circ
-
-    def _feed_input(self, x):
-        self.layers[0]._feed_input(x)
-
-    def backward(self, input_grad: "ndarray"):
-        grad = input_grad
-        for layer in self.layers:
-            grad = layer.backward(grad)
-        return grad

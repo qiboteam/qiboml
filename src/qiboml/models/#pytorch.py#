@@ -1,43 +1,43 @@
-"""Keras interface to qiboml layers"""
+"""Torch interface to qiboml layers"""
 
 import inspect
 from dataclasses import dataclass
 
-import keras
-import tensorflow as tf
+import torch
 
 import qiboml.models.ansatze as ans
 import qiboml.models.encoding_decoding as ed
 
 
-def _keras_factory(module):
+def _torch_factory(module) -> None:
     for name, layer in inspect.getmembers(module, inspect.isclass):
         if layer.__module__ == module.__name__:
 
             def __init__(cls, *args, **kwargs):
                 nonlocal layer
-                name = kwargs.pop("name", None)
-                keras.layers.Layer.__init__(cls, name=name)
+                torch.nn.Module.__init__(cls)
                 layer.__init__(cls, *args, **kwargs)
                 if len(cls.circuit.get_parameters()) > 0:
-                    print("> How do you register parameters with Keras?")
-
-            @tf.custom_gradient
-            def call(cls, x):
-                nonlocal layer
-                return layer.forward(cls, x), layer.backward
+                    cls.register_parameter(
+                        layer.__name__,
+                        torch.nn.Parameter(
+                            torch.as_tensor(cls.circuit.get_parameters())
+                        ),
+                    )
 
             globals()[name] = dataclass(
                 type(
                     name,
-                    (keras.layers.Layer, layer),
+                    (torch.nn.Module, layer),
                     {
                         "__init__": __init__,
-                        "call": call,
+                        "forward": layer.forward,
+                        "backward": layer.backward,
+                        "__hash__": torch.nn.Module.__hash__,
                     },
                 )
             )
 
 
 for module in (ed, ans):
-    _keras_factory(module)
+    _torch_factory(module)
