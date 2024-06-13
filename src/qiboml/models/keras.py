@@ -1,41 +1,40 @@
 import inspect
 from dataclasses import dataclass
 
-import torch
+import keras
+import tensorflow as tf
 
 import qiboml.models.ansatze as ans
 import qiboml.models.encoding_decoding as ed
 
 
-def _torch_factory(module) -> None:
+def _keras_factory(module):
     for name, layer in inspect.getmembers(module, inspect.isclass):
         if layer.__module__ == module.__name__:
 
             def __init__(cls, *args, **kwargs):
                 nonlocal layer
-                torch.nn.Module.__init__(cls)
+                keras.layers.Layer.__init__(cls)
                 layer.__init__(cls, *args, **kwargs)
                 if len(cls.circuit.get_parameters()) > 0:
-                    cls.register_parameter(
-                        layer.__name__,
-                        torch.nn.Parameter(
-                            torch.as_tensor(cls.circuit.get_parameters())
-                        ),
-                    )
+                    print("> How do you register parameters with Keras?")
+
+            @tf.custom_gradient
+            def call(cls, x):
+                nonlocal layer
+                return layer.forward(cls, x), layer.backward
 
             globals()[name] = dataclass(
                 type(
                     name,
-                    (torch.nn.Module, layer),
+                    (keras.layers.Layer, layer),
                     {
                         "__init__": __init__,
-                        "forward": layer.forward,
-                        "backward": layer.backward,
-                        "__hash__": torch.nn.Module.__hash__,
+                        "call": call,
                     },
                 )
             )
 
 
 for module in (ed, ans):
-    _torch_factory(module)
+    _keras_factory(module)
