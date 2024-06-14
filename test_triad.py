@@ -70,9 +70,9 @@ def train_circuit(
 
 
 # frontend definition
-qibo.set_backend("tensorflow")
+qibo.set_backend("jax")
 # execution backend
-backend = construct_backend("numpy")
+backend = construct_backend("jax")
 
 nqubits = 3
 c = build_parametric_circuit(nqubits, 2)

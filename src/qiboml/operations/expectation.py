@@ -3,8 +3,8 @@
 from typing import List, Optional, Union
 
 import qibo
-from qibo.backends import Backend
-from qibojit.backends import NumbaBackend
+from qibo.backends import Backend, NumpyBackend
+from qibo.config import raise_error
 
 from qiboml.backends import JaxBackend, TensorflowBackend
 
@@ -14,7 +14,7 @@ def expectation(
     circuit: qibo.Circuit,
     initial_state: Optional[Union[List, qibo.Circuit]] = None,
     nshots: int = None,
-    exec_backend: Backend = NumbaBackend(),
+    exec_backend: Backend = NumpyBackend(),
     differentiation_rule: Optional[callable] = None,
 ):
     """
@@ -64,6 +64,8 @@ def expectation(
 
         if isinstance(frontend, JaxBackend):
             return _with_jax(**kwargs)
+        else:
+            raise_error(ValueError, f" Interface for {frontend} is not supported.")
 
     elif nshots is None:
         return _exact(observable, circuit, initial_state, exec_backend)
