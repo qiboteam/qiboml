@@ -4,7 +4,9 @@ import inspect
 from dataclasses import dataclass
 
 import keras
+import numpy as np
 import tensorflow as tf
+from keras.src.backend import compute_output_spec
 
 import qiboml.models.ansatze as ans
 import qiboml.models.encoding_decoding as ed
@@ -20,12 +22,22 @@ def _keras_factory(module):
                 keras.layers.Layer.__init__(cls, name=name)
                 layer.__init__(cls, *args, **kwargs)
                 if len(cls.circuit.get_parameters()) > 0:
-                    print("> How do you register parameters with Keras?")
+                    cls.add_weight(
+                        shape=(len(cls.circuit.get_parameters()),),
+                        initializer="zeros",
+                    )
+                    cls.set_weights(
+                        [
+                            np.hstack(cls.circuit.get_parameters()),
+                        ]
+                    )
+
+            def compute_output_shape(cls):
+                return (cls.nqubits,)
 
             @tf.custom_gradient
             def call(cls, x):
-                nonlocal layer
-                return layer.forward(cls, x), layer.backward
+                return cls.forward(x), cls.backward
 
             globals()[name] = dataclass(
                 type(
@@ -34,6 +46,8 @@ def _keras_factory(module):
                     {
                         "__init__": __init__,
                         "call": call,
+                        "compute_output_shape": compute_output_shape,
+                        "__hash__": keras.layers.Layer.__hash__,
                     },
                 )
             )
