@@ -3,6 +3,7 @@
 from typing import List, Optional, Union
 
 import qibo
+from qibo.backends import Backend
 from qibojit.backends import NumbaBackend
 
 from qiboml.backends import JaxBackend, TensorflowBackend
@@ -13,7 +14,7 @@ def expectation(
     circuit: qibo.Circuit,
     initial_state: Optional[Union[List, qibo.Circuit]] = None,
     nshots: int = None,
-    exec_backend: qibo.backends.Backend = NumbaBackend(),
+    exec_backend: Backend = NumbaBackend(),
     differentiation_rule: Optional[callable] = None,
 ):
     """
@@ -57,11 +58,12 @@ def expectation(
         differentiation_rule=differentiation_rule,
     )
 
-    if isinstance(frontend, TensorflowBackend):
-        return _with_tf(**kwargs)
+    if differentiation_rule is not None:
+        if isinstance(frontend, TensorflowBackend):
+            return _with_tf(**kwargs)
 
-    if isinstance(frontend, JaxBackend):
-        return _with_jax(**kwargs)
+        if isinstance(frontend, JaxBackend):
+            return _with_jax(**kwargs)
 
     elif nshots is None:
         return _exact(observable, circuit, initial_state, exec_backend)
@@ -142,7 +144,7 @@ def _with_jax(
 ):
     """
     Compute expectation sample integrating the custom differentiation rule with
-    TensorFlow's automatic differentiation.
+    Jax's automatic differentiation.
     """
     import jax  # pylint: disable=import-error
 

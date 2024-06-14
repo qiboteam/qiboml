@@ -162,7 +162,7 @@ def symbolical(
 def symbolical_with_jax(
     hamiltonian: qibo.hamiltonians.Hamiltonian,
     circuit: qibo.Circuit,
-    exec_backend: qibo.backends.Backend,
+    exec_backend,
     initial_state: Optional[Union[np.ndarray, qibo.Circuit]] = None,
 ):
     def _expectation(params):
