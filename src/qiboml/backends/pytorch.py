@@ -1,6 +1,7 @@
 """PyTorch backend."""
 
 import numpy as np
+import torch
 from qibo import __version__
 from qibo.backends.npmatrices import NumpyMatrices
 from qibo.backends.numpy import NumpyBackend
@@ -157,6 +158,28 @@ class PyTorchBackend(NumpyBackend):
         ud = self.np.conj(eigenvectors).T
         return self.np.matmul(eigenvectors, self.np.matmul(expd, ud))
 
+    def calculate_expval(
+        self,
+        observable,
+        circuit,
+        initial_state,
+        nshots,
+        exec_backend,
+        differentiation_rule,
+    ):
+        params = torch.tensor(
+            circuit.get_parameters(), dtype=torch.float64, requires_grad=True
+        )
+        return _DifferentiableExpectation.apply(
+            params,
+            observable,
+            circuit,
+            initial_state,
+            nshots,
+            exec_backend,
+            differentiation_rule,
+        )
+
     def test_regressions(self, name):
         if name == "test_measurementresult_apply_bitflips":
             return [
@@ -182,3 +205,64 @@ class PyTorchBackend(NumpyBackend):
                 {5: 17, 4: 5, 7: 4, 1: 2, 6: 2},
                 {4: 9, 2: 5, 5: 5, 3: 4, 6: 4, 0: 1, 1: 1, 7: 1},
             ]
+
+
+class _DifferentiableExpectation(torch.autograd.Function):
+    @staticmethod
+    def forward(
+        ctx,
+        params,
+        observable,
+        circuit,
+        initial_state,
+        nshots,
+        exec_backend,
+        differentiation_rule,
+    ):
+        # Save everything needed for the backward pass in ctx
+        ctx.save_for_backward(params)
+        ctx.observable = observable
+        ctx.circuit = circuit
+        ctx.initial_state = initial_state
+        ctx.nshots = nshots
+        ctx.exec_backend = exec_backend
+        ctx.differentiation_rule = differentiation_rule
+
+        # Calculate expectation value using exec_backend
+        if nshots is None:
+            expval = exec_backend.calculate_expectation_state(
+                hamiltonian=exec_backend.cast(observable.matrix),
+                state=exec_backend.execute_circuit(
+                    circuit=circuit, initial_state=initial_state
+                ).state(),
+                normalize=False,
+            )
+        else:
+            expval = exec_backend.execute_circuit(
+                circuit=circuit, initial_state=initial_state, nshots=nshots
+            ).expectation_from_samples(observable)
+
+        return expval.clone().detach().to(dtype=torch.float64)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        (params,) = ctx.saved_tensors
+        observable = ctx.observable
+        circuit = ctx.circuit
+        initial_state = ctx.initial_state
+        nshots = ctx.nshots
+        exec_backend = ctx.exec_backend
+        differentiation_rule = ctx.differentiation_rule
+
+        kwargs = dict(
+            hamiltonian=observable,
+            circuit=circuit,
+            initial_state=initial_state,
+            exec_backend=exec_backend,
+            nshots=nshots,
+        )
+
+        gradients = (grad_output * torch.tensor(differentiation_rule(**kwargs)))[
+            :, None
+        ]
+        return gradients, None, None, None, None, None, None
