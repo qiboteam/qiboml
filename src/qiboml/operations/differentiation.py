@@ -170,6 +170,4 @@ def symbolical_with_jax(
         circuit.set_parameters(params)
         return expectation._exact(hamiltonian, circuit, initial_state, exec_backend)
 
-    print(jax.grad(_expectation)(circuit.get_parameters()))
-
     return jax.grad(_expectation)(circuit.get_parameters())

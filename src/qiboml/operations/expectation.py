@@ -112,6 +112,7 @@ def _with_tf(
         circuit=circuit,
         initial_state=initial_state,
         exec_backend=exec_backend,
+        nshots=nshots if nshots is not None else None,
     )
 
     if nshots is not None:
@@ -132,50 +133,5 @@ def _with_tf(
             )
 
         return expval, grad
-
-    return _expectation(params)
-
-
-def _with_jax(
-    observable,
-    circuit,
-    initial_state,
-    nshots,
-    exec_backend,
-    differentiation_rule,
-):
-    """
-    Compute expectation sample integrating the custom differentiation rule with
-    Jax's automatic differentiation.
-    """
-    import jax  # pylint: disable=import-error
-
-    params = circuit.get_parameters()
-
-    kwargs = dict(
-        hamiltonian=observable,
-        circuit=circuit,
-        initial_state=initial_state,
-        exec_backend=exec_backend,
-    )
-
-    if nshots is not None:
-        kwargs.update({"nshots": nshots})
-
-    @jax.custom_gradient
-    def _expectation(params):
-        params = jax.numpy.array(params)
-
-        def grad(params):
-            return differentiation_rule(**kwargs)
-
-        if nshots is None:
-            expval = _exact(observable, circuit, initial_state, exec_backend)
-        else:
-            expval = _with_shots(
-                observable, circuit, initial_state, nshots, exec_backend
-            )
-
-        return expval, lambda g: g * grad(params)
 
     return _expectation(params)
