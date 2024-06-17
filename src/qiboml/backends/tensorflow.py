@@ -2,6 +2,7 @@ import collections
 import os
 
 import numpy as np
+import qibo
 from qibo import __version__
 from qibo.backends.npmatrices import NumpyMatrices
 from qibo.backends.numpy import NumpyBackend
@@ -204,6 +205,52 @@ class TensorflowBackend(NumpyBackend):
                 ValueError,
                 f"Cannot multiply Hamiltonian with rank-{rank} tensor.",
             )
+
+    def calculate_expval(
+        self,
+        observable,
+        circuit,
+        initial_state,
+        nshots,
+        exec_backend,
+        differentiation_rule,
+    ):
+
+        kwargs = dict(
+            hamiltonian=observable,
+            circuit=circuit,
+            initial_state=initial_state,
+            exec_backend=exec_backend,
+        )
+
+        if nshots is not None:
+            kwargs.update({"nshots": nshots})
+
+        params = circuit.get_parameters()
+
+        @self.tf.custom_gradient
+        def _expectation(params):
+            params = self.cast(params)
+
+            def grad(upstream):
+                gradients = upstream * self.tf.stack(differentiation_rule(**kwargs))
+                return self.tf.unstack(gradients)
+
+            if nshots is None:
+                expval = exec_backend.calculate_expectation_state(
+                    hamiltonian=exec_backend.cast(observable.matrix),
+                    state=exec_backend.execute_circuit(
+                        circuit=circuit, initial_state=initial_state
+                    ).state(),
+                    normalize=False,
+                )
+            else:
+                expval = exec_backend.execute_circuit(
+                    circuit=circuit, initial_state=initial_state, nshots=nshots
+                ).expectation_from_samples(observable)
+            return expval, grad
+
+        return _expectation(params)
 
     def test_regressions(self, name):
         if name == "test_measurementresult_apply_bitflips":
