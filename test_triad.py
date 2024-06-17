@@ -9,10 +9,11 @@ import jax.numpy as jnp
 import numpy as np
 import qibo
 import tensorflow as tf
+import torch
 from qibo import Circuit, gates, hamiltonians
 from qibo.backends import construct_backend
 
-from qiboml.backends import JaxBackend, TensorflowBackend
+from qiboml.backends import JaxBackend, PyTorchBackend, TensorflowBackend
 from qiboml.operations import differentiation, expectation
 
 
@@ -64,16 +65,16 @@ def train_circuit(
     it = time.time()
 
     if isinstance(hamiltonian.backend, TensorflowBackend):
-        params = tf.Variable(params)
+        init_params = tf.Variable(params)
         for epoch in range(nepochs):
             with tf.GradientTape() as tape:
-                cost = cost_function(params)
+                cost = cost_function(init_params)
                 if epoch % 2 == 0:
                     print(f"Cost: {round(cost, 4)} \t |\t Epoch: {epoch}")
-                gradients = tape.gradient(cost, params)
-                init_params = params.assign_sub(learning_rate * gradients)
+                gradients = tape.gradient(cost, init_params)
+                init_params.assign_sub(learning_rate * gradients)
 
-    if isinstance(hamiltonian.backend, JaxBackend):
+    elif isinstance(hamiltonian.backend, JaxBackend):
         jitted_cost_function = jax.jit(cost_function)
         dcost = jax.grad(cost_function)
         for epoch in range(nepochs):
@@ -83,14 +84,26 @@ def train_circuit(
                 print(f"Cost: {cost:.4} \t |\t Epoch: {epoch}")
             params -= learning_rate * gradients
 
+    elif isinstance(hamiltonian.backend, PyTorchBackend):
+        print("here we are")
+        params = torch.tensor(params, requires_grad=True)
+        optimizer = torch.optim.SGD([params], lr=learning_rate)
+        for epoch in range(nepochs):
+            optimizer.zero_grad()
+            cost = cost_function(params)
+            cost.backward()
+            optimizer.step()
+            if epoch % 2 == 0:
+                print(f"Cost: {cost.item():.4} \t |\t Epoch: {epoch}")
+
     ft = time.time()
     return ft - it
 
 
 # frontend definition
-qibo.set_backend("tensorflow")
+qibo.set_backend("pytorch")
 # execution backend
-backend = construct_backend("numpy")
+backend = construct_backend("pytorch")
 
 nqubits = 3
 c = build_parametric_circuit(nqubits, 2)
