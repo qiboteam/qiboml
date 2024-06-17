@@ -49,7 +49,7 @@ def expectation(
     # read the frontend user choice
     frontend = observable.backend
 
-    kwargs = dict(
+    return frontend.calculate_expval(
         observable=observable,
         circuit=circuit,
         initial_state=initial_state,
@@ -57,20 +57,6 @@ def expectation(
         exec_backend=exec_backend,
         differentiation_rule=differentiation_rule,
     )
-
-    if differentiation_rule is not None:
-        if isinstance(frontend, TensorflowBackend):
-            return _with_tf(**kwargs)
-
-        if isinstance(frontend, JaxBackend):
-            return _with_jax(**kwargs)
-        else:
-            raise_error(ValueError, f" Interface for {frontend} is not supported.")
-
-    elif nshots is None:
-        return _exact(observable, circuit, initial_state, exec_backend)
-    else:
-        return _with_shots(observable, circuit, initial_state, nshots, exec_backend)
 
 
 def _exact(observable, circuit, initial_state, exec_backend):
@@ -89,49 +75,3 @@ def _with_shots(observable, circuit, initial_state, nshots, exec_backend):
     return exec_backend.execute_circuit(
         circuit=circuit, initial_state=initial_state, nshots=nshots
     ).expectation_from_samples(observable)
-
-
-def _with_tf(
-    observable,
-    circuit,
-    initial_state,
-    nshots,
-    exec_backend,
-    differentiation_rule,
-):
-    """
-    Compute expectation sample integrating the custom differentiation rule with
-    TensorFlow's automatic differentiation.
-    """
-    import tensorflow as tf  # pylint: disable=import-error
-
-    params = circuit.get_parameters()
-
-    kwargs = dict(
-        hamiltonian=observable,
-        circuit=circuit,
-        initial_state=initial_state,
-        exec_backend=exec_backend,
-        nshots=nshots if nshots is not None else None,
-    )
-
-    if nshots is not None:
-        kwargs.update({"nshots": nshots})
-
-    @tf.custom_gradient
-    def _expectation(params):
-
-        def grad(upstream):
-            gradients = upstream * tf.stack(differentiation_rule(**kwargs))
-            return tf.unstack(gradients)
-
-        if nshots is None:
-            expval = _exact(observable, circuit, initial_state, exec_backend)
-        else:
-            expval = _with_shots(
-                observable, circuit, initial_state, nshots, exec_backend
-            )
-
-        return expval, grad
-
-    return _expectation(params)
