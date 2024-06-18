@@ -3,10 +3,11 @@
 from typing import List, Optional, Union
 
 import qibo
+import torch
 from qibo.backends import Backend, NumpyBackend
 from qibo.config import raise_error
 
-from qiboml.backends import JaxBackend, TensorflowBackend
+from qiboml.backends import PyTorchBackend, TensorflowBackend
 
 
 def expectation(
@@ -61,9 +62,8 @@ def expectation(
     if differentiation_rule is not None:
         if isinstance(frontend, TensorflowBackend):
             return _with_tf(**kwargs)
-
-        if isinstance(frontend, JaxBackend):
-            return _with_jax(**kwargs)
+        elif isinstance(frontend, PyTorchBackend):
+            return _with_torch(**kwargs)
         else:
             raise_error(ValueError, f" Interface for {frontend} is not supported.")
 
@@ -135,3 +135,103 @@ def _with_tf(
         return expval, grad
 
     return _expectation(params)
+
+
+def _with_torch(
+    observable,
+    circuit,
+    initial_state,
+    nshots,
+    exec_backend,
+    differentiation_rule,
+):
+    """
+    Compute expectation sample integrating the custom differentiation rule with
+    Torch's automatic differentiation.
+    """
+
+    kwargs = dict(
+        hamiltonian=observable,
+        circuit=circuit,
+        initial_state=initial_state,
+        exec_backend=exec_backend,
+        nshots=nshots if nshots is not None else None,
+    )
+
+    if nshots is not None:
+        kwargs.update({"nshots": nshots})
+
+    params = torch.tensor(
+        circuit.get_parameters(), dtype=torch.float64, requires_grad=True
+    )
+
+    return _TorchDifferentiableExpectation.apply(
+        params,
+        observable,
+        circuit,
+        initial_state,
+        nshots,
+        exec_backend,
+        differentiation_rule,
+    )
+
+
+class _TorchDifferentiableExpectation(torch.autograd.Function):
+    @staticmethod
+    def forward(
+        ctx,
+        params,
+        observable,
+        circuit,
+        initial_state,
+        nshots,
+        exec_backend,
+        differentiation_rule,
+    ):
+        # Save everything needed for the backward pass in ctx
+        ctx.save_for_backward(params)
+        ctx.observable = observable
+        ctx.circuit = circuit
+        ctx.initial_state = initial_state
+        ctx.nshots = nshots
+        ctx.exec_backend = exec_backend
+        ctx.differentiation_rule = differentiation_rule
+
+        # Calculate expectation value using exec_backend
+        if nshots is None:
+            expval = exec_backend.calculate_expectation_state(
+                hamiltonian=exec_backend.cast(observable.matrix),
+                state=exec_backend.execute_circuit(
+                    circuit=circuit, initial_state=initial_state
+                ).state(),
+                normalize=False,
+            )
+        else:
+            expval = exec_backend.execute_circuit(
+                circuit=circuit, initial_state=initial_state, nshots=nshots
+            ).expectation_from_samples(observable)
+
+        return expval.clone().detach().to(dtype=torch.float64)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        (params,) = ctx.saved_tensors
+        observable = ctx.observable
+        circuit = ctx.circuit
+        initial_state = ctx.initial_state
+        nshots = ctx.nshots
+        exec_backend = ctx.exec_backend
+        differentiation_rule = ctx.differentiation_rule
+
+        kwargs = dict(
+            hamiltonian=observable,
+            circuit=circuit,
+            initial_state=initial_state,
+            exec_backend=exec_backend,
+            nshots=nshots,
+        )
+
+        gradients = (grad_output * torch.tensor(differentiation_rule(**kwargs)))[
+            :, None
+        ]
+        return gradients, None, None, None, None, None, None
