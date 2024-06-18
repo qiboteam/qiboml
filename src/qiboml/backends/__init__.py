@@ -6,7 +6,7 @@ from qiboml.backends.jax import JaxBackend
 from qiboml.backends.pytorch import PyTorchBackend
 from qiboml.backends.tensorflow import TensorflowBackend
 
-QIBOML_BACKENDS = ["tensorflow", "torch", "jax"]
+QIBOML_BACKENDS = ["tensorflow", "pytorch", "jax"]
 QibomlBackend = Union[TensorflowBackend, PyTorchBackend, JaxBackend]
 
 
@@ -26,7 +26,7 @@ class MetaBackend:
 
         if backend == "tensorflow":
             return TensorflowBackend()
-        elif backend == "torch":
+        elif backend == "pytorch":
             return PyTorchBackend()
         elif backend == "jax":
             return JaxBackend()
