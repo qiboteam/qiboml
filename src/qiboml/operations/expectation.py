@@ -11,6 +11,7 @@ from qiboml.backends import PyTorchBackend, TensorflowBackend
 
 
 def expectation(
+    parameters: list,
     observable: qibo.hamiltonians.Hamiltonian,
     circuit: qibo.Circuit,
     initial_state: Optional[Union[List, qibo.Circuit]] = None,
@@ -47,8 +48,14 @@ def expectation(
             ``qiboml.differentiation``.
     """
 
-    # read the frontend user choice
+    if len(list(parameters)) != len(circuit.get_parameters(format="flatlist")):
+        raise_error(
+            ValueError,
+            f"Given parameters list has length {len(parameters)}, which is incompatible with the circuit number of parameters {len(circuit.get_parameters(format='flatlist'))}",
+        )
+
     frontend = observable.backend
+    circuit.set_parameters(frontend.cast(parameters))
 
     kwargs = dict(
         observable=observable,
@@ -61,16 +68,34 @@ def expectation(
 
     if differentiation_rule is not None:
         if isinstance(frontend, TensorflowBackend):
-            return _with_tf(**kwargs)
+            return _with_tf(
+                parameters,
+                observable,
+                circuit,
+                initial_state,
+                nshots,
+                exec_backend,
+                differentiation_rule,
+            )
         elif isinstance(frontend, PyTorchBackend):
-            return _with_torch(**kwargs)
+            return _With_torch.apply(
+                parameters,
+                observable,
+                circuit,
+                initial_state,
+                nshots,
+                exec_backend,
+                differentiation_rule,
+            )
         else:
             raise_error(ValueError, f" Interface for {frontend} is not supported.")
 
-    elif nshots is None:
-        return _exact(observable, circuit, initial_state, exec_backend)
     else:
-        return _with_shots(observable, circuit, initial_state, nshots, exec_backend)
+        circuit.set_parameters(parameters)
+        if nshots is None:
+            return _exact(observable, circuit, initial_state, exec_backend)
+        else:
+            return _with_shots(observable, circuit, initial_state, nshots, exec_backend)
 
 
 def _exact(observable, circuit, initial_state, exec_backend):
@@ -92,6 +117,7 @@ def _with_shots(observable, circuit, initial_state, nshots, exec_backend):
 
 
 def _with_tf(
+    params,
     observable,
     circuit,
     initial_state,
@@ -105,14 +131,11 @@ def _with_tf(
     """
     import tensorflow as tf  # pylint: disable=import-error
 
-    params = circuit.get_parameters()
-
     kwargs = dict(
         hamiltonian=observable,
         circuit=circuit,
         initial_state=initial_state,
         exec_backend=exec_backend,
-        nshots=nshots if nshots is not None else None,
     )
 
     if nshots is not None:
@@ -123,7 +146,7 @@ def _with_tf(
 
         def grad(upstream):
             gradients = upstream * tf.stack(differentiation_rule(**kwargs))
-            return tf.unstack(gradients)
+            return gradients
 
         if nshots is None:
             expval = _exact(observable, circuit, initial_state, exec_backend)
@@ -137,46 +160,7 @@ def _with_tf(
     return _expectation(params)
 
 
-def _with_torch(
-    observable,
-    circuit,
-    initial_state,
-    nshots,
-    exec_backend,
-    differentiation_rule,
-):
-    """
-    Compute expectation sample integrating the custom differentiation rule with
-    Torch's automatic differentiation.
-    """
-
-    kwargs = dict(
-        hamiltonian=observable,
-        circuit=circuit,
-        initial_state=initial_state,
-        exec_backend=exec_backend,
-        nshots=nshots if nshots is not None else None,
-    )
-
-    if nshots is not None:
-        kwargs.update({"nshots": nshots})
-
-    params = torch.tensor(
-        circuit.get_parameters(), dtype=torch.float64, requires_grad=True
-    )
-
-    return _TorchDifferentiableExpectation.apply(
-        params,
-        observable,
-        circuit,
-        initial_state,
-        nshots,
-        exec_backend,
-        differentiation_rule,
-    )
-
-
-class _TorchDifferentiableExpectation(torch.autograd.Function):
+class _With_torch(torch.autograd.Function):
     @staticmethod
     def forward(
         ctx,
@@ -199,19 +183,12 @@ class _TorchDifferentiableExpectation(torch.autograd.Function):
 
         # Calculate expectation value using exec_backend
         if nshots is None:
-            expval = exec_backend.calculate_expectation_state(
-                hamiltonian=exec_backend.cast(observable.matrix),
-                state=exec_backend.execute_circuit(
-                    circuit=circuit, initial_state=initial_state
-                ).state(),
-                normalize=False,
-            )
+            expval = _exact(observable, circuit, initial_state, exec_backend)
         else:
-            expval = exec_backend.execute_circuit(
-                circuit=circuit, initial_state=initial_state, nshots=nshots
-            ).expectation_from_samples(observable)
-
-        return expval.clone().detach().to(dtype=torch.float64)
+            expval = _with_shots(
+                observable, circuit, initial_state, nshots, exec_backend
+            )
+        return torch.tensor(expval, requires_grad=True)
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -231,7 +208,8 @@ class _TorchDifferentiableExpectation(torch.autograd.Function):
             nshots=nshots,
         )
 
-        gradients = (grad_output * torch.tensor(differentiation_rule(**kwargs)))[
-            :, None
-        ]
-        return gradients, None, None, None, None, None, None
+        gradients = (
+            grad_output
+            * torch.tensor(differentiation_rule(**kwargs), dtype=torch.float64)
+        )[:, None]
+        return gradients.view_as(params), None, None, None, None, None, None
