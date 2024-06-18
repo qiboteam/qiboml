@@ -205,8 +205,10 @@ class _With_torch(torch.autograd.Function):
             circuit=circuit,
             initial_state=initial_state,
             exec_backend=exec_backend,
-            nshots=nshots,
         )
+
+        if nshots is not None:
+            kwargs.update({"nshots": nshots})
 
         gradients = (
             grad_output

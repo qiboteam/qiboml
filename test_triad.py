@@ -92,6 +92,7 @@ extime = train_circuit(
     hamiltonian=h,
     nepochs=20,
     exec_backend=backend,
+    nshots=1000,
     differentiation_rule=differentiation.parameter_shift,
 )
 
