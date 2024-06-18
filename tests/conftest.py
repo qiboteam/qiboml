@@ -13,21 +13,21 @@ BACKENDS = [
 
 
 NAME2BACKEND = {
-    "tensorflow": TensorflowBackend(),
-    "pytorch": PyTorchBackend(),
-    "jax": JaxBackend(),
+    "tensorflow": TensorflowBackend,
+    "pytorch": PyTorchBackend,
+    "jax": JaxBackend,
 }
 
 
 @pytest.fixture
 def backend(backend_name):
-    yield NAME2BACKEND[backend_name]
+    yield NAME2BACKEND[backend_name]()
 
 
 AVAILABLE_BACKENDS = []
 for backend_name in BACKENDS:
     try:
-        _backend = NAME2BACKEND[backend_name]
+        _backend = NAME2BACKEND[backend_name]()
         AVAILABLE_BACKENDS.append(backend_name)
     except (ModuleNotFoundError, ImportError):
         pass

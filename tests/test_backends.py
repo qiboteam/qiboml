@@ -1,3 +1,5 @@
+import platform
+
 import pytest
 
 from qiboml.backends import MetaBackend
@@ -13,5 +15,6 @@ def test_metabackend_load_error():
 
 
 def test_metabackend_list_available():
-    available_backends = {"tensorflow": True, "pytorch": True, "jax": True}
+    tensorflow = False if platform.system() == "Windows" else True
+    available_backends = {"tensorflow": tensorflow, "pytorch": True, "jax": True}
     assert MetaBackend().list_available() == available_backends
