@@ -1,5 +1,0 @@
-BACKENDS = [
-    "tensorflow",
-    "pytorch",
-    "jax",
-]
