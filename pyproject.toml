@@ -19,7 +19,8 @@ tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux' or sys_pl
 # the tensorflow requirements
 torch = "^2.2.0"
 jax = "^0.4.25"
-qibo = "^0.2.6"
+jaxlib = "^0.4.25"
+qibo = "^0.2.8"
 
 [tool.poetry.group.dev]
 optional = true
