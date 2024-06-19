@@ -15,7 +15,7 @@ class MetaBackend:
 
     @staticmethod
     def load(backend: str, **kwargs) -> QibomlBackend:
-        """Loads the qiboml backend.
+        """Load the qiboml backend.
 
         Args:
             backend (str): Name of the backend to load.
@@ -37,7 +37,7 @@ class MetaBackend:
             )
 
     def list_available(self) -> dict:
-        """Lists all the available native qibo backends."""
+        """List all the available native qibo backends."""
         available_backends = {}
         for backend in QIBOML_BACKENDS:
             try:
