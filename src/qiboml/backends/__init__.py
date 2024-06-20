@@ -14,7 +14,7 @@ class MetaBackend:
     """Meta-backend class which takes care of loading the qiboml backends."""
 
     @staticmethod
-    def load(platform: str, **kwargs) -> QibomlBackend:
+    def load(platform: str) -> QibomlBackend:
         """Load the qiboml backend.
 
         Args:
