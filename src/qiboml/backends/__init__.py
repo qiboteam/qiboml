@@ -6,7 +6,7 @@ from qiboml.backends.jax import JaxBackend
 from qiboml.backends.pytorch import PyTorchBackend
 from qiboml.backends.tensorflow import TensorflowBackend
 
-QIBOML_BACKENDS = ["tensorflow", "pytorch", "jax"]
+PLATFORMS = ["tensorflow", "pytorch", "jax"]
 QibomlBackend = Union[TensorflowBackend, PyTorchBackend, JaxBackend]
 
 
@@ -14,36 +14,35 @@ class MetaBackend:
     """Meta-backend class which takes care of loading the qiboml backends."""
 
     @staticmethod
-    def load(backend: str, **kwargs) -> QibomlBackend:
+    def load(platform: str, **kwargs) -> QibomlBackend:
         """Load the qiboml backend.
 
         Args:
-            backend (str): Name of the backend to load.
-            kwargs (dict): Additional arguments for the qibo backend.
+            platform (str): Name of the backend to load.
         Returns:
             qibo.backends.abstract.Backend: The loaded backend.
         """
 
-        if backend == "tensorflow":
+        if platform == "tensorflow":
             return TensorflowBackend()
-        elif backend == "pytorch":
+        elif platform == "pytorch":
             return PyTorchBackend()
-        elif backend == "jax":
+        elif platform == "jax":
             return JaxBackend()
         else:
             raise_error(
                 ValueError,
-                f"Backend {backend} is not available. The qiboml backends are {QIBOML_BACKENDS}.",
+                f"Backend {platform} is not available. The qiboml backends are {PLATFORMS}.",
             )
 
     def list_available(self) -> dict:
-        """List all the available native qibo backends."""
+        """List all the available qiboml backends."""
         available_backends = {}
-        for backend in QIBOML_BACKENDS:
+        for platform in PLATFORMS:
             try:
-                MetaBackend.load(backend)
+                MetaBackend.load(platform)
                 available = True
             except:  # pragma: no cover
                 available = False
-            available_backends[backend] = available
+            available_backends[platform] = available
         return available_backends
