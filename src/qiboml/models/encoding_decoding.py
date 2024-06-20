@@ -26,9 +26,9 @@ class BinaryEncodingLayer(QuantumEncodingLayer):
                 f"Invalid input dimension {x.shape[-1]}, but nqubits is {self.nqubits}.",
             )
         circuit = self.circuit.copy()
-        for q, bit in zip(self.qubits, x.ravel()):
-            if bit:
-                circuit.add(gates.X(q))
+        ones = x.ravel() == 1
+        for bit in ones:
+            circuit.add(gates.X(self.qubits[bit]))
         return circuit
 
 
