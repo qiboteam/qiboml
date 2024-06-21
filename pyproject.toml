@@ -6,7 +6,7 @@ build-backend = "poetry.core.masonry.api"
 name = "qiboml"
 version = "0.0.1"
 description = "Quantum Machine Learning using Qibo"
-authors = ["Matteo Robbiati <matteo.robbiati@cern.ch>"]
+authors = ["Qiboteam"]
 readme = "README.md"
 packages = [{ include = "qiboml", from = "src" }]
 
