@@ -60,7 +60,7 @@ for module in (ed, ans):
 
 
 @dataclass
-class Model(keras.layers.Layer):
+class QuantumModel(keras.layers.Layer):
 
     def __init__(self, layers: list[QuantumCircuitLayer]):
         super().__init__()
