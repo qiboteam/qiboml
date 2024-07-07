@@ -79,10 +79,16 @@ class Model(keras.layers.Layer):
             )
 
     def call(self, x: "ndarray"):
-        for layer in self.layers[:-1]:
+        for layer in self.layers:
             x = layer.forward(x)
         return x
+
+    def compute_output_shape(self):
+        return self.layers[-1].output_shape
 
     @property
     def nqubits(self):
         return self.layers[0].circuit.nqubits
+
+    def __hash__(self):
+        return super().__hash__()

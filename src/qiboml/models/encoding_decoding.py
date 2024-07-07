@@ -45,7 +45,7 @@ class PhaseEncodingLayer(QuantumEncodingLayer):
             self.circuit.add(gates.RZ(q, theta=0.0))
 
     def forward(self, x: "ndarray") -> Circuit:
-        self.circuit.set_parameters(x)
+        self.circuit.set_parameters(x.ravel())
         return self.circuit
 
 
@@ -92,8 +92,13 @@ class ExpectationLayer(QuantumDecodingLayer):
 
     def forward(self, x: Circuit) -> "ndarray":
         return self.observable.expectation_from_samples(
-            super().forward(x).frequencies()
+            super().forward(x).samples(),
+            input_samples=True,
         )
+
+    @property
+    def output_shape(self):
+        return (1,)
 
 
 """
