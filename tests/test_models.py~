@@ -1,0 +1,13 @@
+import pytest
+
+import numpy as np
+import qiboml.models.encoding_decoding as ed
+
+def test_binary_encoding_layer():
+    nqubits = 5
+    qubits = np.random.choice(range(nqubits), size=(3,))
+    layer = ed.BinaryEncodingLayer(nqubits, qubits=qubits)
+    data = np.random.choice([0, 1], size=(len(qubits),))
+    c = layer(data)
+    indices = [i for i, gate in enumerate(c.queue) if gate.name == "x"]
+    assert (data == 1) == indices

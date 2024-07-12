@@ -20,13 +20,13 @@ class QuantumEncodingLayer(QuantumCircuitLayer):
 class BinaryEncodingLayer(QuantumEncodingLayer):
 
     def forward(self, x: "ndarray") -> Circuit:
-        if x.shape[-1] != self.nqubits:
+        if x.shape[-1] != len(self.qubits):
             raise_error(
                 RuntimeError,
-                f"Invalid input dimension {x.shape[-1]}, but nqubits is {self.nqubits}.",
+                f"Invalid input dimension {x.shape[-1]}, but the allocated qubits are {self.qubits}.",
             )
         circuit = self.circuit.copy()
-        ones = x.ravel() == 1
+        ones = (x.ravel() == 1).nonzero()
         for bit in ones:
             circuit.add(gates.X(self.qubits[bit]))
         return circuit
@@ -37,15 +37,11 @@ class PhaseEncodingLayer(QuantumEncodingLayer):
 
     def __post_init__(self):
         super().__post_init__()
-        self.circuit.add(gates.H(0))
-        for q in self.qubits:
-            if q != 0:
-                self.circuit.add(gates.CNOT(0, q))
         for q in self.qubits:
             self.circuit.add(gates.RZ(q, theta=0.0))
 
     def forward(self, x: "ndarray") -> Circuit:
-        self.circuit.set_parameters(x.ravel())
+        self.circuit.set_parameters(self.backend.cast(x.ravel()))
         return self.circuit
 
 
@@ -70,17 +66,36 @@ class QuantumDecodingLayer(QuantumCircuitLayer):
         super().__post_init__()
         self.circuit.add(gates.M(*self.qubits))
 
-    def forward(self, x: Circuit) -> Circuit:
+    def forward(self, x: Circuit) -> "CircuitResult":
         return self.backend.execute_circuit(x + self.circuit, nshots=self.nshots)
 
     def backward(self):
         raise_error(NotImplementedError, "TO DO")
 
 
+class ProbabilitiesLayer(QuantumDecodingLayer):
+
+    def forward(self, x: Circuit) -> "ndarray":
+        return super().forward(x).probabilities(self.qubits)
+
+
+class SamplesLayer(QuantumDecodingLayer):
+
+    def forward(self, x: Circuit) -> "ndarray":
+        return super().forward(x).samples()
+
+
+class StateLayer(QuantumDecodingLayer):
+
+    def forward(self, x: Circuit) -> "ndarray":
+        return super().forward(x).state()
+
+
 @dataclass
 class ExpectationLayer(QuantumDecodingLayer):
 
     observable: Union["ndarray", "qibo.models.Hamiltonian"] = None
+    nshots: int = None
 
     def __post_init__(self):
         if self.observable is None:
@@ -91,10 +106,15 @@ class ExpectationLayer(QuantumDecodingLayer):
         super().__post_init__()
 
     def forward(self, x: Circuit) -> "ndarray":
-        return self.observable.expectation_from_samples(
-            super().forward(x).samples(),
-            input_samples=True,
-        )
+        if self.nshots is None:
+            return self.observable.expectation(
+                super().forward(x).state(),
+            )
+        else:
+            return self.observable.expectation_from_samples(
+                super().forward(x).samples(),
+                input_samples=True,
+            )
 
     @property
     def output_shape(self):

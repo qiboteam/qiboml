@@ -1,6 +1,5 @@
 """Torch interface to qiboml layers"""
 
-import inspect
 from dataclasses import dataclass
 
 import torch
@@ -9,7 +8,7 @@ import qiboml.models.ansatze as ans
 import qiboml.models.encoding_decoding as ed
 from qiboml.models.abstract import QuantumCircuitLayer
 
-
+"""
 def _torch_factory(module) -> None:
     for name, layer in inspect.getmembers(module, inspect.isclass):
         if layer.__module__ == module.__name__:
@@ -51,6 +50,7 @@ def _torch_factory(module) -> None:
 
 for module in (ed, ans):
     _torch_factory(module)
+"""
 
 
 @dataclass
@@ -75,14 +75,14 @@ class QuantumModel(torch.nn.Module):
     def forward(self, x: torch.Tensor):
         for layer in self.layers:
             x = layer.forward(x)
-        return x
+        return torch.as_tensor(x)
 
-    def backward(self, input_grad: torch.Tensor):
+    def backward(self, input_grad: torch.Tensor) -> torch.Tensor:
         grad = input_grad
         for layer in self.layers:
             grad = layer.backward(grad)
         return grad
 
     @property
-    def nqubits(self):
+    def nqubits(self) -> int:
         return self.layers[0].circuit.nqubits

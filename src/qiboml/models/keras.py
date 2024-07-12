@@ -1,6 +1,5 @@
 """Keras interface to qiboml layers"""
 
-import inspect
 from dataclasses import dataclass
 
 import keras
@@ -13,7 +12,7 @@ import qiboml.models.ansatze as ans
 import qiboml.models.encoding_decoding as ed
 from qiboml.models.abstract import QuantumCircuitLayer
 
-
+"""
 def _keras_factory(module):
     for name, layer in inspect.getmembers(module, inspect.isclass):
         if layer.__module__ == module.__name__:
@@ -57,6 +56,7 @@ def _keras_factory(module):
 
 for module in (ed, ans):
     _keras_factory(module)
+"""
 
 
 @dataclass
