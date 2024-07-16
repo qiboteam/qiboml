@@ -58,13 +58,17 @@ class QuantumModel(torch.nn.Module):
 
     def __init__(self, layers: list[QuantumCircuitLayer]):
         super().__init__()
-        nqubits = layers[0].circuit.nqubits
         self.layers = layers
         for layer in layers[1:]:
-            if layer.circuit.nqubits != nqubits:
+            if layer.circuit.nqubits != self.nqubits:
                 raise_error(
                     RuntimeError,
                     f"Layer \n{layer}\n has {layer.circuit.nqubits} qubits, but {nqubits} qubits was expected.",
+                )
+            if layer.backend.name != self.backend.name:
+                raise_error(
+                    RuntimeError,
+                    f"Layer \n{layer}\n is using {layer.backend} backend, but {self.backend} backend was expected.",
                 )
         if not isinstance(layers[-1], ed.QuantumDecodingLayer):
             raise_error(
@@ -73,8 +77,12 @@ class QuantumModel(torch.nn.Module):
             )
 
     def forward(self, x: torch.Tensor):
+        if self.backend.name != "pytorch":
+            x = x.detach().numpy()
+            x = self.backend.cast(x, dtype=x.dtype)
         for layer in self.layers:
             x = layer.forward(x)
+        x = x.numpy()
         return torch.as_tensor(x)
 
     def backward(self, input_grad: torch.Tensor) -> torch.Tensor:
@@ -86,3 +94,7 @@ class QuantumModel(torch.nn.Module):
     @property
     def nqubits(self) -> int:
         return self.layers[0].circuit.nqubits
+
+    @property
+    def backend(self) -> "Backend":
+        return self.layers[0].backend
