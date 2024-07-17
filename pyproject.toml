@@ -26,6 +26,12 @@ optional = true
 ipython = "^7.34"
 pdbpp = "^0.10.3"
 
+[tool.poetry.group.tests]
+optional = true
+
+[tool.poetry.group.tests.dependencies]
+torch = "^2.3.1"
+
 [tool.poetry.group.benchmark.dependencies]
 pytest = "^7.1.2"
 pylint = "^2.17"
