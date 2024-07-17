@@ -5,7 +5,8 @@ from dataclasses import dataclass
 import keras
 import numpy as np
 import tensorflow as tf
-from keras.src.backend import compute_output_spec
+
+# from keras.src.backend import compute_output_spec
 from qibo.config import raise_error
 
 import qiboml.models.ansatze as ans

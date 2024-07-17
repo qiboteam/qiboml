@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 
 import torch
+from qibo.config import raise_error
 
 import qiboml.models.ansatze as ans
 import qiboml.models.encoding_decoding as ed
@@ -63,7 +64,7 @@ class QuantumModel(torch.nn.Module):
             if layer.circuit.nqubits != self.nqubits:
                 raise_error(
                     RuntimeError,
-                    f"Layer \n{layer}\n has {layer.circuit.nqubits} qubits, but {nqubits} qubits was expected.",
+                    f"Layer \n{layer}\n has {layer.circuit.nqubits} qubits, but {self.nqubits} qubits was expected.",
                 )
             if layer.backend.name != self.backend.name:
                 raise_error(

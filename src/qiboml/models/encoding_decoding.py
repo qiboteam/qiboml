@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from typing import Union
 
+import numpy as np
 from qibo import Circuit, gates
 from qibo.config import raise_error
 
@@ -26,7 +27,7 @@ class BinaryEncodingLayer(QuantumEncodingLayer):
                 f"Invalid input dimension {x.shape[-1]}, but the allocated qubits are {self.qubits}.",
             )
         circuit = self.circuit.copy()
-        ones = (x.ravel() == 1).numpy().nonzero()[0]
+        ones = np.flatnonzero(x.ravel() == 1)
         for bit in ones:
             circuit.add(gates.X(self.qubits[bit]))
         return circuit
@@ -82,13 +83,16 @@ class ProbabilitiesLayer(QuantumDecodingLayer):
 class SamplesLayer(QuantumDecodingLayer):
 
     def forward(self, x: Circuit) -> "ndarray":
-        return super().forward(x).samples()
+        return self.backend.cast(super().forward(x).samples(), dtype=np.float64)
 
 
 class StateLayer(QuantumDecodingLayer):
 
     def forward(self, x: Circuit) -> "ndarray":
-        return super().forward(x).state()
+        state = super().forward(x).state()
+        return self.backend.cast(
+            np.vstack((np.real(state), np.imag(state))), dtype=np.float64
+        )
 
 
 @dataclass

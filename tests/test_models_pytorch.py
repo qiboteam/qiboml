@@ -34,7 +34,7 @@ def random_subset(nqubits, k):
     return np.random.choice(range(nqubits), size=(k,), replace=False)
 
 
-def output_dim(decoding_layer, input_dim):
+def output_dim(decoding_layer, input_dim, nqubits):
     if decoding_layer is ed.ExpectationLayer:
         return 1
     elif decoding_layer is ed.ProbabilitiesLayer:
@@ -42,7 +42,7 @@ def output_dim(decoding_layer, input_dim):
     elif decoding_layer is ed.SamplesLayer:
         return input_dim
     elif decoding_layer is ed.StateLayer:
-        return 2**input_dim
+        return 2**nqubits
     else:
         raise_error(RuntimeError, f"Layer {decoding_layer} not supported.")
 
@@ -97,7 +97,7 @@ def test_pytorch_decoding(layer):
         torch.nn.Linear(128, dim),
         torch.nn.ReLU(),
         q_model,
-        torch.nn.Linear(output_dim(layer, dim), 128),
+        torch.nn.Linear(output_dim(layer, dim, nqubits), 128),
     )
     data = torch.randn(1, 128)
     model(data)
