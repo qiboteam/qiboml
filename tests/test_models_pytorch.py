@@ -48,13 +48,17 @@ def output_dim(decoding_layer, input_dim, nqubits):
 
 
 @pytest.mark.parametrize("layer", ENCODING_LAYERS)
-def test_pytorch_encoding(layer):
+def test_pytorch_encoding(backend, layer):
     torch.set_default_dtype(torch.float64)
     nqubits = 5
     dim = 4
-    training_layer = ans.ReuploadingLayer(nqubits, random_subset(nqubits, dim))
-    decoding_layer = ed.ProbabilitiesLayer(nqubits, random_subset(nqubits, dim))
-    encoding_layer = layer(nqubits, random_subset(nqubits, dim))
+    training_layer = ans.ReuploadingLayer(
+        nqubits, random_subset(nqubits, dim), backend=backend
+    )
+    decoding_layer = ed.ProbabilitiesLayer(
+        nqubits, random_subset(nqubits, dim), backend=backend
+    )
+    encoding_layer = layer(nqubits, random_subset(nqubits, dim), backend=backend)
     q_model = QuantumModel(
         layers=[
             encoding_layer,
@@ -73,13 +77,17 @@ def test_pytorch_encoding(layer):
 
 
 @pytest.mark.parametrize("layer", DECODING_LAYERS)
-def test_pytorch_decoding(layer):
+def test_pytorch_decoding(backend, layer):
     torch.set_default_dtype(torch.float64)
     nqubits = 5
     dim = 4
-    training_layer = ans.ReuploadingLayer(nqubits, random_subset(nqubits, dim))
-    encoding_layer = ed.PhaseEncodingLayer(nqubits, random_subset(nqubits, dim))
-    kwargs = {}
+    training_layer = ans.ReuploadingLayer(
+        nqubits, random_subset(nqubits, dim), backend=backend
+    )
+    encoding_layer = ed.PhaseEncodingLayer(
+        nqubits, random_subset(nqubits, dim), backend=backend
+    )
+    kwargs = {"backend": backend}
     if layer is ed.ExpectationLayer:
         observable = hamiltonians.SymbolicHamiltonian(
             sum([Z(int(i)) for i in random_subset(nqubits, dim)])

@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 
+import numpy as np
 import torch
 from qibo.config import raise_error
 
@@ -83,8 +84,9 @@ class QuantumModel(torch.nn.Module):
             x = self.backend.cast(x, dtype=x.dtype)
         for layer in self.layers:
             x = layer.forward(x)
-        x = x.numpy()
-        return torch.as_tensor(x)
+        if self.backend.name != "pytorch":
+            x = torch.as_tensor(np.array(x))
+        return x
 
     def backward(self, input_grad: torch.Tensor) -> torch.Tensor:
         grad = input_grad

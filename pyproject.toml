@@ -17,6 +17,7 @@ numba = "^0.59.0"
 tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux' or sys_platform == 'darwin'" }
 # TODO: the marker is a temporary solution due to the lack of the tensorflow-io 0.32.0's wheels for Windows, this package is one of
 # the tensorflow requirements
+torch = { version = "^2.1.1", optional = true }
 qibo = {git="https://github.com/qiboteam/qibo", branch="qiboml_models_updates"}
 
 [tool.poetry.group.dev]
