@@ -46,8 +46,8 @@ class PhaseEncodingLayer(QuantumEncodingLayer):
         return self.circuit
 
 
-class AmplitudeEncodingLayer(QuantumEncodingLayer):
-    pass
+# class AmplitudeEncodingLayer(QuantumEncodingLayer):
+#    pass
 
 
 """
@@ -111,7 +111,6 @@ class ExpectationLayer(QuantumDecodingLayer):
 
     def forward(self, x: Circuit) -> "ndarray":
         if self.nshots is None:
-            # breakpoint()
             return self.observable.expectation(
                 super().forward(x).state(),
             ).reshape(1, 1)

@@ -5,7 +5,7 @@ import pytest
 import torch
 from qibo import hamiltonians
 from qibo.config import raise_error
-from qibo.symbols import Z
+from qibo.symbols import I, Z
 
 import qiboml.models.ansatze as ans
 import qiboml.models.encoding_decoding as ed
@@ -89,8 +89,12 @@ def test_pytorch_decoding(backend, layer):
     )
     kwargs = {"backend": backend}
     if layer is ed.ExpectationLayer:
+        identity = I(0)
+        for i in range(1, nqubits):
+            identity *= I(i)
         observable = hamiltonians.SymbolicHamiltonian(
-            sum([Z(int(i)) for i in random_subset(nqubits, dim)])
+            sum([Z(int(i)) * identity for i in random_subset(nqubits, dim)]),
+            backend=backend,
         )
         kwargs["observable"] = observable
     decoding_layer = layer(nqubits, random_subset(nqubits, dim), **kwargs)
