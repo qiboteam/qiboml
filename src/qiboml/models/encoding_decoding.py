@@ -90,8 +90,8 @@ class StateLayer(QuantumDecodingLayer):
 
     def forward(self, x: Circuit) -> "ndarray":
         state = super().forward(x).state()
-        return self.backend.cast(
-            np.vstack((np.real(state), np.imag(state))), dtype=np.float64
+        return self.backend.np.vstack(
+            (self.backend.np.real(state), self.backend.np.imag(state))
         )
 
 
