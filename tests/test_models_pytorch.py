@@ -17,7 +17,7 @@ def get_layers(module, layer_type=None):
     for name, layer in inspect.getmembers(module, inspect.isclass):
         if layer.__module__ == module.__name__:
             if layer_type is not None:
-                if issubclass(layer, layer_type):
+                if issubclass(layer, layer_type) and not layer is layer_type:
                     pass
                 else:
                     continue

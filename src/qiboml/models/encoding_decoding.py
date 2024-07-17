@@ -111,9 +111,10 @@ class ExpectationLayer(QuantumDecodingLayer):
 
     def forward(self, x: Circuit) -> "ndarray":
         if self.nshots is None:
+            # breakpoint()
             return self.observable.expectation(
                 super().forward(x).state(),
-            )
+            ).reshape(1, 1)
         else:
             return self.observable.expectation_from_samples(
                 super().forward(x).samples(),
