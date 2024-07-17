@@ -61,7 +61,7 @@ for module in (ed, ans):
 
 
 @dataclass
-class QuantumModel(keras.layers.Layer):
+class QuantumModel(keras.layers.Layer):  # pylint: disable=no-member
 
     def __init__(self, layers: list[QuantumCircuitLayer]):
         super().__init__()
