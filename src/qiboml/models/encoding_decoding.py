@@ -99,7 +99,7 @@ class StateLayer(QuantumDecodingLayer):
 class ExpectationLayer(QuantumDecodingLayer):
 
     observable: Union["ndarray", "qibo.models.Hamiltonian"] = None
-    nshots: int = None
+    analytic: bool = False
 
     def __post_init__(self):
         if self.observable is None:
@@ -110,7 +110,7 @@ class ExpectationLayer(QuantumDecodingLayer):
         super().__post_init__()
 
     def forward(self, x: Circuit) -> "ndarray":
-        if self.nshots is None:
+        if self.analytic:
             return self.observable.expectation(
                 super().forward(x).state(),
             ).reshape(1, 1)
@@ -118,11 +118,11 @@ class ExpectationLayer(QuantumDecodingLayer):
             return self.observable.expectation_from_samples(
                 super().forward(x).samples(),
                 input_samples=True,
-            )
+            ).reshape(1, 1)
 
     @property
     def output_shape(self):
-        return (1,)
+        return (1, 1)
 
 
 """

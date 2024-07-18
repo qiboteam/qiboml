@@ -77,7 +77,10 @@ def test_pytorch_encoding(backend, layer):
 
 
 @pytest.mark.parametrize("layer", DECODING_LAYERS)
-def test_pytorch_decoding(backend, layer):
+@pytest.mark.parametrize("analytic", [True, False])
+def test_pytorch_decoding(backend, layer, analytic):
+    if analytic and not layer is ed.ExpectationLayer:
+        pytest.skip("Unused analytic argument.")
     torch.set_default_dtype(torch.float64)
     nqubits = 5
     dim = 4
@@ -88,16 +91,20 @@ def test_pytorch_decoding(backend, layer):
         nqubits, random_subset(nqubits, dim), backend=backend
     )
     kwargs = {"backend": backend}
+    decoding_qubits = random_subset(nqubits, dim)
+    print(decoding_qubits)
     if layer is ed.ExpectationLayer:
-        identity = I(0)
-        for i in range(1, nqubits):
-            identity *= I(i)
         observable = hamiltonians.SymbolicHamiltonian(
-            sum([Z(int(i)) * identity for i in random_subset(nqubits, dim)]),
+            sum([Z(int(i)) for i in decoding_qubits]),
+            nqubits=nqubits,
             backend=backend,
         )
+        print(observable.form)
+        # if not analytic:
+        #    breakpoint()
         kwargs["observable"] = observable
-    decoding_layer = layer(nqubits, random_subset(nqubits, dim), **kwargs)
+        kwargs["analytic"] = analytic
+    decoding_layer = layer(nqubits, decoding_qubits, **kwargs)
     q_model = QuantumModel(
         layers=[
             encoding_layer,
