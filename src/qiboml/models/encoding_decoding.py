@@ -115,11 +115,13 @@ class ExpectationLayer(QuantumDecodingLayer):
                 super().forward(x).state(),
             ).reshape(1, 1)
         else:
-            breakpoint()
-            return self.observable.expectation_from_samples(
-                super().forward(x).frequencies(),
-                #input_samples=True,
-            ).reshape(1, 1)
+            return self.backend.cast(
+                self.observable.expectation_from_samples(
+                    super().forward(x).frequencies(),
+                    qubit_map=self.qubits,
+                ).reshape(1, 1),
+                dtype=np.float64,
+            )
 
     @property
     def output_shape(self):

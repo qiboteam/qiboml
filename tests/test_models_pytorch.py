@@ -1,8 +1,8 @@
 import inspect
+
 import numpy as np
 import pytest
 import torch
-
 from qibo import hamiltonians
 from qibo.config import raise_error
 from qibo.symbols import I, Z
@@ -31,7 +31,7 @@ ANSATZE_LAYERS = get_layers(ans)
 
 
 def random_subset(nqubits, k):
-    return np.random.choice(range(nqubits), size=(k,), replace=False)
+    return np.random.choice(range(nqubits), size=(k,), replace=False).tolist()
 
 
 def output_dim(decoding_layer, input_dim, nqubits):
@@ -92,16 +92,12 @@ def test_pytorch_decoding(backend, layer, analytic):
     )
     kwargs = {"backend": backend}
     decoding_qubits = random_subset(nqubits, dim)
-    print(decoding_qubits)
     if layer is ed.ExpectationLayer:
         observable = hamiltonians.SymbolicHamiltonian(
             sum([Z(int(i)) for i in decoding_qubits]),
             nqubits=nqubits,
             backend=backend,
         )
-        print(observable.form)
-        # if not analytic:
-        #    breakpoint()
         kwargs["observable"] = observable
         kwargs["analytic"] = analytic
     decoding_layer = layer(nqubits, decoding_qubits, **kwargs)
