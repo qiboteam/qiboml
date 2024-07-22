@@ -15,7 +15,6 @@ from qiboml.models.abstract import QuantumCircuitLayer
 # import tensorflow as tf
 
 
-
 """
 def _keras_factory(module):
     for name, layer in inspect.getmembers(module, inspect.isclass):
