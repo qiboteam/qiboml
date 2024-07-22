@@ -32,6 +32,7 @@ optional = true
 
 [tool.poetry.group.tests.dependencies]
 torch = "^2.3.1"
+tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux'" }
 
 [tool.poetry.group.benchmark.dependencies]
 pytest = "^7.1.2"
