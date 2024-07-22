@@ -115,9 +115,10 @@ class ExpectationLayer(QuantumDecodingLayer):
                 super().forward(x).state(),
             ).reshape(1, 1)
         else:
+            breakpoint()
             return self.observable.expectation_from_samples(
-                super().forward(x).samples(),
-                input_samples=True,
+                super().forward(x).frequencies(),
+                #input_samples=True,
             ).reshape(1, 1)
 
     @property

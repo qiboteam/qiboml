@@ -1,8 +1,8 @@
 import inspect
-
 import numpy as np
 import pytest
 import torch
+
 from qibo import hamiltonians
 from qibo.config import raise_error
 from qibo.symbols import I, Z
