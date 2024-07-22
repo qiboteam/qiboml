@@ -60,6 +60,14 @@ def backend(backend_name):
 def frontend(frontend_name):
     yield get_frontend(frontend_name)
 
+def pytest_runtest_setup(item):
+    ALL = {"darwin", "linux"}
+    supported_platforms = ALL.intersection(mark.name for mark in item.iter_markers())
+    plat = sys.platform
+    if supported_platforms and plat not in supported_platforms:  # pragma: no cover
+        # case not covered by workflows
+        pytest.skip(f"Cannot run test on platform {plat}.")
+
 
 def pytest_generate_tests(metafunc):
     module_name = metafunc.module.__name__
