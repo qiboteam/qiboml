@@ -3,6 +3,8 @@
 Pytest fixtures.
 """
 
+import sys
+
 import pytest
 from qibo.backends import construct_backend
 
@@ -59,6 +61,7 @@ def backend(backend_name):
 @pytest.fixture
 def frontend(frontend_name):
     yield get_frontend(frontend_name)
+
 
 def pytest_runtest_setup(item):
     ALL = {"darwin", "linux"}
