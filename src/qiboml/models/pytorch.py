@@ -72,6 +72,12 @@ class QuantumModel(torch.nn.Module):
                     RuntimeError,
                     f"Layer \n{layer}\n is using {layer.backend} backend, but {self.backend} backend was expected.",
                 )
+        for layer in layers:
+            if len(layer.circuit.get_parameters()) > 0:
+                self.register_parameter(
+                    layer.__class__.__name__,
+                    torch.nn.Parameter(torch.as_tensor(layer.circuit.get_parameters())),
+                )
         if not isinstance(layers[-1], ed.QuantumDecodingLayer):
             raise_error(
                 RuntimeError,
@@ -101,3 +107,7 @@ class QuantumModel(torch.nn.Module):
     @property
     def backend(self) -> "Backend":
         return self.layers[0].backend
+
+    @property
+    def output_shape(self):
+        return self.layers[-1].output_shape

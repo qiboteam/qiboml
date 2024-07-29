@@ -76,14 +76,25 @@ class QuantumDecodingLayer(QuantumCircuitLayer):
 
 class ProbabilitiesLayer(QuantumDecodingLayer):
 
+    def __post_init__(self):
+        super().__post_init__()
+
     def forward(self, x: Circuit) -> "ndarray":
-        return super().forward(x).probabilities(self.qubits)
+        return super().forward(x).probabilities(self.qubits).reshape(1, -1)
+
+    @property
+    def output_shape(self):
+        return (1, 2 ** len(self.qubits))
 
 
 class SamplesLayer(QuantumDecodingLayer):
 
     def forward(self, x: Circuit) -> "ndarray":
         return self.backend.cast(super().forward(x).samples(), dtype=np.float64)
+
+    @property
+    def output_shape(self):
+        return (self.nshots, len(self.qubits))
 
 
 class StateLayer(QuantumDecodingLayer):
@@ -93,6 +104,10 @@ class StateLayer(QuantumDecodingLayer):
         return self.backend.np.vstack(
             (self.backend.np.real(state), self.backend.np.imag(state))
         )
+
+    @property
+    def output_shape(self):
+        return (2, 2**self.nqubits)
 
 
 @dataclass

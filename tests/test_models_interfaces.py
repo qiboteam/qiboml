@@ -1,7 +1,9 @@
 import inspect
 
+import keras
 import numpy as np
 import pytest
+import tensorflow as tf
 import torch
 from qibo import hamiltonians
 from qibo.config import raise_error
@@ -9,7 +11,8 @@ from qibo.symbols import I, Z
 
 import qiboml.models.ansatze as ans
 import qiboml.models.encoding_decoding as ed
-from qiboml.models.pytorch import QuantumModel
+
+torch.set_default_dtype(torch.float64)
 
 
 def get_layers(module, layer_type=None):
@@ -34,22 +37,35 @@ def random_subset(nqubits, k):
     return np.random.choice(range(nqubits), size=(k,), replace=False).tolist()
 
 
-def output_dim(decoding_layer, input_dim, nqubits):
-    if decoding_layer is ed.ExpectationLayer:
-        return 1
-    elif decoding_layer is ed.ProbabilitiesLayer:
-        return 2**input_dim
-    elif decoding_layer is ed.SamplesLayer:
-        return input_dim
-    elif decoding_layer is ed.StateLayer:
-        return 2**nqubits
+def build_linear_layer(frontend, input_dim, output_dim):
+    if frontend.__name__ == "qiboml.models.pytorch":
+        return torch.nn.Linear(input_dim, output_dim)
+    elif frontend.__name__ == "qiboml.models.keras":
+        return keras.layers.Dense(output_dim)
     else:
-        raise_error(RuntimeError, f"Layer {decoding_layer} not supported.")
+        raise_error(RuntimeError, f"Unknown frontend {frontend}.")
+
+
+def build_sequential_model(frontend, layers):
+    if frontend.__name__ == "qiboml.models.pytorch":
+        return torch.nn.Sequential(*layers)
+    elif frontend.__name__ == "qiboml.models.keras":
+        return keras.Sequential(layers)
+    else:
+        raise_error(RuntimeError, f"Unknown frontend {frontend}.")
+
+
+def random_tensor(frontend, shape):
+    if frontend.__name__ == "qiboml.models.pytorch":
+        return torch.randn(shape)
+    elif frontend.__name__ == "qiboml.models.keras":
+        return tf.random.uniform(shape)
+    else:
+        raise_error(RuntimeError, f"Unknown frontend {frontend}.")
 
 
 @pytest.mark.parametrize("layer", ENCODING_LAYERS)
-def test_pytorch_encoding(backend, layer):
-    torch.set_default_dtype(torch.float64)
+def test_encoding(backend, frontend, layer):
     nqubits = 5
     dim = 4
     training_layer = ans.ReuploadingLayer(
@@ -59,29 +75,30 @@ def test_pytorch_encoding(backend, layer):
         nqubits, random_subset(nqubits, dim), backend=backend
     )
     encoding_layer = layer(nqubits, random_subset(nqubits, dim), backend=backend)
-    q_model = QuantumModel(
+    q_model = frontend.QuantumModel(
         layers=[
             encoding_layer,
             training_layer,
             decoding_layer,
         ]
     )
-    model = torch.nn.Sequential(
-        torch.nn.Linear(128, dim),
-        torch.nn.Hardshrink(),
-        q_model,
-        torch.nn.Linear(2**dim, 1),
+    model = build_sequential_model(
+        frontend,
+        [
+            build_linear_layer(frontend, 128, dim),
+            q_model,
+            build_linear_layer(frontend, 2**dim, 1),
+        ],
     )
-    data = torch.randn(1, 128)
+    data = random_tensor(frontend, (1, 128))
     model(data)
 
 
 @pytest.mark.parametrize("layer", DECODING_LAYERS)
 @pytest.mark.parametrize("analytic", [True, False])
-def test_pytorch_decoding(backend, layer, analytic):
+def test_decoding(backend, frontend, layer, analytic):
     if analytic and not layer is ed.ExpectationLayer:
         pytest.skip("Unused analytic argument.")
-    torch.set_default_dtype(torch.float64)
     nqubits = 5
     dim = 4
     training_layer = ans.ReuploadingLayer(
@@ -101,18 +118,20 @@ def test_pytorch_decoding(backend, layer, analytic):
         kwargs["observable"] = observable
         kwargs["analytic"] = analytic
     decoding_layer = layer(nqubits, decoding_qubits, **kwargs)
-    q_model = QuantumModel(
+    q_model = frontend.QuantumModel(
         layers=[
             encoding_layer,
             training_layer,
             decoding_layer,
         ]
     )
-    model = torch.nn.Sequential(
-        torch.nn.Linear(128, dim),
-        torch.nn.ReLU(),
-        q_model,
-        torch.nn.Linear(output_dim(layer, dim, nqubits), 128),
+    model = build_sequential_model(
+        frontend,
+        [
+            build_linear_layer(frontend, 128, dim),
+            q_model,
+            build_linear_layer(frontend, q_model.output_shape[-1], 1),
+        ],
     )
     data = torch.randn(1, 128)
     model(data)

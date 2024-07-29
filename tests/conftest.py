@@ -33,7 +33,9 @@ def get_backend(backend_name):
 def get_frontend(frontend_name):
     import qiboml
 
-    return getattr(qiboml, frontend_name)
+    frontend = getattr(qiboml, frontend_name)
+    setattr(frontend, "__str__", frontend_name)
+    return frontend
 
 
 AVAILABLE_BACKENDS = []

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 import keras
 import numpy as np
+import tensorflow as tf
 
 # from keras.src.backend import compute_output_spec
 from qibo.config import raise_error
@@ -11,9 +12,6 @@ from qibo.config import raise_error
 import qiboml.models.ansatze as ans
 import qiboml.models.encoding_decoding as ed
 from qiboml.models.abstract import QuantumCircuitLayer
-
-# import tensorflow as tf
-
 
 """
 def _keras_factory(module):
@@ -81,17 +79,33 @@ class QuantumModel(keras.layers.Layer):  # pylint: disable=no-member
                 f"The last layer has to be a `QuantumDecodinglayer`, but is {layers[-1]}",
             )
 
-    def call(self, x: "ndarray"):
+    def call(self, x: tf.Tensor) -> tf.Tensor:
+        print(x.shape)
+        if self.backend.name != "tensorflow":
+            if self.backend.name == "pytorch":
+                self.backend.requires_grad(False)
+            x = self.backend.cast(np.array(x))
         for layer in self.layers:
             x = layer.forward(x)
+        print(x.shape)
+        if self.backend.name != "tensorflow":
+            x = tf.convert_to_tensor(np.array(x))
         return x
 
     def compute_output_shape(self):
+        return self.output_shape
+
+    @property
+    def output_shape(self):
         return self.layers[-1].output_shape
 
     @property
-    def nqubits(self):
+    def nqubits(self) -> int:
         return self.layers[0].circuit.nqubits
+
+    @property
+    def backend(self) -> "Backend":
+        return self.layers[0].backend
 
     def __hash__(self):
         return super().__hash__()
