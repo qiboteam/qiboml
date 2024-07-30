@@ -1,9 +1,7 @@
 import inspect
 
-import keras
 import numpy as np
 import pytest
-import tensorflow as tf
 import torch
 from qibo import hamiltonians
 from qibo.config import raise_error
@@ -38,6 +36,8 @@ def random_subset(nqubits, k):
 
 
 def build_linear_layer(frontend, input_dim, output_dim):
+    import keras
+
     if frontend.__name__ == "qiboml.models.pytorch":
         return torch.nn.Linear(input_dim, output_dim)
     elif frontend.__name__ == "qiboml.models.keras":
@@ -47,6 +47,8 @@ def build_linear_layer(frontend, input_dim, output_dim):
 
 
 def build_sequential_model(frontend, layers):
+    import keras
+
     if frontend.__name__ == "qiboml.models.pytorch":
         return torch.nn.Sequential(*layers)
     elif frontend.__name__ == "qiboml.models.keras":
@@ -56,6 +58,8 @@ def build_sequential_model(frontend, layers):
 
 
 def random_tensor(frontend, shape):
+    import tensorflow as tf
+
     if frontend.__name__ == "qiboml.models.pytorch":
         return torch.randn(shape)
     elif frontend.__name__ == "qiboml.models.keras":
@@ -133,5 +137,5 @@ def test_decoding(backend, frontend, layer, analytic):
             build_linear_layer(frontend, q_model.output_shape[-1], 1),
         ],
     )
-    data = torch.randn(1, 128)
+    data = random_tensor(frontend, (1, 128))
     model(data)

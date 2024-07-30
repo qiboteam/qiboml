@@ -20,6 +20,3 @@ class ReuploadingLayer(QuantumCircuitLayer):
 
     def forward(self, x: Circuit) -> Circuit:
         return x + self.circuit
-
-    def backward(self, input_grad: "ndarray") -> "ndarray":
-        return input_grad

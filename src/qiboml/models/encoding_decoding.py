@@ -12,9 +12,7 @@ from qiboml.models.abstract import QuantumCircuitLayer
 
 @dataclass
 class QuantumEncodingLayer(QuantumCircuitLayer):
-
-    def backward(self, input_grad: "ndarray") -> "ndarray":
-        return input_grad
+    pass
 
 
 @dataclass
@@ -44,18 +42,6 @@ class PhaseEncodingLayer(QuantumEncodingLayer):
     def forward(self, x: "ndarray") -> Circuit:
         self.circuit.set_parameters(self.backend.cast(x.ravel()))
         return self.circuit
-
-
-# class AmplitudeEncodingLayer(QuantumEncodingLayer):
-#    pass
-
-
-"""
-   .
-   .
-   .
-   .
-"""
 
 
 @dataclass
@@ -141,11 +127,3 @@ class ExpectationLayer(QuantumDecodingLayer):
     @property
     def output_shape(self):
         return (1, 1)
-
-
-"""
-   .
-   .
-   .
-   .
-"""

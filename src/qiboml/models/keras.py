@@ -11,52 +11,6 @@ import qiboml.models.ansatze as ans
 import qiboml.models.encoding_decoding as ed
 from qiboml.models.abstract import QuantumCircuitLayer
 
-"""
-def _keras_factory(module):
-    for name, layer in inspect.getmembers(module, inspect.isclass):
-        if layer.__module__ == module.__name__:
-
-            def __init__(cls, *args, **kwargs):
-                nonlocal layer
-                name = kwargs.pop("name", None)
-                keras.layers.Layer.__init__(cls, name=name)
-                layer.__init__(cls, *args, **kwargs)
-                if len(cls.circuit.get_parameters()) > 0:
-                    cls.add_weight(
-                        shape=(len(cls.circuit.get_parameters()),),
-                        initializer="zeros",
-                    )
-                    cls.set_weights(
-                        [
-                            np.hstack(cls.circuit.get_parameters()),
-                        ]
-                    )
-
-            def compute_output_shape(cls):
-                return (cls.nqubits,)
-
-            @tf.custom_gradient
-            def call(cls, x):
-                return cls.forward(x), cls.backward
-
-            globals()[name] = dataclass(
-                type(
-                    name,
-                    (keras.layers.Layer, layer),
-                    {
-                        "__init__": __init__,
-                        "call": call,
-                        "compute_output_shape": compute_output_shape,
-                        "__hash__": keras.layers.Layer.__hash__,
-                    },
-                )
-            )
-
-
-for module in (ed, ans):
-    _keras_factory(module)
-"""
-
 
 @dataclass
 class QuantumModel(keras.layers.Layer):  # pylint: disable=no-member
@@ -78,14 +32,12 @@ class QuantumModel(keras.layers.Layer):  # pylint: disable=no-member
             )
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
-        print(x.shape)
         if self.backend.name != "tensorflow":
             if self.backend.name == "pytorch":
                 self.backend.requires_grad(False)
             x = self.backend.cast(np.array(x))
         for layer in self.layers:
             x = layer.forward(x)
-        print(x.shape)
         if self.backend.name != "tensorflow":
             x = tf.convert_to_tensor(np.array(x))
         return x

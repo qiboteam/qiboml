@@ -31,10 +31,6 @@ class QuantumCircuitLayer(ABC):
     def __call__(self, x):
         return self.forward(x)
 
-    @abstractmethod
-    def backward(self, input_grad: "ndarray"):
-        pass
-
     @property
     def parameters(self) -> "ndarray":
         return self.circuit.get_parameters()
