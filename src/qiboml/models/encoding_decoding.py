@@ -56,9 +56,6 @@ class QuantumDecodingLayer(QuantumCircuitLayer):
     def forward(self, x: Circuit) -> "CircuitResult":
         return self.backend.execute_circuit(x + self.circuit, nshots=self.nshots)
 
-    def backward(self):
-        raise_error(NotImplementedError, "TO DO")
-
 
 class ProbabilitiesLayer(QuantumDecodingLayer):
 

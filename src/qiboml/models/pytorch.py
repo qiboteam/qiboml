@@ -6,7 +6,6 @@ import numpy as np
 import torch
 from qibo.config import raise_error
 
-import qiboml.models.ansatze as ans
 import qiboml.models.encoding_decoding as ed
 from qiboml.models.abstract import QuantumCircuitLayer
 

@@ -3,9 +3,9 @@ import inspect
 import numpy as np
 import pytest
 import torch
-from qibo import hamiltonians
+from qibo import construct_backend, hamiltonians
 from qibo.config import raise_error
-from qibo.symbols import I, Z
+from qibo.symbols import Z
 
 import qiboml.models.ansatze as ans
 import qiboml.models.encoding_decoding as ed
@@ -139,3 +139,32 @@ def test_decoding(backend, frontend, layer, analytic):
     )
     data = random_tensor(frontend, (1, 128))
     model(data)
+
+
+def test_nqubits_error(frontend):
+    nqubits = 5
+    training_layer = ans.ReuploadingLayer(nqubits - 1)
+    decoding_layer = ed.ProbabilitiesLayer(nqubits)
+    encoding_layer = ed.BinaryEncodingLayer(nqubits)
+    with pytest.raises(RuntimeError):
+        frontend.QuantumModel([encoding_layer, training_layer, decoding_layer])
+
+
+def test_backend_error(frontend):
+    numpy = construct_backend("numpy")
+    torch = construct_backend("pytorch")
+    nqubits = 5
+    training_layer = ans.ReuploadingLayer(nqubits, backend=numpy)
+    decoding_layer = ed.ProbabilitiesLayer(nqubits, backend=torch)
+    encoding_layer = ed.BinaryEncodingLayer(nqubits, backend=numpy)
+    with pytest.raises(RuntimeError):
+        frontend.QuantumModel([encoding_layer, training_layer, decoding_layer])
+
+
+def test_final_layer_error(frontend):
+    nqubits = 5
+    training_layer = ans.ReuploadingLayer(nqubits - 1)
+    decoding_layer = ed.ProbabilitiesLayer(nqubits)
+    encoding_layer = ed.BinaryEncodingLayer(nqubits)
+    with pytest.raises(RuntimeError):
+        frontend.QuantumModel([encoding_layer, decoding_layer, training_layer])

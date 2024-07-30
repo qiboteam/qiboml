@@ -7,7 +7,6 @@ import numpy as np
 import tensorflow as tf  # pylint: disable=import-error
 from qibo.config import raise_error
 
-import qiboml.models.ansatze as ans
 import qiboml.models.encoding_decoding as ed
 from qiboml.models.abstract import QuantumCircuitLayer
 
@@ -24,6 +23,11 @@ class QuantumModel(keras.layers.Layer):  # pylint: disable=no-member
                 raise_error(
                     RuntimeError,
                     f"Layer \n{layer}\n has {layer.circuit.nqubits} qubits, but {nqubits} qubits was expected.",
+                )
+            if layer.backend.name != self.backend.name:
+                raise_error(
+                    RuntimeError,
+                    f"Layer \n{layer}\n is using {layer.backend} backend, but {self.backend} backend was expected.",
                 )
         if not isinstance(layers[-1], ed.QuantumDecodingLayer):
             raise_error(
