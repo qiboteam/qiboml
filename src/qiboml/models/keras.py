@@ -4,9 +4,7 @@ from dataclasses import dataclass
 
 import keras
 import numpy as np
-import tensorflow as tf
-
-# from keras.src.backend import compute_output_spec
+import tensorflow as tf  # pylint: disable=import-error
 from qibo.config import raise_error
 
 import qiboml.models.ansatze as ans
