@@ -32,10 +32,9 @@ optional = true
 [tool.poetry.group.tests.dependencies]
 torch = "^2.3.1"
 tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux'" }
-pytest = "^7.1.2"
+pytest = "^7.2.1"
 pylint = "3.1.0"
-pytest-cov = "^3.0.0"
-pytest-env = "^0.8.1"
+pytest-cov = "4.0.0"
 
 [tool.poetry.group.benchmark.dependencies]
 pytest-benchmark = { version = "^4.0.0", extras = ["histogram"] }
