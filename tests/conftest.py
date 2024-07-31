@@ -83,6 +83,10 @@ def pytest_runtest_setup(item):
         pytest.skip(f"Cannot run test on platform {plat}.")
 
 
+def pytest_configure(config):
+    config.addinivalue_line("markers", "linux: mark test to run only on linux")
+
+
 def pytest_generate_tests(metafunc):
     module_name = metafunc.module.__name__
 
