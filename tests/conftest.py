@@ -8,13 +8,22 @@ import sys
 import pytest
 from qibo.backends import construct_backend
 
+from qiboml.backends.jax import JaxBackend
+from qiboml.backends.pytorch import PyTorchBackend
+from qiboml.backends.tensorflow import TensorflowBackend
+
 # backends to be tested
 BACKENDS = [
-    "numpy",
     "tensorflow",
     "pytorch",
-    # "jax",
+    "jax",
 ]
+
+NAME2BACKEND = {
+    "tensorflow": TensorflowBackend(),
+    "pytorch": PyTorchBackend(),
+    "jax": JaxBackend(),
+}
 
 FRONTENDS = [
     "pytorch",
@@ -23,11 +32,7 @@ FRONTENDS = [
 
 
 def get_backend(backend_name):
-    if "-" in backend_name:
-        name, platform = backend_name.split("-")
-    else:
-        name, platform = backend_name, None
-    return construct_backend(name, platform=platform)
+    return NAME2BACKEND[backend_name]
 
 
 def get_frontend(frontend_name):
@@ -92,6 +97,5 @@ def pytest_generate_tests(metafunc):
 
     if "backend_name" in metafunc.fixturenames:
         metafunc.parametrize("backend_name", AVAILABLE_BACKENDS)
-
     if "frontend_name" in metafunc.fixturenames:
         metafunc.parametrize("frontend_name", AVAILABLE_FRONTENDS)
