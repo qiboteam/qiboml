@@ -100,7 +100,7 @@ class PyTorchBackend(NumpyBackend):
         if isinstance(x, self.np.Tensor):
             return x.is_sparse
 
-        return super().issparse(x)
+        return super().is_sparse(x)
 
     def to_numpy(self, x):
         if isinstance(x, list):
