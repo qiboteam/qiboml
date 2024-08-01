@@ -39,7 +39,7 @@ class JaxBackend(NumpyBackend):
             dtype = self.dtype
         if isinstance(x, self.tensor_types):
             return x.astype(dtype)
-        elif self.issparse(x):
+        elif self.is_sparse(x):
             return x.astype(dtype)
         return self.np.array(x, dtype=dtype, copy=copy)
 

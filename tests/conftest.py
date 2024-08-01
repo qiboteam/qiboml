@@ -7,9 +7,9 @@ import sys
 
 import pytest
 from qibo.backends import construct_backend
+from qibo.backends.pytorch import PyTorchBackend  # the qiboml pytorch is not updated
 
 from qiboml.backends.jax import JaxBackend
-from qiboml.backends.pytorch import PyTorchBackend
 from qiboml.backends.tensorflow import TensorflowBackend
 
 # backends to be tested
