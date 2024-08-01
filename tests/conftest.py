@@ -6,11 +6,6 @@ Pytest fixtures.
 import sys
 
 import pytest
-from qibo.backends import construct_backend
-from qibo.backends.pytorch import PyTorchBackend  # the qiboml pytorch is not updated
-
-from qiboml.backends.jax import JaxBackend
-from qiboml.backends.tensorflow import TensorflowBackend
 
 # backends to be tested
 BACKENDS = [
@@ -19,12 +14,6 @@ BACKENDS = [
     "jax",
 ]
 
-NAME2BACKEND = {
-    "tensorflow": TensorflowBackend(),
-    "pytorch": PyTorchBackend(),
-    "jax": JaxBackend(),
-}
-
 FRONTENDS = [
     "pytorch",
     "keras",
@@ -32,7 +21,20 @@ FRONTENDS = [
 
 
 def get_backend(backend_name):
-    return NAME2BACKEND[backend_name]
+    from qibo.backends.pytorch import (  # the qiboml pytorch is not updated
+        PyTorchBackend,
+    )
+
+    from qiboml.backends.jax import JaxBackend
+    from qiboml.backends.tensorflow import TensorflowBackend
+
+    NAME2BACKEND = {
+        "tensorflow": TensorflowBackend,
+        "pytorch": PyTorchBackend,
+        "jax": JaxBackend,
+    }
+
+    return NAME2BACKEND[backend_name]()
 
 
 def get_frontend(frontend_name):
