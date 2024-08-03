@@ -39,12 +39,16 @@ def test_expectation_layer(backend, analytic):
         backend=backend,
     )
     layer = ed.ExpectationLayer(
-        nqubits, observable=observable, nshots=int(1e5), backend=backend
+        nqubits,
+        observable=observable,
+        nshots=int(1e5),
+        backend=backend,
+        analytic=analytic,
     )
     c_copy = c.copy()
     c_copy.add(gates.M(*range(nqubits)))
     expv = (
-        observable.expectation(backend.execute_circuit(c_copy, nshots=int(1e5)).state())
+        observable.expectation(backend.execute_circuit(c_copy).state())
         if analytic
         else observable.expectation_from_samples(
             backend.execute_circuit(c_copy, nshots=int(1e5)).frequencies()
