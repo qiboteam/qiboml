@@ -13,10 +13,11 @@ from qiboml.models.abstract import QuantumCircuitLayer
 @dataclass
 class QuantumModel(torch.nn.Module):
 
-    def __init__(self, layers: list[QuantumCircuitLayer]):
-        super().__init__()
-        self.layers = layers
-        for layer in layers[1:]:
+    layers: list[QuantumCircuitLayer]
+
+    def __post_init__(self):
+        super().__post_init__()
+        for layer in self.layers[1:]:
             if layer.circuit.nqubits != self.nqubits:
                 raise_error(
                     RuntimeError,
@@ -27,16 +28,16 @@ class QuantumModel(torch.nn.Module):
                     RuntimeError,
                     f"Layer \n{layer}\n is using {layer.backend} backend, but {self.backend} backend was expected.",
                 )
-        for layer in layers:
+        for layer in self.layers:
             if len(layer.circuit.get_parameters()) > 0:
                 self.register_parameter(
                     layer.__class__.__name__,
                     torch.nn.Parameter(torch.as_tensor(layer.circuit.get_parameters())),
                 )
-        if not isinstance(layers[-1], ed.QuantumDecodingLayer):
+        if not isinstance(self.layers[-1], ed.QuantumDecodingLayer):
             raise_error(
                 RuntimeError,
-                f"The last layer has to be a `QuantumDecodinglayer`, but is {layers[-1]}",
+                f"The last layer has to be a `QuantumDecodinglayer`, but is {self.layers[-1]}",
             )
 
     def forward(self, x: torch.Tensor):

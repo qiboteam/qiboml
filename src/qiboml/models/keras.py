@@ -14,25 +14,25 @@ from qiboml.models.abstract import QuantumCircuitLayer
 @dataclass
 class QuantumModel(keras.layers.Layer):  # pylint: disable=no-member
 
-    def __init__(self, layers: list[QuantumCircuitLayer]):
-        super().__init__()
-        nqubits = layers[0].circuit.nqubits
-        self.layers = layers
-        for layer in layers[1:]:
-            if layer.circuit.nqubits != nqubits:
+    layers: list[QuantumCircuitLayer]
+
+    def __post_init__(self):
+        super().__post_init__()
+        for layer in self.layers[1:]:
+            if layer.circuit.nqubits != self.nqubits:
                 raise_error(
                     RuntimeError,
-                    f"Layer \n{layer}\n has {layer.circuit.nqubits} qubits, but {nqubits} qubits was expected.",
+                    f"Layer \n{layer}\n has {layer.circuit.nqubits} qubits, but {self.nqubits} qubits was expected.",
                 )
             if layer.backend.name != self.backend.name:
                 raise_error(
                     RuntimeError,
                     f"Layer \n{layer}\n is using {layer.backend} backend, but {self.backend} backend was expected.",
                 )
-        if not isinstance(layers[-1], ed.QuantumDecodingLayer):
+        if not isinstance(self.layers[-1], ed.QuantumDecodingLayer):
             raise_error(
                 RuntimeError,
-                f"The last layer has to be a `QuantumDecodinglayer`, but is {layers[-1]}",
+                f"The last layer has to be a `QuantumDecodinglayer`, but is {self.layers[-1]}",
             )
 
     def call(self, x: tf.Tensor) -> tf.Tensor:

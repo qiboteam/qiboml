@@ -38,10 +38,14 @@ def get_backend(backend_name):
 
 
 def get_frontend(frontend_name):
-    import qiboml
+    from qiboml.models import keras, pytorch
 
-    frontend = getattr(qiboml, frontend_name)
-    setattr(frontend, "__str__", frontend_name)
+    if frontend_name == "keras":
+        frontend = keras
+    elif frontend_name == "pytorch":
+        frontend = pytorch
+    else:
+        raise RuntimeError(f"Unknown frontend {frontend_name}.")
     return frontend
 
 

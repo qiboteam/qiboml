@@ -7,7 +7,7 @@ from qibo import Circuit
 from qibo.config import raise_error
 from qibo.gates import abstract
 
-from qiboml.backends import TensorflowBackend as JaxBackend
+from qiboml.backends import JaxBackend
 
 
 @dataclass
