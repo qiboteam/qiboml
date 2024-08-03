@@ -17,6 +17,7 @@ class QuantumModel(keras.layers.Layer):  # pylint: disable=no-member
     layers: list[QuantumCircuitLayer]
 
     def __post_init__(self):
+        super().__init__()
         for layer in self.layers[1:]:
             if layer.circuit.nqubits != self.nqubits:
                 raise_error(
