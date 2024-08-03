@@ -26,12 +26,13 @@ def test_state_layer(backend):
 @pytest.mark.parametrize("analytic", [True, False])
 def test_expectation_layer(backend, analytic):
     backend.set_seed(42)
+    rng = np.random.default_rng(42)
     nqubits = 5
     # test observable error
     with pytest.raises(RuntimeError):
         layer = ed.ExpectationLayer(nqubits, backend=backend)
 
-    c = random_clifford(nqubits, backend=backend)
+    c = random_clifford(nqubits, seed=rng, backend=backend)
     observable = hamiltonians.SymbolicHamiltonian(
         sum([Z(i) for i in range(nqubits)]),
         nqubits=nqubits,
