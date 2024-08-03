@@ -45,13 +45,12 @@ def test_expectation_layer(backend, analytic):
         backend=backend,
         analytic=analytic,
     )
-    c_copy = c.copy()
-    c_copy.add(gates.M(*range(nqubits)))
+    layer_expv = layer(c)
     expv = (
-        observable.expectation(backend.execute_circuit(c_copy).state())
+        observable.expectation(backend.execute_circuit(c).state())
         if analytic
         else observable.expectation_from_samples(
-            backend.execute_circuit(c_copy, nshots=int(1e5)).frequencies()
+            backend.execute_circuit(c + layer.circuit, nshots=int(1e5)).frequencies()
         )
     )
-    backend.assert_allclose(layer(c), expv, atol=1e-1)
+    backend.assert_allclose(layer_expv, expv, atol=1e-1)
