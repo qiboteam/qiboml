@@ -25,7 +25,7 @@ class QuantumCircuitLayer(ABC):
         self.circuit = Circuit(self.nqubits)
 
     @abstractmethod
-    def forward(self, x):
+    def forward(self, x):  # pragma: no cover
         pass
 
     def __call__(self, x):

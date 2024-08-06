@@ -163,7 +163,7 @@ def test_backend_error(frontend):
 
 def test_final_layer_error(frontend):
     nqubits = 5
-    training_layer = ans.ReuploadingLayer(nqubits - 1)
+    training_layer = ans.ReuploadingLayer(nqubits)
     decoding_layer = ed.ProbabilitiesLayer(nqubits)
     encoding_layer = ed.BinaryEncodingLayer(nqubits)
     with pytest.raises(RuntimeError):
