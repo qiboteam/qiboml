@@ -50,7 +50,7 @@ def test_expectation_layer(backend, analytic):
         observable.expectation(backend.execute_circuit(c).state())
         if analytic
         else observable.expectation_from_samples(
-            backend.execute_circuit(c + layer.circuit, nshots=int(1e5)).frequencies()
+            layer.circuit.measurements[0].result.frequencies()
         )
     )
-    backend.assert_allclose(layer_expv, expv, atol=1e-1)
+    backend.assert_allclose(layer_expv, expv)
