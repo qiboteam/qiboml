@@ -4,9 +4,11 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 from qibo import Circuit
+from qibo.backends import Backend
 from qibo.config import raise_error
 from qibo.gates import abstract
 
+from qiboml import ndarray
 from qiboml.backends import JaxBackend
 
 
@@ -15,14 +17,13 @@ class QuantumCircuitLayer(ABC):
 
     nqubits: int
     qubits: list[int] = None
-    circuit: Circuit = None
-    initial_state: "ndarray" = None
-    backend: "qibo.backends.Backend" = JaxBackend()
+    _circuit: Circuit = None
+    backend: Backend = JaxBackend()
 
     def __post_init__(self) -> None:
         if self.qubits is None:
             self.qubits = list(range(self.nqubits))
-        self.circuit = Circuit(self.nqubits)
+        self._circuit = Circuit(self.nqubits)
 
     @abstractmethod
     def forward(self, x):  # pragma: no cover
@@ -32,9 +33,13 @@ class QuantumCircuitLayer(ABC):
         return self.forward(x)
 
     @property
-    def parameters(self) -> "ndarray":
+    def parameters(self) -> ndarray:
         return self.backend.cast(self.circuit.get_parameters())
 
+    @property
+    def circuit(self) -> Circuit:
+        return self._circuit
+
     @parameters.setter
-    def parameters(self, x: "ndarray") -> None:
+    def parameters(self, x: ndarray) -> None:
         self.circuit.set_parameters(x)

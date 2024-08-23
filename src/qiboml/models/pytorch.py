@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 import numpy as np
 import torch
+from qibo.backends import Backend
 from qibo.config import raise_error
 
 import qiboml.models.encoding_decoding as ed
@@ -55,7 +56,7 @@ class QuantumModel(torch.nn.Module):
         return self.layers[0].circuit.nqubits
 
     @property
-    def backend(self) -> "Backend":
+    def backend(self) -> Backend:
         return self.layers[0].backend
 
     @property

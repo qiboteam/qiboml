@@ -2,9 +2,10 @@
 
 from dataclasses import dataclass
 
-import keras
 import numpy as np
 import tensorflow as tf  # pylint: disable=import-error
+from keras.layers import Layer
+from qibo.backends import Backend
 from qibo.config import raise_error
 
 import qiboml.models.encoding_decoding as ed
@@ -12,7 +13,7 @@ from qiboml.models.abstract import QuantumCircuitLayer
 
 
 @dataclass
-class QuantumModel(keras.layers.Layer):  # pylint: disable=no-member
+class QuantumModel(Layer):  # pylint: disable=no-member
 
     layers: list[QuantumCircuitLayer]
 
@@ -58,7 +59,7 @@ class QuantumModel(keras.layers.Layer):  # pylint: disable=no-member
         return self.layers[0].circuit.nqubits
 
     @property
-    def backend(self) -> "Backend":
+    def backend(self) -> Backend:
         return self.layers[0].backend
 
     def __hash__(self):

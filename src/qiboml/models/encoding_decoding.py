@@ -6,7 +6,9 @@ from typing import Union
 import numpy as np
 from qibo import Circuit, gates
 from qibo.config import raise_error
+from qibo.hamiltonians import Hamiltonian
 
+from qiboml import ndarray
 from qiboml.models.abstract import QuantumCircuitLayer
 
 
@@ -18,7 +20,7 @@ class QuantumEncodingLayer(QuantumCircuitLayer):
 @dataclass
 class BinaryEncodingLayer(QuantumEncodingLayer):
 
-    def forward(self, x: "ndarray") -> Circuit:
+    def forward(self, x: ndarray) -> Circuit:
         if x.shape[-1] != len(self.qubits):
             raise_error(
                 RuntimeError,
@@ -39,7 +41,7 @@ class PhaseEncodingLayer(QuantumEncodingLayer):
         for q in self.qubits:
             self.circuit.add(gates.RZ(q, theta=0.0))
 
-    def forward(self, x: "ndarray") -> Circuit:
+    def forward(self, x: ndarray) -> Circuit:
         self.circuit.set_parameters(self.backend.cast(x.ravel()))
         return self.circuit
 
@@ -62,7 +64,7 @@ class ProbabilitiesLayer(QuantumDecodingLayer):
     def __post_init__(self):
         super().__post_init__()
 
-    def forward(self, x: Circuit) -> "ndarray":
+    def forward(self, x: Circuit) -> ndarray:
         return super().forward(x).probabilities(self.qubits).reshape(1, -1)
 
     @property
@@ -72,7 +74,7 @@ class ProbabilitiesLayer(QuantumDecodingLayer):
 
 class SamplesLayer(QuantumDecodingLayer):
 
-    def forward(self, x: Circuit) -> "ndarray":
+    def forward(self, x: Circuit) -> ndarray:
         return self.backend.cast(super().forward(x).samples(), dtype=np.float64)
 
     @property
@@ -82,7 +84,7 @@ class SamplesLayer(QuantumDecodingLayer):
 
 class StateLayer(QuantumDecodingLayer):
 
-    def forward(self, x: Circuit) -> "ndarray":
+    def forward(self, x: Circuit) -> ndarray:
         state = super().forward(x).state()
         return self.backend.np.vstack(
             (self.backend.np.real(state), self.backend.np.imag(state))
@@ -96,7 +98,7 @@ class StateLayer(QuantumDecodingLayer):
 @dataclass
 class ExpectationLayer(QuantumDecodingLayer):
 
-    observable: Union["ndarray", "qibo.models.Hamiltonian"] = None
+    observable: Union[ndarray, Hamiltonian] = None
     analytic: bool = False
 
     def __post_init__(self):
@@ -107,7 +109,7 @@ class ExpectationLayer(QuantumDecodingLayer):
             )
         super().__post_init__()
 
-    def forward(self, x: Circuit) -> "ndarray":
+    def forward(self, x: Circuit) -> ndarray:
         if self.analytic:
             return self.observable.expectation(
                 super().forward(x).state(),
