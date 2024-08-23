@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import numpy as np
 import tensorflow as tf  # pylint: disable=import-error
-from keras.layers import Layer
+from keras.layers import Layer  # pylint: disable=import-error, no-name-in-module
 from qibo.backends import Backend
 from qibo.config import raise_error
 
