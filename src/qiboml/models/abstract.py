@@ -36,10 +36,10 @@ class QuantumCircuitLayer(ABC):
     def parameters(self) -> ndarray:
         return self.backend.cast(self.circuit.get_parameters())
 
+    @parameters.setter
+    def parameters(self, params: ndarray):
+        self._circuit.set_parameters(self.backend.cast(params.ravel()))
+
     @property
     def circuit(self) -> Circuit:
         return self._circuit
-
-    @parameters.setter
-    def parameters(self, x: ndarray) -> None:
-        self.circuit.set_parameters(x)

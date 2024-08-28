@@ -30,10 +30,15 @@ class QuantumModel(torch.nn.Module):
                     f"Layer \n{layer}\n is using {layer.backend} backend, but {self.backend} backend was expected.",
                 )
         for layer in self.layers:
-            if len(layer.circuit.get_parameters()) > 0:
+            if len(layer.parameters) > 0:
+                params = (
+                    layer.parameters
+                    if self.backend.name == "pytorch"
+                    else torch.as_tensor(np.array(layer.parameters))
+                )
                 self.register_parameter(
                     layer.__class__.__name__,
-                    torch.nn.Parameter(torch.as_tensor(layer.circuit.get_parameters())),
+                    torch.nn.Parameter(params),
                 )
         if not isinstance(self.layers[-1], ed.QuantumDecodingLayer):
             raise_error(
