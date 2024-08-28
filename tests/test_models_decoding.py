@@ -12,7 +12,9 @@ def test_probabilities_layer(backend):
     qubits = np.random.choice(range(nqubits), size=(4,), replace=False)
     layer = ed.ProbabilitiesLayer(nqubits, qubits=qubits, backend=backend)
     c = random_clifford(nqubits, backend=backend)
-    backend.assert_allclose(layer(c).ravel(), c().probabilities(qubits))
+    backend.assert_allclose(
+        layer(c).ravel(), backend.execute_circuit(c).probabilities(qubits)
+    )
 
 
 def test_state_layer(backend):
@@ -20,7 +22,7 @@ def test_state_layer(backend):
     layer = ed.StateLayer(nqubits, backend=backend)
     c = random_clifford(nqubits, backend=backend)
     real, im = layer(c)
-    backend.assert_allclose(real + 1j * im, c().state())
+    backend.assert_allclose(real + 1j * im, backend.execute_circuit(c).state())
 
 
 @pytest.mark.parametrize("analytic", [True, False])
