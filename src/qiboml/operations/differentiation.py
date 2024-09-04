@@ -1,7 +1,49 @@
 import numpy as np
+from qibo import parameter
 from qibo.backends import construct_backend
 from qibo.config import raise_error
 from qibo.hamiltonians.abstract import AbstractHamiltonian
+
+from qiboml import ndarray
+from qiboml.models.abstract import QuantumCircuitLayer, _run_layers
+
+
+class PSR:
+
+    def __init__(
+        self,
+    ):
+        self.scale_factor = 1.0
+
+    def evaluate(self, x: ndarray, layers: list[QuantumCircuitLayer]):
+        gradients = []
+        for layer in layers:
+            if len(layer.parameters) == 0:
+                continue
+            parameters_bkup = layer.parameters.copy()
+            gradients.append(
+                [
+                    self._evaluate_parameter(x, layers, layer, i, parameters_bkup)
+                    for i in range(len(layer.parameters))
+                ]
+            )
+        return gradients
+
+    def _evaluate_parameter(self, x, layers, layer, index, parameters_bkup):
+        outputs = []
+        for shift in self._shift_parameters(layer.parameters, index, self.epsilon):
+            layer.parameters = shift
+            outputs.append(_run_layers(x, layers))
+            layer.parameters = parameters_bkup
+        return (outputs[0] - outputs[1]) * self.scale_factor
+
+    @staticmethod
+    def _shift_parameters(parameters: ndarray, index: int, epsilon: float):
+        forward = parameters.copy()
+        backward = parameters.copy()
+        forward[index] += epsilon
+        backward[index] -= epsilon
+        return forward, backward
 
 
 def parameter_shift(

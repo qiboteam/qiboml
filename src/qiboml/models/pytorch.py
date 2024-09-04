@@ -8,13 +8,14 @@ from qibo.backends import Backend
 from qibo.config import raise_error
 
 import qiboml.models.encoding_decoding as ed
-from qiboml.models.abstract import QuantumCircuitLayer
+from qiboml.models.abstract import QuantumCircuitLayer, _run_layers
 
 
 @dataclass
 class QuantumModel(torch.nn.Module):
 
     layers: list[QuantumCircuitLayer]
+    differentiation: str = "psr"
 
     def __post_init__(self):
         super().__init__()
@@ -50,8 +51,10 @@ class QuantumModel(torch.nn.Module):
         if self.backend.name != "pytorch":
             x = x.detach().numpy()
             x = self.backend.cast(x, dtype=x.dtype)
-        for layer in self.layers:
-            x = layer.forward(x)
+        if torch.is_grad_enabled():
+            x = QuantumModelAutoGrad.apply(x, self.layers)
+        else:
+            x = _run_layers(x, self.layers)
         if self.backend.name != "pytorch":
             x = torch.as_tensor(np.array(x))
         return x
@@ -67,3 +70,17 @@ class QuantumModel(torch.nn.Module):
     @property
     def output_shape(self):
         return self.layers[-1].output_shape
+
+
+class QuantumModelAutoGrad(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, x: torch.Tensor, layers: list[QuantumCircuitLayer]):
+        ctx.save_for_backward(x)
+        ctx.layers = layers
+        return _run_layers(x, layers)
+
+    @staticmethod
+    def backward(ctx, grad_output: torch.Tensor):
+        (x,) = ctx.saved_tensors
+        return grad_output * self.differentiation.evaluate(x, ctx.layers)

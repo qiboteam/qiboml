@@ -43,3 +43,9 @@ class QuantumCircuitLayer(ABC):
     @property
     def circuit(self) -> Circuit:
         return self._circuit
+
+
+def _run_layers(x: ndarray, layers: list[QuantumCircuitLayer]):
+    for layer in layers:
+        x = layer.forward(x)
+    return x
