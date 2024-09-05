@@ -10,10 +10,10 @@ from qiboml.models.abstract import QuantumCircuitLayer, _run_layers
 
 class PSR:
 
-    def __init__(
-        self,
-    ):
+    def __init__(self, backend):
+        self.backend = backend
         self.scale_factor = 1.0
+        self.epsilon = 1e-2
 
     def evaluate(self, x: ndarray, layers: list[QuantumCircuitLayer]):
         gradients = []
@@ -22,14 +22,19 @@ class PSR:
                 continue
             parameters_bkup = layer.parameters.copy()
             gradients.append(
-                [
-                    self._evaluate_parameter(x, layers, layer, i, parameters_bkup)
-                    for i in range(len(layer.parameters))
-                ]
+                self.backend.cast(
+                    [
+                        self._evaluate_for_parameter(
+                            x, layers, layer, i, parameters_bkup
+                        )
+                        for i in range(len(layer.parameters))
+                    ],
+                    self.backend.np.float64,
+                )
             )
         return gradients
 
-    def _evaluate_parameter(self, x, layers, layer, index, parameters_bkup):
+    def _evaluate_for_parameter(self, x, layers, layer, index, parameters_bkup):
         outputs = []
         for shift in self._shift_parameters(layer.parameters, index, self.epsilon):
             layer.parameters = shift

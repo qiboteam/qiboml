@@ -9,13 +9,14 @@ from qibo.config import raise_error
 
 import qiboml.models.encoding_decoding as ed
 from qiboml.models.abstract import QuantumCircuitLayer, _run_layers
+from qiboml.operations import differentiation as Diff
 
 
-@dataclass
+@dataclass(eq=False)
 class QuantumModel(torch.nn.Module):
 
     layers: list[QuantumCircuitLayer]
-    differentiation: str = "psr"
+    differentiation: str = "PSR"
 
     def __post_init__(self):
         super().__init__()
@@ -46,17 +47,20 @@ class QuantumModel(torch.nn.Module):
                 RuntimeError,
                 f"The last layer has to be a `QuantumDecodinglayer`, but is {self.layers[-1]}",
             )
+        self.differentiation = getattr(Diff, self.differentiation)(self.backend)
 
     def forward(self, x: torch.Tensor):
         if self.backend.name != "pytorch":
-            x = x.detach().numpy()
-            x = self.backend.cast(x, dtype=x.dtype)
-        if torch.is_grad_enabled():
-            x = QuantumModelAutoGrad.apply(x, self.layers)
+            breakpoint()
+            x = QuantumModelAutoGrad.apply(
+                x,
+                *list(self.parameters()),
+                self.layers,
+                self.backend,
+                self.differentiation,
+            )
         else:
             x = _run_layers(x, self.layers)
-        if self.backend.name != "pytorch":
-            x = torch.as_tensor(np.array(x))
         return x
 
     @property
@@ -75,12 +79,25 @@ class QuantumModel(torch.nn.Module):
 class QuantumModelAutoGrad(torch.autograd.Function):
 
     @staticmethod
-    def forward(ctx, x: torch.Tensor, layers: list[QuantumCircuitLayer]):
+    def forward(
+        ctx,
+        x: torch.Tensor,
+        *parameters,
+        layers: list[QuantumCircuitLayer],
+        backend,
+        differentiation,
+    ):
         ctx.save_for_backward(x)
         ctx.layers = layers
-        return _run_layers(x, layers)
+        ctx.differentiation = differentiation
+        x_clone = x.clone().detach().numpy()
+        x_clone = backend.cast(x_clone, dtype=x_clone.dtype)
+        x_clone = torch.as_tensor(np.array(_run_layers(x_clone, layers)))
+        x_clone.requires_grad = True
+        return x_clone
 
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor):
         (x,) = ctx.saved_tensors
-        return grad_output * self.differentiation.evaluate(x, ctx.layers)
+        gradients = ctx.differentiation.evaluate(x, ctx.layers)
+        return *gradients, None, None, None
