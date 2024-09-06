@@ -47,17 +47,12 @@ class QuantumModel(torch.nn.Module):
                 RuntimeError,
                 f"The last layer has to be a `QuantumDecodinglayer`, but is {self.layers[-1]}",
             )
-        self.differentiation = getattr(Diff, self.differentiation)(self.backend)
+        self.differentiation = getattr(Diff, self.differentiation)()
 
     def forward(self, x: torch.Tensor):
         if self.backend.name != "pytorch":
-            breakpoint()
             x = QuantumModelAutoGrad.apply(
-                x,
-                *list(self.parameters()),
-                self.layers,
-                self.backend,
-                self.differentiation,
+                x, self.layers, self.backend, self.differentiation, *self.parameters()
             )
         else:
             x = _run_layers(x, self.layers)
@@ -82,14 +77,15 @@ class QuantumModelAutoGrad(torch.autograd.Function):
     def forward(
         ctx,
         x: torch.Tensor,
-        *parameters,
         layers: list[QuantumCircuitLayer],
         backend,
         differentiation,
+        *parameters,
     ):
         ctx.save_for_backward(x)
         ctx.layers = layers
         ctx.differentiation = differentiation
+        ctx.backend = backend
         x_clone = x.clone().detach().numpy()
         x_clone = backend.cast(x_clone, dtype=x_clone.dtype)
         x_clone = torch.as_tensor(np.array(_run_layers(x_clone, layers)))
@@ -99,5 +95,8 @@ class QuantumModelAutoGrad(torch.autograd.Function):
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor):
         (x,) = ctx.saved_tensors
-        gradients = ctx.differentiation.evaluate(x, ctx.layers)
-        return *gradients, None, None, None
+        gradients = [
+            torch.as_tensor(grad)
+            for grad in ctx.differentiation.evaluate(x, ctx.layers)
+        ]
+        return grad_output @ gradients[0].T, None, None, None, *gradients
