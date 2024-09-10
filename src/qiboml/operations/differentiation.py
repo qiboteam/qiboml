@@ -1,3 +1,5 @@
+import jax
+import jax.numpy as jnp
 import numpy as np
 from qibo import parameter
 from qibo.backends import construct_backend
@@ -38,7 +40,7 @@ class PSR:
         outputs = []
         for shift in self._shift_parameters(layer.parameters, index, self.epsilon):
             layer.parameters = shift
-            outputs.append(_run_layers(x, layers))
+            outputs.append(_run_layers(x, layers, [l.parameters for l in layers]))
             layer.parameters = parameters_bkup
         return (outputs[0] - outputs[1]) * self.scale_factor
 
@@ -49,6 +51,36 @@ class PSR:
         forward[index] += epsilon
         backward[index] -= epsilon
         return forward, backward
+
+
+class Jax:
+
+    def __init__(self):
+        self._input = None
+        self._layers = None
+
+    def evaluate(self, x: ndarray, layers: list[QuantumCircuitLayer]):
+        self._input = x
+        self.layers = layers
+        parameters = []
+        for layer in layers:
+            if layer.has_parameters:
+                parameters.extend(layer.parameters.ravel())
+        parameters = jnp.asarray(parameters)
+        breakpoint()
+        return jax.jacfwd(self._run)(parameters)
+
+    def _run(self, parameters):
+        breakpoint()
+        grouped_parameters = []
+        left_index = right_index = 0
+        for layer in self.layers:
+            if layer.has_parameters:
+                right_index += len(layer.parameters)
+                grouped_parameters.append(parameters[left_index:right_index])
+                left_index = right_index
+        breakpoint()
+        return _run_layers(self._input, self.layers, grouped_parameters)
 
 
 def parameter_shift(

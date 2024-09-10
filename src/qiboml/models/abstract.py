@@ -33,6 +33,12 @@ class QuantumCircuitLayer(ABC):
         return self.forward(x)
 
     @property
+    def has_parameters(self):
+        if len(self.parameters) > 0:
+            return True
+        return False
+
+    @property
     def parameters(self) -> ndarray:
         return self.backend.cast(self.circuit.get_parameters(), self.backend.np.float64)
 
@@ -47,7 +53,11 @@ class QuantumCircuitLayer(ABC):
         return self._circuit
 
 
-def _run_layers(x: ndarray, layers: list[QuantumCircuitLayer]):
+def _run_layers(x: ndarray, layers: list[QuantumCircuitLayer], parameters):
+    index = 0
     for layer in layers:
+        if layer.has_parameters:
+            layer.parameters = parameters[index]
+            index += 1
         x = layer.forward(x)
     return x

@@ -29,13 +29,14 @@ q_model = pt.QuantumModel(
         encoding_layer,
         training_layer,
         decoding_layer,
-    ]
+    ],
+    differentiation="Jax",
 )
-print(list(q_model.parameters()))
 data = torch.randn(1, 5)
-data.requires_grad = True
+# data.requires_grad = True
 out = q_model(data)
 print(out.requires_grad)
 loss = (out - 1.0) ** 2
 print(loss.requires_grad)
 loss.backward()
+print(loss)

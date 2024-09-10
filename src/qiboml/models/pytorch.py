@@ -55,7 +55,7 @@ class QuantumModel(torch.nn.Module):
                 x, self.layers, self.backend, self.differentiation, *self.parameters()
             )
         else:
-            x = _run_layers(x, self.layers)
+            x = _run_layers(x, self.layers, self.parameters)
         return x
 
     @property
@@ -82,19 +82,21 @@ class QuantumModelAutoGrad(torch.autograd.Function):
         differentiation,
         *parameters,
     ):
-        ctx.save_for_backward(x)
+        ctx.save_for_backward(x, *parameters)
         ctx.layers = layers
         ctx.differentiation = differentiation
-        ctx.backend = backend
         x_clone = x.clone().detach().numpy()
         x_clone = backend.cast(x_clone, dtype=x_clone.dtype)
-        x_clone = torch.as_tensor(np.array(_run_layers(x_clone, layers)))
+        x_clone = torch.as_tensor(np.array(_run_layers(x_clone, layers, parameters)))
         x_clone.requires_grad = True
         return x_clone
 
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor):
-        (x,) = ctx.saved_tensors
+        (
+            x,
+            *parameters,
+        ) = ctx.saved_tensors
         gradients = [
             torch.as_tensor(grad)
             for grad in ctx.differentiation.evaluate(x, ctx.layers)
