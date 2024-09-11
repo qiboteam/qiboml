@@ -42,7 +42,7 @@ class PhaseEncodingLayer(QuantumEncodingLayer):
             self.circuit.add(gates.RZ(q, theta=0.0))
 
     def forward(self, x: ndarray) -> Circuit:
-        self.parameters = x
+        self.parameters = x * self.backend.np.pi
         return self.circuit
 
 

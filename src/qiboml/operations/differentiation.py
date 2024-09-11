@@ -62,16 +62,19 @@ class Jax:
     def evaluate(self, x: ndarray, layers: list[QuantumCircuitLayer]):
         self._input = x
         self.layers = layers
-        parameters = []
+        parameters, indices = [], []
         for layer in layers:
             if layer.has_parameters:
                 parameters.extend(layer.parameters.ravel())
+                indices.append(len(parameters))
         parameters = jnp.asarray(parameters)
-        breakpoint()
-        return jax.jacfwd(self._run)(parameters)
+        gradients = jax.jacfwd(self._run)(parameters)
+        return [
+            gradients[:, :, i[0] : i[1]].squeeze(0).T
+            for i in list(zip([0] + indices[:-1], indices))
+        ]
 
     def _run(self, parameters):
-        breakpoint()
         grouped_parameters = []
         left_index = right_index = 0
         for layer in self.layers:
@@ -79,7 +82,6 @@ class Jax:
                 right_index += len(layer.parameters)
                 grouped_parameters.append(parameters[left_index:right_index])
                 left_index = right_index
-        breakpoint()
         return _run_layers(self._input, self.layers, grouped_parameters)
 
 

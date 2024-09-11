@@ -36,12 +36,16 @@ class QuantumModel(torch.nn.Module):
                 params = (
                     layer.parameters
                     if self.backend.name == "pytorch"
-                    else torch.as_tensor(np.array(layer.parameters))
+                    else torch.as_tensor(
+                        layer.parameters.tolist(), dtype=self.backend.np.float64
+                    )
                 )
-                self.register_parameter(
-                    layer.__class__.__name__,
-                    torch.nn.Parameter(params),
-                )
+                params = torch.nn.Parameter(params)
+                setattr(self, layer.__class__.__name__, params)
+                # self.register_parameter(
+                #    layer.__class__.__name__,
+                #    torch.nn.Parameter(params),
+                # )
         if not isinstance(self.layers[-1], ed.QuantumDecodingLayer):
             raise_error(
                 RuntimeError,
@@ -55,7 +59,8 @@ class QuantumModel(torch.nn.Module):
                 x, self.layers, self.backend, self.differentiation, *self.parameters()
             )
         else:
-            x = _run_layers(x, self.layers, self.parameters)
+            breakpoint()
+            x = _run_layers(x, self.layers, list(self.parameters()))
         return x
 
     @property
@@ -98,7 +103,13 @@ class QuantumModelAutoGrad(torch.autograd.Function):
             *parameters,
         ) = ctx.saved_tensors
         gradients = [
-            torch.as_tensor(grad)
+            torch.as_tensor(grad.tolist(), dtype=torch.float64)
             for grad in ctx.differentiation.evaluate(x, ctx.layers)
         ]
-        return grad_output @ gradients[0].T, None, None, None, *gradients
+        return (
+            grad_output @ gradients[0].transpose(-1, -2),
+            None,
+            None,
+            None,
+            *gradients,
+        )
