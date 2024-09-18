@@ -1,7 +1,6 @@
-"""PyTorch backend."""
+"""PyTorch backend supported by Qibo."""
 
 import numpy as np
-
 from qibo import __version__
 from qibo.backends.npmatrices import NumpyMatrices
 from qibo.backends.numpy import NumpyBackend
