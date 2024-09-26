@@ -13,8 +13,8 @@ from qiboml.models import encoding_decoding as ed
 @pytest.mark.parametrize("backend", [JaxBackend(), PyTorchBackend()])
 @pytest.mark.parametrize("differentiation", ["Jax", "PSR"])
 def test_backpropagation(backend, differentiation):
-    nqubits = 5
-    dim = 4
+    nqubits = 3
+    dim = 2
     training_layer = ans.ReuploadingLayer(nqubits, backend=backend)
     encoding_layer = ed.PhaseEncodingLayer(nqubits, backend=backend)
     kwargs = {"backend": backend}
@@ -38,20 +38,22 @@ def test_backpropagation(backend, differentiation):
     encoding = torch.nn.Linear(1, nqubits)
     model = torch.nn.Sequential(encoding, q_model)
     # try to fit a parabola
-    x = torch.randn(10, 1)
+    x = torch.randn(100, 1)
     y = x**2
 
-    optimizer = torch.optim.SGD(model.parameters(), lr=1e-2, momentum=0.9)
+    optimizer = torch.optim.SGD(model.parameters(), lr=1e-1, momentum=0.9)
     for input, target in zip(x, y):
         optimizer.zero_grad()
         output = model(input)
         loss = (target - output) ** 2
-        params_bkp = torch.cat(tuple(p.ravel() for p in model.parameters()))
+        print(list(model.parameters()))
         print(f"> loss: {loss}")
         loss.backward()
         optimizer.step()
-        print(
-            f"> Parameters delta: {torch.cat(tuple(p.ravel() for p in model.parameters())) - params_bkp}"
-        )
+        print(list(model.parameters()))
+
+        # print(
+        #    f"> Parameters delta: {torch.cat(tuple(p.ravel() for p in model.parameters())) - params_bkp}"
+        # )
 
     assert False

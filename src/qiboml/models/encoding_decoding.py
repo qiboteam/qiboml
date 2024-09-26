@@ -1,7 +1,7 @@
 """Some standard encoding and decoding layers"""
 
 from dataclasses import dataclass
-from typing import Union
+from typing import Generator, Union
 
 import numpy as np
 from qibo import Circuit, gates
@@ -14,7 +14,36 @@ from qiboml.models.abstract import QuantumCircuitLayer
 
 @dataclass
 class QuantumEncodingLayer(QuantumCircuitLayer):
-    pass
+
+    _input_parameters = None
+    _input_parameters_indices = None
+
+    def _get_input_parameters_indices(self) -> list[tuple[int]]:
+        spans = []
+        index = 0
+        for gate in self._get_non_trainable_gates():
+            nparams = len(gate.parameters)
+            spans.append((index, index + nparams))
+            index += nparams
+        return spans
+
+    def _get_non_trainable_gates(self) -> Generator[gates.Gate, gates.Gate, gates.Gate]:
+        return (gate for gate in self.circuit.parametrized_gates if not gate.trainable)
+
+    @property
+    def input_parameters(
+        self,
+    ) -> list[ndarray]:
+        return self._input_parameters
+
+    @input_parameters.setter
+    def input_parameters(self, params: ndarray):
+        self._input_parameters = []
+        for span, gate in zip(
+            self._input_parameters_indices, self._get_non_trainable_gates()
+        ):
+            self._input_parameters.append(params[span[0] : span[1]])
+            gate.parameters = self._input_parameters[-1]
 
 
 @dataclass
@@ -39,10 +68,11 @@ class PhaseEncodingLayer(QuantumEncodingLayer):
     def __post_init__(self):
         super().__post_init__()
         for q in self.qubits:
-            self.circuit.add(gates.RZ(q, theta=0.0))
+            self.circuit.add(gates.RZ(q, theta=0.0, trainable=False))
+        self._input_parameters_indices = self._get_input_parameters_indices()
 
     def forward(self, x: ndarray) -> Circuit:
-        self.parameters = x * self.backend.np.pi
+        self.input_parameters = x * self.backend.np.pi
         return self.circuit
 
 

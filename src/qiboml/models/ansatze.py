@@ -14,6 +14,7 @@ class ReuploadingLayer(QuantumCircuitLayer):
         params = self.backend.cast(
             [[random.random() - 0.5 for _ in range(2)] for _ in range(self.nqubits)],
             dtype=self.backend.np.float64,
+            requires_grad=True,
         )
         for q, param in zip(self.qubits, params):
             self.circuit.add(gates.RY(q, theta=param[0] * self.backend.np.pi))

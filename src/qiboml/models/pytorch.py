@@ -6,6 +6,7 @@ import numpy as np
 import torch
 from qibo.backends import Backend
 from qibo.config import raise_error
+from sympy.core import parameters
 
 import qiboml.models.encoding_decoding as ed
 from qiboml.models.abstract import QuantumCircuitLayer, _run_layers
@@ -31,26 +32,24 @@ class QuantumModel(torch.nn.Module):
                     RuntimeError,
                     f"Layer \n{layer}\n is using {layer.backend} backend, but {self.backend} backend was expected.",
                 )
-        for layer in self.layers:
-            if len(layer.parameters) > 0:
-                params = (
-                    layer.parameters
-                    if self.backend.name == "pytorch"
-                    else torch.as_tensor(
-                        layer.parameters.tolist(), dtype=self.backend.np.float64
-                    )
-                )
-                params = torch.nn.Parameter(params)
-                setattr(self, layer.__class__.__name__, params)
-                # self.register_parameter(
-                #    layer.__class__.__name__,
-                #    torch.nn.Parameter(params),
-                # )
         if not isinstance(self.layers[-1], ed.QuantumDecodingLayer):
             raise_error(
                 RuntimeError,
                 f"The last layer has to be a `QuantumDecodinglayer`, but is {self.layers[-1]}",
             )
+
+        for layer in self.layers:
+            for i, params in enumerate(layer.parameters):
+                # if self.backend.name != "pytorch":
+                #    params = torch.as_tensor(
+                #        params, dtype=self.backend.precision
+                #    )
+                setattr(
+                    self,
+                    f"{layer.__class__.__name__}_{i}",
+                    torch.nn.Parameter(torch.as_tensor(params)),
+                )
+
         self.differentiation = getattr(Diff, self.differentiation)()
 
     def forward(self, x: torch.Tensor):
@@ -59,8 +58,23 @@ class QuantumModel(torch.nn.Module):
                 x, self.layers, self.backend, self.differentiation, *self.parameters()
             )
         else:
-            breakpoint()
-            x = _run_layers(x, self.layers, list(self.parameters()))
+            # breakpoint()
+            """
+            index = 0
+            circ = self.layers[0](x)
+            parameters = list(self.parameters())
+            for layer in self.layers[1:-1]:
+                if layer.has_parameters and not issubclass(layer.__class__, ed.QuantumEncodingLayer):
+                    layer.parameters = parameters[index]
+                    index += 1
+                circ = layer.forward(circ)
+            #circ.set_parameters([p for param in self.parameters() for p in param])
+            return self.layers[-1](circ)
+            #x = _run_layers(x, self.layers, list(self.parameters()))
+            """
+            for layer in self.layers:
+                x = layer(x)
+
         return x
 
     @property

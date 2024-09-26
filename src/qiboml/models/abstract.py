@@ -2,6 +2,7 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import Generator
 
 from qibo import Circuit
 from qibo.backends import Backend
@@ -34,19 +35,23 @@ class QuantumCircuitLayer(ABC):
 
     @property
     def has_parameters(self):
-        if len(self.parameters) > 0:
+        if len(list(self.parameters)) > 0:
             return True
         return False
 
     @property
-    def parameters(self) -> ndarray:
-        return self.backend.cast(self.circuit.get_parameters(), self.backend.np.float64)
+    def parameters(self) -> Generator[ndarray, ndarray, ndarray]:
+        # return self.backend.cast(self.circuit.get_parameters(), self.backend.precision)
+        return (gate.parameters for gate in self.circuit.trainable_gates)
 
     @parameters.setter
-    def parameters(self, params: ndarray):
-        self._circuit.set_parameters(
-            self.backend.cast(params.ravel(), self.backend.np.float64)
-        )
+    def parameters(self, params: list[ndarray]):
+        # self._circuit.set_parameters(
+        #    params.ravel()
+        # self.backend.cast(params.ravel(), self.backend.np.float64)
+        # )
+        for param, gate in zip(params, self.circuit.trainable_gates):
+            gate.parameters = param
 
     @property
     def circuit(self) -> Circuit:
