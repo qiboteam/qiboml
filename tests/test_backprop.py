@@ -46,11 +46,11 @@ def test_backpropagation(backend, differentiation):
         optimizer.zero_grad()
         output = model(input)
         loss = (target - output) ** 2
-        print(list(model.parameters()))
+        print(list(model.named_parameters()))
         print(f"> loss: {loss}")
         loss.backward()
         optimizer.step()
-        print(list(model.parameters()))
+        print(list(model.named_parameters()))
 
         # print(
         #    f"> Parameters delta: {torch.cat(tuple(p.ravel() for p in model.parameters())) - params_bkp}"

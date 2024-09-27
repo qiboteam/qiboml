@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Generator
 
 from qibo import Circuit
-from qibo.backends import Backend
+from qibo.backends import Backend, GlobalBackend
 from qibo.config import raise_error
 from qibo.gates import abstract
 
@@ -19,7 +19,7 @@ class QuantumCircuitLayer(ABC):
     nqubits: int
     qubits: list[int] = None
     _circuit: Circuit = None
-    backend: Backend = JaxBackend()
+    backend: Backend = GlobalBackend()
 
     def __post_init__(self) -> None:
         if self.qubits is None:
@@ -40,18 +40,13 @@ class QuantumCircuitLayer(ABC):
         return False
 
     @property
-    def parameters(self) -> Generator[ndarray, ndarray, ndarray]:
-        # return self.backend.cast(self.circuit.get_parameters(), self.backend.precision)
+    def parameters(self) -> Generator[ndarray, None, None]:
         return (gate.parameters for gate in self.circuit.trainable_gates)
 
     @parameters.setter
     def parameters(self, params: list[ndarray]):
-        # self._circuit.set_parameters(
-        #    params.ravel()
-        # self.backend.cast(params.ravel(), self.backend.np.float64)
-        # )
         for param, gate in zip(params, self.circuit.trainable_gates):
-            gate.parameters = param
+            gate.parameters = [param]
 
     @property
     def circuit(self) -> Circuit:

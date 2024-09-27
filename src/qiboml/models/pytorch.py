@@ -1,6 +1,7 @@
 """Torch interface to qiboml layers"""
 
 from dataclasses import dataclass
+from typing import Generator
 
 import numpy as np
 import torch
@@ -38,17 +39,18 @@ class QuantumModel(torch.nn.Module):
                 f"The last layer has to be a `QuantumDecodinglayer`, but is {self.layers[-1]}",
             )
 
-        for layer in self.layers:
+        for j, layer in enumerate(self._trainable_layers):
             for i, params in enumerate(layer.parameters):
-                # if self.backend.name != "pytorch":
-                #    params = torch.as_tensor(
-                #        params, dtype=self.backend.precision
-                #    )
+                params = torch.as_tensor(params)
+                params.requires_grad = True
                 setattr(
                     self,
-                    f"{layer.__class__.__name__}_{i}",
-                    torch.nn.Parameter(torch.as_tensor(params)),
+                    f"{layer.__class__.__name__}-{j}_{i}",
+                    torch.nn.Parameter(params.squeeze()),
                 )
+
+        for i, layer in enumerate(self._trainable_layers):
+            layer.parameters = self._get_parameters_for_layer(i)
 
         self.differentiation = getattr(Diff, self.differentiation)()
 
@@ -58,20 +60,6 @@ class QuantumModel(torch.nn.Module):
                 x, self.layers, self.backend, self.differentiation, *self.parameters()
             )
         else:
-            # breakpoint()
-            """
-            index = 0
-            circ = self.layers[0](x)
-            parameters = list(self.parameters())
-            for layer in self.layers[1:-1]:
-                if layer.has_parameters and not issubclass(layer.__class__, ed.QuantumEncodingLayer):
-                    layer.parameters = parameters[index]
-                    index += 1
-                circ = layer.forward(circ)
-            #circ.set_parameters([p for param in self.parameters() for p in param])
-            return self.layers[-1](circ)
-            #x = _run_layers(x, self.layers, list(self.parameters()))
-            """
             for layer in self.layers:
                 x = layer(x)
 
@@ -88,6 +76,16 @@ class QuantumModel(torch.nn.Module):
     @property
     def output_shape(self):
         return self.layers[-1].output_shape
+
+    @property
+    def _trainable_layers(
+        self,
+    ) -> Generator[QuantumCircuitLayer, None, None]:
+        return (layer for layer in self.layers if layer.has_parameters)
+
+    def _get_parameters_for_layer(self, i: int) -> list[torch.nn.Parameter]:
+        layer_name = list(self._trainable_layers)[i].__class__.__name__
+        return [v for k, v in self.named_parameters() if f"{layer_name}-{i}_" in k]
 
 
 class QuantumModelAutoGrad(torch.autograd.Function):
