@@ -41,6 +41,8 @@ class QuantumModel(torch.nn.Module):
 
         for j, layer in enumerate(self._trainable_layers):
             for i, params in enumerate(layer.parameters):
+                if self.backend.name != "pytorch":
+                    params = [p.tolist() for p in params]
                 params = torch.as_tensor(params)
                 params.requires_grad = True
                 setattr(

@@ -47,25 +47,89 @@ def build_linear_layer(frontend, input_dim, output_dim):
 
 
 def build_sequential_model(frontend, layers):
-    import keras
-
     if frontend.__name__ == "qiboml.models.pytorch":
-        return torch.nn.Sequential(*layers)
+        return frontend.torch.nn.Sequential(*layers)
     elif frontend.__name__ == "qiboml.models.keras":
-        return keras.Sequential(layers)
+        return frontend.keras.Sequential(layers)
     else:
         raise_error(RuntimeError, f"Unknown frontend {frontend}.")
 
 
-def random_tensor(frontend, shape):
-    import tensorflow as tf
-
+def random_tensor(frontend, shape, binary=False):
     if frontend.__name__ == "qiboml.models.pytorch":
-        return torch.randn(shape)
+        tensor = frontend.torch.randint(0, 2, shape) if binary else torch.randn(shape)
     elif frontend.__name__ == "qiboml.models.keras":
-        return tf.random.uniform(shape)
+        tensor = frontend.tf.random.uniform(shape)
     else:
         raise_error(RuntimeError, f"Unknown frontend {frontend}.")
+    return tensor
+
+
+def train_model(frontend, model, data, target):
+    if frontend.__name__ == "qiboml.models.pytorch":
+
+        optimizer = torch.optim.LBFGS(model.parameters(), lr=1e-1, tolerance_grad=1e-4)
+        loss_f = torch.nn.MSELoss()
+
+        def closure():
+            optimizer.zero_grad()
+            out = frontend.torch.vstack([model(x) for x in data])
+            loss = loss_f(out, target)
+            loss.backward()
+            return loss
+
+        optimizer.step(closure)
+    elif frontend.__name__ == "qiboml.models.keras":
+        pass
+
+
+def eval_model(frontend, model, data, target=None):
+    loss = None
+    outputs = []
+    if frontend.__name__ == "qiboml.models.pytorch":
+        loss_f = torch.nn.MSELoss()
+        with torch.no_grad():
+            for x in data:
+                outputs.append(model(x))
+            outputs = frontend.torch.vstack(outputs)
+    elif frontend.__name__ == "qiboml.models.keras":
+        pass
+    if target is not None:
+        loss = loss_f(target, outputs)
+    return outputs, loss
+
+
+def random_parameters(frontend, model):
+    if frontend.__name__ == "qiboml.models.pytorch":
+        new_params = {}
+        for k, v in model.state_dict().items():
+            new_params.update({k: frontend.torch.randn(v.shape)})
+    elif frontend.__name__ == "qiboml.models.keras":
+        pass
+    return new_params
+
+
+def get_parameters(frontend, model):
+    if frontend.__name__ == "qiboml.models.pytorch":
+        return {k: v.clone() for k, v in model.state_dict().items()}
+    elif frontend.__name__ == "qiboml.models.keras":
+        pass
+
+
+def set_parameters(frontend, model, params):
+    if frontend.__name__ == "qiboml.models.pytorch":
+        model.load_state_dict(params)
+    elif frontend.__name__ == "qiboml.models.keras":
+        pass
+
+
+def prepare_targets(frontend, model, data):
+    target_params = random_parameters(frontend, model)
+    init_params = get_parameters(frontend, model)
+    set_parameters(frontend, model, target_params)
+    target, _ = eval_model(frontend, model, data)
+    set_parameters(frontend, model, init_params)
+    return target
 
 
 @pytest.mark.parametrize("layer", ENCODING_LAYERS)
@@ -86,6 +150,15 @@ def test_encoding(backend, frontend, layer):
             decoding_layer,
         ]
     )
+
+    binary = True if layer.__class__.__name__ == "BinaryEncodingLayer" else False
+    data = random_tensor(frontend, (100, dim), binary)
+    target = prepare_targets(frontend, q_model, data)
+    _, loss_untrained = eval_model(frontend, q_model, data, target)
+    train_model(frontend, q_model, data, target)
+    _, loss_trained = eval_model(frontend, q_model, data, target)
+    assert loss_untrained > loss_trained
+
     model = build_sequential_model(
         frontend,
         [
