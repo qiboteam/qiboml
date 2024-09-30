@@ -16,13 +16,13 @@ class PSR:
         self.scale_factor = 1.0
         self.epsilon = 1e-2
 
-    def evaluate(self, x: ndarray, layers: list[QuantumCircuitLayer]):
+    def evaluate(self, x: ndarray, layers: list[QuantumCircuitLayer], *parameters):
         backend = layers[-1].backend
         gradients = []
         for layer in layers:
-            if len(layer.parameters) == 0:
+            if layer.has_parameters:
                 continue
-            parameters_bkup = layer.parameters.copy()
+            parameters_bkup = [par.copy() for par in layer.parameters]
             gradients.append(
                 backend.cast(
                     [

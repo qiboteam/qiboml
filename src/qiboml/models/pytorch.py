@@ -51,8 +51,9 @@ class QuantumModel(torch.nn.Module):
                     torch.nn.Parameter(params.squeeze()),
                 )
 
-        for i, layer in enumerate(self._trainable_layers):
-            layer.parameters = self._get_parameters_for_layer(i)
+        if self.backend.name == "pytorch":
+            for i, layer in enumerate(self._trainable_layers):
+                layer.parameters = self._get_parameters_for_layer(i)
 
         self.differentiation = getattr(Diff, self.differentiation)()
 
@@ -99,31 +100,41 @@ class QuantumModelAutoGrad(torch.autograd.Function):
         layers: list[QuantumCircuitLayer],
         backend,
         differentiation,
-        *parameters,
+        *parameters: list[torch.nn.Parameter],
     ):
         ctx.save_for_backward(x, *parameters)
         ctx.layers = layers
         ctx.differentiation = differentiation
         x_clone = x.clone().detach().numpy()
         x_clone = backend.cast(x_clone, dtype=x_clone.dtype)
-        x_clone = torch.as_tensor(np.array(_run_layers(x_clone, layers, parameters)))
+        params = [
+            backend.cast(par.clone().detach().numpy(), dtype=backend.precision)
+            for par in parameters
+        ]
+
+        index = 0
+        for layer in layers:
+            if layer.has_parameters:
+                nparams = len(list(layer.parameters))
+                layer.parameters = params[index : index + nparams]
+                index += nparams
+            x_clone = layer(x_clone)
+
+        x_clone = torch.as_tensor(x_clone.tolist())
         x_clone.requires_grad = True
         return x_clone
 
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor):
-        (
-            x,
-            *parameters,
-        ) = ctx.saved_tensors
+        x, *parameters = ctx.saved_tensors
         gradients = [
-            torch.as_tensor(grad.tolist(), dtype=torch.float64)
-            for grad in ctx.differentiation.evaluate(x, ctx.layers)
+            torch.as_tensor(grad.tolist())
+            for grad in ctx.differentiation.evaluate(x, ctx.layers, *parameters)
         ]
         return (
             grad_output @ gradients[0].transpose(-1, -2),
-            None,
-            None,
-            None,
             *gradients,
+            None,
+            None,
+            None,
         )

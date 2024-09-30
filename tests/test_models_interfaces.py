@@ -132,10 +132,17 @@ def prepare_targets(frontend, model, data):
     return target
 
 
+def test_backprop(frontend, model, data, target):
+    _, loss_untrained = eval_model(frontend, model, data, target)
+    train_model(frontend, model, data, target)
+    _, loss_trained = eval_model(frontend, model, data, target)
+    assert loss_untrained > loss_trained
+
+
 @pytest.mark.parametrize("layer", ENCODING_LAYERS)
 def test_encoding(backend, frontend, layer):
-    nqubits = 5
-    dim = 4
+    nqubits = 3
+    dim = 2
     training_layer = ans.ReuploadingLayer(
         nqubits, random_subset(nqubits, dim), backend=backend
     )
@@ -154,21 +161,19 @@ def test_encoding(backend, frontend, layer):
     binary = True if layer.__class__.__name__ == "BinaryEncodingLayer" else False
     data = random_tensor(frontend, (100, dim), binary)
     target = prepare_targets(frontend, q_model, data)
-    _, loss_untrained = eval_model(frontend, q_model, data, target)
-    train_model(frontend, q_model, data, target)
-    _, loss_trained = eval_model(frontend, q_model, data, target)
-    assert loss_untrained > loss_trained
+    test_backprop(frontend, q_model, data, target)
 
+    data = random_tensor(frontend, (100, 32))
     model = build_sequential_model(
         frontend,
         [
-            build_linear_layer(frontend, 128, dim),
+            build_linear_layer(frontend, 32, dim),
             q_model,
             build_linear_layer(frontend, 2**dim, 1),
         ],
     )
-    data = random_tensor(frontend, (1, 128))
-    model(data)
+    target = prepare_targets(frontend, model, data)
+    test_backprop(frontend, model, data, target)
 
 
 @pytest.mark.parametrize("layer", DECODING_LAYERS)
@@ -195,6 +200,7 @@ def test_decoding(backend, frontend, layer, analytic):
         kwargs["observable"] = observable
         kwargs["analytic"] = analytic
     decoding_layer = layer(nqubits, decoding_qubits, **kwargs)
+
     q_model = frontend.QuantumModel(
         layers=[
             encoding_layer,
@@ -202,16 +208,23 @@ def test_decoding(backend, frontend, layer, analytic):
             decoding_layer,
         ]
     )
+
+    data = random_tensor(frontend, (100, dim))
+    target = prepare_targets(frontend, q_model, data)
+    test_backprop(frontend, q_model, data, target)
+
     model = build_sequential_model(
         frontend,
         [
-            build_linear_layer(frontend, 128, dim),
+            build_linear_layer(frontend, 32, dim),
             q_model,
             build_linear_layer(frontend, q_model.output_shape[-1], 1),
         ],
     )
-    data = random_tensor(frontend, (1, 128))
-    model(data)
+
+    data = random_tensor(frontend, (100, 32))
+    target = prepare_targets(frontend, model, data)
+    test_backprop(frontend, model, data, target)
 
 
 def test_nqubits_error(frontend):
