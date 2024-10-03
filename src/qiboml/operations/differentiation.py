@@ -5,6 +5,7 @@ from qibo import parameter
 from qibo.backends import construct_backend
 from qibo.config import raise_error
 from qibo.hamiltonians.abstract import AbstractHamiltonian
+from torch.autograd import forward_ad
 
 from qiboml import ndarray
 from qiboml.models.abstract import QuantumCircuitLayer, _run_layers
@@ -18,26 +19,41 @@ class PSR:
 
     def evaluate(self, x: ndarray, layers: list[QuantumCircuitLayer], *parameters):
         backend = layers[-1].backend
+        if backend.name == "pytorch":
+            breakpoint()
         gradients = []
+        index = 0
         for layer in layers:
-            if layer.has_parameters:
+            if not layer.has_parameters:
                 continue
-            parameters_bkup = [par.copy() for par in layer.parameters]
-            gradients.append(
-                backend.cast(
-                    [
-                        self._evaluate_for_parameter(
-                            x, layers, layer, i, parameters_bkup
-                        )
-                        for i in range(len(layer.parameters))
-                    ],
-                    backend.np.float64,
-                ).reshape(*parameters_bkup.shape)
-            )
+            parameters_bkup = [
+                backend.cast(par, dtype=backend.precision, copy=True)
+                for par in layer.parameters
+            ]
+            for i, param in enumerate(layer.parameters):
+                grad = []
+                param = backend.cast(param, backend.precision)
+                for j in range(len(param)):
+                    forward_backward = []
+                    for shift in self._shift_parameters(param, j, self.epsilon):
+                        params = list(layer.parameters)
+                        params[i] = shift
+                        layer.parameters = params
+                        x_copy = x.clone()
+                        for layer in layers:
+                            x_copy = layer(x_copy)
+                        forward_backward.append(x_copy)
+                        layer.parameters = parameters_bkup
+                    grad.append(
+                        (forward_backward[0] - forward_backward[1]) * self.scale_factor
+                    )
+                gradients.append(backend.cast(grad))
+
         return gradients
 
     def _evaluate_for_parameter(self, x, layers, layer, index, parameters_bkup):
         outputs = []
+        parameters_bkup = [backend.cast(par) for par in layer.parameters]
         for shift in self._shift_parameters(layer.parameters, index, self.epsilon):
             layer.parameters = shift
             outputs.append(_run_layers(x, layers, [l.parameters for l in layers]))
@@ -46,11 +62,32 @@ class PSR:
 
     @staticmethod
     def _shift_parameters(parameters: ndarray, index: int, epsilon: float):
-        forward = parameters.copy()
-        backward = parameters.copy()
+        forward = parameters.clone()
+        backward = parameters.clone()
         forward[index] += epsilon
         backward[index] -= epsilon
         return forward, backward
+
+
+class _PSR:
+
+    def __init__(self):
+        self.scale_factor = 1.0
+        self.epsilon = 1e-2
+
+    def evaluate(self, x: ndarray, encoding, training, decoding, backend, *parameters):
+        x = encoding(x) + training
+        gradients = []
+        for i, param in enumerate(parameters):
+            tmp_params = backend.cast(parameters, copy=True)
+            tmp_params[i] = param + self.epsilon
+            x.set_parameters(tmp_params)
+            forward = decoding(x)
+            tmp_params[i] = param - 2 * self.epsilon
+            x.set_parameters(tmp_params)
+            backward = decoding(x)
+            gradients.append((forward - backward) * self.scale_factor)
+        return gradients
 
 
 class Jax:

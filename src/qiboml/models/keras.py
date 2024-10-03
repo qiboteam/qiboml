@@ -2,9 +2,9 @@
 
 from dataclasses import dataclass
 
+import keras
 import numpy as np
 import tensorflow as tf  # pylint: disable=import-error
-from keras.layers import Layer  # pylint: disable=import-error, no-name-in-module
 from qibo.backends import Backend
 from qibo.config import raise_error
 
@@ -13,7 +13,7 @@ from qiboml.models.abstract import QuantumCircuitLayer
 
 
 @dataclass
-class QuantumModel(Layer):  # pylint: disable=no-member
+class QuantumModel(keras.Layer):  # pylint: disable=no-member
 
     layers: list[QuantumCircuitLayer]
 

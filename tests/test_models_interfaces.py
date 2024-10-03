@@ -15,7 +15,7 @@ torch.set_default_dtype(torch.float64)
 
 def get_layers(module, layer_type=None):
     layers = []
-    for name, layer in inspect.getmembers(module, inspect.isclass):
+    for _, layer in inspect.getmembers(module, inspect.isclass):
         if layer.__module__ == module.__name__:
             if layer_type is not None:
                 if issubclass(layer, layer_type) and not layer is layer_type:
@@ -93,7 +93,12 @@ def eval_model(frontend, model, data, target=None):
                 outputs.append(model(x))
             outputs = frontend.torch.vstack(outputs)
     elif frontend.__name__ == "qiboml.models.keras":
-        pass
+        loss_f = frontend.keras.losses.MeanSquaredError(
+            reduction="sum_over_batch_size",
+        )
+        for x in data:
+            outputs.append(model(x))
+        outputs = frontend.tf.stack(outputs, axis=0)
     if target is not None:
         loss = loss_f(target, outputs)
     return outputs, loss
