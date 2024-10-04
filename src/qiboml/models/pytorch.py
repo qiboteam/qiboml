@@ -1,30 +1,28 @@
 """Torch interface to qiboml layers"""
 
 from dataclasses import dataclass
-from typing import Generator
 
 import numpy as np
 import torch
 from qibo import Circuit
 from qibo.backends import Backend, _check_backend
 from qibo.config import raise_error
-from torch.autograd import forward_ad
 
-import qiboml.models.encoding_decoding as ed
-from qiboml.models.abstract import QuantumCircuitLayer, _run_layers
+# import qiboml.models.encoding_decoding as ed
+# from qiboml.models.abstract import QuantumCircuitLayer, _run_layers
 from qiboml.models.decoding import QuantumDecoding
 from qiboml.models.encoding import QuantumEncoding
 from qiboml.operations import differentiation as Diff
 
 BACKEND_2_DIFFERENTIATION = {
     "pytorch": None,
-    "tensorflow": "_PSR",
-    "jax": "_PSR",
+    "tensorflow": "PSR",
+    "jax": "PSR",
 }
 
-
+"""
 @dataclass(eq=False)
-class QuantumModel(torch.nn.Module):
+class _QuantumModel(torch.nn.Module):
 
     layers: list[QuantumCircuitLayer]
     differentiation: str = "auto"
@@ -106,7 +104,7 @@ class QuantumModel(torch.nn.Module):
         return [v for k, v in self.named_parameters() if f"{layer_name}-{i}_" in k]
 
 
-class QuantumModelAutoGrad(torch.autograd.Function):
+class _QuantumModelAutoGrad(torch.autograd.Function):
 
     @staticmethod
     def forward(
@@ -153,10 +151,11 @@ class QuantumModelAutoGrad(torch.autograd.Function):
             None,
             *gradients,
         )
+"""
 
 
 @dataclass(eq=False)
-class _QuantumModel(torch.nn.Module):
+class QuantumModel(torch.nn.Module):
 
     encoding: QuantumEncoding
     circuit: Circuit
@@ -175,15 +174,19 @@ class _QuantumModel(torch.nn.Module):
 
         if self.differentiation == "auto":
             self.differentiation = BACKEND_2_DIFFERENTIATION.get(
-                self.backend.name, "_PSR"
+                self.backend.name, "PSR"
             )
 
         if self.differentiation is not None:
             self.differentiation = getattr(Diff, self.differentiation)()
 
     def forward(self, x: torch.Tensor):
-        if self.backend.name != "pytorch" or self.differentiation is not None:
-            x = _QuantumModelAutoGrad.apply(
+        if (
+            self.backend.name != "pytorch"
+            or self.differentiation is not None
+            or not self.decoding.analytic
+        ):
+            x = QuantumModelAutoGrad.apply(
                 x,
                 self.encoding,
                 self.circuit,
@@ -193,7 +196,6 @@ class _QuantumModel(torch.nn.Module):
                 *list(self.parameters())[0],
             )
         else:
-            # breakpoint()
             self.circuit.set_parameters(list(self.parameters())[0])
             x = self.encoding(x) + self.circuit
             x = self.decoding(x)
@@ -212,8 +214,12 @@ class _QuantumModel(torch.nn.Module):
     ) -> Backend:
         return self.decoding.backend
 
+    @property
+    def output_shape(self):
+        return self.decoding.output_shape
 
-class _QuantumModelAutoGrad(torch.autograd.Function):
+
+class QuantumModelAutoGrad(torch.autograd.Function):
 
     @staticmethod
     def forward(

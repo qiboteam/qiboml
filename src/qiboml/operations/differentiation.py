@@ -10,7 +10,7 @@ from torch.autograd import forward_ad
 from qiboml import ndarray
 from qiboml.models.abstract import QuantumCircuitLayer, _run_layers
 
-
+"""
 class PSR:
 
     def __init__(self):
@@ -67,9 +67,10 @@ class PSR:
         forward[index] += epsilon
         backward[index] -= epsilon
         return forward, backward
+"""
 
 
-class _PSR:
+class PSR:
 
     def __init__(self):
         self.scale_factor = 1.0
@@ -80,14 +81,23 @@ class _PSR:
         gradients = []
         for i, param in enumerate(parameters):
             tmp_params = backend.cast(parameters, copy=True)
-            tmp_params[i] = param + self.epsilon
+            tmp_params = PSR.shift_parameter(tmp_params, i, self.epsilon, backend)
             x.set_parameters(tmp_params)
             forward = decoding(x)
-            tmp_params[i] = param - 2 * self.epsilon
+            tmp_params = PSR.shift_parameter(tmp_params, i, -2 * self.epsilon, backend)
             x.set_parameters(tmp_params)
             backward = decoding(x)
             gradients.append((forward - backward) * self.scale_factor)
         return gradients
+
+    @staticmethod
+    def shift_parameter(parameters, i, epsilon, backend):
+        if backend.name == "tensorflow":
+            return backend.tf.stack(
+                [parameters[j] + int(i == j) * epsilon for j in range(len(parameters))]
+            )
+        parameters[i] = parameters[i] + epsilon
+        return parameters
 
 
 class Jax:

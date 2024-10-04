@@ -31,6 +31,8 @@ class QuantumDecoding:
 @dataclass
 class Probabilities(QuantumDecoding):
 
+    analytic: bool = True
+
     def __call__(self, x: Circuit) -> ndarray:
         return super().__call__(x).probabilities()
 

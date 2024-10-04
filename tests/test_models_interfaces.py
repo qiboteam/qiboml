@@ -8,7 +8,10 @@ from qibo.config import raise_error
 from qibo.symbols import Z
 
 import qiboml.models.ansatze as ans
-import qiboml.models.encoding_decoding as ed
+import qiboml.models.decoding as dec
+
+# import qiboml.models.encoding_decoding as ed
+import qiboml.models.encoding as enc
 
 torch.set_default_dtype(torch.float64)
 
@@ -26,8 +29,8 @@ def get_layers(module, layer_type=None):
     return layers
 
 
-ENCODING_LAYERS = get_layers(ed, ed.QuantumEncodingLayer)
-DECODING_LAYERS = get_layers(ed, ed.QuantumDecodingLayer)
+ENCODING_LAYERS = get_layers(enc, enc.QuantumEncoding)
+DECODING_LAYERS = get_layers(dec, dec.QuantumDecoding)
 ANSATZE_LAYERS = get_layers(ans)
 
 
@@ -36,12 +39,10 @@ def random_subset(nqubits, k):
 
 
 def build_linear_layer(frontend, input_dim, output_dim):
-    import keras
-
     if frontend.__name__ == "qiboml.models.pytorch":
-        return torch.nn.Linear(input_dim, output_dim)
+        return frontend.torch.nn.Linear(input_dim, output_dim)
     elif frontend.__name__ == "qiboml.models.keras":
-        return keras.layers.Dense(output_dim)
+        return frontend.keras.layers.Dense(output_dim)
     else:
         raise_error(RuntimeError, f"Unknown frontend {frontend}.")
 
@@ -79,8 +80,18 @@ def train_model(frontend, model, data, target):
             return loss
 
         optimizer.step(closure)
+
     elif frontend.__name__ == "qiboml.models.keras":
-        pass
+
+        optimizer = frontend.keras.optimizers.Adam()
+        loss_f = frontend.keras.losses.MeanSquaredError()
+        model.compile(loss=loss_f, optimizer=optimizer)
+        model.fit(
+            data,
+            target,
+            batch_size=1,
+            epochs=500,
+        )
 
 
 def eval_model(frontend, model, data, target=None):
@@ -110,7 +121,7 @@ def random_parameters(frontend, model):
         for k, v in model.state_dict().items():
             new_params.update({k: frontend.torch.randn(v.shape)})
     elif frontend.__name__ == "qiboml.models.keras":
-        pass
+        new_params = [frontend.tf.random.uniform(model.get_weights()[0].shape)]
     return new_params
 
 
@@ -118,14 +129,14 @@ def get_parameters(frontend, model):
     if frontend.__name__ == "qiboml.models.pytorch":
         return {k: v.clone() for k, v in model.state_dict().items()}
     elif frontend.__name__ == "qiboml.models.keras":
-        pass
+        return model.get_weights()
 
 
 def set_parameters(frontend, model, params):
     if frontend.__name__ == "qiboml.models.pytorch":
         model.load_state_dict(params)
     elif frontend.__name__ == "qiboml.models.keras":
-        pass
+        model.set_weights(params)
 
 
 def prepare_targets(frontend, model, data):
@@ -137,36 +148,44 @@ def prepare_targets(frontend, model, data):
     return target
 
 
-def test_backprop(frontend, model, data, target):
+def assert_grad_norm(frontend, parameters, tol=1e-2):
+    if frontend.__name__ == "qiboml.models.pytorch":
+        for param in parameters:
+            assert param.grad.norm() < tol
+    elif frontend.__name__ == "qiboml.models.keras":
+        pass
+
+
+def backprop_test(frontend, model, data, target):
     _, loss_untrained = eval_model(frontend, model, data, target)
     train_model(frontend, model, data, target)
     _, loss_trained = eval_model(frontend, model, data, target)
     assert loss_untrained > loss_trained
+    # assert_grad_norm(frontend, model.parameters())
 
 
 @pytest.mark.parametrize("layer", ENCODING_LAYERS)
 def test_encoding(backend, frontend, layer):
     nqubits = 3
     dim = 2
-    training_layer = ans.ReuploadingLayer(
+    training_layer = ans.ReuploadingCircuit(
+        nqubits,
+        random_subset(nqubits, dim),
+    )
+    decoding_layer = dec.Probabilities(
         nqubits, random_subset(nqubits, dim), backend=backend
     )
-    decoding_layer = ed.ProbabilitiesLayer(
-        nqubits, random_subset(nqubits, dim), backend=backend
-    )
-    encoding_layer = layer(nqubits, random_subset(nqubits, dim), backend=backend)
+    encoding_layer = layer(nqubits, random_subset(nqubits, dim))
     q_model = frontend.QuantumModel(
-        layers=[
-            encoding_layer,
-            training_layer,
-            decoding_layer,
-        ]
+        encoding_layer,
+        training_layer,
+        decoding_layer,
     )
 
-    binary = True if layer.__class__.__name__ == "BinaryEncodingLayer" else False
+    binary = True if layer.__class__.__name__ == "BinaryEncoding" else False
     data = random_tensor(frontend, (100, dim), binary)
     target = prepare_targets(frontend, q_model, data)
-    test_backprop(frontend, q_model, data, target)
+    backprop_test(frontend, q_model, data, target)
 
     data = random_tensor(frontend, (100, 32))
     model = build_sequential_model(
@@ -174,29 +193,31 @@ def test_encoding(backend, frontend, layer):
         [
             build_linear_layer(frontend, 32, dim),
             q_model,
-            build_linear_layer(frontend, 2**dim, 1),
+            build_linear_layer(frontend, 2**nqubits, 1),
         ],
     )
     target = prepare_targets(frontend, model, data)
-    test_backprop(frontend, model, data, target)
+    backprop_test(frontend, model, data, target)
 
 
 @pytest.mark.parametrize("layer", DECODING_LAYERS)
 @pytest.mark.parametrize("analytic", [True, False])
 def test_decoding(backend, frontend, layer, analytic):
-    if analytic and not layer is ed.ExpectationLayer:
+    if analytic and not layer is dec.Expectation:
         pytest.skip("Unused analytic argument.")
-    nqubits = 5
-    dim = 4
-    training_layer = ans.ReuploadingLayer(
-        nqubits, random_subset(nqubits, dim), backend=backend
+    nqubits = 3
+    dim = 2
+    training_layer = ans.ReuploadingCircuit(
+        nqubits,
+        random_subset(nqubits, dim),
     )
-    encoding_layer = ed.PhaseEncodingLayer(
-        nqubits, random_subset(nqubits, dim), backend=backend
+    encoding_layer = enc.PhaseEncoding(
+        nqubits,
+        random_subset(nqubits, dim),
     )
     kwargs = {"backend": backend}
     decoding_qubits = random_subset(nqubits, dim)
-    if layer is ed.ExpectationLayer:
+    if layer is dec.Expectation:
         observable = hamiltonians.SymbolicHamiltonian(
             sum([Z(int(i)) for i in decoding_qubits]),
             nqubits=nqubits,
@@ -207,16 +228,14 @@ def test_decoding(backend, frontend, layer, analytic):
     decoding_layer = layer(nqubits, decoding_qubits, **kwargs)
 
     q_model = frontend.QuantumModel(
-        layers=[
-            encoding_layer,
-            training_layer,
-            decoding_layer,
-        ]
+        encoding_layer,
+        training_layer,
+        decoding_layer,
     )
 
     data = random_tensor(frontend, (100, dim))
     target = prepare_targets(frontend, q_model, data)
-    test_backprop(frontend, q_model, data, target)
+    backprop_test(frontend, q_model, data, target)
 
     model = build_sequential_model(
         frontend,
@@ -229,7 +248,7 @@ def test_decoding(backend, frontend, layer, analytic):
 
     data = random_tensor(frontend, (100, 32))
     target = prepare_targets(frontend, model, data)
-    test_backprop(frontend, model, data, target)
+    backprop_test(frontend, model, data, target)
 
 
 def test_nqubits_error(frontend):
