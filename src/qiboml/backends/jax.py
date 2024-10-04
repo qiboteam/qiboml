@@ -20,6 +20,7 @@ class JaxBackend(NumpyBackend):
 
         self.np = jnp
         self.tensor_types = (jnp.ndarray, numpy.ndarray)
+        self.matrices.np = jnp
 
     def set_precision(self, precision):
         if precision != self.precision:
