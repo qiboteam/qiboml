@@ -30,7 +30,9 @@ class PyTorchBackend(NumpyBackend):
 
         self.np = torch
 
-        self.name = "pytorch"
+        self.name = "qiboml"
+        self.platform = "pytorch"
+
         self.versions = {
             "qibo": __version__,
             "numpy": np.__version__,

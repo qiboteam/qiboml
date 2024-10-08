@@ -6,7 +6,7 @@ from qiboml.backends import MetaBackend
 
 
 def test_metabackend_load(backend):
-    assert isinstance(MetaBackend.load(backend.name), backend.__class__)
+    assert isinstance(MetaBackend.load(backend.platform), backend.__class__)
 
 
 def test_metabackend_load_error():
