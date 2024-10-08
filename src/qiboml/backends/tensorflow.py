@@ -16,9 +16,6 @@ class TensorflowMatrices(NumpyMatrices):
         import tensorflow as tf  # pylint: disable=import-error
         import tensorflow.experimental.numpy as tnp  # pylint: disable=import-error  # type: ignore
 
-        self.name = "qiboml"
-        self.platform = "tensorflow"
-
         self.tf = tf
         self.np = tnp
         self.np.linalg = tf.linalg
@@ -33,7 +30,10 @@ class TensorflowMatrices(NumpyMatrices):
 class TensorflowBackend(NumpyBackend):
     def __init__(self):
         super().__init__()
-        self.name = "tensorflow"
+
+        self.name = "qiboml"
+        self.platform = "tensorflow"
+
         os.environ["TF_CPP_MIN_LOG_LEVEL"] = str(TF_LOG_LEVEL)
 
         import tensorflow as tf  # pylint: disable=import-error
