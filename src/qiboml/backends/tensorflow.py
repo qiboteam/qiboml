@@ -16,6 +16,9 @@ class TensorflowMatrices(NumpyMatrices):
         import tensorflow as tf  # pylint: disable=import-error
         import tensorflow.experimental.numpy as tnp  # pylint: disable=import-error  # type: ignore
 
+        self.name = "qiboml"
+        self.platform = "tensorflow"
+
         self.tf = tf
         self.np = tnp
         self.np.linalg = tf.linalg
