@@ -31,7 +31,10 @@ class TensorflowMatrices(NumpyMatrices):
 class TensorflowBackend(NumpyBackend):
     def __init__(self):
         super().__init__()
-        self.name = "tensorflow"
+
+        self.name = "qiboml"
+        self.platform = "tensorflow"
+
         os.environ["TF_CPP_MIN_LOG_LEVEL"] = str(TF_LOG_LEVEL)
 
         import tensorflow as tf  # pylint: disable=import-error
