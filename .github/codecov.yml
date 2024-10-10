@@ -27,3 +27,8 @@ comment:
 
 github_checks:
   annotations: false
+
+ignore:
+  - "src/qiboml/backends/tensorflow.py"
+  - "src/qiboml/backends/pytorch.py"
+  - "src/qiboml/backends/jax.py"

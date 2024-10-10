@@ -98,11 +98,11 @@ class PyTorchBackend(NumpyBackend):
 
         return x
 
-    def issparse(self, x):
+    def is_sparse(self, x):
         if isinstance(x, self.np.Tensor):
             return x.is_sparse
 
-        return super().issparse(x)
+        return super().is_sparse(x)
 
     def to_numpy(self, x):
         if isinstance(x, list):
@@ -151,7 +151,7 @@ class PyTorchBackend(NumpyBackend):
         return self.np.linalg.eigh(matrix)  # pylint: disable=not-callable
 
     def calculate_matrix_exp(self, a, matrix, eigenvectors=None, eigenvalues=None):
-        if eigenvectors is None or self.issparse(matrix):
+        if eigenvectors is None or self.is_sparse(matrix):
             return self.np.linalg.matrix_exp(  # pylint: disable=not-callable
                 -1j * a * matrix
             )
