@@ -20,7 +20,7 @@ tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux' or sys_pl
 torch = "^2.2.0"
 jax = "^0.4.25"
 jaxlib = "^0.4.25"
-qibo = "^0.2.8"
+qibo = "^0.2.11"
 
 [tool.poetry.group.dev]
 optional = true
