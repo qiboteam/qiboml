@@ -63,13 +63,12 @@ class Jax:
         parameters = self._jax.cast(parameters, parameters.dtype)
         self._circuit = encoding(x) + training
         self._decoding = decoding
-        self._decoding.backend = self._jax
-        self._decoding.observable.backend = self._jax
-        if decoding.output_shape == (1, 1):
-            gradients = jax.grad(self._run, range(len(parameters)))(*parameters)
-        else:
-            gradients = jax.jacfwd(self._run)(*parameters)
-        return backend.cast(gradients, backend.precision)
+        self._decoding.set_backend(self._jax)
+        gradients = jax.jacfwd(self._run, range(len(parameters)))(*parameters)
+        gradients = self._jax.to_numpy(
+            self._jax.cast(gradients, gradients[0].dtype)
+        ).reshape(1, len(parameters))
+        return backend.cast(gradients.tolist(), backend.precision)
 
     def _run(self, *parameters):
         self._circuit.set_parameters(parameters)

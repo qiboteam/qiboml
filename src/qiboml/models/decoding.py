@@ -35,6 +35,9 @@ class QuantumDecoding:
     ):
         return self._circuit
 
+    def set_backend(self, backend):
+        self.backend = backend
+
 
 @dataclass
 class Probabilities(QuantumDecoding):
@@ -75,6 +78,10 @@ class Expectation(QuantumDecoding):
     @property
     def output_shape(self):
         return (1, 1)
+
+    def set_backend(self, backend):
+        super().set_backend(backend)
+        self.observable.backend = backend
 
 
 @dataclass
