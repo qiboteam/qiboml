@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
+import numpy as np
 from qibo import Circuit, gates
 
 from qiboml import ndarray
@@ -24,7 +25,14 @@ class QuantumEncoding(ABC):
     def __call__(self, x: ndarray) -> Circuit:
         pass
 
+    @property
+    def circuit(
+        self,
+    ):
+        return self._circuit
 
+
+@dataclass
 class PhaseEncoding(QuantumEncoding):
 
     def __post_init__(
@@ -41,3 +49,19 @@ class PhaseEncoding(QuantumEncoding):
     def __call__(self, x: ndarray) -> Circuit:
         self._set_phases(x)
         return self._circuit
+
+
+@dataclass
+class BinaryEncodingLayer(QuantumEncoding):
+
+    def __call__(self, x: ndarray) -> Circuit:
+        if x.shape[-1] != self.nqubits:
+            raise_error(
+                RuntimeError,
+                f"Invalid input dimension {x.shape[-1]}, but the allocated qubits are {self.qubits}.",
+            )
+        circuit = self.circuit.copy()
+        ones = np.flatnonzero(x.ravel() == 1)
+        for bit in ones:
+            circuit.add(gates.X(self.qubits[bit]))
+        return circuit

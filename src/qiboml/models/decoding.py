@@ -69,3 +69,28 @@ class Expectation(QuantumDecoding):
     @property
     def output_shape(self):
         return (1, 1)
+
+
+@dataclass
+class State(QuantumDecoding):
+
+    def __call__(self, x: Circuit) -> ndarray:
+        state = super().__call__(x).state()
+        return self.backend.np.vstack(
+            (self.backend.np.real(state), self.backend.np.imag(state))
+        )
+
+    @property
+    def output_shape(self):
+        return (2, 2**self.nqubits)
+
+
+@dataclass
+class Samples(QuantumDecoding):
+
+    def forward(self, x: Circuit) -> ndarray:
+        return self.backend.cast(super().__call__(x).samples(), dtype=np.float64)
+
+    @property
+    def output_shape(self):
+        return (self.nshots, len(self.qubits))

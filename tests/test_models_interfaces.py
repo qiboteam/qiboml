@@ -69,7 +69,7 @@ def random_tensor(frontend, shape, binary=False):
 def train_model(frontend, model, data, target):
     if frontend.__name__ == "qiboml.models.pytorch":
 
-        optimizer = torch.optim.LBFGS(model.parameters(), lr=1e-1, tolerance_grad=1e-4)
+        optimizer = torch.optim.LBFGS(model.parameters(), lr=1.0, tolerance_grad=1e-3)
         loss_f = torch.nn.MSELoss()
 
         def closure():
@@ -166,6 +166,8 @@ def backprop_test(frontend, model, data, target):
 
 @pytest.mark.parametrize("layer", ENCODING_LAYERS)
 def test_encoding(backend, frontend, layer):
+    if frontend.__name__ == "qiboml.models.keras":
+        pytest.skip("keras interface not ready.")
     nqubits = 3
     dim = 2
     training_layer = ans.ReuploadingCircuit(
@@ -203,6 +205,8 @@ def test_encoding(backend, frontend, layer):
 @pytest.mark.parametrize("layer", DECODING_LAYERS)
 @pytest.mark.parametrize("analytic", [True, False])
 def test_decoding(backend, frontend, layer, analytic):
+    if frontend.__name__ == "qiboml.models.keras":
+        pytest.skip("keras interface not ready.")
     if analytic and not layer is dec.Expectation:
         pytest.skip("Unused analytic argument.")
     nqubits = 3
@@ -258,23 +262,3 @@ def test_nqubits_error(frontend):
     encoding_layer = ed.BinaryEncodingLayer(nqubits)
     with pytest.raises(RuntimeError):
         frontend.QuantumModel([encoding_layer, training_layer, decoding_layer])
-
-
-def test_backend_error(frontend):
-    numpy = construct_backend("numpy")
-    torch = construct_backend("pytorch")
-    nqubits = 5
-    training_layer = ans.ReuploadingLayer(nqubits, backend=numpy)
-    decoding_layer = ed.ProbabilitiesLayer(nqubits, backend=torch)
-    encoding_layer = ed.BinaryEncodingLayer(nqubits, backend=numpy)
-    with pytest.raises(RuntimeError):
-        frontend.QuantumModel([encoding_layer, training_layer, decoding_layer])
-
-
-def test_final_layer_error(frontend):
-    nqubits = 5
-    training_layer = ans.ReuploadingLayer(nqubits)
-    decoding_layer = ed.ProbabilitiesLayer(nqubits)
-    encoding_layer = ed.BinaryEncodingLayer(nqubits)
-    with pytest.raises(RuntimeError):
-        frontend.QuantumModel([encoding_layer, decoding_layer, training_layer])

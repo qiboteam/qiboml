@@ -77,6 +77,11 @@ class PSR:
         self.epsilon = 1e-2
 
     def evaluate(self, x: ndarray, encoding, training, decoding, backend, *parameters):
+        if decoding.output_shape != (1, 1):
+            raise_error(
+                NotImplementedError,
+                "Parameter Shift Rule only supports expectation value decoding.",
+            )
         x = encoding(x) + training
         gradients = []
         for i, param in enumerate(parameters):
@@ -96,7 +101,10 @@ class PSR:
             return backend.tf.stack(
                 [parameters[j] + int(i == j) * epsilon for j in range(len(parameters))]
             )
-        parameters[i] = parameters[i] + epsilon
+        elif backend.name == "jax":
+            parameters.at[i].set(parameters[i] + epsilon)
+        else:
+            parameters[i] = parameters[i] + epsilon
         return parameters
 
 
@@ -104,9 +112,8 @@ class Jax:
 
     def __init__(self):
         self._input = None
-        self._layers = None
 
-    def evaluate(self, x: ndarray, layers: list[QuantumCircuitLayer]):
+    def evaluate(self, x: ndarray, encoding, training, decoding, backend, *parameters):
         self._input = x
         self.layers = layers
         parameters, indices = [], []
