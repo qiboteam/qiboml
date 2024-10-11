@@ -2,72 +2,14 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from qibo import parameter
-from qibo.backends import construct_backend
+from qibo.backends import Backend, construct_backend
 from qibo.config import raise_error
 from qibo.hamiltonians.abstract import AbstractHamiltonian
 from torch.autograd import forward_ad
 
 from qiboml import ndarray
-from qiboml.models.abstract import QuantumCircuitLayer, _run_layers
-
-"""
-class PSR:
-
-    def __init__(self):
-        self.scale_factor = 1.0
-        self.epsilon = 1e-2
-
-    def evaluate(self, x: ndarray, layers: list[QuantumCircuitLayer], *parameters):
-        backend = layers[-1].backend
-        if backend.name == "pytorch":
-            breakpoint()
-        gradients = []
-        index = 0
-        for layer in layers:
-            if not layer.has_parameters:
-                continue
-            parameters_bkup = [
-                backend.cast(par, dtype=backend.precision, copy=True)
-                for par in layer.parameters
-            ]
-            for i, param in enumerate(layer.parameters):
-                grad = []
-                param = backend.cast(param, backend.precision)
-                for j in range(len(param)):
-                    forward_backward = []
-                    for shift in self._shift_parameters(param, j, self.epsilon):
-                        params = list(layer.parameters)
-                        params[i] = shift
-                        layer.parameters = params
-                        x_copy = x.clone()
-                        for layer in layers:
-                            x_copy = layer(x_copy)
-                        forward_backward.append(x_copy)
-                        layer.parameters = parameters_bkup
-                    grad.append(
-                        (forward_backward[0] - forward_backward[1]) * self.scale_factor
-                    )
-                gradients.append(backend.cast(grad))
-
-        return gradients
-
-    def _evaluate_for_parameter(self, x, layers, layer, index, parameters_bkup):
-        outputs = []
-        parameters_bkup = [backend.cast(par) for par in layer.parameters]
-        for shift in self._shift_parameters(layer.parameters, index, self.epsilon):
-            layer.parameters = shift
-            outputs.append(_run_layers(x, layers, [l.parameters for l in layers]))
-            layer.parameters = parameters_bkup
-        return (outputs[0] - outputs[1]) * self.scale_factor
-
-    @staticmethod
-    def _shift_parameters(parameters: ndarray, index: int, epsilon: float):
-        forward = parameters.clone()
-        backward = parameters.clone()
-        forward[index] += epsilon
-        backward[index] -= epsilon
-        return forward, backward
-"""
+from qiboml.backends.jax import JaxBackend
+from qiboml.models.decoding import QuantumDecoding
 
 
 class PSR:
@@ -111,32 +53,27 @@ class PSR:
 class Jax:
 
     def __init__(self):
-        self._input = None
+        self._jax: Backend = JaxBackend()
+        self._decoding: QuantumDecoding = None
 
     def evaluate(self, x: ndarray, encoding, training, decoding, backend, *parameters):
-        self._input = x
-        self.layers = layers
-        parameters, indices = [], []
-        for layer in layers:
-            if layer.has_parameters:
-                parameters.extend(layer.parameters.ravel())
-                indices.append(len(parameters))
-        parameters = jnp.asarray(parameters)
-        gradients = jax.jacfwd(self._run)(parameters)
-        return [
-            gradients[:, :, i[0] : i[1]].squeeze(0).T
-            for i in list(zip([0] + indices[:-1], indices))
-        ]
+        x = backend.to_numpy(x)
+        x = self._jax.cast(x, x.dtype)
+        parameters = backend.to_numpy(list(parameters))
+        parameters = self._jax.cast(parameters, parameters.dtype)
+        self._circuit = encoding(x) + training
+        self._decoding = decoding
+        self._decoding.backend = self._jax
+        self._decoding.observable.backend = self._jax
+        if decoding.output_shape == (1, 1):
+            gradients = jax.grad(self._run, range(len(parameters)))(*parameters)
+        else:
+            gradients = jax.jacfwd(self._run)(*parameters)
+        return backend.cast(gradients, backend.precision)
 
-    def _run(self, parameters):
-        grouped_parameters = []
-        left_index = right_index = 0
-        for layer in self.layers:
-            if layer.has_parameters:
-                right_index += len(layer.parameters)
-                grouped_parameters.append(parameters[left_index:right_index])
-                left_index = right_index
-        return _run_layers(self._input, self.layers, grouped_parameters)
+    def _run(self, *parameters):
+        self._circuit.set_parameters(parameters)
+        return self._decoding(self._circuit)
 
 
 def parameter_shift(

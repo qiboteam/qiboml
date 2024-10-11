@@ -234,9 +234,7 @@ def test_decoding(backend, frontend, layer, analytic):
     decoding_layer = layer(nqubits, decoding_qubits, **kwargs)
 
     q_model = frontend.QuantumModel(
-        encoding_layer,
-        training_layer,
-        decoding_layer,
+        encoding_layer, training_layer, decoding_layer, differentiation="Jax"
     )
 
     data = random_tensor(frontend, (100, dim))
