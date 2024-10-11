@@ -15,7 +15,9 @@ class QuantumDecoding:
     nqubits: int
     qubits: list[int] = None
     nshots: int = 1000
+    analytic: bool = True
     backend: Backend = None
+    _circuit: Circuit = None
 
     def __post_init__(self):
         if self.qubits is None:
@@ -27,11 +29,15 @@ class QuantumDecoding:
     def __call__(self, x: Circuit) -> "CircuitResult":
         return self.backend.execute_circuit(x + self._circuit, nshots=self.nshots)
 
+    @property
+    def circuit(
+        self,
+    ):
+        return self._circuit
+
 
 @dataclass
 class Probabilities(QuantumDecoding):
-
-    analytic: bool = True
 
     def __call__(self, x: Circuit) -> ndarray:
         return super().__call__(x).probabilities()

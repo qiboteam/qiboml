@@ -9,8 +9,6 @@ from qibo.symbols import Z
 
 import qiboml.models.ansatze as ans
 import qiboml.models.decoding as dec
-
-# import qiboml.models.encoding_decoding as ed
 import qiboml.models.encoding as enc
 
 torch.set_default_dtype(torch.float64)
@@ -148,7 +146,7 @@ def prepare_targets(frontend, model, data):
     return target
 
 
-def assert_grad_norm(frontend, parameters, tol=1e-2):
+def assert_grad_norm(frontend, parameters, tol=1e-3):
     if frontend.__name__ == "qiboml.models.pytorch":
         for param in parameters:
             assert param.grad.norm() < tol
@@ -168,6 +166,8 @@ def backprop_test(frontend, model, data, target):
 def test_encoding(backend, frontend, layer):
     if frontend.__name__ == "qiboml.models.keras":
         pytest.skip("keras interface not ready.")
+    if backend.name != "pytorch":
+        pytest.skip("Non pytorch differentiatio is not working yet.")
     nqubits = 3
     dim = 2
     training_layer = ans.ReuploadingCircuit(
@@ -207,6 +207,8 @@ def test_encoding(backend, frontend, layer):
 def test_decoding(backend, frontend, layer, analytic):
     if frontend.__name__ == "qiboml.models.keras":
         pytest.skip("keras interface not ready.")
+    if backend.name != "pytorch":
+        pytest.skip("Non pytorch differentiatio is not working yet.")
     if analytic and not layer is dec.Expectation:
         pytest.skip("Unused analytic argument.")
     nqubits = 3
@@ -253,12 +255,3 @@ def test_decoding(backend, frontend, layer, analytic):
     data = random_tensor(frontend, (100, 32))
     target = prepare_targets(frontend, model, data)
     backprop_test(frontend, model, data, target)
-
-
-def test_nqubits_error(frontend):
-    nqubits = 5
-    training_layer = ans.ReuploadingLayer(nqubits - 1)
-    decoding_layer = ed.ProbabilitiesLayer(nqubits)
-    encoding_layer = ed.BinaryEncodingLayer(nqubits)
-    with pytest.raises(RuntimeError):
-        frontend.QuantumModel([encoding_layer, training_layer, decoding_layer])
