@@ -65,10 +65,11 @@ class Jax:
         self._decoding = decoding
         self._decoding.set_backend(self._jax)
         gradients = jax.jacfwd(self._run, range(len(parameters)))(*parameters)
-        gradients = self._jax.to_numpy(
-            self._jax.cast(gradients, gradients[0].dtype)
-        ).reshape(1, len(parameters))
-        return backend.cast(gradients.tolist(), backend.precision)
+        decoding.set_backend(backend)
+        return [
+            backend.cast(self._jax.to_numpy(grad).tolist(), backend.precision)
+            for grad in gradients
+        ]
 
     def _run(self, *parameters):
         self._circuit.set_parameters(parameters)
