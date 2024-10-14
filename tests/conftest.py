@@ -7,11 +7,15 @@ from qiboml.backends.tensorflow import TensorflowBackend
 # backends to be tested
 BACKENDS = [
     "tensorflow",
+    "pytorch",
+    "jax",
 ]
 
 
 NAME2BACKEND = {
     "tensorflow": TensorflowBackend,
+    "pytorch": PyTorchBackend,
+    "jax": JaxBackend,
 }
 
 

@@ -6,8 +6,9 @@ from qiboml.backends.jax import JaxBackend
 from qiboml.backends.pytorch import PyTorchBackend
 from qiboml.backends.tensorflow import TensorflowBackend
 
-PLATFORMS = ["tensorflow"]
-QibomlBackend = Union[TensorflowBackend]
+PLATFORMS = ["tensorflow", "pytorch", "jax"]
+AVAILABLE_PLATFORMS = ["tensorflow"]
+QibomlBackend = Union[TensorflowBackend, PyTorchBackend, JaxBackend]
 
 
 class MetaBackend:
@@ -38,7 +39,7 @@ class MetaBackend:
     def list_available(self) -> dict:
         """List all the available qiboml backends."""
         available_backends = {}
-        for platform in PLATFORMS:
+        for platform in AVAILABLE_PLATFORMS:
             try:
                 MetaBackend.load(platform)
                 available = True
