@@ -7,7 +7,7 @@ from qiboml.backends.pytorch import PyTorchBackend
 from qiboml.backends.tensorflow import TensorflowBackend
 
 PLATFORMS = ["tensorflow"]
-QibomlBackend = Union[TensorflowBackend, PyTorchBackend, JaxBackend]
+QibomlBackend = Union[TensorflowBackend]
 
 
 class MetaBackend:
