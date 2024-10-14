@@ -6,7 +6,7 @@ from qiboml.backends.jax import JaxBackend
 from qiboml.backends.pytorch import PyTorchBackend
 from qiboml.backends.tensorflow import TensorflowBackend
 
-PLATFORMS = ["tensorflow", "pytorch", "jax"]
+PLATFORMS = ["tensorflow"]
 QibomlBackend = Union[TensorflowBackend, PyTorchBackend, JaxBackend]
 
 
