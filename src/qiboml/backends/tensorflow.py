@@ -1,10 +1,11 @@
 import collections
 import os
+from typing import Union
 
 import numpy as np
 from qibo import __version__
 from qibo.backends.npmatrices import NumpyMatrices
-from qibo.backends.numpy import NumpyBackend
+from qibo.backends.numpy import NumpyBackend, _calculate_negative_power_singular_matrix
 from qibo.config import TF_LOG_LEVEL, log, raise_error
 
 
@@ -192,10 +193,52 @@ class TensorflowBackend(NumpyBackend):
             return self.tf.linalg.expm(-1j * a * matrix)
         return super().calculate_matrix_exp(a, matrix, eigenvectors, eigenvalues)
 
+    def calculate_matrix_power(
+        self,
+        matrix,
+        power: Union[float, int],
+        precision_singularity: float = 1e-14,
+    ):
+        if not isinstance(power, (float, int)):
+            raise_error(
+                TypeError,
+                f"``power`` must be either float or int, but it is type {type(power)}.",
+            )
+
+        if power < 0.0:
+            # negative powers of singular matrices via SVD
+            determinant = self.tf.linalg.det(matrix)
+            if abs(determinant) < precision_singularity:
+                return _calculate_negative_power_singular_matrix(
+                    matrix, power, precision_singularity, self.tf, self
+                )
+
+        return super().calculate_matrix_power(matrix, power, precision_singularity)
+
     def calculate_singular_value_decomposition(self, matrix):
         # needed to unify order of return
         S, U, V = self.tf.linalg.svd(matrix)
         return U, S, self.np.conj(self.np.transpose(V))
+
+    def calculate_jacobian_matrix(
+        self, circuit, parameters=None, initial_state=None, return_complex: bool = True
+    ):
+        copied = circuit.copy(deep=True)
+
+        # necessary for the tape to properly watch the variables
+        parameters = self.tf.Variable(parameters)
+
+        with self.tf.GradientTape(persistent=return_complex) as tape:
+            copied.set_parameters(parameters)
+            state = self.execute_circuit(copied, initial_state=initial_state).state()
+            real = self.np.real(state)
+            if return_complex:
+                imag = self.np.imag(state)
+
+        if return_complex:
+            return tape.jacobian(real, parameters), tape.jacobian(imag, parameters)
+
+        return tape.jacobian(real, parameters)
 
     def calculate_hamiltonian_matrix_product(self, matrix1, matrix2):
         if self.is_sparse(matrix1) or self.is_sparse(matrix2):
