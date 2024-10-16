@@ -46,6 +46,8 @@ class TensorflowBackend(NumpyBackend):
         self.np = tnp
         self.np.flatnonzero = np.flatnonzero
         self.np.copy = np.copy
+        self.np.einsum = np.einsum
+        self.np.nonzero = np.nonzero
 
         self.versions = {
             "qibo": __version__,
