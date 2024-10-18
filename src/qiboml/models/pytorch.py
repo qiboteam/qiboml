@@ -133,11 +133,11 @@ class QuantumModelAutoGrad(torch.autograd.Function):
             )
         ]
         return (
-            grad_output * torch.vstack(gradients),
+            grad_output,
             None,
             None,
             None,
             None,
             None,
-            *gradients,
+            *(torch.vstack(gradients) @ grad_output),
         )

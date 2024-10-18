@@ -65,19 +65,21 @@ def random_tensor(frontend, shape, binary=False):
 
 
 def train_model(frontend, model, data, target):
+    epochs = 10
     if frontend.__name__ == "qiboml.models.pytorch":
 
-        optimizer = torch.optim.LBFGS(model.parameters(), lr=1.0, tolerance_grad=1e-3)
+        optimizer = torch.optim.Adam(model.parameters())
         loss_f = torch.nn.MSELoss()
 
-        def closure():
-            optimizer.zero_grad()
-            out = frontend.torch.vstack([model(x) for x in data])
-            loss = loss_f(out, target)
-            loss.backward()
-            return loss
-
-        optimizer.step(closure)
+        for _ in range(epochs):
+            avg_grad = 0.0
+            for x, y in zip(data, target):
+                optimizer.zero_grad()
+                loss = loss_f(model(x), y)
+                loss.backward()
+                avg_grad += list(model.parameters())[-1].grad.norm()
+                optimizer.step()
+        return avg_grad / len(data)
 
     elif frontend.__name__ == "qiboml.models.keras":
 
@@ -88,7 +90,7 @@ def train_model(frontend, model, data, target):
             data,
             target,
             batch_size=1,
-            epochs=500,
+            epochs=epochs,
         )
 
 
@@ -100,7 +102,7 @@ def eval_model(frontend, model, data, target=None):
         with torch.no_grad():
             for x in data:
                 outputs.append(model(x))
-            outputs = frontend.torch.vstack(outputs)
+        outputs = frontend.torch.vstack(outputs)
     elif frontend.__name__ == "qiboml.models.keras":
         loss_f = frontend.keras.losses.MeanSquaredError(
             reduction="sum_over_batch_size",
@@ -156,10 +158,10 @@ def assert_grad_norm(frontend, parameters, tol=1e-3):
 
 def backprop_test(frontend, model, data, target):
     _, loss_untrained = eval_model(frontend, model, data, target)
-    train_model(frontend, model, data, target)
+    grad = train_model(frontend, model, data, target)
     _, loss_trained = eval_model(frontend, model, data, target)
     assert loss_untrained > loss_trained
-    # assert_grad_norm(frontend, model.parameters())
+    assert grad < 1e-3
 
 
 @pytest.mark.parametrize("layer", ENCODING_LAYERS)
@@ -179,12 +181,9 @@ def test_encoding(backend, frontend, layer):
     )
     encoding_layer = layer(nqubits, random_subset(nqubits, dim))
     q_model = frontend.QuantumModel(
-        encoding_layer,
-        training_layer,
-        decoding_layer,
+        encoding_layer, training_layer, decoding_layer, differentiation="Jax"
     )
-
-    binary = True if layer.__class__.__name__ == "BinaryEncoding" else False
+    binary = True if encoding_layer.__class__.__name__ == "BinaryEncoding" else False
     data = random_tensor(frontend, (100, dim), binary)
     target = prepare_targets(frontend, q_model, data)
     backprop_test(frontend, q_model, data, target)
