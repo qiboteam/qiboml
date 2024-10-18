@@ -1,7 +1,79 @@
+import jax
+import jax.numpy as jnp
 import numpy as np
-from qibo.backends import construct_backend
+from qibo import parameter
+from qibo.backends import Backend, construct_backend
 from qibo.config import raise_error
 from qibo.hamiltonians.abstract import AbstractHamiltonian
+from torch.autograd import forward_ad
+
+from qiboml import ndarray
+from qiboml.backends.jax import JaxBackend
+from qiboml.models.decoding import QuantumDecoding
+
+
+class PSR:
+
+    def __init__(self):
+        self.scale_factor = 1.0
+        self.epsilon = 1e-2
+
+    def evaluate(self, x: ndarray, encoding, training, decoding, backend, *parameters):
+        if decoding.output_shape != (1, 1):
+            raise_error(
+                NotImplementedError,
+                "Parameter Shift Rule only supports expectation value decoding.",
+            )
+        x = encoding(x) + training
+        gradients = []
+        for i, param in enumerate(parameters):
+            tmp_params = backend.cast(parameters, copy=True)
+            tmp_params = PSR.shift_parameter(tmp_params, i, self.epsilon, backend)
+            x.set_parameters(tmp_params)
+            forward = decoding(x)
+            tmp_params = PSR.shift_parameter(tmp_params, i, -2 * self.epsilon, backend)
+            x.set_parameters(tmp_params)
+            backward = decoding(x)
+            gradients.append((forward - backward) * self.scale_factor)
+        return gradients
+
+    @staticmethod
+    def shift_parameter(parameters, i, epsilon, backend):
+        if backend.name == "tensorflow":
+            return backend.tf.stack(
+                [parameters[j] + int(i == j) * epsilon for j in range(len(parameters))]
+            )
+        elif backend.name == "jax":
+            parameters.at[i].set(parameters[i] + epsilon)
+        else:
+            parameters[i] = parameters[i] + epsilon
+        return parameters
+
+
+class Jax:
+
+    def __init__(self):
+        self._jax: Backend = JaxBackend()
+        self._decoding: QuantumDecoding = None
+
+    def evaluate(self, x: ndarray, encoding, training, decoding, backend, *parameters):
+        x = backend.to_numpy(x)
+        x = self._jax.cast(x, x.dtype)
+        parameters = backend.to_numpy(list(parameters))
+        parameters = self._jax.cast(parameters, parameters.dtype)
+        self._circuit = encoding(x) + training
+        self._decoding = decoding
+        self._decoding.set_backend(self._jax)
+        gradients = jax.jacfwd(self._run, range(len(parameters)))(*parameters)
+        decoding.set_backend(backend)
+        return [
+            backend.cast(self._jax.to_numpy(grad).tolist(), backend.precision)
+            for grad in gradients
+        ]
+
+    def _run(self, *parameters):
+        self._circuit.set_parameters(parameters)
+        return self._decoding(self._circuit)
 
 
 def parameter_shift(
