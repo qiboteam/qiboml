@@ -73,12 +73,15 @@ def train_model(frontend, model, data, target):
 
         for _ in range(epochs):
             avg_grad = 0.0
+            avg_loss = 0.0
             for x, y in zip(data, target):
                 optimizer.zero_grad()
                 loss = loss_f(model(x), y)
                 loss.backward()
                 avg_grad += list(model.parameters())[-1].grad.norm()
+                avg_loss += loss
                 optimizer.step()
+            print(f"avg grad: {avg_grad/len(data)}, avg loss: {avg_loss/len(data)}")
         return avg_grad / len(data)
 
     elif frontend.__name__ == "qiboml.models.keras":

@@ -1,7 +1,7 @@
 import jax
 import jax.numpy as jnp
 import numpy as np
-from qibo import parameter
+from qibo import Circuit, parameter
 from qibo.backends import Backend, construct_backend
 from qibo.config import raise_error
 from qibo.hamiltonians.abstract import AbstractHamiltonian
@@ -54,17 +54,22 @@ class Jax:
 
     def __init__(self):
         self._jax: Backend = JaxBackend()
+        self._circuit: Circuit = None
         self._decoding: QuantumDecoding = None
+        self._argnums: list[int] = None
 
     def evaluate(self, x: ndarray, encoding, training, decoding, backend, *parameters):
         x = backend.to_numpy(x)
         x = self._jax.cast(x, x.dtype)
+        if self._argnums is None:
+            self._argnums = range(len(parameters))
+            setattr(self, "_jacobian", jax.jit(jax.jacfwd(self._run, self._argnums)))
         parameters = backend.to_numpy(list(parameters))
         parameters = self._jax.cast(parameters, parameters.dtype)
         self._circuit = encoding(x) + training
         self._decoding = decoding
         self._decoding.set_backend(self._jax)
-        gradients = jax.jacfwd(self._run, range(len(parameters)))(*parameters)
+        gradients = self._jacobian(*parameters)
         decoding.set_backend(backend)
         return [
             backend.cast(self._jax.to_numpy(grad).tolist(), backend.precision)
