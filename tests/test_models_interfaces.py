@@ -87,7 +87,6 @@ def train_model(frontend, model, data, target):
                 optimizer.step()
             avg_grad /= len(data)
             print(f"avg grad: {avg_grad}, avg loss: {avg_loss/len(data)}")
-        assert False
         return avg_grad / len(data)
 
     elif frontend.__name__ == "qiboml.models.keras":
