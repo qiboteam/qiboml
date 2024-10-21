@@ -1,22 +1,18 @@
-from dataclasses import dataclass
+import random
 
 import numpy as np
 from qibo import Circuit, gates
 
-from qiboml.models.abstract import QuantumCircuitLayer
 
+def ReuploadingCircuit(nqubits: int, qubits: list[int] = None) -> Circuit:
+    if qubits is None:
+        qubits = list(range(nqubits))
 
-@dataclass
-class ReuploadingLayer(QuantumCircuitLayer):
-
-    def __post_init__(self):
-        super().__post_init__()
-        for q in self.qubits:
-            self.circuit.add(gates.RY(q, theta=0.0))
-            self.circuit.add(gates.RZ(q, theta=0.0))
-        for i, q in enumerate(self.qubits[:-2]):
-            self.circuit.add(gates.CNOT(q0=q, q1=self.qubits[i + 1]))
-        self.circuit.add(gates.CNOT(q0=self.qubits[-1], q1=self.qubits[0]))
-
-    def forward(self, x: Circuit) -> Circuit:
-        return x + self.circuit
+    circuit = Circuit(nqubits)
+    for q in qubits:
+        circuit.add(gates.RY(q, theta=random.random() * np.pi, trainable=True))
+        circuit.add(gates.RZ(q, theta=random.random() * np.pi, trainable=True))
+    for i, q in enumerate(qubits[:-2]):
+        circuit.add(gates.CNOT(q0=q, q1=qubits[i + 1]))
+    circuit.add(gates.CNOT(q0=qubits[-1], q1=qubits[0]))
+    return circuit
