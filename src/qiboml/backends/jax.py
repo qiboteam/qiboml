@@ -44,6 +44,13 @@ class JaxBackend(NumpyBackend):
             return x.astype(dtype)
         return self.np.array(x, dtype=dtype, copy=copy)
 
+    def to_numpy(self, x):
+
+        if isinstance(x, list) or isinstance(x, tuple):
+            return self.numpy.asarray([self.to_numpy(i) for i in x])
+
+        return self.numpy.asarray(x)
+
     # TODO: using numpy's rng for now. Shall we use Jax's?
     def set_seed(self, seed):
         self.numpy.random.seed(seed)

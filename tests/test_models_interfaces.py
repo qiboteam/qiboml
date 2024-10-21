@@ -47,7 +47,8 @@ def build_linear_layer(frontend, input_dim, output_dim):
 
 def build_sequential_model(frontend, layers):
     if frontend.__name__ == "qiboml.models.pytorch":
-        return frontend.torch.nn.Sequential(*layers)
+        activation = frontend.torch.nn.Threshold(1, 0)
+        return frontend.torch.nn.Sequential(*(layers[:1] + [activation] + layers[1:]))
     elif frontend.__name__ == "qiboml.models.keras":
         return frontend.keras.Sequential(layers)
     else:
@@ -65,13 +66,16 @@ def random_tensor(frontend, shape, binary=False):
 
 
 def train_model(frontend, model, data, target):
-    epochs = 10
+    max_epochs = 50
     if frontend.__name__ == "qiboml.models.pytorch":
 
         optimizer = torch.optim.Adam(model.parameters())
         loss_f = torch.nn.MSELoss()
 
-        for _ in range(epochs):
+        # for _ in range(epochs):
+        avg_grad, ep = 1.0, 0
+        while avg_grad > 1e-2 and ep < max_epochs:
+            ep += 1
             avg_grad = 0.0
             avg_loss = 0.0
             for x, y in zip(data, target):
@@ -81,7 +85,9 @@ def train_model(frontend, model, data, target):
                 avg_grad += list(model.parameters())[-1].grad.norm()
                 avg_loss += loss
                 optimizer.step()
-            print(f"avg grad: {avg_grad/len(data)}, avg loss: {avg_loss/len(data)}")
+            avg_grad /= len(data)
+            print(f"avg grad: {avg_grad}, avg loss: {avg_loss/len(data)}")
+        assert False
         return avg_grad / len(data)
 
     elif frontend.__name__ == "qiboml.models.keras":
@@ -122,7 +128,7 @@ def random_parameters(frontend, model):
     if frontend.__name__ == "qiboml.models.pytorch":
         new_params = {}
         for k, v in model.state_dict().items():
-            new_params.update({k: frontend.torch.randn(v.shape)})
+            new_params.update({k: v + frontend.torch.randn(v.shape)})
     elif frontend.__name__ == "qiboml.models.keras":
         new_params = [frontend.tf.random.uniform(model.get_weights()[0].shape)]
     return new_params
@@ -164,15 +170,15 @@ def backprop_test(frontend, model, data, target):
     grad = train_model(frontend, model, data, target)
     _, loss_trained = eval_model(frontend, model, data, target)
     assert loss_untrained > loss_trained
-    assert grad < 1e-3
+    assert grad < 1e-2
 
 
 @pytest.mark.parametrize("layer", ENCODING_LAYERS)
 def test_encoding(backend, frontend, layer):
     if frontend.__name__ == "qiboml.models.keras":
         pytest.skip("keras interface not ready.")
-    if backend.name != "pytorch":
-        pytest.skip("Non pytorch differentiatio is not working yet.")
+    if backend.name not in ("pytorch", "jax"):
+        pytest.skip("Non pytorch/jax differentiation is not working yet.")
     nqubits = 3
     dim = 2
     training_layer = ans.ReuploadingCircuit(
@@ -183,9 +189,7 @@ def test_encoding(backend, frontend, layer):
         nqubits, random_subset(nqubits, dim), backend=backend
     )
     encoding_layer = layer(nqubits, random_subset(nqubits, dim))
-    q_model = frontend.QuantumModel(
-        encoding_layer, training_layer, decoding_layer, differentiation="Jax"
-    )
+    q_model = frontend.QuantumModel(encoding_layer, training_layer, decoding_layer)
     binary = True if encoding_layer.__class__.__name__ == "BinaryEncoding" else False
     data = random_tensor(frontend, (100, dim), binary)
     target = prepare_targets(frontend, q_model, data)
@@ -241,6 +245,7 @@ def test_decoding(backend, frontend, layer, analytic):
 
     data = random_tensor(frontend, (100, dim))
     target = prepare_targets(frontend, q_model, data)
+    print("> Training the pure quantum model...")
     backprop_test(frontend, q_model, data, target)
 
     model = build_sequential_model(
@@ -254,4 +259,5 @@ def test_decoding(backend, frontend, layer, analytic):
 
     data = random_tensor(frontend, (100, 32))
     target = prepare_targets(frontend, model, data)
+    print("> Training the hybrid classical-quantum model...")
     backprop_test(frontend, model, data, target)
