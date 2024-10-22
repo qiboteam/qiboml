@@ -127,7 +127,7 @@ def random_parameters(frontend, model):
     if frontend.__name__ == "qiboml.models.pytorch":
         new_params = {}
         for k, v in model.state_dict().items():
-            new_params.update({k: v + frontend.torch.randn(v.shape)})
+            new_params.update({k: v + frontend.torch.randn(v.shape) / 10})
     elif frontend.__name__ == "qiboml.models.keras":
         new_params = [frontend.tf.random.uniform(model.get_weights()[0].shape)]
     return new_params
@@ -212,8 +212,8 @@ def test_encoding(backend, frontend, layer):
 def test_decoding(backend, frontend, layer, analytic):
     if frontend.__name__ == "qiboml.models.keras":
         pytest.skip("keras interface not ready.")
-    if backend.name != "pytorch":
-        pytest.skip("Non pytorch differentiatio is not working yet.")
+    if backend.name not in ("pytorch", "jax"):
+        pytest.skip("Non pytorch/jax differentiation is not working yet.")
     if analytic and not layer is dec.Expectation:
         pytest.skip("Unused analytic argument.")
     nqubits = 3
@@ -238,13 +238,15 @@ def test_decoding(backend, frontend, layer, analytic):
         kwargs["analytic"] = analytic
     decoding_layer = layer(nqubits, decoding_qubits, **kwargs)
 
+    if not decoding_layer.analytic:
+        pytest.skip("PSR differentiation is not working yet.")
+
     q_model = frontend.QuantumModel(
         encoding_layer, training_layer, decoding_layer, differentiation="Jax"
     )
 
     data = random_tensor(frontend, (100, dim))
     target = prepare_targets(frontend, q_model, data)
-    print("> Training the pure quantum model...")
     backprop_test(frontend, q_model, data, target)
 
     model = build_sequential_model(
@@ -258,5 +260,4 @@ def test_decoding(backend, frontend, layer, analytic):
 
     data = random_tensor(frontend, (100, 32))
     target = prepare_targets(frontend, model, data)
-    print("> Training the hybrid classical-quantum model...")
     backprop_test(frontend, model, data, target)

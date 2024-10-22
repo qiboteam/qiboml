@@ -105,6 +105,10 @@ class State(QuantumDecoding):
 @dataclass
 class Samples(QuantumDecoding):
 
+    def __post_init__(self):
+        super().__post_init__()
+        self.analytic = False
+
     def forward(self, x: Circuit) -> ndarray:
         return self.backend.cast(super().__call__(x).samples(), self.backend.precision)
 

@@ -139,5 +139,5 @@ class QuantumModelAutoGrad(torch.autograd.Function):
             None,
             None,
             None,
-            *(torch.vstack(gradients) @ grad_output),
+            *(torch.vstack(gradients).view((-1,) + grad_output.shape) @ grad_output.T),
         )
