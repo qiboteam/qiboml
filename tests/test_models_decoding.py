@@ -25,8 +25,8 @@ def test_state_layer(backend):
     backend.assert_allclose(real + 1j * im, backend.execute_circuit(c).state())
 
 
-@pytest.mark.parametrize("analytic", [True, False])
-def test_expectation_layer(backend, analytic):
+@pytest.mark.parametrize("nshots", [None, 10000])
+def test_expectation_layer(backend, nshots):
     backend.set_seed(42)
     rng = np.random.default_rng(42)
     nqubits = 5
@@ -43,14 +43,13 @@ def test_expectation_layer(backend, analytic):
     layer = dec.Expectation(
         nqubits,
         observable=observable,
-        nshots=int(1e5),
+        nshots=nshots,
         backend=backend,
-        analytic=analytic,
     )
     layer_expv = layer(c)
     expv = (
         observable.expectation(backend.execute_circuit(c).state())
-        if analytic
+        if nshots is None
         else observable.expectation_from_samples(
             layer.circuit.measurements[0].result.frequencies()
         )
