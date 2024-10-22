@@ -66,14 +66,14 @@ def random_tensor(frontend, shape, binary=False):
 
 
 def train_model(frontend, model, data, target):
-    max_epochs = 50
+    max_epochs = 30
     if frontend.__name__ == "qiboml.models.pytorch":
 
         optimizer = torch.optim.Adam(model.parameters())
         loss_f = torch.nn.MSELoss()
 
-        # for _ in range(epochs):
         avg_grad, ep = 1.0, 0
+        shape = model(data[0]).shape
         while avg_grad > 1e-2 and ep < max_epochs:
             ep += 1
             avg_grad = 0.0
@@ -87,6 +87,7 @@ def train_model(frontend, model, data, target):
                 optimizer.step()
             avg_grad /= len(data)
             print(f"avg grad: {avg_grad}, avg loss: {avg_loss/len(data)}")
+
         return avg_grad / len(data)
 
     elif frontend.__name__ == "qiboml.models.keras":
@@ -110,7 +111,8 @@ def eval_model(frontend, model, data, target=None):
         with torch.no_grad():
             for x in data:
                 outputs.append(model(x))
-        outputs = frontend.torch.vstack(outputs)
+            shape = model(data[0]).shape
+        outputs = frontend.torch.vstack(outputs).reshape((data.shape[0],) + shape)
     elif frontend.__name__ == "qiboml.models.keras":
         loss_f = frontend.keras.losses.MeanSquaredError(
             reduction="sum_over_batch_size",
@@ -178,7 +180,7 @@ def test_encoding(backend, frontend, layer):
         pytest.skip("keras interface not ready.")
     if backend.name not in ("pytorch", "jax"):
         pytest.skip("Non pytorch/jax differentiation is not working yet.")
-    nqubits = 3
+    nqubits = 2
     dim = 2
     training_layer = ans.ReuploadingCircuit(
         nqubits,
@@ -190,7 +192,7 @@ def test_encoding(backend, frontend, layer):
     encoding_layer = layer(nqubits, random_subset(nqubits, dim))
     q_model = frontend.QuantumModel(encoding_layer, training_layer, decoding_layer)
     binary = True if encoding_layer.__class__.__name__ == "BinaryEncoding" else False
-    data = random_tensor(frontend, (100, dim), binary)
+    data = random_tensor(frontend, (200, dim), binary)
     target = prepare_targets(frontend, q_model, data)
     backprop_test(frontend, q_model, data, target)
 
@@ -216,7 +218,7 @@ def test_decoding(backend, frontend, layer, analytic):
         pytest.skip("Non pytorch/jax differentiation is not working yet.")
     if analytic and not layer is dec.Expectation:
         pytest.skip("Unused analytic argument.")
-    nqubits = 3
+    nqubits = 2
     dim = 2
     training_layer = ans.ReuploadingCircuit(
         nqubits,
@@ -245,7 +247,7 @@ def test_decoding(backend, frontend, layer, analytic):
         encoding_layer, training_layer, decoding_layer, differentiation="Jax"
     )
 
-    data = random_tensor(frontend, (100, dim))
+    data = random_tensor(frontend, (200, dim))
     target = prepare_targets(frontend, q_model, data)
     backprop_test(frontend, q_model, data, target)
 

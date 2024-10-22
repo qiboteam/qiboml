@@ -95,11 +95,11 @@ class State(QuantumDecoding):
         state = super().__call__(x).state()
         return self.backend.np.vstack(
             (self.backend.np.real(state), self.backend.np.imag(state))
-        )
+        ).reshape(self.output_shape)
 
     @property
     def output_shape(self):
-        return (2, 2**self.nqubits)
+        return (2, 1, 2**self.nqubits)
 
 
 @dataclass
