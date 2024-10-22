@@ -14,7 +14,7 @@ class QuantumDecoding:
 
     nqubits: int
     qubits: list[int] = None
-    nshots: int = 1000
+    nshots: int = None
     analytic: bool = True
     backend: Backend = None
     _circuit: Circuit = None
@@ -58,7 +58,6 @@ class Probabilities(QuantumDecoding):
 class Expectation(QuantumDecoding):
 
     observable: Union[ndarray, Hamiltonian] = None
-    analytic: bool = False
 
     def __post_init__(self):
         if self.observable is None:
@@ -69,7 +68,7 @@ class Expectation(QuantumDecoding):
         super().__post_init__()
 
     def __call__(self, x: Circuit) -> ndarray:
-        if self.analytic:
+        if self.nshots is None:
             return self.observable.expectation(
                 super().__call__(x).state(),
             ).reshape(1, 1)
