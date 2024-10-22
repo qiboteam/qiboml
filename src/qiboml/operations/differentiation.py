@@ -85,10 +85,10 @@ class Jax:
         if binary:
             gradients = (
                 self._jax.numpy.zeros((decoding.output_shape[-1], x.shape[-1])),
-                self._jacobian_without_inputs(*parameters),
+                self._jacobian_without_inputs(*parameters),  # pylint: disable=no-member
             )
         else:
-            gradients = self._jacobian(x, *parameters)
+            gradients = self._jacobian(x, *parameters)  # pylint: disable=no-member
         decoding.set_backend(backend)
         return [
             backend.cast(self._jax.to_numpy(grad).tolist(), backend.precision)

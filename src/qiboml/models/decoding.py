@@ -38,6 +38,10 @@ class QuantumDecoding:
     def set_backend(self, backend):
         self.backend = backend
 
+    @property
+    def output_shape(self):
+        raise_error(NotImplementedError)
+
 
 @dataclass
 class Probabilities(QuantumDecoding):
@@ -102,7 +106,7 @@ class State(QuantumDecoding):
 class Samples(QuantumDecoding):
 
     def forward(self, x: Circuit) -> ndarray:
-        return self.backend.cast(super().__call__(x).samples(), dtype=np.float64)
+        return self.backend.cast(super().__call__(x).samples(), self.backend.precision)
 
     @property
     def output_shape(self):
