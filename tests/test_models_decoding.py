@@ -22,7 +22,9 @@ def test_state_layer(backend):
     layer = dec.State(nqubits, backend=backend)
     c = random_clifford(nqubits, backend=backend)
     real, im = layer(c)
-    backend.assert_allclose(real + 1j * im, backend.execute_circuit(c).state())
+    backend.assert_allclose(
+        (real + 1j * im).ravel(), backend.execute_circuit(c).state().ravel()
+    )
 
 
 @pytest.mark.parametrize("analytic", [True, False])
