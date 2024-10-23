@@ -64,7 +64,7 @@ class QuantumModel(torch.nn.Module):
             self.circuit.set_parameters(list(self.parameters())[0])
             x = self.encoding(x) + self.circuit
             x = self.decoding(x)
-
+        print(f"QuantumModel x: {x}")
         return x
 
     @property

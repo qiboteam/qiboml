@@ -45,10 +45,11 @@ def build_linear_layer(frontend, input_dim, output_dim):
         raise_error(RuntimeError, f"Unknown frontend {frontend}.")
 
 
-def build_sequential_model(frontend, layers):
+def build_sequential_model(frontend, layers, binary=False):
     if frontend.__name__ == "qiboml.models.pytorch":
         activation = frontend.torch.nn.Threshold(1, 0)
-        return frontend.torch.nn.Sequential(*(layers[:1] + [activation] + layers[1:]))
+        layers = layers[:1] + [activation] + layers[1:] if binary else layers
+        return frontend.torch.nn.Sequential(*layers)
     elif frontend.__name__ == "qiboml.models.keras":
         return frontend.keras.Sequential(layers)
     else:
@@ -78,7 +79,8 @@ def train_model(frontend, model, data, target):
             ep += 1
             avg_grad = 0.0
             avg_loss = 0.0
-            for x, y in zip(data, target):
+            permutation = frontend.torch.randint(0, len(data), (len(data),))
+            for x, y in zip(data[permutation], target[permutation]):
                 optimizer.zero_grad()
                 loss = loss_f(model(x), y)
                 loss.backward()
@@ -106,6 +108,7 @@ def train_model(frontend, model, data, target):
 def eval_model(frontend, model, data, target=None):
     loss = None
     outputs = []
+
     if frontend.__name__ == "qiboml.models.pytorch":
         loss_f = torch.nn.MSELoss()
         with torch.no_grad():
@@ -113,6 +116,7 @@ def eval_model(frontend, model, data, target=None):
                 outputs.append(model(x))
             shape = model(data[0]).shape
         outputs = frontend.torch.vstack(outputs).reshape((data.shape[0],) + shape)
+
     elif frontend.__name__ == "qiboml.models.keras":
         loss_f = frontend.keras.losses.MeanSquaredError(
             reduction="sum_over_batch_size",
@@ -129,7 +133,7 @@ def random_parameters(frontend, model):
     if frontend.__name__ == "qiboml.models.pytorch":
         new_params = {}
         for k, v in model.state_dict().items():
-            new_params.update({k: v + frontend.torch.randn(v.shape) / 10})
+            new_params.update({k: v + frontend.torch.randn(v.shape) / 2})
     elif frontend.__name__ == "qiboml.models.keras":
         new_params = [frontend.tf.random.uniform(model.get_weights()[0].shape)]
     return new_params
@@ -154,6 +158,11 @@ def prepare_targets(frontend, model, data):
     init_params = get_parameters(frontend, model)
     set_parameters(frontend, model, target_params)
     target, _ = eval_model(frontend, model, data)
+    # if len(target.unique(dim=0)) == 1:
+    # breakpoint()
+    #    print(model)
+    #    print(f"Target: {target[0]}")
+    #    assert False
     set_parameters(frontend, model, init_params)
     return target
 
@@ -204,6 +213,7 @@ def test_encoding(backend, frontend, layer):
             q_model,
             build_linear_layer(frontend, 2**nqubits, 1),
         ],
+        binary=binary,
     )
     target = prepare_targets(frontend, model, data)
     backprop_test(frontend, model, data, target)
@@ -243,9 +253,7 @@ def test_decoding(backend, frontend, layer, analytic):
     if not decoding_layer.analytic:
         pytest.skip("PSR differentiation is not working yet.")
 
-    q_model = frontend.QuantumModel(
-        encoding_layer, training_layer, decoding_layer, differentiation="Jax"
-    )
+    q_model = frontend.QuantumModel(encoding_layer, training_layer, decoding_layer)
 
     data = random_tensor(frontend, (200, dim))
     target = prepare_targets(frontend, q_model, data)
