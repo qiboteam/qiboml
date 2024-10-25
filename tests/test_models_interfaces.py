@@ -236,10 +236,11 @@ def test_decoding(backend, frontend, layer, analytic):
         )
         kwargs["observable"] = observable
         kwargs["analytic"] = analytic
+        kwargs["nshots"] = None
     decoding_layer = layer(nqubits, decoding_qubits, **kwargs)
 
-    if not decoding_layer.analytic:
-        pytest.skip("PSR differentiation is not working yet.")
+    # if not decoding_layer.analytic:
+    #     pytest.skip("PSR differentiation is not working yet.")
 
     q_model = frontend.QuantumModel(
         encoding_layer, training_layer, decoding_layer, differentiation="Jax"
