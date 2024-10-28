@@ -7,7 +7,7 @@ from qiboml.backends.pytorch import PyTorchBackend
 from qiboml.backends.tensorflow import TensorflowBackend
 
 PLATFORMS = ["tensorflow", "pytorch", "jax"]
-AVAILABLE_PLATFORMS = ["tensorflow"]
+AVAILABLE_PLATFORMS = ["tensorflow"] # temporary: to remove once pytorch and tensorflow are migrated  and jax is fully woring
 QibomlBackend = Union[TensorflowBackend, PyTorchBackend, JaxBackend]
 
 
