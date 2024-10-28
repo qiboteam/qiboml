@@ -4,25 +4,27 @@ from qibo import gates, hamiltonians
 from qibo.quantum_info import random_clifford
 from qibo.symbols import Z
 
-import qiboml.models.encoding_decoding as ed
+import qiboml.models.decoding as dec
 
 
 def test_probabilities_layer(backend):
     nqubits = 5
     qubits = np.random.choice(range(nqubits), size=(4,), replace=False)
-    layer = ed.ProbabilitiesLayer(nqubits, qubits=qubits, backend=backend)
+    layer = dec.Probabilities(nqubits, qubits=qubits, backend=backend)
     c = random_clifford(nqubits, backend=backend)
     backend.assert_allclose(
-        layer(c).ravel(), backend.execute_circuit(c).probabilities(qubits)
+        layer(c).ravel(), backend.execute_circuit(c).probabilities()
     )
 
 
 def test_state_layer(backend):
     nqubits = 5
-    layer = ed.StateLayer(nqubits, backend=backend)
+    layer = dec.State(nqubits, backend=backend)
     c = random_clifford(nqubits, backend=backend)
     real, im = layer(c)
-    backend.assert_allclose(real + 1j * im, backend.execute_circuit(c).state())
+    backend.assert_allclose(
+        (real + 1j * im).ravel(), backend.execute_circuit(c).state().ravel()
+    )
 
 
 @pytest.mark.parametrize("analytic", [True, False])
@@ -32,7 +34,7 @@ def test_expectation_layer(backend, analytic):
     nqubits = 5
     # test observable error
     with pytest.raises(RuntimeError):
-        layer = ed.ExpectationLayer(nqubits, backend=backend)
+        layer = dec.Expectation(nqubits, backend=backend)
 
     c = random_clifford(nqubits, seed=rng, backend=backend)
     observable = hamiltonians.SymbolicHamiltonian(
@@ -40,7 +42,7 @@ def test_expectation_layer(backend, analytic):
         nqubits=nqubits,
         backend=backend,
     )
-    layer = ed.ExpectationLayer(
+    layer = dec.Expectation(
         nqubits,
         observable=observable,
         nshots=int(1e5),

@@ -1,13 +1,13 @@
 import numpy as np
 import pytest
 
-import qiboml.models.encoding_decoding as ed
+import qiboml.models.encoding as ed
 
 
 def test_binary_encoding_layer(backend):
     nqubits = 10
     qubits = np.random.choice(range(nqubits), size=(6,), replace=False)
-    layer = ed.BinaryEncodingLayer(nqubits, qubits=qubits, backend=backend)
+    layer = ed.BinaryEncoding(nqubits, qubits=qubits)
     data = backend.cast(np.random.choice([0, 1], size=(len(qubits),)))
     c = layer(data)
     indices = [gate.qubits[0] for gate in c.queue if gate.name == "x"]
@@ -20,14 +20,8 @@ def test_binary_encoding_layer(backend):
 def test_phase_encoding_layer(backend):
     nqubits = 10
     qubits = np.random.choice(range(nqubits), size=(6,), replace=False)
-    layer = ed.PhaseEncodingLayer(nqubits, qubits=qubits, backend=backend)
+    layer = ed.PhaseEncoding(nqubits, qubits=qubits)
     data = backend.cast(np.random.randn(1, len(qubits)))
     c = layer(data)
-    angles = [gate.init_kwargs["theta"] for gate in c.queue if gate.name == "rz"]
+    angles = [gate.init_kwargs["theta"] for gate in c.queue if gate.name == "ry"]
     backend.assert_allclose(data.ravel(), angles)
-    # test parameters getter
-    backend.assert_allclose(data.ravel(), layer.parameters.ravel())
-    # test parameters setter
-    new_parameters = backend.cast(np.random.randn(1, len(qubits)))
-    layer.parameters = new_parameters.ravel()
-    backend.assert_allclose(new_parameters.ravel(), layer.parameters.ravel())
