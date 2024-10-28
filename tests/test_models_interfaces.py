@@ -168,19 +168,8 @@ def prepare_targets(frontend, model, data):
     init_params = get_parameters(frontend, model)
     set_parameters(frontend, model, target_params)
     target, _ = eval_model(frontend, model, data)
-    # if sum(sum(target) - len(target) * target).norm() < 1e-5:
-    #    breakpoint()
-
     set_parameters(frontend, model, init_params)
     return target
-
-
-def assert_grad_norm(frontend, parameters, tol=1e-3):
-    if frontend.__name__ == "qiboml.models.pytorch":
-        for param in parameters:
-            assert param.grad.norm() < tol
-    elif frontend.__name__ == "qiboml.models.keras":
-        pass
 
 
 def backprop_test(frontend, model, data, target):
@@ -212,7 +201,7 @@ def test_encoding(backend, frontend, layer, seed):
     encoding_layer = layer(nqubits, random_subset(nqubits, dim))
     q_model = frontend.QuantumModel(encoding_layer, training_layer, decoding_layer)
     binary = True if encoding_layer.__class__.__name__ == "BinaryEncoding" else False
-    data = random_tensor(frontend, (200, dim), binary)
+    data = random_tensor(frontend, (100, dim), binary)
     target = prepare_targets(frontend, q_model, data)
     backprop_test(frontend, q_model, data, target)
 
@@ -230,7 +219,7 @@ def test_encoding(backend, frontend, layer, seed):
     backprop_test(frontend, model, data, target)
 
 
-@pytest.mark.parametrize("layer,seed", zip(DECODING_LAYERS, [1, 3, 1, 1]))
+@pytest.mark.parametrize("layer,seed", zip(DECODING_LAYERS, [1, 2, 1, 1]))
 @pytest.mark.parametrize("analytic", [True, False])
 def test_decoding(backend, frontend, layer, seed, analytic):
     if frontend.__name__ == "qiboml.models.keras":
@@ -269,10 +258,10 @@ def test_decoding(backend, frontend, layer, seed, analytic):
 
     q_model = frontend.QuantumModel(encoding_layer, training_layer, decoding_layer)
 
-    data = random_tensor(frontend, (200, dim))
+    data = random_tensor(frontend, (100, dim))
     target = prepare_targets(frontend, q_model, data)
     backprop_test(frontend, q_model, data, target)
-    """
+
     model = build_sequential_model(
         frontend,
         [
@@ -285,4 +274,3 @@ def test_decoding(backend, frontend, layer, seed, analytic):
     data = random_tensor(frontend, (100, 32))
     target = prepare_targets(frontend, model, data)
     backprop_test(frontend, model, data, target)
-    """

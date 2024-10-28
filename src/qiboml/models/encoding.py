@@ -41,7 +41,7 @@ class PhaseEncoding(QuantumEncoding):
     ):
         super().__post_init__()
         for q in self.qubits:
-            self._circuit.add(gates.RZ(q, theta=0.0, trainable=False))
+            self._circuit.add(gates.RY(q, theta=0.0, trainable=False))
 
     def _set_phases(self, x: ndarray):
         for gate, phase in zip(self._circuit.parametrized_gates, x.ravel()):
