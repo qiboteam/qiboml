@@ -16,6 +16,7 @@ class QuantumModel(torch.nn.Module):
     encoding: QuantumEncoding
     circuit: Circuit
     decoding: QuantumDecoding
+    # TODO: from callable to abstract differentiation class
     differentiation_rule: callable = None
 
     def __post_init__(
@@ -23,6 +24,7 @@ class QuantumModel(torch.nn.Module):
     ):
         super().__init__()
 
+        circuit = self.encoding.circuit
         params = [p for param in self.circuit.get_parameters() for p in param]
         params = torch.as_tensor(self.backend.to_numpy(x=params)).ravel()
         params.requires_grad = True
