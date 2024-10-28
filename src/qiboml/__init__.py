@@ -15,7 +15,7 @@ try:
     from qiboml.models import keras
 
     ndarray = Union[ndarray, tf_tensor]
-except ImportError:
+except ImportError:  # pragma: no cover
     pass
 
 try:
@@ -24,5 +24,5 @@ try:
     from qiboml.models import pytorch
 
     ndarray = Union[ndarray, pt_tensor]
-except ImportError:
+except ImportError:  # pragma: no cover
     pass
