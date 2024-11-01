@@ -7,7 +7,9 @@ from qibo.config import raise_error
 class JaxBackend(NumpyBackend):
     def __init__(self):
         super().__init__()
-        self.name = "jax"
+
+        self.name = "qiboml"
+        self.platform = "jax"
 
         import jax
         import jax.numpy as jnp  # pylint: disable=import-error
