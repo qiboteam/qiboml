@@ -114,9 +114,7 @@ def train_model(frontend, model, data, target):
     elif frontend.__name__ == "qiboml.models.keras":
         optimizer = frontend.keras.optimizers.Adam()
         loss_f = frontend.keras.losses.MeanSquaredError()
-        breakpoint()
         model.compile(loss=loss_f, optimizer=optimizer)
-        breakpoint()
         model.fit(
             data,
             target,
@@ -186,9 +184,7 @@ def prepare_targets(frontend, model, data):
     set_parameters(frontend, model, target_params)
     # Mi faccio dare gli output del modello (con
     # target_params) per ogni x in contenuto in data
-    print("Eval Model (pre)")
     target, _ = eval_model(frontend, model, data)
-    print("Eval Model (post)")
     # Metto in model i parametri iniziali
     set_parameters(frontend, model, init_params)
     return target
@@ -204,13 +200,10 @@ def assert_grad_norm(frontend, parameters, tol=1e-3):
 
 def backprop_test(frontend, model, data, target):
     # Calcolo la loss coi parametri iniziali
-    breakpoint()
     _, loss_untrained = eval_model(frontend, model, data, target)
     # Calcolo i gradienti
-    breakpoint()
     grad = train_model(frontend, model, data, target)
     # Calcolo la loss
-    breakpoint()
     _, loss_trained = eval_model(frontend, model, data, target)
     # Controllo che la nuova loss sia più piccola, ovvero che ho allenato
     assert loss_untrained > loss_trained
@@ -257,7 +250,6 @@ def test_encoding(backend, frontend, layer):
     # ============
     # Pure QuantumModel
     # ============
-    breakpoint()
     print("Pure QuantumModel")
     backprop_test(frontend, q_model, data, target)
 

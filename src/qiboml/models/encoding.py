@@ -72,7 +72,7 @@ class BinaryEncoding(QuantumEncoding):
         def false_fn():
             tf.no_op()
 
-        for i, q in enumerate(qubits):
+        for i, q in enumerate(self.qubits):
             pred = tf.equal(x[0][i], 1)
             tf.cond(pred, true_fn=true_fn, false_fn=false_fn)
 
