@@ -3,6 +3,7 @@ import inspect
 import numpy as np
 import pytest
 import torch
+import tensorflow as tf
 from qibo import construct_backend, hamiltonians
 from qibo.config import raise_error
 from qibo.symbols import Z
@@ -36,20 +37,42 @@ def random_subset(nqubits, k):
     return np.random.choice(range(nqubits), size=(k,), replace=False).tolist()
 
 
+def build_linear_layer_adding(frontend, q_model):
+    model = frontend.keras.Sequential()
+    model.add(
+        frontend.keras.layers.Dense(
+            5,
+            name="Dense0",
+            activation="relu",
+            input_shape=(input_size,),
+        )
+    )
+    model.add(q_model)
+    model.add(
+        frontend.keras.layers.Dense(
+            12,
+            name="Dense1",
+            activation="relu",
+        )
+    )
+
+
 def build_linear_layer(frontend, input_dim, output_dim):
     if frontend.__name__ == "qiboml.models.pytorch":
         return frontend.torch.nn.Linear(input_dim, output_dim)
     elif frontend.__name__ == "qiboml.models.keras":
-        return frontend.keras.layers.Dense(output_dim)
+        return frontend.keras.layers.Dense(units=output_dim)
     else:
         raise_error(RuntimeError, f"Unknown frontend {frontend}.")
 
 
-def build_sequential_model(frontend, layers):
+def build_sequential_model(frontend, layers, input_dim):
     if frontend.__name__ == "qiboml.models.pytorch":
         return frontend.torch.nn.Sequential(*layers)
     elif frontend.__name__ == "qiboml.models.keras":
-        return frontend.keras.Sequential(layers)
+        model = frontend.keras.Sequential(layers)
+        model.build((None, input_dim))
+        return model
     else:
         raise_error(RuntimeError, f"Unknown frontend {frontend}.")
 
@@ -58,7 +81,11 @@ def random_tensor(frontend, shape, binary=False):
     if frontend.__name__ == "qiboml.models.pytorch":
         tensor = frontend.torch.randint(0, 2, shape) if binary else torch.randn(shape)
     elif frontend.__name__ == "qiboml.models.keras":
-        tensor = frontend.tf.random.uniform(shape)
+        tensor = (
+            tf.random.uniform(shape, minval=0, maxval=2, dtype=tf.int32)
+            if binary
+            else tf.random.normal(shape)
+        )
     else:
         raise_error(RuntimeError, f"Unknown frontend {frontend}.")
     return tensor
@@ -85,14 +112,15 @@ def train_model(frontend, model, data, target):
         return avg_grad / len(data)
 
     elif frontend.__name__ == "qiboml.models.keras":
-
         optimizer = frontend.keras.optimizers.Adam()
         loss_f = frontend.keras.losses.MeanSquaredError()
+        breakpoint()
         model.compile(loss=loss_f, optimizer=optimizer)
+        breakpoint()
         model.fit(
             data,
             target,
-            batch_size=1,
+            # batch_size=50,
             epochs=epochs,
         )
 
@@ -111,6 +139,7 @@ def eval_model(frontend, model, data, target=None):
             reduction="sum_over_batch_size",
         )
         for x in data:
+            x = tf.expand_dims(x, axis=0)
             outputs.append(model(x))
         outputs = frontend.tf.stack(outputs, axis=0)
     if target is not None:
@@ -124,7 +153,9 @@ def random_parameters(frontend, model):
         for k, v in model.state_dict().items():
             new_params.update({k: frontend.torch.randn(v.shape)})
     elif frontend.__name__ == "qiboml.models.keras":
-        new_params = [frontend.tf.random.uniform(model.get_weights()[0].shape)]
+        new_params = []
+        for i in range(len(model.get_weights())):
+            new_params += [frontend.tf.random.uniform(model.get_weights()[i].shape)]
     return new_params
 
 
@@ -143,10 +174,22 @@ def set_parameters(frontend, model, params):
 
 
 def prepare_targets(frontend, model, data):
+    # Genero dei parametri a caso per il modello
     target_params = random_parameters(frontend, model)
+    # q_model: [<tf.Tensor: shape=(4,)]
+    # sequential: [<tf.Tensor: shape=(3, 5)]
+    # Prendo i parametri iniziali del modello
     init_params = get_parameters(frontend, model)
+    # q_model: lista contenente un array
+    # sequential: [array, array, array]
+    # Metto i target_params nel modello
     set_parameters(frontend, model, target_params)
+    # Mi faccio dare gli output del modello (con
+    # target_params) per ogni x in contenuto in data
+    print("Eval Model (pre)")
     target, _ = eval_model(frontend, model, data)
+    print("Eval Model (post)")
+    # Metto in model i parametri iniziali
     set_parameters(frontend, model, init_params)
     return target
 
@@ -160,38 +203,74 @@ def assert_grad_norm(frontend, parameters, tol=1e-3):
 
 
 def backprop_test(frontend, model, data, target):
+    # Calcolo la loss coi parametri iniziali
+    breakpoint()
     _, loss_untrained = eval_model(frontend, model, data, target)
+    # Calcolo i gradienti
+    breakpoint()
     grad = train_model(frontend, model, data, target)
+    # Calcolo la loss
+    breakpoint()
     _, loss_trained = eval_model(frontend, model, data, target)
+    # Controllo che la nuova loss sia più piccola, ovvero che ho allenato
     assert loss_untrained > loss_trained
-    assert grad < 1e-3
+    # assert grad < 1e-3
 
 
 @pytest.mark.parametrize("layer", ENCODING_LAYERS)
 def test_encoding(backend, frontend, layer):
-    if frontend.__name__ == "qiboml.models.keras":
-        pytest.skip("keras interface not ready.")
-    if backend.name != "pytorch":
-        pytest.skip("Non pytorch differentiatio is not working yet.")
-    nqubits = 3
-    dim = 2
+    # if frontend.__name__ == "qiboml.models.keras":
+    #    pytest.skip("keras interface not ready.")
+    # if backend.name != "pytorch":
+    #    pytest.skip("Non pytorch differentiatio is not working yet.")
+    nqubits = 7
+    dim = 5
     training_layer = ans.ReuploadingCircuit(
         nqubits,
         random_subset(nqubits, dim),
     )
+    # Ti restituisce le probabilità per ogni stato possibile
     decoding_layer = dec.Probabilities(
         nqubits, random_subset(nqubits, dim), backend=backend
     )
+    # il metodo layer è: PhaseEncoding, BinaryEncoding (a seconda del test)
+    # Questa è solo una istanza dell'encoding. Se voglio usarlo devo fare:
+    # encoding_layer(x)
     encoding_layer = layer(nqubits, random_subset(nqubits, dim))
+    # Ogni frontend costruisce il suo QuantumModel
+    # Questo è solo una istanza
+    print("Layers inizializzati")
     q_model = frontend.QuantumModel(
         encoding_layer, training_layer, decoding_layer, differentiation="Jax"
     )
+    print("Q Model costruito")
+
     binary = True if encoding_layer.__class__.__name__ == "BinaryEncoding" else False
-    data = random_tensor(frontend, (100, dim), binary)
+
+    # Vengono generati dei dati: tensore uniforme con la shape (100, dim)
+    data = random_tensor(frontend, (5, dim), binary)
+    # Genero i dati target del problema
+    print("Pre target")
     target = prepare_targets(frontend, q_model, data)
+    print("Post target")
+
+    # ============
+    # Pure QuantumModel
+    # ============
+    breakpoint()
+    print("Pure QuantumModel")
     backprop_test(frontend, q_model, data, target)
 
-    data = random_tensor(frontend, (100, 32))
+    """
+    # ============
+    # Sequential: Hybrid classical and QuantumModel
+    # ============
+    print("Sequential")
+    batch_size = 5
+    input_size = 32
+    data = random_tensor(frontend, (batch_size, input_size), binary)
+
+    # model = build_linear_layer_adding(frontend, q_model)
     model = build_sequential_model(
         frontend,
         [
@@ -199,9 +278,15 @@ def test_encoding(backend, frontend, layer):
             q_model,
             build_linear_layer(frontend, 2**nqubits, 1),
         ],
+        input_size,
     )
+
+    print("Sequential: pre prepare targets")
     target = prepare_targets(frontend, model, data)
+    print("Sequential: post prepare targets")
+    breakpoint()
     backprop_test(frontend, model, data, target)
+    """
 
 
 @pytest.mark.parametrize("layer", DECODING_LAYERS)

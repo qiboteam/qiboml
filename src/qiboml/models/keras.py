@@ -31,10 +31,15 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
     def __post_init__(self):
         super().__init__()
 
+        # Trainable parameters
+        # Prendo i parametri da self.circuit perché mi interessa la shape per
+        # generere in modo gaussiano self.circuit_parameters
         params = [p for param in self.circuit.get_parameters() for p in param]
         params = tf.Variable(self.backend.to_numpy(params))
-        self.circuit_parameters = self.add_weight(shape=params.shape, trainable=True)
-        self.set_weights([params])
+
+        self.circuit_parameters = self.add_weight(
+            shape=params.shape, initializer="random_normal", trainable=True
+        )
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
         if self.backend.name != "tensorflow":
@@ -44,12 +49,15 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
         #    x = self.backend.cast(np.array(x))
 
         else:
-            self.circuit.set_parameters(self.get_weights()[0])
-            # self.circuit.set_parameters(self.circuit_parameters)
-            x = self.encoding(x) + self.circuit
-            x = self.decoding(x)
 
-        return x
+            weights = tf.identity(self.circuit_parameters)
+            self.circuit.set_parameters(weights)
+
+            y = self.encoding(x) + self.circuit
+            output = self.decoding(y)
+            output_expanded = tf.expand_dims(output, axis=0)
+
+        return output_expanded
 
     def compute_output_shape(
         self,

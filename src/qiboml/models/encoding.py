@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 import numpy as np
+import tensorflow as tf
+import tensorflow.experimental.numpy as tnp
 from qibo import Circuit, gates
 from qibo.config import raise_error
 
@@ -44,8 +46,9 @@ class PhaseEncoding(QuantumEncoding):
             self._circuit.add(gates.RZ(q, theta=0.0, trainable=False))
 
     def _set_phases(self, x: ndarray):
-        for gate, phase in zip(self._circuit.parametrized_gates, x.ravel()):
-            gate.parameters = phase
+        phase = tf.reshape(x, [-1])
+        for i, gate in enumerate(self._circuit.parametrized_gates):
+            gate.parameters = phase[i]
 
     def __call__(self, x: ndarray) -> Circuit:
         self._set_phases(x)
@@ -62,7 +65,5 @@ class BinaryEncoding(QuantumEncoding):
                 f"Invalid input dimension {x.shape[-1]}, but the allocated qubits are {self.qubits}.",
             )
         circuit = self.circuit.copy()
-        ones = np.flatnonzero(x.ravel() == 1)
-        for bit in ones:
-            circuit.add(gates.X(self.qubits[bit]))
+
         return circuit
