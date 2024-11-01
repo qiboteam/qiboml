@@ -1,19 +1,39 @@
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+
 import jax
-import jax.numpy as jnp
 import numpy as np
-from qibo import Circuit, parameter
-from qibo.backends import Backend, construct_backend
+from qibo import Circuit
+from qibo.backends import Backend
 from qibo.config import raise_error
-from qibo.hamiltonians.abstract import AbstractHamiltonian
-from torch.autograd import forward_ad
 
 from qiboml import ndarray
 from qiboml.backends.jax import JaxBackend
 from qiboml.models.decoding import QuantumDecoding
-from qiboml.models.encoding import BinaryEncoding
+from qiboml.models.encoding import BinaryEncoding, QuantumEncoding
 
 
-class PSR:
+@dataclass
+class DifferentiationRule(ABC):
+
+    @abstractmethod
+    def evaluate(
+        self,
+        x: ndarray,
+        encoding: QuantumEncoding,
+        training: Circuit,  # TODO: replace with an abstract TrainableLayer
+        decoding: QuantumDecoding,
+        backend: Backend,
+        *parameters: ndarray,
+    ):
+        """
+        Evaluate the gradient of a quantum model w.r.t variables and parameters,
+        respectively represented by `x` and `parameters`.
+        """
+        pass
+
+
+class PSR(DifferentiationRule):
 
     def __init__(self):
         pass
@@ -56,7 +76,7 @@ class PSR:
 
         circuit.set_parameters(tmp_params)
         backward = decoding(circuit)
-        return forward - backward
+        return generator_eigenval * (forward - backward)
 
     @staticmethod
     def shift_parameter(parameters, i, epsilon, backend):
@@ -71,7 +91,7 @@ class PSR:
         return parameters
 
 
-class Jax:
+class Jax(DifferentiationRule):
 
     def __init__(self):
         self._jax: Backend = JaxBackend()
