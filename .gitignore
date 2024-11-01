@@ -127,6 +127,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+qiboml/
 
 # Spyder project settings
 .spyderproject
