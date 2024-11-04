@@ -46,6 +46,8 @@ def test_expval_grad_PSR(frontend, backend, nshots):
 
         from qiboml.interfaces.pytorch import QuantumModel
 
+    interface_engine.set_seed(42)
+
     decimals = 6 if nshots is None else 2
 
     x = construct_x(frontend)
