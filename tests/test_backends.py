@@ -6,7 +6,8 @@ from qiboml.backends import MetaBackend
 
 
 def test_metabackend_load(backend):
-    assert isinstance(MetaBackend.load(backend.platform), backend.__class__)
+    name = backend.name if backend.name != "qiboml" else backend.platform
+    assert isinstance(MetaBackend.load(name), backend.__class__)
 
 
 def test_metabackend_load_error():
