@@ -6,6 +6,7 @@ from qibo import Circuit, gates
 from qibo.config import raise_error
 
 from qiboml import ndarray
+from qiboml.models.ansatze import layered_ansatz
 
 
 @dataclass
@@ -66,3 +67,60 @@ class BinaryEncoding(QuantumEncoding):
         for bit in ones:
             circuit.add(gates.X(self.qubits[bit]))
         return circuit
+
+
+@dataclass
+class ReuploadingEncoding(QuantumEncoding):
+    """
+    Implementing reuploading scheme alternating encoding U and training V layers.
+    It follows the scheme V - U - V - U - V, namely upload `nlayers` times x and
+    and each encoding layer is preceded and followed by a trainable layer V.
+    The chosen default V layer is a
+    `qiboml.models.ansatze.layered_ansatz(nqubits, 1, qubits, [RY, RZ], True)`.
+    """
+
+    # big TODO: make this model more flexible
+    data_shape: tuple = (1,)
+    nlayers: int = 1
+    trainable_ansatz: Circuit = None
+    encoding_gate: gates.Gate = gates.RX
+
+    def __post_init__(
+        self,
+    ):
+
+        super().__post_init__()
+
+        data_dim = np.prod(self.data_shape, axis=0)
+
+        if int(data_dim) % len(self.qubits) != 0:
+            raise_error(
+                ValueError,
+                f"The data dimension has to be equal to the length of the chosen {self.qubits} subset of the {self.nqubits} system.",
+            )
+
+        if self.trainable_ansatz is None:
+            self._circuit += layered_ansatz(nqubits=self.nqubits, qubits=self.qubits)
+        for _ in range(self.nlayers):
+            for q in self.qubits:
+                self._circuit.add(self.encoding_gate(q=q, theta=0.0, trainable=False))
+            if self.trainable_ansatz is None:
+                self._circuit += layered_ansatz(
+                    nqubits=self.nqubits, qubits=self.qubits
+                )
+
+    def _set_phases(self, x: ndarray):
+        encoding_gates = [
+            g for g in self._circuit.parametrized_gates if g.trainable == False
+        ]
+        data_length = len(x.ravel())
+        for l in range(self.nlayers):
+            for gate, phase in zip(
+                encoding_gates[data_length * l : data_length * l + data_length],
+                x.ravel(),
+            ):
+                gate.parameters = phase
+
+    def __call__(self, x: ndarray) -> Circuit:
+        self._set_phases(x)
+        return self._circuit

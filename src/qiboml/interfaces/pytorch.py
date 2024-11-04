@@ -15,7 +15,7 @@ from qiboml.operations.differentiation import DifferentiationRule
 class QuantumModel(torch.nn.Module):
 
     encoding: QuantumEncoding
-    circuit: Circuit
+    trainable_circuit: Circuit
     decoding: QuantumDecoding
     differentiation_rule: DifferentiationRule = None
 
@@ -24,11 +24,13 @@ class QuantumModel(torch.nn.Module):
     ):
         super().__init__()
 
-        circuit = self.encoding.circuit
-        params = [p for param in self.circuit.get_parameters() for p in param]
+        circuit = self.encoding.circuit + self.trainable_circuit
+        params = [p for param in circuit.get_parameters() for p in param]
         params = torch.as_tensor(self.backend.to_numpy(x=params)).ravel()
         params.requires_grad = True
-        self.circuit_parameters = torch.nn.Parameter(params)
+        print(params)
+        # all trainable parameters
+        self.trainable_parameters = torch.nn.Parameter(params)
 
     def forward(self, x: torch.Tensor):
         if (
@@ -39,15 +41,15 @@ class QuantumModel(torch.nn.Module):
             x = QuantumModelAutoGrad.apply(
                 x,
                 self.encoding,
-                self.circuit,
+                self.trainable_circuit,
                 self.decoding,
                 self.backend,
                 self.differentiation_rule,
                 *list(self.parameters())[0],
             )
         else:
-            self.circuit.set_parameters(list(self.parameters())[0])
-            x = self.encoding(x) + self.circuit
+            x = self.encoding(x) + self.trainable_circuit
+            x.set_parameters(list(self.parameters())[0])
             x = self.decoding(x)
         return x
 
@@ -66,6 +68,10 @@ class QuantumModel(torch.nn.Module):
     @property
     def output_shape(self):
         return self.decoding.output_shape
+
+    def draw(self):
+        circuit = self.encoding.circuit + self.trainable_circuit
+        circuit.draw()
 
 
 class QuantumModelAutoGrad(torch.autograd.Function):
