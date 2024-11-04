@@ -1,7 +1,6 @@
 import numpy as np
 import pytest
 import qibo
-import tensorflow as tf
 import torch
 from qibo import hamiltonians
 from qibo.backends import NumpyBackend, PyTorchBackend
@@ -23,9 +22,9 @@ torch.set_printoptions(precision=15, sci_mode=False)
 
 def construct_x(frontend):
     if frontend.__name__ == "qiboml.interfaces.pytorch":
-        return torch.tensor([0.5, 0.8])
+        return frontend.torch.tensor([0.5, 0.8])
     elif frontend.__name__ == "qiboml.interfaces.keras":
-        return tf.Variable([0.5, 0.8])
+        return frontend.tf.Variable([0.5, 0.8])
 
 
 @pytest.mark.parametrize("nshots", [None, 500000])
