@@ -38,6 +38,7 @@ tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux'" }
 pytest = "^7.2.1"
 pylint = "3.1.0"
 pytest-cov = "4.0.0"
+qibojit = "^0.1.7"
 
 [tool.poetry.group.benchmark.dependencies]
 pytest-benchmark = { version = "^4.0.0", extras = ["histogram"] }
