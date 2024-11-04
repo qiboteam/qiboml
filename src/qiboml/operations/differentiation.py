@@ -45,7 +45,7 @@ class PSR(DifferentiationRule):
                 "Parameter Shift Rule only supports expectation value decoding.",
             )
         x = encoding(x) + training
-        gradients = [np.array([[0.0]])]
+        gradients = [np.array([[(0.0, 0.0)]])]
         for i in range(len(parameters)):
             gradients.append(
                 self.one_parameter_shift(
