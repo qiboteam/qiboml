@@ -15,7 +15,6 @@ class QuantumDecoding:
     nqubits: int
     qubits: list[int] = None
     nshots: int = None
-    analytic: bool = True
     backend: Backend = None
     _circuit: Circuit = None
 
@@ -42,9 +41,17 @@ class QuantumDecoding:
     def output_shape(self):
         raise_error(NotImplementedError)
 
+    @property
+    def analytic(self):
+        if self.nshots is None:
+            return True
+        else:
+            return False
+
 
 @dataclass
 class Probabilities(QuantumDecoding):
+    # TODO: collapse on ExpectationDecoding if not analytic
 
     def __call__(self, x: Circuit) -> ndarray:
         return super().__call__(x).probabilities()
@@ -52,6 +59,10 @@ class Probabilities(QuantumDecoding):
     @property
     def output_shape(self):
         return (1, 2**self.nqubits)
+
+    @property
+    def analytic(self):
+        return True
 
 
 @dataclass
@@ -100,6 +111,10 @@ class State(QuantumDecoding):
     def output_shape(self):
         return (2, 1, 2**self.nqubits)
 
+    @property
+    def analytic(self):
+        return True
+
 
 @dataclass
 class Samples(QuantumDecoding):
@@ -114,3 +129,7 @@ class Samples(QuantumDecoding):
     @property
     def output_shape(self):
         return (self.nshots, len(self.qubits))
+
+    @property
+    def analytic(self):
+        return False
