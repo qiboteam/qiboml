@@ -73,13 +73,15 @@ class BinaryEncoding(QuantumEncoding):
 class ReuploadingEncoding(QuantumEncoding):
     """
     Implementing reuploading scheme alternating encoding U and training V layers.
-    It follows the scheme V - U - V - U - V, namely upload `nlayers` times x and
+    It follows the scheme V - U - V - U - V (in case of 2 layers), namely upload `nlayers` times x and
     and each encoding layer is preceded and followed by a trainable layer V.
     The chosen default V layer is a
     `qiboml.models.ansatze.layered_ansatz(nqubits, 1, qubits, [RY, RZ], True)`.
     """
 
-    # big TODO: make this model more flexible
+    # big TODO: make this model more flexible enabling e.g. lambda function of data and params
+
+    # TODO: rm this and raise error when calling the class
     data_shape: tuple = (1,)
     nlayers: int = 1
     trainable_ansatz: Circuit = None
@@ -99,6 +101,7 @@ class ReuploadingEncoding(QuantumEncoding):
                 f"The data dimension has to be equal to the length of the chosen {self.qubits} subset of the {self.nqubits} system.",
             )
 
+        # TODO: use deepcopy to repeat the call creating single elements
         if self.trainable_ansatz is None:
             self._circuit += layered_ansatz(nqubits=self.nqubits, qubits=self.qubits)
         for _ in range(self.nlayers):

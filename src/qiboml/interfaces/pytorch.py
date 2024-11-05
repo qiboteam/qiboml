@@ -28,7 +28,6 @@ class QuantumModel(torch.nn.Module):
         params = [p for param in circuit.get_parameters() for p in param]
         params = torch.as_tensor(self.backend.to_numpy(x=params)).ravel()
         params.requires_grad = True
-        print(params)
         # all trainable parameters
         self.trainable_parameters = torch.nn.Parameter(params)
 
