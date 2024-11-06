@@ -211,6 +211,26 @@ def backprop_test(frontend, model, data, target):
 
 
 @pytest.mark.parametrize("layer", ENCODING_LAYERS)
+def test_draw(backend, frontend, layer):
+    nqubits = 7
+    dim = 5
+    training_layer = ans.ReuploadingCircuit(
+        nqubits,
+        random_subset(nqubits, dim),
+    )
+    decoding_layer = dec.Probabilities(
+        nqubits, random_subset(nqubits, dim), backend=backend
+    )
+    encoding_layer = layer(nqubits, random_subset(nqubits, dim))
+
+    q_model = frontend.QuantumModel(
+        encoding_layer, training_layer, decoding_layer, differentiation="Jax"
+    )
+
+    q_model.draw()
+
+
+@pytest.mark.parametrize("layer", ENCODING_LAYERS)
 def test_encoding(backend, frontend, layer):
     # if frontend.__name__ == "qiboml.models.keras":
     #    pytest.skip("keras interface not ready.")
@@ -232,32 +252,25 @@ def test_encoding(backend, frontend, layer):
     encoding_layer = layer(nqubits, random_subset(nqubits, dim))
     # Ogni frontend costruisce il suo QuantumModel
     # Questo è solo una istanza
-    print("Layers inizializzati")
     q_model = frontend.QuantumModel(
         encoding_layer, training_layer, decoding_layer, differentiation="Jax"
     )
-    print("Q Model costruito")
 
     binary = True if encoding_layer.__class__.__name__ == "BinaryEncoding" else False
 
     # Vengono generati dei dati: tensore uniforme con la shape (100, dim)
     data = random_tensor(frontend, (5, dim), binary)
     # Genero i dati target del problema
-    print("Pre target")
     target = prepare_targets(frontend, q_model, data)
-    print("Post target")
 
     # ============
     # Pure QuantumModel
     # ============
-    print("Pure QuantumModel")
     backprop_test(frontend, q_model, data, target)
 
-    """
     # ============
     # Sequential: Hybrid classical and QuantumModel
     # ============
-    print("Sequential")
     batch_size = 5
     input_size = 32
     data = random_tensor(frontend, (batch_size, input_size), binary)
@@ -273,12 +286,9 @@ def test_encoding(backend, frontend, layer):
         input_size,
     )
 
-    print("Sequential: pre prepare targets")
     target = prepare_targets(frontend, model, data)
-    print("Sequential: post prepare targets")
-    breakpoint()
+
     backprop_test(frontend, model, data, target)
-    """
 
 
 @pytest.mark.parametrize("layer", DECODING_LAYERS)

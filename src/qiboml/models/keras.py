@@ -64,6 +64,12 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
     ):
         return self.output_shape
 
+    def draw(
+        self,
+    ):
+        breakpoint()
+        print("ciao")
+
     @property
     def output_shape(
         self,
