@@ -23,5 +23,5 @@ def test_phase_encoding_layer(backend):
     layer = ed.PhaseEncoding(nqubits, qubits=qubits)
     data = backend.cast(np.random.randn(1, len(qubits)))
     c = layer(data)
-    angles = [gate.init_kwargs["theta"] for gate in c.queue if gate.name == "rz"]
+    angles = [gate.init_kwargs["theta"] for gate in c.queue if gate.name == "ry"]
     backend.assert_allclose(data.ravel(), angles)

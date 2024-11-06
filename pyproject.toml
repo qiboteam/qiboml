@@ -8,6 +8,9 @@ version = "0.0.1"
 description = "Quantum Machine Learning using Qibo"
 authors = ["Qiboteam"]
 readme = "README.md"
+homepage = "https://qibo.science/"
+repository = "https://github.com/qiboteam/qiboml/"
+documentation = "https://qibo.science/docs/qiboml/stable"
 packages = [{ include = "qiboml", from = "src" }]
 
 [tool.poetry.dependencies]
@@ -21,6 +24,16 @@ torch = { version = "^2.3.1", optional = true }
 qibo = {git="https://github.com/qiboteam/qibo"}
 jax = "^0.4.25"
 jaxlib = "^0.4.25"
+
+[tool.poetry.group.docs]
+optional = true
+
+[tool.poetry.group.docs.dependencies]
+Sphinx = "^5.3.0"
+furo = "^2023.3.27"
+sphinxcontrib-bibtex = "^2.5.0"
+sphinx-copybutton = "^0.5.2"
+sphinxcontrib-katex = "^0.9.9"
 
 [tool.poetry.group.dev]
 optional = true
@@ -47,6 +60,9 @@ bench = "pytest benchmarks/"
 test = "pytest"
 lint = "pylint src/**/*.py -E"
 lint-warnings = "pylint src/**/*.py --exit-zero"
+docs = "make -C doc html"
+docs-clean = "make -C doc clean"
+test-docs = "make -C doc doctest"
 
 [tool.pytest.ini_options]
 testpaths = ['tests/', 'benchmarks/']

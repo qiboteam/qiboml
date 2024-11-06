@@ -14,8 +14,8 @@ from qiboml.operations import differentiation as Diff
 
 BACKEND_2_DIFFERENTIATION = {
     "pytorch": None,
-    "tensorflow": "PSR",
-    "jax": "PSR",
+    "qibolab": "PSR",
+    "jax": "Jax",
 }
 
 
@@ -64,7 +64,6 @@ class QuantumModel(torch.nn.Module):
             self.circuit.set_parameters(list(self.parameters())[0])
             x = self.encoding(x) + self.circuit
             x = self.decoding(x)
-
         return x
 
     @property
@@ -126,18 +125,24 @@ class QuantumModelAutoGrad(torch.autograd.Function):
             )
             for par in parameters
         ]
-        gradients = [
+        grad_input, *gradients = (
             torch.as_tensor(ctx.backend.to_numpy(grad).tolist())
             for grad in ctx.differentiation.evaluate(
                 x_clone, ctx.encoding, ctx.circuit, ctx.decoding, ctx.backend, *params
             )
-        ]
+        )
+        gradients = torch.vstack(gradients).view((-1,) + grad_output.shape)
+        left_indices = tuple(range(len(gradients.shape)))
+        right_indices = left_indices[::-1][: len(gradients.shape) - 2] + (
+            len(left_indices),
+        )
+        gradients = torch.einsum(gradients, left_indices, grad_output.T, right_indices)
         return (
-            grad_output,
+            grad_output @ grad_input,
             None,
             None,
             None,
             None,
             None,
-            *(torch.vstack(gradients) @ grad_output),
+            *gradients,
         )

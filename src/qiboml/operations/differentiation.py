@@ -10,6 +10,7 @@ from torch.autograd import forward_ad
 from qiboml import ndarray
 from qiboml.backends.jax import JaxBackend
 from qiboml.models.decoding import QuantumDecoding
+from qiboml.models.encoding import BinaryEncoding
 
 
 class PSR:
@@ -54,29 +55,52 @@ class Jax:
 
     def __init__(self):
         self._jax: Backend = JaxBackend()
-        self._circuit: Circuit = None
+        self._encoding = None
+        self._training: Circuit = None
         self._decoding: QuantumDecoding = None
         self._argnums: list[int] = None
+        self._circuit = None
 
     def evaluate(self, x: ndarray, encoding, training, decoding, backend, *parameters):
+        binary = isinstance(encoding, BinaryEncoding)
         x = backend.to_numpy(x)
-        x = self._jax.cast(x, x.dtype)
+        x = self._jax.cast(x, self._jax.precision)
         if self._argnums is None:
-            self._argnums = range(len(parameters))
+            self._argnums = range(len(parameters) + 1)
             setattr(self, "_jacobian", jax.jit(jax.jacfwd(self._run, self._argnums)))
+            setattr(
+                self,
+                "_jacobian_without_inputs",
+                jax.jit(jax.jacfwd(self._run_without_inputs, self._argnums[:-1])),
+            )
         parameters = backend.to_numpy(list(parameters))
         parameters = self._jax.cast(parameters, parameters.dtype)
-        self._circuit = encoding(x) + training
+        if binary:
+            self._circuit = encoding(x) + training
+        else:
+            self._encoding = encoding
+            self._training = training
         self._decoding = decoding
         self._decoding.set_backend(self._jax)
-        gradients = self._jacobian(*parameters)
+        if binary:
+            gradients = (
+                self._jax.numpy.zeros((decoding.output_shape[-1], x.shape[-1])),
+                self._jacobian_without_inputs(*parameters),  # pylint: disable=no-member
+            )
+        else:
+            gradients = self._jacobian(x, *parameters)  # pylint: disable=no-member
         decoding.set_backend(backend)
         return [
             backend.cast(self._jax.to_numpy(grad).tolist(), backend.precision)
             for grad in gradients
         ]
 
-    def _run(self, *parameters):
+    def _run(self, x, *parameters):
+        circuit = self._encoding(x) + self._training
+        circuit.set_parameters(parameters)
+        return self._decoding(circuit)
+
+    def _run_without_inputs(self, *parameters):
         self._circuit.set_parameters(parameters)
         return self._decoding(self._circuit)
 

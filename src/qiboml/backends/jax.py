@@ -7,7 +7,9 @@ from qibo.config import raise_error
 class JaxBackend(NumpyBackend):
     def __init__(self):
         super().__init__()
-        self.name = "jax"
+
+        self.name = "qiboml"
+        self.platform = "jax"
 
         import jax
         import jax.numpy as jnp  # pylint: disable=import-error
@@ -43,6 +45,13 @@ class JaxBackend(NumpyBackend):
         elif self.is_sparse(x):
             return x.astype(dtype)
         return self.np.array(x, dtype=dtype, copy=copy)
+
+    def to_numpy(self, x):
+
+        if isinstance(x, list) or isinstance(x, tuple):
+            return self.numpy.asarray([self.to_numpy(i) for i in x])
+
+        return self.numpy.asarray(x)
 
     # TODO: using numpy's rng for now. Shall we use Jax's?
     def set_seed(self, seed):

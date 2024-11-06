@@ -42,11 +42,13 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
         )
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
-        if self.backend.name != "tensorflow":
-            pass
-        # @tf.custom_gradient
-        # def custom_call(x: tf.Tensor):
-        #    x = self.backend.cast(np.array(x))
+        if (
+            self.backend.name != "tensorflow"
+            or self.differentiation is not None
+            or not self.decoding.analytic
+        ):
+            
+            
 
         else:
 
