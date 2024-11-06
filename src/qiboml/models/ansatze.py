@@ -3,10 +3,13 @@ from typing import List, Optional
 
 import numpy as np
 from qibo import Circuit, gates
+from qibo.config import raise_error
 
 
 def entangling_circuit(nqubits: int, entangling_gate: gates.Gate = gates.CNOT):
     """Construct entangling layer."""
+    if nqubits < 2:
+        raise_error(ValueError, "This layer cannot be used if nqubits is < 2.")
     circuit = Circuit(nqubits)
     for q in range(nqubits):
         circuit.add(entangling_gate(q0=q % nqubits, q1=(q + 1) % nqubits))
@@ -31,7 +34,7 @@ def layered_ansatz(
         for q in qubits:
             for gate in gates_list:
                 circuit.add(gate(q, theta=random.random(), trainable=True))
-        if entanglement:
+        if entanglement and nqubits > 1:
             circuit += entangling_circuit(nqubits, gates.CNOT)
 
     return circuit
