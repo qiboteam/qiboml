@@ -41,8 +41,10 @@ class PSR(DifferentiationRule):
                 NotImplementedError,
                 "Parameter Shift Rule only supports expectation value decoding.",
             )
+        x_size = backend.to_numpy(x).size
         x = encoding(x) + training
-        gradients = [np.array([[(0.0, 0.0)]])]
+        # TODO: fix this differentiation removing the padding
+        gradients = [np.array([[(0.0,) * x_size]])]
         for i in range(len(parameters)):
             gradients.append(
                 self.one_parameter_shift(
