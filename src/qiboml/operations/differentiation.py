@@ -35,9 +35,6 @@ class DifferentiationRule(ABC):
 
 class PSR(DifferentiationRule):
 
-    def __init__(self):
-        pass
-
     def evaluate(self, x: ndarray, encoding, training, decoding, backend, *parameters):
         if decoding.output_shape != (1, 1):
             raise_error(
