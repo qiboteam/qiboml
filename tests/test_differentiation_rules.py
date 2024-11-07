@@ -62,6 +62,8 @@ def test_expval_grad_PSR(frontend, backend, nshots):
 
     decimals = 6 if nshots is None else 2
 
+    frontend.np.random.seed(42)
+
     x = construct_x(frontend)
 
     nqubits = 2

@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 
+import numpy as np
 import torch
 from qibo import Circuit
 from qibo.backends import Backend
