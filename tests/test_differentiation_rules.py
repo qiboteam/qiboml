@@ -42,7 +42,7 @@ def compute_gradient(frontend, model, x):
         return grad
 
 
-@pytest.mark.parametrize("nshots", [None, 500000])
+@pytest.mark.parametrize("nshots", [None, 1000000])
 @pytest.mark.parametrize("backend", EXECUTION_BACKENDS)
 def test_expval_grad_PSR(frontend, backend, nshots):
     """
