@@ -56,11 +56,10 @@ def test_expval_grad_PSR(frontend, backend, nshots):
 
     obs = hamiltonians.Z(nqubits=nqubits)
 
-    encoding_layer = PhaseEncoding(nqubits=nqubits, qubits=[0, 1])
-    training_layer = ReuploadingCircuit(nqubits=nqubits, qubits=[0, 1], nlayers=1)
+    encoding_layer = PhaseEncoding(nqubits=nqubits)
+    training_layer = ReuploadingCircuit(nqubits=nqubits, nlayers=1)
     decoding_layer = Expectation(
         nqubits=nqubits,
-        qubits=[0, 1],
         backend=backend,
         observable=obs,
         nshots=nshots,
