@@ -4,7 +4,7 @@
 name = "absl-py"
 version = "2.1.0"
 description = "Abseil Python Common Libraries, see https://github.com/abseil/abseil-py."
-optional = false
+optional = true
 python-versions = ">=3.7"
 files = [
     {file = "absl-py-2.1.0.tar.gz", hash = "sha256:7820790efbb316739cde8b4e19357243fc3608a152024288513dd968d7d959ff"},
@@ -13,13 +13,13 @@ files = [
 
 [[package]]
 name = "alembic"
-version = "1.13.3"
+version = "1.14.0"
 description = "A database migration tool for SQLAlchemy."
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "alembic-1.13.3-py3-none-any.whl", hash = "sha256:908e905976d15235fae59c9ac42c4c5b75cfcefe3d27c0fbf7ae15a37715d80e"},
-    {file = "alembic-1.13.3.tar.gz", hash = "sha256:203503117415561e203aa14541740643a611f641517f0209fcae63e9fa09f1a2"},
+    {file = "alembic-1.14.0-py3-none-any.whl", hash = "sha256:99bd884ca390466db5e27ffccff1d179ec5c05c965cfefc0607e69f9e411cb25"},
+    {file = "alembic-1.14.0.tar.gz", hash = "sha256:b00892b53b3642d0b8dbedba234dbf1924b69be83a9a769d5a624b01094e304b"},
 ]
 
 [package.dependencies]
@@ -70,7 +70,7 @@ typing-extensions = {version = ">=4.0.0", markers = "python_version < \"3.11\""}
 name = "astunparse"
 version = "1.6.3"
 description = "An AST unparser for Python"
-optional = false
+optional = true
 python-versions = "*"
 files = [
     {file = "astunparse-1.6.3-py2.py3-none-any.whl", hash = "sha256:c2652417f2c8b5bb325c885ae329bdf3f86424075c4fd1a128674bc6fba4b8e8"},
@@ -115,7 +115,7 @@ files = [
 name = "certifi"
 version = "2024.8.30"
 description = "Python package for providing Mozilla's CA Bundle."
-optional = false
+optional = true
 python-versions = ">=3.6"
 files = [
     {file = "certifi-2024.8.30-py3-none-any.whl", hash = "sha256:922820b53db7a7257ffbda3f597266d435245903d80737e34f8a45ff3e3230d8"},
@@ -126,7 +126,7 @@ files = [
 name = "charset-normalizer"
 version = "3.4.0"
 description = "The Real First Universal Charset Detector. Open, modern and actively maintained alternative to Chardet."
-optional = false
+optional = true
 python-versions = ">=3.7.0"
 files = [
     {file = "charset_normalizer-3.4.0-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:4f9fc98dad6c2eaa32fc3af1417d95b5e3d08aff968df0cd320066def971f9a6"},
@@ -418,7 +418,7 @@ pyrepl = ">=0.8.2"
 name = "filelock"
 version = "3.16.1"
 description = "A platform independent file lock."
-optional = false
+optional = true
 python-versions = ">=3.8"
 files = [
     {file = "filelock-3.16.1-py3-none-any.whl", hash = "sha256:2082e5703d51fbf98ea75855d9d5527e33d8ff23099bec374a134febee6946b0"},
@@ -434,7 +434,7 @@ typing = ["typing-extensions (>=4.12.2)"]
 name = "flatbuffers"
 version = "24.3.25"
 description = "The FlatBuffers serialization format for Python"
-optional = false
+optional = true
 python-versions = "*"
 files = [
     {file = "flatbuffers-24.3.25-py2.py3-none-any.whl", hash = "sha256:8dbdec58f935f3765e4f7f3cf635ac3a77f83568138d6a2311f524ec96364812"},
@@ -445,7 +445,7 @@ files = [
 name = "fsspec"
 version = "2024.10.0"
 description = "File-system specification"
-optional = false
+optional = true
 python-versions = ">=3.8"
 files = [
     {file = "fsspec-2024.10.0-py3-none-any.whl", hash = "sha256:03b9a6785766a4de40368b88906366755e2819e758b83705c88cd7cb5fe81871"},
@@ -484,7 +484,7 @@ tqdm = ["tqdm"]
 name = "gast"
 version = "0.6.0"
 description = "Python AST that abstracts the underlying Python version"
-optional = false
+optional = true
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,>=2.7"
 files = [
     {file = "gast-0.6.0-py3-none-any.whl", hash = "sha256:52b182313f7330389f72b069ba00f174cfe2a06411099547288839c6cbafbd54"},
@@ -495,7 +495,7 @@ files = [
 name = "google-pasta"
 version = "0.2.0"
 description = "pasta is an AST-based Python refactoring library"
-optional = false
+optional = true
 python-versions = "*"
 files = [
     {file = "google-pasta-0.2.0.tar.gz", hash = "sha256:c9f2c8dfc8f96d0d5808299920721be30c9eec37f2389f28904f454565c8a16e"},
@@ -596,7 +596,7 @@ test = ["objgraph", "psutil"]
 name = "grpcio"
 version = "1.67.1"
 description = "HTTP/2-based RPC framework"
-optional = false
+optional = true
 python-versions = ">=3.8"
 files = [
     {file = "grpcio-1.67.1-cp310-cp310-linux_armv7l.whl", hash = "sha256:8b0341d66a57f8a3119b77ab32207072be60c9bf79760fa609c5609f2deb1f3f"},
@@ -663,7 +663,7 @@ protobuf = ["grpcio-tools (>=1.67.1)"]
 name = "h5py"
 version = "3.12.1"
 description = "Read and write HDF5 files from Python"
-optional = false
+optional = true
 python-versions = ">=3.9"
 files = [
     {file = "h5py-3.12.1-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:2f0f1a382cbf494679c07b4371f90c70391dedb027d517ac94fa2c05299dacda"},
@@ -701,7 +701,7 @@ numpy = ">=1.19.3"
 name = "idna"
 version = "3.10"
 description = "Internationalized Domain Names in Applications (IDNA)"
-optional = false
+optional = true
 python-versions = ">=3.6"
 files = [
     {file = "idna-3.10-py3-none-any.whl", hash = "sha256:946d195a0d259cbba61165e88e65941f16e9b36ea6ddb97f00452bae8b1287d3"},
@@ -890,7 +890,7 @@ testing = ["Django", "attrs", "colorama", "docopt", "pytest (<7.0.0)"]
 name = "jinja2"
 version = "3.1.4"
 description = "A very fast and expressive template engine."
-optional = false
+optional = true
 python-versions = ">=3.7"
 files = [
     {file = "jinja2-3.1.4-py3-none-any.whl", hash = "sha256:bc5dd2abb727a5319567b7a813e6a2e7318c39f4f487cfe6c89c6f9c7d25197d"},
@@ -918,7 +918,7 @@ files = [
 name = "keras"
 version = "3.6.0"
 description = "Multi-backend Keras."
-optional = false
+optional = true
 python-versions = ">=3.9"
 files = [
     {file = "keras-3.6.0-py3-none-any.whl", hash = "sha256:49585e4577f6e86bd890d96dfbcb1890f5bab5967ef831c07fd63f9d86e4bfe9"},
@@ -939,7 +939,7 @@ rich = "*"
 name = "libclang"
 version = "18.1.1"
 description = "Clang Python Bindings, mirrored from the official LLVM repo: https://github.com/llvm/llvm-project/tree/main/clang/bindings/python, to make the installation process easier."
-optional = false
+optional = true
 python-versions = "*"
 files = [
     {file = "libclang-18.1.1-py2.py3-none-macosx_10_9_x86_64.whl", hash = "sha256:6f14c3f194704e5d09769108f03185fce7acaf1d1ae4bbb2f30a72c2400cb7c5"},
@@ -1006,7 +1006,7 @@ testing = ["pytest"]
 name = "markdown"
 version = "3.7"
 description = "Python implementation of John Gruber's Markdown."
-optional = false
+optional = true
 python-versions = ">=3.8"
 files = [
     {file = "Markdown-3.7-py3-none-any.whl", hash = "sha256:7eb6df5690b81a1d7942992c97fad2938e956e79df20cbc6186e9c3a77b1c803"},
@@ -1024,7 +1024,7 @@ testing = ["coverage", "pyyaml"]
 name = "markdown-it-py"
 version = "3.0.0"
 description = "Python port of markdown-it. Markdown parsing, done right!"
-optional = false
+optional = true
 python-versions = ">=3.8"
 files = [
     {file = "markdown-it-py-3.0.0.tar.gz", hash = "sha256:e3f60a94fa066dc52ec76661e37c851cb232d92f9886b15cb560aaada2df8feb"},
@@ -1143,7 +1143,7 @@ files = [
 name = "mdurl"
 version = "0.1.2"
 description = "Markdown URL utilities"
-optional = false
+optional = true
 python-versions = ">=3.7"
 files = [
     {file = "mdurl-0.1.2-py3-none-any.whl", hash = "sha256:84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8"},
@@ -1208,7 +1208,7 @@ tests = ["pytest (>=4.6)"]
 name = "namex"
 version = "0.0.8"
 description = "A simple utility to separate the implementation of your Python package and its public API surface."
-optional = false
+optional = true
 python-versions = "*"
 files = [
     {file = "namex-0.0.8-py3-none-any.whl", hash = "sha256:7ddb6c2bb0e753a311b7590f84f6da659dd0c05e65cb89d519d54c0a250c0487"},
@@ -1316,7 +1316,7 @@ files = [
 name = "nvidia-cublas-cu12"
 version = "12.1.3.1"
 description = "CUBLAS native runtime libraries"
-optional = false
+optional = true
 python-versions = ">=3"
 files = [
     {file = "nvidia_cublas_cu12-12.1.3.1-py3-none-manylinux1_x86_64.whl", hash = "sha256:ee53ccca76a6fc08fb9701aa95b6ceb242cdaab118c3bb152af4e579af792728"},
@@ -1327,7 +1327,7 @@ files = [
 name = "nvidia-cuda-cupti-cu12"
 version = "12.1.105"
 description = "CUDA profiling tools runtime libs."
-optional = false
+optional = true
 python-versions = ">=3"
 files = [
     {file = "nvidia_cuda_cupti_cu12-12.1.105-py3-none-manylinux1_x86_64.whl", hash = "sha256:e54fde3983165c624cb79254ae9818a456eb6e87a7fd4d56a2352c24ee542d7e"},
@@ -1338,7 +1338,7 @@ files = [
 name = "nvidia-cuda-nvrtc-cu12"
 version = "12.1.105"
 description = "NVRTC native runtime libraries"
-optional = false
+optional = true
 python-versions = ">=3"
 files = [
     {file = "nvidia_cuda_nvrtc_cu12-12.1.105-py3-none-manylinux1_x86_64.whl", hash = "sha256:339b385f50c309763ca65456ec75e17bbefcbbf2893f462cb8b90584cd27a1c2"},
@@ -1349,7 +1349,7 @@ files = [
 name = "nvidia-cuda-runtime-cu12"
 version = "12.1.105"
 description = "CUDA Runtime native Libraries"
-optional = false
+optional = true
 python-versions = ">=3"
 files = [
     {file = "nvidia_cuda_runtime_cu12-12.1.105-py3-none-manylinux1_x86_64.whl", hash = "sha256:6e258468ddf5796e25f1dc591a31029fa317d97a0a94ed93468fc86301d61e40"},
@@ -1360,7 +1360,7 @@ files = [
 name = "nvidia-cudnn-cu12"
 version = "9.1.0.70"
 description = "cuDNN runtime libraries"
-optional = false
+optional = true
 python-versions = ">=3"
 files = [
     {file = "nvidia_cudnn_cu12-9.1.0.70-py3-none-manylinux2014_x86_64.whl", hash = "sha256:165764f44ef8c61fcdfdfdbe769d687e06374059fbb388b6c89ecb0e28793a6f"},
@@ -1374,7 +1374,7 @@ nvidia-cublas-cu12 = "*"
 name = "nvidia-cufft-cu12"
 version = "11.0.2.54"
 description = "CUFFT native runtime libraries"
-optional = false
+optional = true
 python-versions = ">=3"
 files = [
     {file = "nvidia_cufft_cu12-11.0.2.54-py3-none-manylinux1_x86_64.whl", hash = "sha256:794e3948a1aa71fd817c3775866943936774d1c14e7628c74f6f7417224cdf56"},
@@ -1385,7 +1385,7 @@ files = [
 name = "nvidia-curand-cu12"
 version = "10.3.2.106"
 description = "CURAND native runtime libraries"
-optional = false
+optional = true
 python-versions = ">=3"
 files = [
     {file = "nvidia_curand_cu12-10.3.2.106-py3-none-manylinux1_x86_64.whl", hash = "sha256:9d264c5036dde4e64f1de8c50ae753237c12e0b1348738169cd0f8a536c0e1e0"},
@@ -1396,7 +1396,7 @@ files = [
 name = "nvidia-cusolver-cu12"
 version = "11.4.5.107"
 description = "CUDA solver native runtime libraries"
-optional = false
+optional = true
 python-versions = ">=3"
 files = [
     {file = "nvidia_cusolver_cu12-11.4.5.107-py3-none-manylinux1_x86_64.whl", hash = "sha256:8a7ec542f0412294b15072fa7dab71d31334014a69f953004ea7a118206fe0dd"},
@@ -1412,7 +1412,7 @@ nvidia-nvjitlink-cu12 = "*"
 name = "nvidia-cusparse-cu12"
 version = "12.1.0.106"
 description = "CUSPARSE native runtime libraries"
-optional = false
+optional = true
 python-versions = ">=3"
 files = [
     {file = "nvidia_cusparse_cu12-12.1.0.106-py3-none-manylinux1_x86_64.whl", hash = "sha256:f3b50f42cf363f86ab21f720998517a659a48131e8d538dc02f8768237bd884c"},
@@ -1426,7 +1426,7 @@ nvidia-nvjitlink-cu12 = "*"
 name = "nvidia-nccl-cu12"
 version = "2.20.5"
 description = "NVIDIA Collective Communication Library (NCCL) Runtime"
-optional = false
+optional = true
 python-versions = ">=3"
 files = [
     {file = "nvidia_nccl_cu12-2.20.5-py3-none-manylinux2014_aarch64.whl", hash = "sha256:1fc150d5c3250b170b29410ba682384b14581db722b2531b0d8d33c595f33d01"},
@@ -1437,7 +1437,7 @@ files = [
 name = "nvidia-nvjitlink-cu12"
 version = "12.6.77"
 description = "Nvidia JIT LTO Library"
-optional = false
+optional = true
 python-versions = ">=3"
 files = [
     {file = "nvidia_nvjitlink_cu12-12.6.77-py3-none-manylinux2014_aarch64.whl", hash = "sha256:3bf10d85bb1801e9c894c6e197e44dd137d2a0a9e43f8450e9ad13f2df0dd52d"},
@@ -1449,7 +1449,7 @@ files = [
 name = "nvidia-nvtx-cu12"
 version = "12.1.105"
 description = "NVIDIA Tools Extension"
-optional = false
+optional = true
 python-versions = ">=3"
 files = [
     {file = "nvidia_nvtx_cu12-12.1.105-py3-none-manylinux1_x86_64.whl", hash = "sha256:dc21cf308ca5691e7c04d962e213f8a4aa9bbfa23d95412f452254c2caeb09e5"},
@@ -1491,7 +1491,7 @@ files = [
 name = "optree"
 version = "0.13.0"
 description = "Optimized PyTree Utilities."
-optional = false
+optional = true
 python-versions = ">=3.7"
 files = [
     {file = "optree-0.13.0-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:7b8fe0442ac5e50b5e6bceb37dcc2cd4908e7716b869cbe6b8901cc0b489884f"},
@@ -1743,7 +1743,7 @@ wcwidth = "*"
 name = "protobuf"
 version = "5.28.3"
 description = ""
-optional = false
+optional = true
 python-versions = ">=3.8"
 files = [
     {file = "protobuf-5.28.3-cp310-abi3-win32.whl", hash = "sha256:0c4eec6f987338617072592b97943fdbe30d019c56126493111cf24344c1cc24"},
@@ -2085,7 +2085,7 @@ cuquantum = ["cuquantum-python-cu12 (>=23.10.0,<24.0.0)"]
 name = "requests"
 version = "2.32.3"
 description = "Python HTTP for Humans."
-optional = false
+optional = true
 python-versions = ">=3.8"
 files = [
     {file = "requests-2.32.3-py3-none-any.whl", hash = "sha256:70761cfe03c773ceb22aa2f671b4757976145175cdfca038c02654d061d6dcc6"},
@@ -2106,7 +2106,7 @@ use-chardet-on-py3 = ["chardet (>=3.0.2,<6)"]
 name = "rich"
 version = "13.9.4"
 description = "Render rich text, tables, progress bars, syntax highlighting, markdown and more to the terminal"
-optional = false
+optional = true
 python-versions = ">=3.8.0"
 files = [
     {file = "rich-13.9.4-py3-none-any.whl", hash = "sha256:6049d5e6ec054bf2779ab3358186963bac2ea89175919d699e378b99738c2a90"},
@@ -2187,7 +2187,7 @@ type = ["importlib-metadata (>=7.0.2)", "jaraco.develop (>=7.21)", "mypy (==1.12
 name = "six"
 version = "1.16.0"
 description = "Python 2 and 3 compatibility utilities"
-optional = false
+optional = true
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*"
 files = [
     {file = "six-1.16.0-py2.py3-none-any.whl", hash = "sha256:8abb2f1d86890a2dfb989f9a77cfcfd3e47c2a354b01111771326f8aa26e0254"},
@@ -2324,7 +2324,7 @@ widechars = ["wcwidth"]
 name = "tensorboard"
 version = "2.18.0"
 description = "TensorBoard lets you watch Tensors Flow"
-optional = false
+optional = true
 python-versions = ">=3.9"
 files = [
     {file = "tensorboard-2.18.0-py3-none-any.whl", hash = "sha256:107ca4821745f73e2aefa02c50ff70a9b694f39f790b11e6f682f7d326745eab"},
@@ -2346,7 +2346,7 @@ werkzeug = ">=1.0.1"
 name = "tensorboard-data-server"
 version = "0.7.2"
 description = "Fast data loading for TensorBoard"
-optional = false
+optional = true
 python-versions = ">=3.7"
 files = [
     {file = "tensorboard_data_server-0.7.2-py3-none-any.whl", hash = "sha256:7e0610d205889588983836ec05dc098e80f97b7e7bbff7e994ebb78f578d0ddb"},
@@ -2358,7 +2358,7 @@ files = [
 name = "tensorflow"
 version = "2.18.0"
 description = "TensorFlow is an open source machine learning framework for everyone."
-optional = false
+optional = true
 python-versions = ">=3.9"
 files = [
     {file = "tensorflow-2.18.0-cp310-cp310-macosx_12_0_arm64.whl", hash = "sha256:8da90a9388a1f6dd00d626590d2b5810faffbb3e7367f9783d80efff882340ee"},
@@ -2410,7 +2410,7 @@ and-cuda = ["nvidia-cublas-cu12 (==12.5.3.2)", "nvidia-cuda-cupti-cu12 (==12.5.8
 name = "tensorflow-io-gcs-filesystem"
 version = "0.37.1"
 description = "TensorFlow IO"
-optional = false
+optional = true
 python-versions = "<3.13,>=3.7"
 files = [
     {file = "tensorflow_io_gcs_filesystem-0.37.1-cp310-cp310-macosx_10_14_x86_64.whl", hash = "sha256:249c12b830165841411ba71e08215d0e94277a49c551e6dd5d72aab54fe5491b"},
@@ -2442,7 +2442,7 @@ tensorflow-rocm = ["tensorflow-rocm (>=2.16.0,<2.17.0)"]
 name = "termcolor"
 version = "2.5.0"
 description = "ANSI color formatting for output in terminal"
-optional = false
+optional = true
 python-versions = ">=3.9"
 files = [
     {file = "termcolor-2.5.0-py3-none-any.whl", hash = "sha256:37b17b5fc1e604945c2642c872a3764b5d547a48009871aea3edd3afa180afb8"},
@@ -2478,7 +2478,7 @@ files = [
 name = "torch"
 version = "2.4.1"
 description = "Tensors and Dynamic neural networks in Python with strong GPU acceleration"
-optional = false
+optional = true
 python-versions = ">=3.8.0"
 files = [
     {file = "torch-2.4.1-cp310-cp310-manylinux1_x86_64.whl", hash = "sha256:362f82e23a4cd46341daabb76fba08f04cd646df9bfaf5da50af97cb60ca4971"},
@@ -2530,13 +2530,13 @@ optree = ["optree (>=0.11.0)"]
 
 [[package]]
 name = "tqdm"
-version = "4.66.6"
+version = "4.67.0"
 description = "Fast, Extensible Progress Meter"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "tqdm-4.66.6-py3-none-any.whl", hash = "sha256:223e8b5359c2efc4b30555531f09e9f2f3589bcd7fdd389271191031b49b7a63"},
-    {file = "tqdm-4.66.6.tar.gz", hash = "sha256:4bdd694238bef1485ce839d67967ab50af8f9272aab687c0d7702a01da0be090"},
+    {file = "tqdm-4.67.0-py3-none-any.whl", hash = "sha256:0cd8af9d56911acab92182e88d763100d4788bdf421d251616040cc4d44863be"},
+    {file = "tqdm-4.67.0.tar.gz", hash = "sha256:fe5a6f95e6fe0b9755e9469b77b9c3cf850048224ecaa8293d7d2d31f97d869a"},
 ]
 
 [package.dependencies]
@@ -2544,6 +2544,7 @@ colorama = {version = "*", markers = "platform_system == \"Windows\""}
 
 [package.extras]
 dev = ["pytest (>=6)", "pytest-cov", "pytest-timeout", "pytest-xdist"]
+discord = ["requests"]
 notebook = ["ipywidgets (>=6)"]
 slack = ["slack-sdk"]
 telegram = ["requests"]
@@ -2567,7 +2568,7 @@ test = ["argcomplete (>=3.0.3)", "mypy (>=1.7.0)", "pre-commit", "pytest (>=7.0,
 name = "triton"
 version = "3.0.0"
 description = "A language and compiler for custom Deep Learning operations"
-optional = false
+optional = true
 python-versions = "*"
 files = [
     {file = "triton-3.0.0-1-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:e1efef76935b2febc365bfadf74bcb65a6f959a9872e5bddf44cc9e0adce1e1a"},
@@ -2600,7 +2601,7 @@ files = [
 name = "urllib3"
 version = "2.2.3"
 description = "HTTP library with thread-safe connection pooling, file post, and more."
-optional = false
+optional = true
 python-versions = ">=3.8"
 files = [
     {file = "urllib3-2.2.3-py3-none-any.whl", hash = "sha256:ca899ca043dcb1bafa3e262d73aa25c465bfb49e0bd9dd5d59f1d0acba2f8fac"},
@@ -2626,13 +2627,13 @@ files = [
 
 [[package]]
 name = "werkzeug"
-version = "3.1.1"
+version = "3.1.2"
 description = "The comprehensive WSGI web application library."
-optional = false
+optional = true
 python-versions = ">=3.9"
 files = [
-    {file = "werkzeug-3.1.1-py3-none-any.whl", hash = "sha256:a71124d1ef06008baafa3d266c02f56e1836a5984afd6dd6c9230669d60d9fb5"},
-    {file = "werkzeug-3.1.1.tar.gz", hash = "sha256:8cd39dfbdfc1e051965f156163e2974e52c210f130810e9ad36858f0fd3edad4"},
+    {file = "werkzeug-3.1.2-py3-none-any.whl", hash = "sha256:4f7d1a5de312c810a8a2c6f0b47e9f6a7cffb7c8322def35e4d4d9841ff85597"},
+    {file = "werkzeug-3.1.2.tar.gz", hash = "sha256:f471a4cd167233077e9d2a8190c3471c5bc520c636a9e3c1e9300c33bced03bc"},
 ]
 
 [package.dependencies]
@@ -2645,7 +2646,7 @@ watchdog = ["watchdog (>=2.3)"]
 name = "wheel"
 version = "0.44.0"
 description = "A built-package format for Python"
-optional = false
+optional = true
 python-versions = ">=3.8"
 files = [
     {file = "wheel-0.44.0-py3-none-any.whl", hash = "sha256:2376a90c98cc337d18623527a97c31797bd02bad0033d41547043a1cbfbe448f"},
@@ -2676,7 +2677,7 @@ test = ["pytest"]
 name = "wrapt"
 version = "1.16.0"
 description = "Module for decorators, wrappers and monkey patching."
-optional = false
+optional = true
 python-versions = ">=3.6"
 files = [
     {file = "wrapt-1.16.0-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:ffa565331890b90056c01db69c0fe634a776f8019c143a5ae265f9c6bc4bd6d4"},
@@ -2773,4 +2774,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.13"
-content-hash = "d40fc7978a02ec7c2a547f6b1ab214aeb9afc670094b6d7c56368981f746d7f9"
+content-hash = "64a27bd83a859160af2504e4f5ee4213991af64852bd64776c29f663e6388d11"
