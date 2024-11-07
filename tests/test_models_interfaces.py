@@ -221,15 +221,14 @@ def test_encoding(backend, frontend, layer, seed):
 
 
 @pytest.mark.parametrize("layer,seed", zip(DECODING_LAYERS, [1, 2, 1, 1]))
-@pytest.mark.parametrize("analytic", [True, False])
-def test_decoding(backend, frontend, layer, seed, analytic):
+def test_decoding(backend, frontend, layer, seed):
     if frontend.__name__ == "qiboml.interfaces.keras":
         pytest.skip("keras interface not ready.")
     if backend.name not in ("pytorch", "jax"):
         pytest.skip("Non pytorch/jax differentiation is not working yet.")
-    if analytic and not layer is dec.Expectation:
+    if layer.analytic and not layer is dec.Expectation:
         pytest.skip("Unused analytic argument.")
-    if not analytic and not layer is dec.Expectation:
+    if not layer.analytic and not layer is dec.Expectation:
         pytest.skip(
             "Expectation layer is the only differentiable decoding when the diffrule is not analytical."
         )
@@ -255,8 +254,7 @@ def test_decoding(backend, frontend, layer, seed, analytic):
             backend=backend,
         )
         kwargs["observable"] = observable
-        kwargs["analytic"] = analytic
-        if not analytic:
+        if not layer.analytic:
             differentiation_rule = PSR()
         else:
             differentiation_rule = None
