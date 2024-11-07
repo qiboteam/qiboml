@@ -27,6 +27,21 @@ def construct_x(frontend):
         return frontend.tf.Variable([0.5, 0.8])
 
 
+def compute_gradient(frontend, model, x):
+    if frontend.__name__ == "qiboml.interfaces.keras":
+        # TODO: to check if this work once keras interface is introduced
+        with frontend.tf.GradientTape() as tape:
+            expval = model(x)
+        return tape.gradient(expval, model.parameters)
+
+    elif frontend.__name__ == "qiboml.interfaces.pytorch":
+        expval = model(x)
+        expval.backward()
+        # TODO: standardize this output with keras' one and use less convolutions
+        grad = np.array(list(model.parameters())[-1].grad)
+        return grad
+
+
 @pytest.mark.parametrize("nshots", [None, 500000])
 @pytest.mark.parametrize("backend", EXECUTION_BACKENDS)
 def test_expval_grad_PSR(frontend, backend, nshots):
@@ -42,11 +57,8 @@ def test_expval_grad_PSR(frontend, backend, nshots):
         # TODO: replace with qiboml, pytorch as soon as migration is complete
         # TODO: define a proper qiboml.set_interface() procedure for these situations
         qibo.set_backend("pytorch")
-        interface_engine = qibo.get_backend()
 
         from qiboml.interfaces.pytorch import QuantumModel
-
-    interface_engine.set_seed(42)
 
     decimals = 6 if nshots is None else 2
 
@@ -76,11 +88,7 @@ def test_expval_grad_PSR(frontend, backend, nshots):
         differentiation_rule=PSR(),
     )
 
-    expval = q_model(x)
-    expval.backward()
-
-    # TODO: standardize this output with keras' one and use less convolutions
-    grad = interface_engine.to_numpy(list(q_model.parameters())[-1].grad)
+    grad = compute_gradient(frontend, q_model, x)
 
     assert np.round(grad[0], decimals=decimals) == np.round(
         TARGET_GRAD[0], decimals=decimals
