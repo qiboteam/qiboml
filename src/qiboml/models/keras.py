@@ -20,6 +20,58 @@ BACKEND_2_DIFFERENTIATION = {
 }
 
 
+@tf.custom_gradient
+def custom_operation(
+    encoding, circuit, decoding, differentiation, backend, parameters, x
+):
+    """
+    We need to detach the parameters and the datapoint from the
+    TensorFlow graph.
+    """
+    # Datapoint
+    x_clone = tf.identity(x)
+    x_clone = tf.stop_gradient(x)
+
+    with tf.device("CPU:0"):
+        x_clone = tf.identity(x_clone)
+
+    x_clone = x_clone.numpy()
+    x_clone = backend.cast(x_clone, dtype=backend.precision)
+
+    # Parameters
+    parameters = tf.identity(parameters)
+    params = []
+    for w in parameters:
+        w_clone = tf.identity(w)
+        w_clone = tf.stop_gradient(w_clone)
+
+        with tf.device("CPU:0"):
+            w_clone = tf.identity(w_clone)
+
+        w_clone_numpy = w_clone.numpy()
+        w_clone_backend_compatible = backend.cast(
+            w_clone_numpy, dtype=backend.precision
+        )
+        params.append(w_clone_backend_compatible)
+
+    output = encoding(x_clone) + circuit
+    output.set_parameters(params)
+    output = decoding(output)
+    output = tf.expand_dims(output, axis=0)
+
+    def custom_grad(upstream):
+        grad_input, *gradients = (
+            tf.Constant(backend.to_numpy(grad).tolist())
+            for grad in differentiation.evaluate(
+                x_clone, encoding, circuit, decoding, backend, *parameters
+            )
+        )
+
+        return upstream * grad_input
+
+    return output, custom_grad
+
+
 @dataclass(eq=False)
 class QuantumModel(keras.Model):  # pylint: disable=no-member
 
@@ -47,8 +99,17 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
             or self.differentiation is not None
             or not self.decoding.analytic
         ):
-            
-            
+
+            """devo chiamare una funzione che mi ritorna la prediction voluta e
+            la funzione custom grad"""
+            return custom_operation(
+                self.encoding,
+                self.circuit,
+                self.decoding,
+                self.differentiation,
+                self.circuit_parameters,
+                x,
+            )
 
         else:
 
