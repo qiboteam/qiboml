@@ -8,18 +8,32 @@ version = "0.0.1"
 description = "Quantum Machine Learning using Qibo"
 authors = ["Qiboteam"]
 readme = "README.md"
+homepage = "https://qibo.science/"
+repository = "https://github.com/qiboteam/qiboml/"
+documentation = "https://qibo.science/docs/qiboml/stable"
 packages = [{ include = "qiboml", from = "src" }]
 
 [tool.poetry.dependencies]
 python = ">=3.9,<3.13"
 numpy = "^1.26.4"
-numba = "^0.59.0"
-tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux' or sys_platform == 'darwin'" }
-torch = "^2.2.0"
+keras = { version = "^3.0.0", optional = true }
+tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux' or sys_platform == 'darwin'", optional = true }
+# TODO: the marker is a temporary solution due to the lack of the tensorflow-io 0.32.0's wheels for Windows, this package is one of
+# the tensorflow requirements
+torch = { version = "^2.3.1", optional = true }
+qibo = {git="https://github.com/qiboteam/qibo"}
 jax = "^0.4.25"
 jaxlib = "^0.4.25"
-# TODO: this is temporary and has to be updated with Qibo
-qibo = { git  = "https://github.com/qiboteam/qibo.git" }
+
+[tool.poetry.group.docs]
+optional = true
+
+[tool.poetry.group.docs.dependencies]
+Sphinx = "^5.3.0"
+furo = "^2023.3.27"
+sphinxcontrib-bibtex = "^2.5.0"
+sphinx-copybutton = "^0.5.2"
+sphinxcontrib-katex = "^0.9.9"
 
 [tool.poetry.group.dev]
 optional = true
@@ -28,11 +42,17 @@ optional = true
 ipython = "^7.34"
 pdbpp = "^0.10.3"
 
+[tool.poetry.group.tests]
+optional = true
+
+[tool.poetry.group.tests.dependencies]
+torch = "^2.3.1"
+tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux'" }
+pytest = "^7.2.1"
+pylint = "3.1.0"
+pytest-cov = "4.0.0"
+
 [tool.poetry.group.benchmark.dependencies]
-pytest = "^7.1.2"
-pylint = "^2.17"
-pytest-cov = "^3.0.0"
-pytest-env = "^0.8.1"
 pytest-benchmark = { version = "^4.0.0", extras = ["histogram"] }
 
 [tool.poe.tasks]
@@ -40,6 +60,9 @@ bench = "pytest benchmarks/"
 test = "pytest"
 lint = "pylint src/**/*.py -E"
 lint-warnings = "pylint src/**/*.py --exit-zero"
+docs = "make -C doc html"
+docs-clean = "make -C doc clean"
+test-docs = "make -C doc doctest"
 
 [tool.pytest.ini_options]
 testpaths = ['tests/', 'benchmarks/']
