@@ -168,11 +168,11 @@ class TensorflowBackend(NumpyBackend):
         )
         return frequencies
 
-    def calculate_norm(self, state, order=2):
+    def calculate_vector_norm(self, state, order=2):
         state = self.cast(state)
         return self.tf.norm(state, ord=order)
 
-    def calculate_norm_density_matrix(self, state, order="nuc"):
+    def calculate_matrix_norm(self, state, order="nuc"):
         state = self.cast(state)
         if order == "nuc":
             return self.np.trace(state)
