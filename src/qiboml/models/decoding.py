@@ -45,8 +45,7 @@ class QuantumDecoding:
     def analytic(self):
         if self.nshots is None:
             return True
-        else:
-            return False
+        return False
 
 
 @dataclass
