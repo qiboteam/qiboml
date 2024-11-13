@@ -26,11 +26,19 @@ class QuantumEncoding(ABC):
     def __call__(self, x: ndarray) -> Circuit:
         pass
 
+    @abstractmethod
+    def gates_encoding_feature(self, feature_index: int):
+        pass
+
     @property
     def circuit(
         self,
     ):
         return self._circuit
+
+    @property
+    def hardware_differentiable(self):
+        return False
 
 
 @dataclass
@@ -50,6 +58,17 @@ class PhaseEncoding(QuantumEncoding):
     def __call__(self, x: ndarray) -> Circuit:
         self._set_phases(x)
         return self._circuit
+
+    def gates_encoding_feature(self, feature_index: int):
+        return [
+            [g for g in self._circuit.parametrized_gates if g.trainable == False][
+                feature_index
+            ]
+        ]
+
+    @property
+    def hardware_differentiable(self):
+        return True
 
 
 @dataclass
