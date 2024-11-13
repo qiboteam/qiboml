@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from copy import deepcopy
 from dataclasses import dataclass
 
 import jax
@@ -41,10 +42,53 @@ class PSR(DifferentiationRule):
                 NotImplementedError,
                 "Parameter Shift Rule only supports expectation value decoding.",
             )
+        x_copy = deepcopy(x)
         x_size = backend.to_numpy(x).size
+        # construct circuit
         x = encoding(x) + training
-        # TODO: fix this differentiation removing the padding
-        gradients = [np.array([[(0.0,) * x_size]])]
+
+        # what follows now works for encodings in which the angle is equal to the feature
+        # TODO: adapt this strategy to the more general case of a callable(x, params)
+        if encoding.hardware_differentiable:
+            x_gradient = []
+            # loop over data components
+            for k in range(x_size):
+                # initialize derivative
+                derivative_k = 0.0
+                # extract gates which are encoding component x_k
+                gates_encoding_xk = encoding.gates_encoding_feature(k)
+                # loop over encoding gates
+                for enc_gate in gates_encoding_xk:
+                    # search for the target encoding gate in the circuit
+                    generator_eigenval = enc_gate.generator_eigenvalue()
+                    shift = np.pi / (4 * generator_eigenval)
+                    for gate in x.queue:
+                        if gate == enc_gate:
+                            original_parameter = deepcopy(gate.parameters)
+                            gate.parameters = shifted_x_component(
+                                x=x_copy,
+                                index=k,
+                                shift_value=shift,
+                                backend=backend,
+                            )
+                            forward = decoding(x)
+                            gate.parameters = shifted_x_component(
+                                x=x_copy,
+                                index=k,
+                                shift_value=-2 * shift,
+                                backend=backend,
+                            )
+                            backward = decoding(x)
+                            derivative_k += generator_eigenval * (forward - backward)
+                            # restore original parameter
+                            gate.parameters = original_parameter
+                x_gradient.append(derivative_k)
+            gradients = [np.array([[(der,) * len(x_gradient)]]) for der in x_gradient]
+            print(gradients)
+        else:
+            # pad the gradients in case data are not uploaded into gates
+            gradients = [np.array([[(0.0,) * x_size]])]
+
         for i in range(len(parameters)):
             gradients.append(
                 self.one_parameter_shift(
@@ -142,3 +186,13 @@ class Jax(DifferentiationRule):
     def _run_without_inputs(self, *parameters):
         self._circuit.set_parameters(parameters)
         return self._decoding(self._circuit)
+
+
+def shifted_x_component(
+    x: ndarray, index: int, shift_value: float, backend: Backend
+) -> float:
+    """Shift a component of an ndarray."""
+    flat_array = backend.to_numpy(x).flatten()
+    shifted_flat_array = deepcopy(flat_array)
+    shifted_flat_array[index] += shift_value
+    return shifted_flat_array[index]
