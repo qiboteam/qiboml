@@ -79,12 +79,12 @@ class PSR(DifferentiationRule):
                                 backend=backend,
                             )
                             backward = decoding(x)
-                            derivative_k += generator_eigenval * (forward - backward)
+                            derivative_k += float(
+                                generator_eigenval * (forward - backward)
+                            )
                             # restore original parameter
                             gate.parameters = original_parameter
-                x_gradient.append(derivative_k)
-            gradients = [np.array([[(der,) * len(x_gradient)]]) for der in x_gradient]
-            print(gradients)
+            gradients = [np.array([[[der for der in x_gradient]]])]
         else:
             # pad the gradients in case data are not uploaded into gates
             gradients = [np.array([[(0.0,) * x_size]])]
