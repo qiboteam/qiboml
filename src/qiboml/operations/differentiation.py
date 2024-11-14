@@ -35,6 +35,11 @@ class DifferentiationRule(ABC):
 
 
 class PSR(DifferentiationRule):
+    """
+    Compute the gradient of the expectation value of a target observable w.r.t
+    features and parameters contained in a quantum model using the parameter shift
+    rules.
+    """
 
     def evaluate(self, x: ndarray, encoding, training, decoding, backend, *parameters):
         if decoding.output_shape != (1, 1):
@@ -42,64 +47,30 @@ class PSR(DifferentiationRule):
                 NotImplementedError,
                 "Parameter Shift Rule only supports expectation value decoding.",
             )
-        x_copy = deepcopy(x)
-        x_size = backend.to_numpy(x).size
         # construct circuit
-        x = encoding(x) + training
+        circuit = encoding(x) + training
 
-        # what follows now works for encodings in which the angle is equal to the feature
-        # TODO: adapt this strategy to the more general case of a callable(x, params)
-        if encoding.hardware_differentiable:
-            x_gradient = []
-            # loop over data components
-            for k in range(x_size):
-                # initialize derivative
-                derivative_k = 0.0
-                # extract gates which are encoding component x_k
-                gates_encoding_xk = encoding.gates_encoding_feature(k)
-                # loop over encoding gates
-                for enc_gate in gates_encoding_xk:
-                    # search for the target encoding gate in the circuit
-                    generator_eigenval = enc_gate.generator_eigenvalue()
-                    shift = np.pi / (4 * generator_eigenval)
-                    for gate in x.queue:
-                        if gate == enc_gate:
-                            original_parameter = deepcopy(gate.parameters)
-                            gate.parameters = shifted_x_component(
-                                x=x_copy,
-                                index=k,
-                                shift_value=shift,
-                                backend=backend,
-                            )
-                            forward = decoding(x)
-                            gate.parameters = shifted_x_component(
-                                x=x_copy,
-                                index=k,
-                                shift_value=-2 * shift,
-                                backend=backend,
-                            )
-                            backward = decoding(x)
-                            derivative_k += float(
-                                generator_eigenval * (forward - backward)
-                            )
-                            # restore original parameter
-                            gate.parameters = original_parameter
-            gradients = [np.array([[[der for der in x_gradient]]])]
-        else:
-            # pad the gradients in case data are not uploaded into gates
-            gradients = [np.array([[(0.0,) * x_size]])]
+        # compute first gradient part, wrt data
+        gradient = self.gradient_wrt_data(
+            data=x,
+            encoding=encoding,
+            circuit=circuit,
+            decoding=decoding,
+            backend=backend,
+        )
 
+        # compute second gradient part, wrt parameters
         for i in range(len(parameters)):
-            gradients.append(
+            gradient.append(
                 self.one_parameter_shift(
-                    circuit=x,
+                    circuit=circuit,
                     decoding=decoding,
                     parameters=parameters,
                     parameter_index=i,
                     backend=backend,
                 )
             )
-        return gradients
+        return gradient
 
     def one_parameter_shift(
         self, circuit, decoding, parameters, parameter_index, backend
@@ -120,6 +91,73 @@ class PSR(DifferentiationRule):
         circuit.set_parameters(tmp_params)
         backward = decoding(circuit)
         return generator_eigenval * (forward - backward)
+
+    def gradient_wrt_data(
+        self,
+        data,
+        encoding,
+        circuit,
+        decoding,
+        backend,
+    ):
+        """
+        Compute the gradient w.r.t. data.
+
+        Args:
+            data: data;
+            encoding: encoding part of the quantum model. It is used to check whether
+                parameter shift rules can be used to compute the gradient.
+            circuit: all the quantum circuit, composed of encoding + eventual trainable
+                layer.
+            decoding: decoding part of the quantum model. In the PSR the decoding
+                is usually a qiboml.models.decoding.Expectation layer.
+            backend: qibo backend on which the circuit execution is performed-
+        """
+        x_size = backend.to_numpy(data).size
+        # what follows now works for encodings in which the angle is equal to the feature
+        # TODO: adapt this strategy to the more general case of a callable(x, params)
+        if encoding.hardware_differentiable:
+            x_gradient = []
+            # loop over data components
+            for k in range(x_size):
+                # initialize derivative
+                derivative_k = 0.0
+                # extract gates which are encoding component x_k
+                gates_encoding_xk = encoding.gates_encoding_feature(k)
+                # loop over encoding gates
+                for enc_gate in gates_encoding_xk:
+                    # search for the target encoding gate in the circuit
+                    generator_eigenval = enc_gate.generator_eigenvalue()
+                    # TODO: the following shift value is valid only for rotation-like gates
+                    shift = np.pi / (4 * generator_eigenval)
+                    for gate in circuit.queue:
+                        if gate == enc_gate:
+                            original_parameter = deepcopy(gate.parameters)
+                            gate.parameters = shifted_x_component(
+                                x=data,
+                                index=k,
+                                shift_value=shift,
+                                backend=backend,
+                            )
+                            forward = decoding(circuit)
+                            gate.parameters = shifted_x_component(
+                                x=data,
+                                index=k,
+                                shift_value=-2 * shift,
+                                backend=backend,
+                            )
+                            backward = decoding(circuit)
+                            derivative_k += float(
+                                generator_eigenval * (forward - backward)
+                            )
+                            # restore original parameter
+                            gate.parameters = original_parameter
+                x_gradient.append(derivative_k)
+            return [np.array([[[der for der in x_gradient]]])]
+
+        else:
+            # pad the gradients in case data are not uploaded into gates
+            return [np.array([[(0.0,) * x_size]])]
 
     @staticmethod
     def shift_parameter(parameters, i, epsilon, backend):
