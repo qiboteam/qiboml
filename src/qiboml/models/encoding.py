@@ -26,7 +26,6 @@ class QuantumEncoding(ABC):
     def __call__(self, x: ndarray) -> Circuit:
         pass
 
-    @abstractmethod
     def gates_encoding_feature(self, feature_index: int):
         pass
 
