@@ -51,7 +51,7 @@ class PSR(DifferentiationRule):
         circuit = encoding(x) + training
 
         # compute first gradient part, wrt data
-        gradient = self.gradient_wrt_data(
+        gradient = self.gradient_from_data(
             data=x,
             encoding=encoding,
             circuit=circuit,
