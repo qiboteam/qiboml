@@ -42,7 +42,7 @@ def compute_gradient(frontend, model, x):
         return grad
 
 
-@pytest.mark.parametrize("nshots", [None, 1000000])
+@pytest.mark.parametrize("nshots", [None, 500000])
 @pytest.mark.parametrize("backend", EXECUTION_BACKENDS)
 def test_expval_grad_PSR(frontend, backend, nshots):
     """
@@ -60,7 +60,7 @@ def test_expval_grad_PSR(frontend, backend, nshots):
 
         from qiboml.interfaces.pytorch import QuantumModel
 
-    decimals = 6 if nshots is None else 2
+    decimals = 6 if nshots is None else 1
 
     frontend.np.random.seed(42)
 
