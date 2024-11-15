@@ -92,7 +92,7 @@ class PSR(DifferentiationRule):
         backward = decoding(circuit)
         return generator_eigenval * (forward - backward)
 
-    def gradient_wrt_data(
+    def gradient_from_data(
         self,
         data,
         encoding,
