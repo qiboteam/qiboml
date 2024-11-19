@@ -1,9 +1,9 @@
 from typing import Union
 
-from qibo.backends.pytorch import PyTorchBackend  # qiboml pytorch is not updated
 from qibo.config import raise_error
 
 from qiboml.backends.jax import JaxBackend
+from qiboml.backends.pytorch import PyTorchBackend
 from qiboml.backends.tensorflow import TensorflowBackend
 
 PLATFORMS = ["tensorflow", "pytorch", "jax"]
