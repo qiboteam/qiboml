@@ -2,21 +2,13 @@
 
 from dataclasses import dataclass
 
-import numpy as np
 import torch
 from qibo import Circuit
-from qibo.backends import Backend, _check_backend
-from qibo.config import raise_error
+from qibo.backends import Backend
 
 from qiboml.models.decoding import QuantumDecoding
 from qiboml.models.encoding import QuantumEncoding
-from qiboml.operations import differentiation as Diff
-
-BACKEND_2_DIFFERENTIATION = {
-    "pytorch": None,
-    "qibolab": "PSR",
-    "jax": "Jax",
-}
+from qiboml.operations.differentiation import DifferentiationRule
 
 
 @dataclass(eq=False)
@@ -25,30 +17,23 @@ class QuantumModel(torch.nn.Module):
     encoding: QuantumEncoding
     circuit: Circuit
     decoding: QuantumDecoding
-    differentiation: str = "auto"
+    differentiation_rule: DifferentiationRule = None
 
     def __post_init__(
         self,
     ):
         super().__init__()
 
+        circuit = self.encoding.circuit
         params = [p for param in self.circuit.get_parameters() for p in param]
-        params = torch.as_tensor(self.backend.to_numpy(params)).ravel()
+        params = torch.as_tensor(self.backend.to_numpy(x=params)).ravel()
         params.requires_grad = True
         self.circuit_parameters = torch.nn.Parameter(params)
-
-        if self.differentiation == "auto":
-            self.differentiation = BACKEND_2_DIFFERENTIATION.get(
-                self.backend.name, "PSR"
-            )
-
-        if self.differentiation is not None:
-            self.differentiation = getattr(Diff, self.differentiation)()
 
     def forward(self, x: torch.Tensor):
         if (
             self.backend.name != "pytorch"
-            or self.differentiation is not None
+            or self.differentiation_rule is not None
             or not self.decoding.analytic
         ):
             x = QuantumModelAutoGrad.apply(
@@ -57,7 +42,7 @@ class QuantumModel(torch.nn.Module):
                 self.circuit,
                 self.decoding,
                 self.backend,
-                self.differentiation,
+                self.differentiation_rule,
                 *list(self.parameters())[0],
             )
         else:
@@ -93,7 +78,7 @@ class QuantumModelAutoGrad(torch.autograd.Function):
         circuit: Circuit,
         decoding: QuantumDecoding,
         backend,
-        differentiation,
+        differentiation_rule,
         *parameters: list[torch.nn.Parameter],
     ):
         ctx.save_for_backward(x, *parameters)
@@ -101,7 +86,7 @@ class QuantumModelAutoGrad(torch.autograd.Function):
         ctx.circuit = circuit
         ctx.decoding = decoding
         ctx.backend = backend
-        ctx.differentiation = differentiation
+        ctx.differentiation_rule = differentiation_rule
         x_clone = x.clone().detach().cpu().numpy()
         x_clone = backend.cast(x_clone, dtype=x_clone.dtype)
         params = [
@@ -127,7 +112,7 @@ class QuantumModelAutoGrad(torch.autograd.Function):
         ]
         grad_input, *gradients = (
             torch.as_tensor(ctx.backend.to_numpy(grad).tolist())
-            for grad in ctx.differentiation.evaluate(
+            for grad in ctx.differentiation_rule.evaluate(
                 x_clone, ctx.encoding, ctx.circuit, ctx.decoding, ctx.backend, *params
             )
         )

@@ -38,7 +38,7 @@ def get_backend(backend_name):
 
 
 def get_frontend(frontend_name):
-    from qiboml.models import keras, pytorch
+    from qiboml.interfaces import keras, pytorch
 
     if frontend_name == "keras":
         frontend = keras
