@@ -31,9 +31,6 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
     def __post_init__(self):
         super().__init__()
 
-        # Trainable parameters
-        # Prendo i parametri da self.circuit perché mi interessa la shape per
-        # generere in modo gaussiano self.circuit_parameters
         params = [p for param in self.circuit.get_parameters() for p in param]
         params = tf.Variable(self.backend.to_numpy(params))
 

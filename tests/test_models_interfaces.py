@@ -194,20 +194,13 @@ def set_parameters(frontend, model, params):
 
 
 def prepare_targets(frontend, model, data):
-    # Genero dei parametri a caso per il modello
     target_params = random_parameters(frontend, model)
-    # q_model: [<tf.Tensor: shape=(4,)]
-    # sequential: [<tf.Tensor: shape=(3, 5)]
-    # Prendo i parametri iniziali del modello
+
     init_params = get_parameters(frontend, model)
-    # q_model: lista contenente un array
-    # sequential: [array, array, array]
-    # Metto i target_params nel modello
+
     set_parameters(frontend, model, target_params)
-    # Mi faccio dare gli output del modello (con
-    # target_params) per ogni x in contenuto in data
+
     target, _ = eval_model(frontend, model, data)
-    # Metto in model i parametri iniziali
     set_parameters(frontend, model, init_params)
     return target
 
@@ -228,8 +221,8 @@ def backprop_test(frontend, model, data, target):
 def test_encoding(backend, frontend, layer, seed):
     # if frontend.__name__ == "qiboml.models.keras":
     #    pytest.skip("keras interface not ready.")
-    # if backend.name not in ("pytorch", "jax"):
-    #    pytest.skip("Non pytorch/jax differentiation is not working yet.")
+    if backend.name not in ("pytorch", "jax"):
+        pytest.skip("Non pytorch/jax differentiation is not working yet.")
 
     set_seed(frontend, seed)
 
@@ -246,9 +239,8 @@ def test_encoding(backend, frontend, layer, seed):
     q_model = frontend.QuantumModel(encoding_layer, training_layer, decoding_layer)
     binary = True if encoding_layer.__class__.__name__ == "BinaryEncoding" else False
 
-    # Vengono generati dei dati: tensore uniforme con la shape (100, dim)
     data = random_tensor(frontend, (5, dim), binary)
-    # Genero i dati target del problema
+
     target = prepare_targets(frontend, q_model, data)
 
     # ============
