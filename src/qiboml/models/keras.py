@@ -39,7 +39,6 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
         )
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
-        breakpoint()
         if self.backend.platform != "tensorflow":
             return custom_operation(
                 self.encoding,
