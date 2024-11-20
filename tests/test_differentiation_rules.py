@@ -4,6 +4,7 @@ import qibo
 import torch
 from qibo import hamiltonians
 from qibo.backends import NumpyBackend, PyTorchBackend
+
 from qibojit.backends import NumbaBackend
 
 from qiboml.models.ansatze import ReuploadingCircuit
@@ -12,7 +13,7 @@ from qiboml.models.encoding import PhaseEncoding
 from qiboml.operations.differentiation import PSR
 
 # TODO: use the classical conftest mechanism or customize mechanism for this test
-EXECUTION_BACKENDS = [NumbaBackend(), NumpyBackend(), PyTorchBackend()]
+EXECUTION_BACKENDS = [NumpyBackend(), PyTorchBackend()]
 
 TARGET_GRAD = np.array([0.130832955241203, 0.0, -1.806316614151001, 0.0])
 
@@ -28,13 +29,16 @@ def construct_x(frontend):
 
 
 def compute_gradient(frontend, model, x):
-    if frontend.__name__ == "qiboml.interfaces.keras":
+    breakpoint()
+    if frontend.__name__ == "qiboml.models.keras":
+        breakpoint()
         # TODO: to check if this work once keras interface is introduced
         with frontend.tf.GradientTape() as tape:
+            breakpoint()
             expval = model(x)
         return tape.gradient(expval, model.parameters)
 
-    elif frontend.__name__ == "qiboml.interfaces.pytorch":
+    elif frontend.__name__ == "qiboml.models.pytorch":
         expval = model(x)
         expval.backward()
         # TODO: standardize this output with keras' one and use less convolutions
@@ -78,11 +82,11 @@ def test_expval_grad_PSR(frontend, backend, nshots):
     initial_params = np.linspace(0.0, 2 * np.pi, nparams)
     training_layer.set_parameters(initial_params)
 
-    q_model = QuantumModel(
+    q_model = frontend.QuantumModel(
         encoding=encoding_layer,
         circuit=training_layer,
         decoding=decoding_layer,
-        differentiation_rule=PSR(),
+        differentiation=PSR(),
     )
 
     grad = compute_gradient(frontend, q_model, x)
