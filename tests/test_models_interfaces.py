@@ -221,8 +221,8 @@ def backprop_test(frontend, model, data, target):
 def test_encoding(backend, frontend, layer, seed):
     # if frontend.__name__ == "qiboml.models.keras":
     #    pytest.skip("keras interface not ready.")
-    if backend.name not in ("pytorch", "jax"):
-        pytest.skip("Non pytorch/jax differentiation is not working yet.")
+    # if backend.name not in ("pytorch", "jax"):
+    #    pytest.skip("Non pytorch/jax differentiation is not working yet.")
 
     set_seed(frontend, seed)
 
