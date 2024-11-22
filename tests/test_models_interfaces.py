@@ -43,8 +43,7 @@ def build_linear_layer(frontend, input_dim, output_dim):
         raise_error(RuntimeError, f"Unknown frontend {frontend}.")
 
 
-def build_sequential_model(frontend, layers, binary=False):
-    layers = layers[:1] + [build_activation(frontend, binary)] + layers[1:]
+def build_sequential_model(frontend, layers):
     if frontend.__name__ == "qiboml.models.pytorch":
         return frontend.torch.nn.Sequential(*layers)
     elif frontend.__name__ == "qiboml.models.keras":
@@ -58,13 +57,11 @@ def build_activation(frontend, binary=False):
 
         class Activation(frontend.torch.nn.Module):
             def forward(self, x):
-                # normalize
-                x = x / x.max()
-                if binary:
-                    x = x.round().abs()
-                else:
+                if not binary:
+                    # normalize
+                    x = x / x.max()
                     # apply the tanh and rescale by pi
-                    x = np.pi * frontend.torch.nn.functional.tanh(x)
+                    return np.pi * frontend.torch.nn.functional.tanh(x)
                 return x
 
     elif frontend.__name__ == "qiboml.models.keras":
@@ -167,8 +164,8 @@ def random_parameters(frontend, model):
         new_params = {}
         for k, v in model.state_dict().items():
             new_params.update(
-                {k: v + frontend.torch.randn(v.shape) / 5}
-            )  # perturbation of max +- 0.2
+                {k: v + frontend.torch.randn(v.shape) / 4}
+            )  # perturbation of max +- 0.25
             # of the original parameters
     elif frontend.__name__ == "qiboml.models.keras":
         new_params = [frontend.tf.random.uniform(model.get_weights()[0].shape)]
@@ -225,8 +222,16 @@ def test_encoding(backend, frontend, layer, seed):
         nqubits, random_subset(nqubits, dim), backend=backend
     )
     encoding_layer = layer(nqubits, random_subset(nqubits, dim))
-    q_model = frontend.QuantumModel(encoding_layer, training_layer, decoding_layer)
     binary = True if encoding_layer.__class__.__name__ == "BinaryEncoding" else False
+    activation = build_activation(frontend, binary)
+    q_model = build_sequential_model(
+        frontend,
+        [
+            activation,
+            frontend.QuantumModel(encoding_layer, training_layer, decoding_layer),
+        ],
+    )
+
     data = random_tensor(frontend, (100, dim), binary)
     target = prepare_targets(frontend, q_model, data)
     backprop_test(frontend, q_model, data, target)
@@ -239,7 +244,6 @@ def test_encoding(backend, frontend, layer, seed):
             q_model,
             build_linear_layer(frontend, 2**nqubits, 1),
         ],
-        binary=binary,
     )
     target = prepare_targets(frontend, model, data)
     backprop_test(frontend, model, data, target)
@@ -282,7 +286,14 @@ def test_decoding(backend, frontend, layer, seed, analytic):
     if not decoding_layer.analytic:
         pytest.skip("PSR differentiation is not working yet.")
 
-    q_model = frontend.QuantumModel(encoding_layer, training_layer, decoding_layer)
+    activation = build_activation(frontend, binary=False)
+    q_model = build_sequential_model(
+        frontend,
+        [
+            activation,
+            frontend.QuantumModel(encoding_layer, training_layer, decoding_layer),
+        ],
+    )
 
     data = random_tensor(frontend, (100, dim))
     target = prepare_targets(frontend, q_model, data)
@@ -293,7 +304,7 @@ def test_decoding(backend, frontend, layer, seed, analytic):
         [
             build_linear_layer(frontend, 4, dim),
             q_model,
-            build_linear_layer(frontend, q_model.output_shape[-1], 1),
+            build_linear_layer(frontend, q_model[1].output_shape[-1], 1),
         ],
     )
 
