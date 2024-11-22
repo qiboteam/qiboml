@@ -205,7 +205,7 @@ def backprop_test(frontend, model, data, target):
     assert grad < 1e-2
 
 
-@pytest.mark.parametrize("layer,seed", zip(ENCODING_LAYERS, [1, 4]))
+@pytest.mark.parametrize("layer,seed", zip(ENCODING_LAYERS, [2, 4]))
 def test_encoding(backend, frontend, layer, seed):
     if frontend.__name__ == "qiboml.models.keras":
         pytest.skip("keras interface not ready.")
