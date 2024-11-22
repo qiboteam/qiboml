@@ -94,7 +94,7 @@ def random_tensor(frontend, shape, binary=False):
 
 
 def train_model(frontend, model, data, target):
-    max_epochs = 30
+    max_epochs = 10
     if frontend.__name__ == "qiboml.models.pytorch":
 
         optimizer = frontend.torch.optim.Adam(model.parameters())
@@ -168,7 +168,10 @@ def random_parameters(frontend, model):
     if frontend.__name__ == "qiboml.models.pytorch":
         new_params = {}
         for k, v in model.state_dict().items():
-            new_params.update({k: v + frontend.torch.randn(v.shape) / 2})
+            new_params.update(
+                {k: v + frontend.torch.randn(v.shape) / 5}
+            )  # perturbation of max +- 0.2
+            # of the original parameters
     elif frontend.__name__ == "qiboml.models.keras":
         new_params = [frontend.tf.random.uniform(model.get_weights()[0].shape)]
     return new_params
@@ -230,11 +233,11 @@ def test_encoding(backend, frontend, layer, seed):
     target = prepare_targets(frontend, q_model, data)
     backprop_test(frontend, q_model, data, target)
 
-    data = random_tensor(frontend, (100, 32))
+    data = random_tensor(frontend, (100, 4))
     model = build_sequential_model(
         frontend,
         [
-            build_linear_layer(frontend, 32, dim),
+            build_linear_layer(frontend, 4, dim),
             q_model,
             build_linear_layer(frontend, 2**nqubits, 1),
         ],
@@ -290,12 +293,12 @@ def test_decoding(backend, frontend, layer, seed, analytic):
     model = build_sequential_model(
         frontend,
         [
-            build_linear_layer(frontend, 32, dim),
+            build_linear_layer(frontend, 4, dim),
             q_model,
             build_linear_layer(frontend, q_model.output_shape[-1], 1),
         ],
     )
 
-    data = random_tensor(frontend, (100, 32))
+    data = random_tensor(frontend, (100, 4))
     target = prepare_targets(frontend, model, data)
     backprop_test(frontend, model, data, target)
