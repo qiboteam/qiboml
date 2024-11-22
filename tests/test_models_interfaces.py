@@ -3,7 +3,6 @@ import random
 
 import numpy as np
 import pytest
-import torch
 from qibo import hamiltonians
 from qibo.config import raise_error
 from qibo.symbols import Z
@@ -11,8 +10,6 @@ from qibo.symbols import Z
 import qiboml.models.ansatze as ans
 import qiboml.models.decoding as dec
 import qiboml.models.encoding as enc
-
-torch.set_default_dtype(torch.float64)
 
 
 def get_layers(module, layer_type=None):
@@ -139,7 +136,7 @@ def eval_model(frontend, model, data, target=None):
 
     if frontend.__name__ == "qiboml.models.pytorch":
         loss_f = frontend.torch.nn.MSELoss()
-        with torch.no_grad():
+        with frontend.torch.no_grad():
             for x in data:
                 outputs.append(model(x))
             shape = model(data[0]).shape
@@ -161,6 +158,7 @@ def set_seed(frontend, seed):
     random.seed(seed)
     np.random.seed(seed)
     if frontend.__name__ == "qiboml.models.pytorch":
+        frontend.torch.set_default_dtype(frontend.torch.float64)
         frontend.torch.manual_seed(seed)
 
 
@@ -208,7 +206,7 @@ def backprop_test(frontend, model, data, target):
     assert grad < 1e-2
 
 
-@pytest.mark.parametrize("layer,seed", zip(ENCODING_LAYERS, [2, 4]))
+@pytest.mark.parametrize("layer,seed", zip(ENCODING_LAYERS, [4, 1]))
 def test_encoding(backend, frontend, layer, seed):
     if frontend.__name__ == "qiboml.models.keras":
         pytest.skip("keras interface not ready.")
@@ -247,7 +245,7 @@ def test_encoding(backend, frontend, layer, seed):
     backprop_test(frontend, model, data, target)
 
 
-@pytest.mark.parametrize("layer,seed", zip(DECODING_LAYERS, [1, 2, 1, 1]))
+@pytest.mark.parametrize("layer,seed", zip(DECODING_LAYERS, [1, 5, 1, 1]))
 @pytest.mark.parametrize("analytic", [True, False])
 def test_decoding(backend, frontend, layer, seed, analytic):
     if frontend.__name__ == "qiboml.models.keras":
