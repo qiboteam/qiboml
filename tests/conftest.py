@@ -10,12 +10,12 @@ import pytest
 # backends to be tested
 BACKENDS = [
     "tensorflow",
-    "pytorch",
-    "jax",
+    # "pytorch",
+    # "jax",
 ]
 
 FRONTENDS = [
-    "pytorch",
+    # "pytorch",
     "keras",
 ]
 

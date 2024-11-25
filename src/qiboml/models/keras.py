@@ -15,7 +15,7 @@ from qiboml.operations import differentiation as Diff
 
 BACKEND_2_DIFFERENTIATION = {
     "pytorch": "PSR",
-    "tensorflow": None,
+    "tensorflow": "PSR",
     "jax": "PSR",
 }
 
@@ -33,28 +33,41 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
 
         params = [p for param in self.circuit.get_parameters() for p in param]
         params = tf.Variable(self.backend.to_numpy(params))
-        self.circuit_parameters = self.add_weight(shape=params.shape, trainable=True)
-        self.set_weights([params])
+
+        self.circuit_parameters = self.add_weight(
+            shape=params.shape, initializer="random_normal", trainable=True
+        )
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
-        if self.backend.name != "tensorflow":
-            pass
-        # @tf.custom_gradient
-        # def custom_call(x: tf.Tensor):
-        #    x = self.backend.cast(np.array(x))
+        if self.backend.platform != "tensorflow":
+            return custom_operation(
+                self.encoding,
+                self.circuit,
+                self.decoding,
+                self.differentiation,
+                self.circuit_parameters,
+                x,
+            )
 
         else:
-            self.circuit.set_parameters(self.get_weights()[0])
-            # self.circuit.set_parameters(self.circuit_parameters)
-            x = self.encoding(x) + self.circuit
-            x = self.decoding(x)
 
-        return x
+            weights = tf.identity(self.circuit_parameters)
+            self.circuit.set_parameters(weights)
+
+            output = self.decoding(self.encoding(x) + self.circuit)
+            output = tf.expand_dims(output, axis=0)
+            return output
 
     def compute_output_shape(
         self,
     ):
         return self.output_shape
+
+    def draw(
+        self,
+    ):
+        breakpoint()
+        print("ciao")
 
     @property
     def output_shape(
