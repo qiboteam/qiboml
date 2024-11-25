@@ -12,7 +12,7 @@ from qibo.symbols import Z
 import qiboml.models.ansatze as ans
 import qiboml.models.decoding as dec
 import qiboml.models.encoding as enc
-from qiboml.operations.differentiation import PSR
+from qiboml.operations.differentiation import Jax
 
 torch.set_default_dtype(torch.float64)
 
@@ -85,7 +85,7 @@ def build_sequential_model(frontend, layers, binary=False):
 def random_tensor(frontend, shape, binary=False):
     if frontend.__name__ == "qiboml.interfaces.pytorch":
         tensor = frontend.torch.randint(0, 2, shape) if binary else torch.randn(shape)
-    elif frontend.__name__ == "qiboml.models.keras":
+    elif frontend.__name__ == "qiboml.interfaces.keras":
         tensor = (
             tf.random.uniform(shape, minval=0, maxval=2, dtype=tf.int32)
             if binary
@@ -140,6 +140,7 @@ def eval_model(frontend, model, data, target=None):
     loss = None
     outputs = []
 
+    breakpoint()
     if frontend.__name__ == "qiboml.interfaces.pytorch":
         loss_f = torch.nn.MSELoss()
         with torch.no_grad():
@@ -149,12 +150,15 @@ def eval_model(frontend, model, data, target=None):
         outputs = frontend.torch.vstack(outputs).reshape((data.shape[0],) + shape)
 
     elif frontend.__name__ == "qiboml.interfaces.keras":
+        breakpoint()
         loss_f = frontend.keras.losses.MeanSquaredError(
             reduction="sum_over_batch_size",
         )
+        breakpoint()
         for x in data:
             x = tf.expand_dims(x, axis=0)
             outputs.append(model(x))
+        breakpoint()
         outputs = frontend.tf.stack(outputs, axis=0)
     if target is not None:
         loss = loss_f(target, outputs)
@@ -173,7 +177,7 @@ def random_parameters(frontend, model):
         new_params = {}
         for k, v in model.state_dict().items():
             new_params.update({k: v + frontend.torch.randn(v.shape) / 2})
-    elif frontend.__name__ == "qiboml.models.keras":
+    elif frontend.__name__ == "qiboml.interfaces.keras":
         new_params = []
         for i in range(len(model.get_weights())):
             new_params += [frontend.tf.random.uniform(model.get_weights()[i].shape)]
@@ -215,8 +219,10 @@ def prepare_targets(frontend, model, data):
 
 def backprop_test(frontend, model, data, target):
     # Calcolo la loss coi parametri iniziali
+    breakpoint()
     _, loss_untrained = eval_model(frontend, model, data, target)
     # Calcolo i gradienti
+    breakpoint()
     grad = train_model(frontend, model, data, target)
     # Calcolo la loss
     _, loss_trained = eval_model(frontend, model, data, target)
@@ -244,7 +250,9 @@ def test_encoding(backend, frontend, layer, seed):
         nqubits, random_subset(nqubits, dim), backend=backend
     )
     encoding_layer = layer(nqubits, random_subset(nqubits, dim))
-    q_model = frontend.QuantumModel(encoding_layer, training_layer, decoding_layer)
+    q_model = frontend.QuantumModel(
+        encoding_layer, training_layer, decoding_layer, differentiation=None
+    )
     binary = True if encoding_layer.__class__.__name__ == "BinaryEncoding" else False
 
     # Vengono generati dei dati: tensore uniforme con la shape (100, dim)
@@ -278,6 +286,39 @@ def test_encoding(backend, frontend, layer, seed):
     target = prepare_targets(frontend, model, data)
 
     backprop_test(frontend, model, data, target)
+
+
+def test_differentiation_rules(backend, frontend):
+    if backend.platform != "tensorflow":
+        pytest.skip("Non tensorflow backend.")
+
+    seed = 43
+    set_seed(frontend, seed)
+
+    layer = 1
+    nqubits = 2
+    dim = 2
+    training_layer = ans.ReuploadingCircuit(
+        nqubits,
+        random_subset(nqubits, dim),
+    )
+    encoding_layer = enc.PhaseEncoding(
+        nqubits,
+        random_subset(nqubits, dim),
+    )
+    decoding_layer = dec.Probabilities(
+        nqubits, random_subset(nqubits, dim), backend=backend
+    )
+    q_model = frontend.QuantumModel(
+        encoding_layer, training_layer, decoding_layer, differentiation=None
+    )
+
+    binary = True if encoding_layer.__class__.__name__ == "BinaryEncoding" else False
+    data = random_tensor(frontend, (5, dim), binary)
+
+    target = prepare_targets(frontend, q_model, data)
+
+    backprop_test(frontend, q_model, data, target)
 
 
 @pytest.mark.parametrize("layer,seed", zip(DECODING_LAYERS, [1, 2, 1, 1]))

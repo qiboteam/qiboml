@@ -3,16 +3,17 @@ import pytest
 import qibo
 import torch
 from qibo import hamiltonians
-from qibo.backends import NumpyBackend, PyTorchBackend
-from qibojit.backends import NumbaBackend
+import os
+
+os.environ["JAX_TRACEBACK_FILTERING"] = "off"
 
 from qiboml.models.ansatze import ReuploadingCircuit
 from qiboml.models.decoding import Expectation
 from qiboml.models.encoding import PhaseEncoding
 from qiboml.operations.differentiation import PSR
+from qiboml.backends.jax import JaxBackend
 
 # TODO: use the classical conftest mechanism or customize mechanism for this test
-EXECUTION_BACKENDS = [NumbaBackend(), NumpyBackend(), PyTorchBackend()]
 
 TARGET_GRAD = np.array([0.130832955241203, 0.0, -1.806316614151001, 0.0])
 
@@ -43,18 +44,18 @@ def compute_gradient(frontend, model, x):
 
 
 @pytest.mark.parametrize("nshots", [None, 500000])
-@pytest.mark.parametrize("backend", EXECUTION_BACKENDS)
 def test_expval_grad_PSR(frontend, backend, nshots):
     """
     Compute test gradient of < 0 | model^dag observable model | 0 > w.r.t model's
     parameters. In this test the system size is fixed to two qubits and all the
     parameters/data values are fixed.
     """
+    backend = JaxBackend()
 
     if frontend.__name__ == "qiboml.interfaces.keras":
         from qiboml.interfaces.keras import QuantumModel
-    elif frontend.__name__ == "qiboml.interfaces.pytorch":
-        pytest.skip("torch interface not ready.")
+    # elif frontend.__name__ == "qiboml.interfaces.pytorch":
+    #    pytest.skip("torch interface not ready.")
 
     decimals = 6 if nshots is None else 1
 
@@ -82,7 +83,7 @@ def test_expval_grad_PSR(frontend, backend, nshots):
         encoding=encoding_layer,
         circuit=training_layer,
         decoding=decoding_layer,
-        differentiation_rule=PSR(),
+        differentiation=PSR(),
     )
 
     grad = compute_gradient(frontend, q_model, x)

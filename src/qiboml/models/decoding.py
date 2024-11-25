@@ -79,13 +79,14 @@ class Expectation(QuantumDecoding):
         super().__post_init__()
 
     def __call__(self, x: Circuit) -> ndarray:
+        breakpoint()
         if self.nshots is None:
             return self.observable.expectation(
-                super().__call__(x).state(),
+                super(Expectation, self).__call__(x).state(),
             ).reshape(1, 1)
         else:
             return self.observable.expectation_from_samples(
-                super().__call__(x).frequencies(),
+                super(Expectation, self).__call__(x).frequencies(),
                 qubit_map=self.qubits,
             ).reshape(1, 1)
 

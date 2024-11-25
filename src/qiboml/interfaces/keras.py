@@ -13,6 +13,7 @@ from qiboml.models.decoding import QuantumDecoding
 from qiboml.models.encoding import QuantumEncoding
 from qiboml.operations import differentiation as Diff
 
+
 BACKEND_2_DIFFERENTIATION = {
     "pytorch": "PSR",
     "tensorflow": None,
@@ -32,13 +33,13 @@ def custom_operation(
     x_clone = tf.identity(x)
     x_clone = tf.stop_gradient(x)
 
-    with tf.device("CPU:0"):
-        x_clone = tf.identity(x_clone)
-
     x_clone = x_clone.numpy()
     x_clone = backend.cast(x_clone, dtype=backend.precision)
 
+    # breakpoint()
+
     # Parameters
+    """
     parameters = tf.identity(parameters)
     params = []
     for w in parameters:
@@ -54,12 +55,23 @@ def custom_operation(
         )
         params.append(w_clone_backend_compatible)
 
+    """
+    print("Ciao1")
+
     output = encoding(x_clone) + circuit
-    output.set_parameters(params)
+    # output.set_parameters(params)
     output = decoding(output)
+    breakpoint()
     output = tf.expand_dims(output, axis=0)
 
+    print("Ciao2")
+
     def custom_grad(upstream):
+        print("Ciao3")
+        breakpoint()
+
+        # gradiente rispetto ad input x
+        # e rispetto ai parametri del circuito che mettiamo tutti in una lista
         grad_input, *gradients = (
             tf.Constant(backend.to_numpy(grad).tolist())
             for grad in differentiation.evaluate(
@@ -67,8 +79,26 @@ def custom_operation(
             )
         )
 
-        return upstream * grad_input
+        left_indices = tuple(range(len(gradients.shape)))
+        right_indices = left_indices[::-1][: len(gradients.shape) - 2] + (
+            len(left_indices),
+        )
 
+        einsum_subscript = (
+            "".join(chr(ord("a") + i) for i in left_indices)
+            + ","
+            + "".join(chr(ord("a") + i) for i in right_indices)
+            + "->"
+            + "".join(chr(ord("a") + i) for i in range(len(gradients.shape)))
+        )
+
+        r1 = tf.einsum(einsum_subscript, gradients, upstream)
+        r2 = tf.matmul(upstream, grad_input)
+
+        return r1, r2
+
+    print("Ciao4")
+    breakpoint()
     return output, custom_grad
 
 
@@ -78,7 +108,7 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
     encoding: QuantumEncoding
     circuit: Circuit
     decoding: QuantumDecoding
-    differentiation: str = "auto"
+    differentiation: None
 
     def __post_init__(self):
         super().__init__()
@@ -94,19 +124,20 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
         )
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
+        breakpoint()
         if (
-            self.backend.name != "tensorflow"
+            self.backend.platform != "tensorflow"
             or self.differentiation is not None
             or not self.decoding.analytic
         ):
 
-            """devo chiamare una funzione che mi ritorna la prediction voluta e
-            la funzione custom grad"""
+            breakpoint()
             return custom_operation(
                 self.encoding,
                 self.circuit,
                 self.decoding,
                 self.differentiation,
+                self.backend,
                 self.circuit_parameters,
                 x,
             )
@@ -120,7 +151,7 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
             output = self.decoding(y)
             output_expanded = tf.expand_dims(output, axis=0)
 
-        return output_expanded
+            return output_expanded
 
     def compute_output_shape(
         self,
