@@ -213,6 +213,8 @@ def backprop_test(frontend, model, data, target):
     # Calcolo la loss
     _, loss_trained = eval_model(frontend, model, data, target)
     # Controllo che la nuova loss sia più piccola, ovvero che ho allenato
+    print(f"Loss untrained {loss_untrained}")
+    print(f"Loss trained {loss_trained}")
     assert loss_untrained != loss_trained
     # assert grad < 1e-2
 
