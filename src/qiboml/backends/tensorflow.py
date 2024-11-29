@@ -5,7 +5,7 @@ from typing import Union
 import numpy as np
 from qibo import __version__
 from qibo.backends.npmatrices import NumpyMatrices
-from qibo.backends.numpy import NumpyBackend, _calculate_negative_power_singular_matrix
+from qibo.backends.numpy import NumpyBackend
 from qibo.config import TF_LOG_LEVEL, log, raise_error
 
 
