@@ -9,6 +9,8 @@ from qibo import construct_backend, hamiltonians
 from qibo.config import raise_error
 from qibo.symbols import Z
 
+from qiboml.operations.differentiation import Jax, PSR
+
 import qiboml.models.ansatze as ans
 import qiboml.models.decoding as dec
 import qiboml.models.encoding as enc
@@ -127,6 +129,7 @@ def train_model(frontend, model, data, target):
         optimizer = frontend.keras.optimizers.Adam()
         loss_f = frontend.keras.losses.MeanSquaredError()
         model.compile(loss=loss_f, optimizer=optimizer)
+        breakpoint()
         model.fit(
             data,
             target,
@@ -219,7 +222,7 @@ def backprop_test(frontend, model, data, target):
     # assert grad < 1e-2
 
 
-@pytest.mark.parametrize("layer,seed", zip(ENCODING_LAYERS, [1, 4]))
+@pytest.mark.parametrize("layer, seed", zip(ENCODING_LAYERS, [1, 4]))
 def test_encoding(backend, frontend, layer, seed):
     # if frontend.__name__ == "qiboml.models.keras":
     #    pytest.skip("keras interface not ready.")
@@ -238,7 +241,9 @@ def test_encoding(backend, frontend, layer, seed):
         nqubits, random_subset(nqubits, dim), backend=backend
     )
     encoding_layer = layer(nqubits, random_subset(nqubits, dim))
-    q_model = frontend.QuantumModel(encoding_layer, training_layer, decoding_layer)
+    q_model = frontend.QuantumModel(
+        encoding_layer, training_layer, decoding_layer, differentiation="Jax"
+    )
     binary = True if encoding_layer.__class__.__name__ == "BinaryEncoding" else False
 
     data = random_tensor(frontend, (5, dim), binary)
@@ -328,3 +333,38 @@ def test_decoding(backend, frontend, layer, seed, analytic):
     data = random_tensor(frontend, (100, 32))
     target = prepare_targets(frontend, model, data)
     backprop_test(frontend, model, data, target)
+
+
+@pytest.mark.parametrize("layer, seed", zip(ENCODING_LAYERS, [1, 4]))
+def test_differentiation(backend, frontend, layer, seed):
+    nqubits = 2
+    dim = 2
+    training_layer = ans.ReuploadingCircuit(
+        nqubits,
+        random_subset(nqubits, dim),
+    )
+    decoding_layer = dec.Probabilities(
+        nqubits, random_subset(nqubits, dim), backend=backend
+    )
+    encoding_layer = layer(nqubits, random_subset(nqubits, dim))
+    q_model = frontend.QuantumModel(
+        encoding_layer, training_layer, decoding_layer, differentiation=Jax()
+    )
+    binary = True if encoding_layer.__class__.__name__ == "BinaryEncoding" else False
+
+    data = random_tensor(frontend, (1, dim), binary)
+    data = tf.cast(data, dtype=tf.float32)
+
+    # target = prepare_targets(frontend, q_model, data)
+    breakpoint()
+
+    print(f"Data {data}")
+
+    with tf.GradientTape(persistent=True) as tape:
+        tape.watch(data)
+        result = q_model(data)
+
+    grad = tape.gradient(result, data)
+
+    breakpoint()
+    print(f"Gradient {grad}")

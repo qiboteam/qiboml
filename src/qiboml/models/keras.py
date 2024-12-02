@@ -20,13 +20,58 @@ BACKEND_2_DIFFERENTIATION = {
 }
 
 
+@dataclass()
+class CustomGrad:
+    _encoding: QuantumEncoding
+    _circuit: Circuit
+    _decoding: QuantumDecoding
+    _differentiation: None
+    _backend: Backend
+    _parameters: None
+
+    def __post_init__(self):
+        self._parameters = tf.unstack(tf.identity(self._parameters))
+
+    def __call__(self, x):
+        @tf.custom_gradient
+        def custom_gradient(x):
+
+            breakpoint()
+
+            def forward(x):
+                return self._decoding(self._encoding(x) + self._circuit)
+
+            def grad_fn(upstream):
+                breakpoint()
+                # x = tf.identity(x)
+                grad_input, *gradients = self._differentiation.evaluate(
+                    x,
+                    self._encoding,
+                    self._circuit,
+                    self._decoding,
+                    self._backend,
+                    *self._parameters,
+                )
+
+                # upstream ha la shape dello output di custom_gradient che è forward(x) shape=(4,)
+                # grad_fn deve avere la shape dell'input di custom_gradient: shape=(1,2)
+
+                breakpoint()
+                print(f"Upstream {upstream}")
+                return (upstream @ grad_input, *gradients)
+
+            return forward(x), grad_fn
+
+        return custom_gradient(x)
+
+
 @dataclass(eq=False)
 class QuantumModel(keras.Model):  # pylint: disable=no-member
 
     encoding: QuantumEncoding
     circuit: Circuit
     decoding: QuantumDecoding
-    differentiation: str = "auto"
+    differentiation: None
 
     def __post_init__(self):
         super().__init__()
@@ -39,15 +84,19 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
         )
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
-        if self.backend.platform != "tensorflow":
-            return custom_operation(
+        if self.backend.platform != "tensorflow" or self.differentiation is not None:
+
+            custom = CustomGrad(
                 self.encoding,
                 self.circuit,
                 self.decoding,
                 self.differentiation,
+                self.backend,
                 self.circuit_parameters,
-                x,
             )
+            a = custom(x)
+            breakpoint()
+            return a
 
         else:
 

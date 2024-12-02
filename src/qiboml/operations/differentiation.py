@@ -61,8 +61,9 @@ class Jax:
         self._argnums: list[int] = None
         self._circuit = None
 
-    def evaluate(self, x: ndarray, encoding, training, decoding, backend, *parameters):
+    def evaluate(self, x, encoding, training, decoding, backend, *parameters):
         binary = isinstance(encoding, BinaryEncoding)
+        breakpoint()
         x = backend.to_numpy(x)
         x = self._jax.cast(x, self._jax.precision)
         if self._argnums is None:
