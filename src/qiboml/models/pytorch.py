@@ -39,7 +39,7 @@ class QuantumModel(torch.nn.Module):
 
         if self.differentiation == "auto":
             self.differentiation = BACKEND_2_DIFFERENTIATION.get(
-                self.backend.name, "PSR"
+                self.backend.platform, "PSR"
             )
 
         if self.differentiation is not None:
@@ -47,7 +47,7 @@ class QuantumModel(torch.nn.Module):
 
     def forward(self, x: torch.Tensor):
         if (
-            self.backend.name != "pytorch"
+            self.backend.platform != "pytorch"
             or self.differentiation is not None
             or not self.decoding.analytic
         ):
