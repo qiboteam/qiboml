@@ -1,11 +1,11 @@
 import numpy as np
 import pytest
-import qibo
 import torch
 from qibo import hamiltonians
-from qibo.backends import NumpyBackend, PyTorchBackend
+from qibo.backends import NumpyBackend
 from qibojit.backends import NumbaBackend
 
+from qiboml.backends import PyTorchBackend
 from qiboml.models.ansatze import ReuploadingCircuit
 from qiboml.models.decoding import Expectation
 from qiboml.models.encoding import PhaseEncoding
