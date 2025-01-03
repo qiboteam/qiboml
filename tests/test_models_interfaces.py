@@ -261,8 +261,6 @@ def test_decoding(backend, frontend, layer, seed):
         pytest.skip("keras interface not ready.")
     if backend.platform not in ("pytorch", "jax"):
         pytest.skip("Non pytorch/jax differentiation is not working yet.")
-    if layer.analytic and not layer is dec.Expectation:
-        pytest.skip("Unused analytic argument.")
     if not layer.analytic and not layer is dec.Expectation:
         pytest.skip(
             "Expectation layer is the only differentiable decoding when the diffrule is not analytical."
