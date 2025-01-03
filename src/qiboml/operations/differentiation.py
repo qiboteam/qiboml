@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from copy import deepcopy
 from dataclasses import dataclass
 
 import jax
@@ -15,7 +14,7 @@ from qiboml.models.encoding import BinaryEncoding, QuantumEncoding
 
 
 @dataclass
-class DifferentiationRule(ABC):
+class Differentiation(ABC):
 
     @abstractmethod
     def evaluate(
@@ -34,7 +33,7 @@ class DifferentiationRule(ABC):
         pass
 
 
-class PSR(DifferentiationRule):
+class PSR(Differentiation):
     """
     Compute the gradient of the expectation value of a target observable w.r.t
     features and parameters contained in a quantum model using the parameter shift
@@ -95,69 +94,14 @@ class PSR(DifferentiationRule):
     def gradient_from_data(
         self,
         data,
-        encoding,
-        circuit,
-        decoding,
         backend,
     ):
         """
-        Compute the gradient w.r.t. data.
-
-        Args:
-            data: data;
-            encoding: encoding part of the quantum model. It is used to check whether
-                parameter shift rules can be used to compute the gradient.
-            circuit: all the quantum circuit, composed of encoding + eventual trainable
-                layer.
-            decoding: decoding part of the quantum model. In the PSR the decoding
-                is usually a qiboml.models.decoding.Expectation layer.
-            backend: qibo backend on which the circuit execution is performed-
+        Pad the gradient w.r.t. data.
         """
+        # TODO: adapt this to the discussed strategy
         x_size = backend.to_numpy(data).size
-        # what follows now works for encodings in which the angle is equal to the feature
-        # TODO: adapt this strategy to the more general case of a callable(x, params)
-        if encoding.hardware_differentiable:
-            x_gradient = []
-            # loop over data components
-            for k in range(x_size):
-                # initialize derivative
-                derivative_k = 0.0
-                # extract gates which are encoding component x_k
-                gates_encoding_xk = encoding.gates_encoding_feature(k)
-                # loop over encoding gates
-                for enc_gate in gates_encoding_xk:
-                    # search for the target encoding gate in the circuit
-                    generator_eigenval = enc_gate.generator_eigenvalue()
-                    # TODO: the following shift value is valid only for rotation-like gates
-                    shift = np.pi / (4 * generator_eigenval)
-                    for gate in circuit.queue:
-                        if gate == enc_gate:
-                            original_parameter = deepcopy(gate.parameters)
-                            gate.parameters = shifted_x_component(
-                                x=data,
-                                index=k,
-                                shift_value=shift,
-                                backend=backend,
-                            )
-                            forward = decoding(circuit)
-                            gate.parameters = shifted_x_component(
-                                x=data,
-                                index=k,
-                                shift_value=-2 * shift,
-                                backend=backend,
-                            )
-                            backward = decoding(circuit)
-                            derivative_k += float(
-                                generator_eigenval * (forward - backward)
-                            )
-                            # restore original parameter
-                            gate.parameters = original_parameter
-                x_gradient.append(derivative_k)
-            return [np.array([[[der for der in x_gradient]]])]
-
-        else:
-            # pad the gradients in case data are not uploaded into gates
-            return [np.array([[(0.0,) * x_size]])]
+        return [np.array([[(0.0,) * x_size]])]
 
     @staticmethod
     def shift_parameter(parameters, i, epsilon, backend):
@@ -172,7 +116,7 @@ class PSR(DifferentiationRule):
         return parameters
 
 
-class Jax(DifferentiationRule):
+class Jax(Differentiation):
 
     def __init__(self):
         self._jax: Backend = JaxBackend()
@@ -224,13 +168,3 @@ class Jax(DifferentiationRule):
     def _run_without_inputs(self, *parameters):
         self._circuit.set_parameters(parameters)
         return self._decoding(self._circuit)
-
-
-def shifted_x_component(
-    x: ndarray, index: int, shift_value: float, backend: Backend
-) -> float:
-    """Shift a component of an ndarray."""
-    flat_array = backend.to_numpy(x).flatten()
-    shifted_flat_array = deepcopy(flat_array)
-    shifted_flat_array[index] += shift_value
-    return shifted_flat_array[index]

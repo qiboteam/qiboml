@@ -290,9 +290,9 @@ def test_decoding(backend, frontend, layer, seed):
         )
         kwargs["observable"] = observable
         if not layer.analytic:
-            differentiation_rule = PSR()
+            differentiation = PSR()
         else:
-            differentiation_rule = None
+            differentiation = None
         kwargs["nshots"] = None
     decoding_layer = layer(nqubits, decoding_qubits, **kwargs)
 

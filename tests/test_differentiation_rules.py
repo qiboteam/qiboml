@@ -87,7 +87,7 @@ def test_expval_grad_PSR(frontend, backend, nshots):
         encoding=encoding_layer,
         circuit=training_layer,
         decoding=decoding_layer,
-        differentiation_rule=PSR(),
+        differentiation=PSR(),
     )
 
     grad = compute_gradient(frontend, q_model, x)
