@@ -52,9 +52,6 @@ class PSR(Differentiation):
         # compute first gradient part, wrt data
         gradient = self.gradient_from_data(
             data=x,
-            encoding=encoding,
-            circuit=circuit,
-            decoding=decoding,
             backend=backend,
         )
 
