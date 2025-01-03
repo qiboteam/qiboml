@@ -81,7 +81,7 @@ def test_expval_grad_PSR(frontend, backend, nshots):
 
     nparams = len(training_layer.get_parameters())
     initial_params = np.linspace(0.0, 2 * np.pi, nparams)
-    training_layer.set_parameters(initial_params)
+    training_layer.set_parameters(backend.cast(initial_params))
 
     q_model = QuantumModel(
         encoding=encoding_layer,
