@@ -54,10 +54,6 @@ def test_expval_grad_PSR(frontend, backend, nshots):
     if frontend.__name__ == "qiboml.interfaces.keras":
         pytest.skip("keras interface not ready.")
     elif frontend.__name__ == "qiboml.interfaces.pytorch":
-        # TODO: replace with qiboml, pytorch as soon as migration is complete
-        # TODO: define a proper qiboml.set_interface() procedure for these situations
-        qibo.set_backend("pytorch")
-
         from qiboml.interfaces.pytorch import QuantumModel
 
     decimals = 6 if nshots is None else 1

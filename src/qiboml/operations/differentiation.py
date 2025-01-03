@@ -97,7 +97,7 @@ class PSR(Differentiation):
         backend,
     ):
         """
-        Pad the gradient w.r.t. data.
+        Pad the gradient w.r.t. inputs.
         """
         # TODO: adapt this to the discussed strategy
         x_size = backend.to_numpy(data).size
