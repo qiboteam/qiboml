@@ -80,7 +80,6 @@ class BinaryEncoding(QuantumEncoding):
                 f"Invalid input dimension {x.shape[-1]}, but the allocated qubits are {self.qubits}.",
             )
         circuit = self.circuit.copy()
-        ones = np.flatnonzero(x.ravel() == 1)
-        for bit in ones:
-            circuit.add(gates.X(self.qubits[bit]))
+        for qubit, bit in zip(self.qubits, x.ravel()):
+            circuit.add(gates.RX(qubit, theta=bit * np.pi, trainable=False))
         return circuit

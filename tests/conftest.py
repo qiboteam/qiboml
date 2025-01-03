@@ -21,11 +21,9 @@ FRONTENDS = [
 
 
 def get_backend(backend_name):
-    from qibo.backends.pytorch import (  # the qiboml pytorch is not updated
-        PyTorchBackend,
-    )
 
     from qiboml.backends.jax import JaxBackend
+    from qiboml.backends.pytorch import PyTorchBackend
     from qiboml.backends.tensorflow import TensorflowBackend
 
     NAME2BACKEND = {

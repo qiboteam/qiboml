@@ -9,7 +9,7 @@ from qibo.backends import Backend
 
 from qiboml.models.decoding import QuantumDecoding
 from qiboml.models.encoding import QuantumEncoding
-from qiboml.operations.differentiation import DifferentiationRule
+from qiboml.operations.differentiation import Differentiation
 
 
 @dataclass(eq=False)
@@ -18,7 +18,7 @@ class QuantumModel(torch.nn.Module):
     encoding: QuantumEncoding
     circuit: Circuit
     decoding: QuantumDecoding
-    differentiation_rule: DifferentiationRule = None
+    differentiation: Differentiation = None
 
     def __post_init__(
         self,
@@ -34,7 +34,7 @@ class QuantumModel(torch.nn.Module):
     def forward(self, x: torch.Tensor):
         if (
             self.backend.name != "pytorch"
-            or self.differentiation_rule is not None
+            or self.differentiation is not None
             or not self.decoding.analytic
         ):
             x = QuantumModelAutoGrad.apply(
@@ -43,7 +43,7 @@ class QuantumModel(torch.nn.Module):
                 self.circuit,
                 self.decoding,
                 self.backend,
-                self.differentiation_rule,
+                self.differentiation,
                 *list(self.parameters())[0],
             )
         else:
@@ -79,7 +79,7 @@ class QuantumModelAutoGrad(torch.autograd.Function):
         circuit: Circuit,
         decoding: QuantumDecoding,
         backend,
-        differentiation_rule,
+        differentiation,
         *parameters: list[torch.nn.Parameter],
     ):
         ctx.save_for_backward(x, *parameters)
@@ -87,7 +87,7 @@ class QuantumModelAutoGrad(torch.autograd.Function):
         ctx.circuit = circuit
         ctx.decoding = decoding
         ctx.backend = backend
-        ctx.differentiation_rule = differentiation_rule
+        ctx.differentiation = differentiation
         x_clone = x.clone().detach().cpu().numpy()
         x_clone = backend.cast(x_clone, dtype=x_clone.dtype)
         params = [
@@ -113,7 +113,7 @@ class QuantumModelAutoGrad(torch.autograd.Function):
         ]
         grad_input, *gradients = (
             torch.as_tensor(ctx.backend.to_numpy(grad).tolist())
-            for grad in ctx.differentiation_rule.evaluate(
+            for grad in ctx.differentiation.evaluate(
                 x_clone, ctx.encoding, ctx.circuit, ctx.decoding, ctx.backend, *params
             )
         )
