@@ -78,7 +78,7 @@ class Expectation(QuantumDecoding):
         super().__post_init__()
 
     def __call__(self, x: Circuit) -> ndarray:
-        if self.nshots is None:
+        if self.analytic:
             return self.observable.expectation(
                 super().__call__(x).state(),
             ).reshape(1, 1)
