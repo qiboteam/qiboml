@@ -102,11 +102,11 @@ class PSR(Differentiation):
 
     @staticmethod
     def shift_parameter(parameters, i, epsilon, backend):
-        if backend.name == "tensorflow":
+        if backend.platform == "tensorflow":
             return backend.tf.stack(
                 [parameters[j] + int(i == j) * epsilon for j in range(len(parameters))]
             )
-        elif backend.name == "jax":
+        elif backend.platform == "jax":
             parameters.at[i].set(parameters[i] + epsilon)
         else:
             parameters[i] = parameters[i] + epsilon

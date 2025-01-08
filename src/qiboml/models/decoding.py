@@ -120,9 +120,8 @@ class Samples(QuantumDecoding):
 
     def __post_init__(self):
         super().__post_init__()
-        self.analytic = False
 
-    def forward(self, x: Circuit) -> ndarray:
+    def __call__(self, x: Circuit) -> ndarray:
         return self.backend.cast(super().__call__(x).samples(), self.backend.precision)
 
     @property
@@ -130,5 +129,5 @@ class Samples(QuantumDecoding):
         return (self.nshots, len(self.qubits))
 
     @property
-    def analytic(self):
-        return False
+    def anaytic(self):
+        False

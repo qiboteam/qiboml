@@ -45,7 +45,7 @@ def build_linear_layer(frontend, input_dim, output_dim):
 
 
 def build_sequential_model(frontend, layers):
-    if frontend.__name__ == "qiboml.models.pytorch":
+    if frontend.__name__ == "qiboml.interfaces.pytorch":
         return frontend.torch.nn.Sequential(*layers)
     elif frontend.__name__ == "qiboml.interfaces.keras":
         return frontend.keras.Sequential(layers)
@@ -54,7 +54,7 @@ def build_sequential_model(frontend, layers):
 
 
 def build_activation(frontend, binary=False):
-    if frontend.__name__ == "qiboml.models.pytorch":
+    if frontend.__name__ == "qiboml.interfaces.pytorch":
 
         class Activation(frontend.torch.nn.Module):
             def forward(self, x):
@@ -65,7 +65,7 @@ def build_activation(frontend, binary=False):
                     return np.pi * frontend.torch.nn.functional.tanh(x)
                 return x
 
-    elif frontend.__name__ == "qiboml.models.keras":
+    elif frontend.__name__ == "qiboml.interfaces.keras":
         pass
     else:
         raise_error(RuntimeError, f"Unknown frontend {frontend}.")
@@ -75,13 +75,13 @@ def build_activation(frontend, binary=False):
 
 
 def random_tensor(frontend, shape, binary=False):
-    if frontend.__name__ == "qiboml.models.pytorch":
+    if frontend.__name__ == "qiboml.interfaces.pytorch":
         tensor = (
             frontend.torch.randint(0, 2, shape).double()
             if binary
             else frontend.torch.randn(shape)
         )
-    elif frontend.__name__ == "qiboml.models.keras":
+    elif frontend.__name__ == "qiboml.interfaces.keras":
         tensor = frontend.tf.random.uniform(shape)
     else:
         raise_error(RuntimeError, f"Unknown frontend {frontend}.")
@@ -90,7 +90,7 @@ def random_tensor(frontend, shape, binary=False):
 
 def train_model(frontend, model, data, target):
     max_epochs = 10
-    if frontend.__name__ == "qiboml.models.pytorch":
+    if frontend.__name__ == "qiboml.interfaces.pytorch":
 
         optimizer = frontend.torch.optim.Adam(model.parameters())
         loss_f = frontend.torch.nn.MSELoss()
@@ -132,7 +132,7 @@ def eval_model(frontend, model, data, target=None):
     loss = None
     outputs = []
 
-    if frontend.__name__ == "qiboml.models.pytorch":
+    if frontend.__name__ == "qiboml.interfaces.pytorch":
         loss_f = frontend.torch.nn.MSELoss()
         with frontend.torch.no_grad():
             for x in data:
@@ -155,7 +155,7 @@ def eval_model(frontend, model, data, target=None):
 def set_seed(frontend, seed):
     random.seed(seed)
     np.random.seed(seed)
-    if frontend.__name__ == "qiboml.models.pytorch":
+    if frontend.__name__ == "qiboml.interfaces.pytorch":
         frontend.torch.set_default_dtype(frontend.torch.float64)
         frontend.torch.manual_seed(seed)
 
@@ -168,7 +168,7 @@ def random_parameters(frontend, model):
                 {k: v + frontend.torch.randn(v.shape) / 5}
             )  # perturbation of max +- 0.2
             # of the original parameters
-    elif frontend.__name__ == "qiboml.models.keras":
+    elif frontend.__name__ == "qiboml.interfaces.keras":
         new_params = [frontend.tf.random.uniform(model.get_weights()[0].shape)]
     return new_params
 
@@ -224,9 +224,25 @@ def test_encoding(backend, frontend, layer, seed):
         nqubits,
         random_subset(nqubits, dim),
     )
-    decoding_layer = dec.Probabilities(
-        nqubits, random_subset(nqubits, dim), backend=backend
+
+    decoding_qubits = random_subset(nqubits, dim)
+    observable = hamiltonians.SymbolicHamiltonian(
+        sum([Z(int(i)) for i in decoding_qubits]),
+        nqubits=nqubits,
+        backend=backend,
     )
+    decoding_layer = dec.Expectation(
+        nqubits=nqubits,
+        qubits=decoding_qubits,
+        observable=observable,
+        backend=backend,
+    )
+
+    if backend.platform != "pytorch":
+        differentiation = PSR()
+    else:
+        differentiation = None
+
     encoding_layer = layer(nqubits, random_subset(nqubits, dim))
     binary = True if encoding_layer.__class__.__name__ == "BinaryEncoding" else False
     activation = build_activation(frontend, binary)
@@ -234,7 +250,12 @@ def test_encoding(backend, frontend, layer, seed):
         frontend,
         [
             activation,
-            frontend.QuantumModel(encoding_layer, training_layer, decoding_layer),
+            frontend.QuantumModel(
+                encoding=encoding_layer,
+                circuit=training_layer,
+                decoding=decoding_layer,
+                differentiation=differentiation,
+            ),
         ],
     )
 
@@ -248,9 +269,10 @@ def test_encoding(backend, frontend, layer, seed):
         [
             build_linear_layer(frontend, 4, dim),
             q_model,
-            build_linear_layer(frontend, 2**nqubits, 1),
+            build_linear_layer(frontend, 1, 1),
         ],
     )
+
     target = prepare_targets(frontend, model, data)
     backprop_test(frontend, model, data, target)
 
@@ -287,24 +309,48 @@ def test_decoding(backend, frontend, layer, seed):
             backend=backend,
         )
         kwargs["observable"] = observable
-        if not layer.analytic:
-            differentiation = PSR()
-        else:
-            differentiation = None
         kwargs["nshots"] = None
+
+    # test error
+    if layer is dec.Samples:
+        kwargs["nshots"] = 1000
+
     decoding_layer = layer(nqubits, decoding_qubits, **kwargs)
+
+    if not decoding_layer.analytic:
+        differentiation = PSR()
+    else:
+        differentiation = None
 
     activation = build_activation(frontend, binary=False)
     q_model = build_sequential_model(
         frontend,
         [
             activation,
-            frontend.QuantumModel(encoding_layer, training_layer, decoding_layer),
+            frontend.QuantumModel(
+                encoding=encoding_layer,
+                circuit=training_layer,
+                decoding=decoding_layer,
+                differentiation=differentiation,
+            ),
         ],
     )
 
     data = random_tensor(frontend, (100, dim))
     target = prepare_targets(frontend, q_model, data)
+
+    if layer is dec.Samples:
+        with pytest.raises(NotImplementedError):
+            _ = backprop_test(frontend, q_model, data, target)
+        pytest.skip("Skipping the rest of the test for Samples decoding.")
+
+    if backend.platform != "pytorch" and differentiation is None:
+        with pytest.raises(ValueError):
+            _ = backprop_test(frontend, q_model, data, target)
+        pytest.skip(
+            "Skipping the rest of the test because symbolical differentiation cannot be executed for unmatching frameworks in backend and interface."
+        )
+
     backprop_test(frontend, q_model, data, target)
 
     model = build_sequential_model(

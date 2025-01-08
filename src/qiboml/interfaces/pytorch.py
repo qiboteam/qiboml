@@ -6,6 +6,7 @@ import numpy as np
 import torch
 from qibo import Circuit
 from qibo.backends import Backend
+from qibo.config import raise_error
 
 from qiboml.models.decoding import QuantumDecoding
 from qiboml.models.encoding import QuantumEncoding
@@ -32,20 +33,22 @@ class QuantumModel(torch.nn.Module):
         self.circuit_parameters = torch.nn.Parameter(params)
 
     def forward(self, x: torch.Tensor):
-        if (
-            self.backend.name != "pytorch"
-            or self.differentiation is not None
-            or not self.decoding.analytic
-        ):
-            x = QuantumModelAutoGrad.apply(
-                x,
-                self.encoding,
-                self.circuit,
-                self.decoding,
-                self.backend,
-                self.differentiation,
-                *list(self.parameters())[0],
-            )
+        if self.backend.platform != "pytorch" or not self.decoding.analytic:
+            if self.differentiation is None:
+                raise_error(
+                    ValueError,
+                    f"Pytorch automatic differentiation cannot be used with backend {self.backend.name}-{self.backend.platform}.",
+                )
+            else:
+                x = QuantumModelAutoGrad.apply(
+                    x,
+                    self.encoding,
+                    self.circuit,
+                    self.decoding,
+                    self.backend,
+                    self.differentiation,
+                    *list(self.parameters())[0],
+                )
         else:
             self.circuit.set_parameters(list(self.parameters())[0])
             x = self.encoding(x) + self.circuit
