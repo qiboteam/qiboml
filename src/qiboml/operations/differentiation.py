@@ -27,7 +27,7 @@ class Differentiation(ABC):
         *parameters: ndarray,
     ):
         """
-        Evaluate the gradient of a quantum model w.r.t variables and parameters,
+        Evaluate the gradient of a quantum model w.r.t inputs and parameters,
         respectively represented by `x` and `parameters`.
         """
         pass

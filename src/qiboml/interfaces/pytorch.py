@@ -26,7 +26,6 @@ class QuantumModel(torch.nn.Module):
     ):
         super().__init__()
 
-        circuit = self.encoding.circuit
         params = [p for param in self.circuit.get_parameters() for p in param]
         params = torch.as_tensor(self.backend.to_numpy(x=params)).ravel()
         params.requires_grad = True
