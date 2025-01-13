@@ -311,7 +311,6 @@ def test_decoding(backend, frontend, layer, seed):
         kwargs["observable"] = observable
         kwargs["nshots"] = None
 
-    # test error
     if layer is dec.Samples:
         kwargs["nshots"] = 1000
 
@@ -337,6 +336,14 @@ def test_decoding(backend, frontend, layer, seed):
     )
 
     data = random_tensor(frontend, (100, dim))
+
+    if backend.platform != "pytorch" and differentiation is None:
+        with pytest.raises(ValueError):
+            _ = prepare_targets(frontend, q_model, data)
+        pytest.skip(
+            "Skipping the rest of the test since the raise error has been successfully tested."
+        )
+
     target = prepare_targets(frontend, q_model, data)
 
     if layer is dec.Samples:
