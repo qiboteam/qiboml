@@ -220,6 +220,7 @@ def test_encoding(backend, frontend, layer, seed):
 
     nqubits = 2
     dim = 2
+
     training_layer = ans.ReuploadingCircuit(
         nqubits,
         random_subset(nqubits, dim),
@@ -238,11 +239,6 @@ def test_encoding(backend, frontend, layer, seed):
         backend=backend,
     )
 
-    if backend.platform != "pytorch":
-        differentiation = PSR()
-    else:
-        differentiation = None
-
     encoding_layer = layer(nqubits, random_subset(nqubits, dim))
     binary = True if encoding_layer.__class__.__name__ == "BinaryEncoding" else False
     activation = build_activation(frontend, binary)
@@ -254,7 +250,6 @@ def test_encoding(backend, frontend, layer, seed):
                 encoding=encoding_layer,
                 circuit=training_layer,
                 decoding=decoding_layer,
-                differentiation=differentiation,
             ),
         ],
     )
@@ -316,11 +311,6 @@ def test_decoding(backend, frontend, layer, seed):
 
     decoding_layer = layer(nqubits, decoding_qubits, **kwargs)
 
-    if not decoding_layer.analytic:
-        differentiation = PSR()
-    else:
-        differentiation = None
-
     activation = build_activation(frontend, binary=False)
     q_model = build_sequential_model(
         frontend,
@@ -330,19 +320,11 @@ def test_decoding(backend, frontend, layer, seed):
                 encoding=encoding_layer,
                 circuit=training_layer,
                 decoding=decoding_layer,
-                differentiation=differentiation,
             ),
         ],
     )
 
     data = random_tensor(frontend, (100, dim))
-
-    if backend.platform != "pytorch" and differentiation is None:
-        with pytest.raises(ValueError):
-            _ = prepare_targets(frontend, q_model, data)
-        pytest.skip(
-            "Skipping the rest of the test since the raise error has been successfully tested."
-        )
 
     target = prepare_targets(frontend, q_model, data)
 
@@ -350,13 +332,6 @@ def test_decoding(backend, frontend, layer, seed):
         with pytest.raises(NotImplementedError):
             _ = backprop_test(frontend, q_model, data, target)
         pytest.skip("Skipping the rest of the test for Samples decoding.")
-
-    if backend.platform != "pytorch" and differentiation is None:
-        with pytest.raises(ValueError):
-            _ = backprop_test(frontend, q_model, data, target)
-        pytest.skip(
-            "Skipping the rest of the test because symbolical differentiation cannot be executed for unmatching frameworks in backend and interface."
-        )
 
     backprop_test(frontend, q_model, data, target)
 

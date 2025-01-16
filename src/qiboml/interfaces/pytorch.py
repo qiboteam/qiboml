@@ -10,7 +10,13 @@ from qibo.config import raise_error
 
 from qiboml.models.decoding import QuantumDecoding
 from qiboml.models.encoding import QuantumEncoding
-from qiboml.operations.differentiation import Differentiation
+from qiboml.operations.differentiation import PSR, Differentiation, Jax
+
+DEFAULT_DIFFERENTIATION = {
+    "qiboml-pytorch": None,
+    "qiboml-tensorflow": Jax(),
+    "qiboml-jax": Jax(),
+}
 
 
 @dataclass(eq=False)
@@ -31,27 +37,36 @@ class QuantumModel(torch.nn.Module):
         params.requires_grad = True
         self.circuit_parameters = torch.nn.Parameter(params)
 
-    def forward(self, x: torch.Tensor):
-        if self.backend.platform != "pytorch" or not self.decoding.analytic:
-            if self.differentiation is None:
-                raise_error(
-                    ValueError,
-                    f"Pytorch automatic differentiation cannot be used with backend {self.backend.name}-{self.backend.platform}.",
-                )
+        backend_string = (
+            f"{self.decoding.backend.name}-{self.decoding.backend.platform}"
+            if self.decoding.backend.platform is not None
+            else self.decoding.backend.name
+        )
+
+        if self.differentiation is None:
+            if not self.decoding.analytic:
+                self.differentiation = PSR()
             else:
-                x = QuantumModelAutoGrad.apply(
-                    x,
-                    self.encoding,
-                    self.circuit,
-                    self.decoding,
-                    self.backend,
-                    self.differentiation,
-                    *list(self.parameters())[0],
-                )
-        else:
+                if backend_string in DEFAULT_DIFFERENTIATION.keys():
+                    self.differentiation = DEFAULT_DIFFERENTIATION[backend_string]
+                else:
+                    self.differentiation = PSR()
+
+    def forward(self, x: torch.Tensor):
+        if self.differentiation is None:
             self.circuit.set_parameters(list(self.parameters())[0])
             x = self.encoding(x) + self.circuit
             x = self.decoding(x)
+        else:
+            x = QuantumModelAutoGrad.apply(
+                x,
+                self.encoding,
+                self.circuit,
+                self.decoding,
+                self.backend,
+                self.differentiation,
+                *list(self.parameters())[0],
+            )
         return x
 
     @property
