@@ -1,0 +1,11 @@
+Installation instructions
+=========================
+
+Installing with pip
+"""""""""""""""""""
+
+The installation using ``pip`` is the recommended approach to install Qiboml.
+
+.. code-block:: bash
+
+      pip install qibo
