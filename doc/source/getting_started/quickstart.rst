@@ -1,5 +1,5 @@
-Quick start
------------
+Building your first Quantum Model
+---------------------------------
 
 In order to build a Quantum Model you need to define three fundamental ingredients:
 
