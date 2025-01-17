@@ -213,8 +213,6 @@ def backprop_test(frontend, model, data, target):
 def test_encoding(backend, frontend, layer, seed):
     if frontend.__name__ == "qiboml.interfaces.keras":
         pytest.skip("keras interface not ready.")
-    if backend.platform not in ("pytorch", "jax"):
-        pytest.skip("Non pytorch/jax differentiation is not working yet.")
 
     set_seed(frontend, seed)
 
@@ -276,8 +274,6 @@ def test_encoding(backend, frontend, layer, seed):
 def test_decoding(backend, frontend, layer, seed):
     if frontend.__name__ == "qiboml.interfaces.keras":
         pytest.skip("keras interface not ready.")
-    if backend.platform not in ("pytorch", "jax"):
-        pytest.skip("Non pytorch/jax differentiation is not working yet.")
     if not layer.analytic and not layer is dec.Expectation:
         pytest.skip(
             "Expectation layer is the only differentiable decoding when the diffrule is not analytical."
