@@ -10,6 +10,7 @@ from qibo.symbols import Z
 import qiboml.models.ansatze as ans
 import qiboml.models.decoding as dec
 import qiboml.models.encoding as enc
+from qiboml.operations.differentiation import PSR
 
 
 def get_layers(module, layer_type=None):
@@ -35,25 +36,25 @@ def random_subset(nqubits, k):
 
 
 def build_linear_layer(frontend, input_dim, output_dim):
-    if frontend.__name__ == "qiboml.models.pytorch":
+    if frontend.__name__ == "qiboml.interfaces.pytorch":
         return frontend.torch.nn.Linear(input_dim, output_dim)
-    elif frontend.__name__ == "qiboml.models.keras":
+    elif frontend.__name__ == "qiboml.interfaces.keras":
         return frontend.keras.layers.Dense(output_dim)
     else:
         raise_error(RuntimeError, f"Unknown frontend {frontend}.")
 
 
 def build_sequential_model(frontend, layers):
-    if frontend.__name__ == "qiboml.models.pytorch":
+    if frontend.__name__ == "qiboml.interfaces.pytorch":
         return frontend.torch.nn.Sequential(*layers)
-    elif frontend.__name__ == "qiboml.models.keras":
+    elif frontend.__name__ == "qiboml.interfaces.keras":
         return frontend.keras.Sequential(layers)
     else:
         raise_error(RuntimeError, f"Unknown frontend {frontend}.")
 
 
 def build_activation(frontend, binary=False):
-    if frontend.__name__ == "qiboml.models.pytorch":
+    if frontend.__name__ == "qiboml.interfaces.pytorch":
 
         class Activation(frontend.torch.nn.Module):
             def forward(self, x):
@@ -64,7 +65,7 @@ def build_activation(frontend, binary=False):
                     return np.pi * frontend.torch.nn.functional.tanh(x)
                 return x
 
-    elif frontend.__name__ == "qiboml.models.keras":
+    elif frontend.__name__ == "qiboml.interfaces.keras":
         pass
     else:
         raise_error(RuntimeError, f"Unknown frontend {frontend}.")
@@ -74,13 +75,13 @@ def build_activation(frontend, binary=False):
 
 
 def random_tensor(frontend, shape, binary=False):
-    if frontend.__name__ == "qiboml.models.pytorch":
+    if frontend.__name__ == "qiboml.interfaces.pytorch":
         tensor = (
             frontend.torch.randint(0, 2, shape).double()
             if binary
             else frontend.torch.randn(shape)
         )
-    elif frontend.__name__ == "qiboml.models.keras":
+    elif frontend.__name__ == "qiboml.interfaces.keras":
         tensor = frontend.tf.random.uniform(shape)
     else:
         raise_error(RuntimeError, f"Unknown frontend {frontend}.")
@@ -89,7 +90,7 @@ def random_tensor(frontend, shape, binary=False):
 
 def train_model(frontend, model, data, target):
     max_epochs = 10
-    if frontend.__name__ == "qiboml.models.pytorch":
+    if frontend.__name__ == "qiboml.interfaces.pytorch":
 
         optimizer = frontend.torch.optim.Adam(model.parameters())
         loss_f = frontend.torch.nn.MSELoss()
@@ -114,7 +115,7 @@ def train_model(frontend, model, data, target):
 
         return avg_grad / len(data)
 
-    elif frontend.__name__ == "qiboml.models.keras":
+    elif frontend.__name__ == "qiboml.interfaces.keras":
 
         optimizer = frontend.keras.optimizers.Adam()
         loss_f = frontend.keras.losses.MeanSquaredError()
@@ -131,7 +132,7 @@ def eval_model(frontend, model, data, target=None):
     loss = None
     outputs = []
 
-    if frontend.__name__ == "qiboml.models.pytorch":
+    if frontend.__name__ == "qiboml.interfaces.pytorch":
         loss_f = frontend.torch.nn.MSELoss()
         with frontend.torch.no_grad():
             for x in data:
@@ -139,7 +140,7 @@ def eval_model(frontend, model, data, target=None):
             shape = model(data[0]).shape
         outputs = frontend.torch.vstack(outputs).reshape((data.shape[0],) + shape)
 
-    elif frontend.__name__ == "qiboml.models.keras":
+    elif frontend.__name__ == "qiboml.interfaces.keras":
         loss_f = frontend.keras.losses.MeanSquaredError(
             reduction="sum_over_batch_size",
         )
@@ -154,35 +155,35 @@ def eval_model(frontend, model, data, target=None):
 def set_seed(frontend, seed):
     random.seed(seed)
     np.random.seed(seed)
-    if frontend.__name__ == "qiboml.models.pytorch":
+    if frontend.__name__ == "qiboml.interfaces.pytorch":
         frontend.torch.set_default_dtype(frontend.torch.float64)
         frontend.torch.manual_seed(seed)
 
 
 def random_parameters(frontend, model):
-    if frontend.__name__ == "qiboml.models.pytorch":
+    if frontend.__name__ == "qiboml.interfaces.pytorch":
         new_params = {}
         for k, v in model.state_dict().items():
             new_params.update(
                 {k: v + frontend.torch.randn(v.shape) / 5}
             )  # perturbation of max +- 0.2
             # of the original parameters
-    elif frontend.__name__ == "qiboml.models.keras":
+    elif frontend.__name__ == "qiboml.interfaces.keras":
         new_params = [frontend.tf.random.uniform(model.get_weights()[0].shape)]
     return new_params
 
 
 def get_parameters(frontend, model):
-    if frontend.__name__ == "qiboml.models.pytorch":
+    if frontend.__name__ == "qiboml.interfaces.pytorch":
         return {k: v.clone() for k, v in model.state_dict().items()}
-    elif frontend.__name__ == "qiboml.models.keras":
+    elif frontend.__name__ == "qiboml.interfaces.keras":
         return model.get_weights()
 
 
 def set_parameters(frontend, model, params):
-    if frontend.__name__ == "qiboml.models.pytorch":
+    if frontend.__name__ == "qiboml.interfaces.pytorch":
         model.load_state_dict(params)
-    elif frontend.__name__ == "qiboml.models.keras":
+    elif frontend.__name__ == "qiboml.interfaces.keras":
         model.set_weights(params)
 
 
@@ -210,22 +211,32 @@ def backprop_test(frontend, model, data, target):
 
 @pytest.mark.parametrize("layer,seed", zip(ENCODING_LAYERS, [4, 1]))
 def test_encoding(backend, frontend, layer, seed):
-    if frontend.__name__ == "qiboml.models.keras":
+    if frontend.__name__ == "qiboml.interfaces.keras":
         pytest.skip("keras interface not ready.")
-    if backend.platform not in ("pytorch", "jax"):
-        pytest.skip("Non pytorch/jax differentiation is not working yet.")
 
     set_seed(frontend, seed)
 
     nqubits = 2
     dim = 2
+
     training_layer = ans.ReuploadingCircuit(
         nqubits,
         random_subset(nqubits, dim),
     )
-    decoding_layer = dec.Probabilities(
-        nqubits, random_subset(nqubits, dim), backend=backend
+
+    decoding_qubits = random_subset(nqubits, dim)
+    observable = hamiltonians.SymbolicHamiltonian(
+        sum([Z(int(i)) for i in decoding_qubits]),
+        nqubits=nqubits,
+        backend=backend,
     )
+    decoding_layer = dec.Expectation(
+        nqubits=nqubits,
+        qubits=decoding_qubits,
+        observable=observable,
+        backend=backend,
+    )
+
     encoding_layer = layer(nqubits, random_subset(nqubits, dim))
     binary = True if encoding_layer.__class__.__name__ == "BinaryEncoding" else False
     activation = build_activation(frontend, binary)
@@ -233,7 +244,11 @@ def test_encoding(backend, frontend, layer, seed):
         frontend,
         [
             activation,
-            frontend.QuantumModel(encoding_layer, training_layer, decoding_layer),
+            frontend.QuantumModel(
+                encoding=encoding_layer,
+                circuit=training_layer,
+                decoding=decoding_layer,
+            ),
         ],
     )
 
@@ -247,22 +262,22 @@ def test_encoding(backend, frontend, layer, seed):
         [
             build_linear_layer(frontend, 4, dim),
             q_model,
-            build_linear_layer(frontend, 2**nqubits, 1),
+            build_linear_layer(frontend, 1, 1),
         ],
     )
+
     target = prepare_targets(frontend, model, data)
     backprop_test(frontend, model, data, target)
 
 
-@pytest.mark.parametrize("layer,seed", zip(DECODING_LAYERS, [1, 8, 1, 1]))
-@pytest.mark.parametrize("analytic", [True, False])
-def test_decoding(backend, frontend, layer, seed, analytic):
-    if frontend.__name__ == "qiboml.models.keras":
+@pytest.mark.parametrize("layer,seed", zip(DECODING_LAYERS, [1, 2, 1, 1]))
+def test_decoding(backend, frontend, layer, seed):
+    if frontend.__name__ == "qiboml.interfaces.keras":
         pytest.skip("keras interface not ready.")
-    if backend.platform not in ("pytorch", "jax"):
-        pytest.skip("Non pytorch/jax differentiation is not working yet.")
-    if analytic and not layer is dec.Expectation:
-        pytest.skip("Unused analytic argument.")
+    if not layer.analytic and not layer is dec.Expectation:
+        pytest.skip(
+            "Expectation layer is the only differentiable decoding when the diffrule is not analytical."
+        )
 
     set_seed(frontend, seed)
 
@@ -285,23 +300,35 @@ def test_decoding(backend, frontend, layer, seed, analytic):
             backend=backend,
         )
         kwargs["observable"] = observable
-        kwargs["analytic"] = analytic
-    decoding_layer = layer(nqubits, decoding_qubits, **kwargs)
+        kwargs["nshots"] = None
 
-    if not decoding_layer.analytic:
-        pytest.skip("PSR differentiation is not working yet.")
+    if layer is dec.Samples:
+        kwargs["nshots"] = 1000
+
+    decoding_layer = layer(nqubits, decoding_qubits, **kwargs)
 
     activation = build_activation(frontend, binary=False)
     q_model = build_sequential_model(
         frontend,
         [
             activation,
-            frontend.QuantumModel(encoding_layer, training_layer, decoding_layer),
+            frontend.QuantumModel(
+                encoding=encoding_layer,
+                circuit=training_layer,
+                decoding=decoding_layer,
+            ),
         ],
     )
 
     data = random_tensor(frontend, (100, dim))
+
     target = prepare_targets(frontend, q_model, data)
+
+    if layer is dec.Samples:
+        with pytest.raises(NotImplementedError):
+            _ = backprop_test(frontend, q_model, data, target)
+        pytest.skip("Skipping the rest of the test for Samples decoding.")
+
     backprop_test(frontend, q_model, data, target)
 
     model = build_sequential_model(

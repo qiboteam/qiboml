@@ -5,17 +5,17 @@ from dataclasses import dataclass
 import numpy as np
 import torch
 from qibo import Circuit
-from qibo.backends import Backend, _check_backend
+from qibo.backends import Backend
 from qibo.config import raise_error
 
 from qiboml.models.decoding import QuantumDecoding
 from qiboml.models.encoding import QuantumEncoding
-from qiboml.operations import differentiation as Diff
+from qiboml.operations.differentiation import PSR, Differentiation, Jax
 
-BACKEND_2_DIFFERENTIATION = {
-    "pytorch": None,
-    "qibolab": "PSR",
-    "jax": "Jax",
+DEFAULT_DIFFERENTIATION = {
+    "qiboml-pytorch": None,
+    "qiboml-tensorflow": Jax,
+    "qiboml-jax": Jax,
 }
 
 
@@ -25,7 +25,7 @@ class QuantumModel(torch.nn.Module):
     encoding: QuantumEncoding
     circuit: Circuit
     decoding: QuantumDecoding
-    differentiation: str = "auto"
+    differentiation: Differentiation = None
 
     def __post_init__(
         self,
@@ -33,24 +33,32 @@ class QuantumModel(torch.nn.Module):
         super().__init__()
 
         params = [p for param in self.circuit.get_parameters() for p in param]
-        params = torch.as_tensor(self.backend.to_numpy(params)).ravel()
+        params = torch.as_tensor(self.backend.to_numpy(x=params)).ravel()
         params.requires_grad = True
         self.circuit_parameters = torch.nn.Parameter(params)
 
-        if self.differentiation == "auto":
-            self.differentiation = BACKEND_2_DIFFERENTIATION.get(
-                self.backend.platform, "PSR"
-            )
+        backend_string = (
+            f"{self.decoding.backend.name}-{self.decoding.backend.platform}"
+            if self.decoding.backend.platform is not None
+            else self.decoding.backend.name
+        )
 
-        if self.differentiation is not None:
-            self.differentiation = getattr(Diff, self.differentiation)()
+        if self.differentiation is None:
+            if not self.decoding.analytic:
+                self.differentiation = PSR()
+            else:
+                if backend_string in DEFAULT_DIFFERENTIATION.keys():
+                    diff = DEFAULT_DIFFERENTIATION[backend_string]
+                    self.differentiation = diff() if diff is not None else None
+                else:
+                    self.differentiation = PSR()
 
     def forward(self, x: torch.Tensor):
-        if (
-            self.backend.platform != "pytorch"
-            or self.differentiation is not None
-            or not self.decoding.analytic
-        ):
+        if self.differentiation is None:
+            self.circuit.set_parameters(list(self.parameters())[0])
+            x = self.encoding(x) + self.circuit
+            x = self.decoding(x)
+        else:
             x = QuantumModelAutoGrad.apply(
                 x,
                 self.encoding,
@@ -60,10 +68,6 @@ class QuantumModel(torch.nn.Module):
                 self.differentiation,
                 *list(self.parameters())[0],
             )
-        else:
-            self.circuit.set_parameters(list(self.parameters())[0])
-            x = self.encoding(x) + self.circuit
-            x = self.decoding(x)
         return x
 
     @property
