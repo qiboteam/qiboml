@@ -14,8 +14,8 @@ from qiboml.operations.differentiation import PSR, Differentiation, Jax
 
 DEFAULT_DIFFERENTIATION = {
     "qiboml-pytorch": None,
-    "qiboml-tensorflow": Jax(),
-    "qiboml-jax": Jax(),
+    "qiboml-tensorflow": Jax,
+    "qiboml-jax": Jax,
 }
 
 
@@ -48,7 +48,8 @@ class QuantumModel(torch.nn.Module):
                 self.differentiation = PSR()
             else:
                 if backend_string in DEFAULT_DIFFERENTIATION.keys():
-                    self.differentiation = DEFAULT_DIFFERENTIATION[backend_string]
+                    diff = DEFAULT_DIFFERENTIATION[backend_string]
+                    self.differentiation = diff() if diff is not None else None
                 else:
                     self.differentiation = PSR()
 
