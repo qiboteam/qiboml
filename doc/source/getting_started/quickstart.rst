@@ -27,7 +27,9 @@ Therefore, building a ``qiboml`` model is rather immediate. For instance using t
    decoding = Probabilities(nqubits=3)
    # build the computation circuit
    circuit = Circuit(3)
-   circuit.add((gates.RZ(i, theta=torch.pi * torch.randn(1)) for i in range(3)))
+   circuit.add((gates.H(i) for i in range(3)))
+   circuit.add((gates.CNOT(0,1), gates.CNOT(0,2)))
+   circuit.draw()
    # join everything together through the torch interface
    quantum_model = QuantumModel(encoding, circuit, decoding)
    # run on some data
