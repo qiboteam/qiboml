@@ -1,7 +1,7 @@
-Switching ML interface
-----------------------
+Switching the ML Interface
+--------------------------
 
-In addition to the ``torch`` interface (:class:`qibmol.interfaces.pytorch.QuantumModel`) showcased in the previous section, a ``keras`` based interface is available as well (:class:`qibmol.interfaces.keras.QuantumModel`). Similarly to ``torch``, this exposes a ``keras.Model`` object that can be easily integrated in ``keras`` pipelines.
+In addition to the ``torch`` interface (:py:class:`qibmol.interfaces.pytorch.QuantumModel`) showcased in the previous section, a ``keras`` based interface is available as well (:py:class:`qibmol.interfaces.keras.QuantumModel`). Similarly to ``torch``, this exposes a ``keras.Model`` object that can be easily integrated in ``keras`` pipelines.
 
 In order to switch between the two interfaces, one can just make use of the corresponding ``QuantumModel`` object:
 
@@ -33,3 +33,13 @@ Note that, since the pre-defined encoding, decoding and ansatz layers provided i
    torch_model = pt.QuantumModel(encoding, circuit, decoding)
    # build the keras model
    keras_model = ks.QuantumModel(encoding, circuit, decoding)
+
+As it happens for ``torch``, the ``keras_model`` object can then be used in combination with the ``keras`` API, e.g. stacking layers through the ``keras.Sequential`` or training with the ``keras.optimizers``:
+
+.. testcode::
+
+   import keras
+
+   opt = keras.optimizers.Adam(learning_rate=0.01)
+   keras_model.compile(loss='categorical_crossentropy', optimizer=opt)
+   keras_model.fit(...)
