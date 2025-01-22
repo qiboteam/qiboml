@@ -36,6 +36,9 @@ class QuantumModel(torch.nn.Module):
         params = torch.as_tensor(self.backend.to_numpy(x=params)).ravel()
         params.requires_grad = True
         self.circuit_parameters = torch.nn.Parameter(params)
+        # This is used to know if the non-differentiable gates have been marked
+        # so to reduce the computational cost of hardware-compatible differentiation
+        self._differentiability_checked = False
 
         backend_string = (
             f"{self.decoding.backend.name}-{self.decoding.backend.platform}"
@@ -59,6 +62,15 @@ class QuantumModel(torch.nn.Module):
             x = self.encoding(x) + self.circuit
             x = self.decoding(x)
         else:
+            # Also for the first iteration, marking which gates are differentiable
+            if not self._differentiability_checked:
+                self._mark_differentiable_angles(
+                    circuit=self.encoding(x) + self.circuit,
+                    differentiate_wrt_data=False,  # TODO: expose this feature if we think it's useful
+                )
+                # Inform the model the check is done
+                self._differentiability_checked = True
+
             x = QuantumModelAutoGrad.apply(
                 x,
                 self.encoding,
@@ -85,6 +97,27 @@ class QuantumModel(torch.nn.Module):
     @property
     def output_shape(self):
         return self.decoding.output_shape
+
+    def _mark_differentiable_angles(self, circuit, differentiate_wrt_data=False):
+        """
+        Check circuit's parameters and identify which, among them, are not differentiable.
+        This will be useful to reduce the computational cost of the parameter shift
+        rule, by avoiding the computation of gradients w.r.t. input data.
+        The distinction is made by setting the gates containing non differentiable
+        angles as `trainable=False` within Qibo.
+
+        Args:
+            circuit (qibo.Circuit): qibo circuit to be checked.
+            differentiate_wrt_data (bool): if True, gradient w.r.t. input data
+                are computed as well. Default to `False`.
+        """
+
+        if not differentiate_wrt_data:
+            for gate in circuit.parametrized_gates:
+                if any(param.requires_grad == True for param in gate.parameters):
+                    gate.trainable = True
+                else:
+                    gate.trainable = False
 
 
 class QuantumModelAutoGrad(torch.autograd.Function):

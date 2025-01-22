@@ -56,16 +56,19 @@ class PSR(Differentiation):
         )
 
         # compute second gradient part, wrt parameters
-        for i in range(len(parameters)):
-            gradient.append(
-                self.one_parameter_shift(
-                    circuit=circuit,
-                    decoding=decoding,
-                    parameters=parameters,
-                    parameter_index=i,
-                    backend=backend,
+        for i, gate in enumerate(len(circuit.trainable_gates)):
+            if gate.trainable:
+                gradient.append(
+                    self.one_parameter_shift(
+                        circuit=circuit,
+                        decoding=decoding,
+                        parameters=parameters,
+                        parameter_index=i,
+                        backend=backend,
+                    )
                 )
-            )
+            else:
+                gradient.append(0.0)
         return gradient
 
     def one_parameter_shift(
