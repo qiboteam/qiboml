@@ -32,9 +32,6 @@ def test_expectation_layer(backend, nshots):
     backend.set_seed(42)
     rng = np.random.default_rng(42)
     nqubits = 5
-    # test observable error
-    with pytest.raises(RuntimeError):
-        layer = dec.Expectation(nqubits, backend=backend)
 
     c = random_clifford(nqubits, seed=rng, backend=backend)
     observable = hamiltonians.SymbolicHamiltonian(

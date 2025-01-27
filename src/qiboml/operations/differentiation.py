@@ -164,25 +164,27 @@ class Jax(Differentiation):
                 self,
                 "_jacobian",
                 partial(jax.jit, static_argnums=(1, 2, 3))(
-                    jax.jacfwd(self._run, (0,) + self._argnums)
+                    jax.jacfwd(self._run, (0,) + self._argnums),
                 ),
             )
             setattr(
                 self,
                 "_jacobian_without_inputs",
                 partial(jax.jit, static_argnums=(1, 2, 3))(
-                    jax.jacfwd(self._run, self._argnums)
+                    jax.jacfwd(self._run, self._argnums),
                 ),
             )
         parameters = backend.to_numpy(list(parameters))
         parameters = self._jax.cast(parameters, parameters.dtype)
         decoding.set_backend(self._jax)
         if wrt_inputs:
-            gradients = self._jacobian(x, encoding, circuit, decoding, *parameters)
+            gradients = self._jacobian(
+                x, encoding, circuit, decoding, *parameters
+            )  # pylint: disable=no-member
         else:
             gradients = (
                 self._jax.numpy.zeros((decoding.output_shape[-1], x.shape[-1])),
-                self._jacobian_without_inputs(
+                self._jacobian_without_inputs(  # pylint: disable=no-member
                     x, encoding, circuit, decoding, *parameters
                 ),
             )

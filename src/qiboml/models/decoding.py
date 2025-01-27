@@ -4,7 +4,7 @@ from typing import Union
 from qibo import Circuit, gates
 from qibo.backends import Backend, _check_backend
 from qibo.config import raise_error
-from qibo.hamiltonians import Hamiltonian
+from qibo.hamiltonians import Hamiltonian, Z
 
 from qiboml import ndarray
 
@@ -13,14 +13,15 @@ from qiboml import ndarray
 class QuantumDecoding:
 
     nqubits: int
-    qubits: list[int] = None
+    qubits: tuple[int] = None
     nshots: int = None
     backend: Backend = None
     _circuit: Circuit = None
 
     def __post_init__(self):
-        if self.qubits is None:
-            self.qubits = list(range(self.nqubits))
+        self.qubits = (
+            tuple(range(self.nqubits)) if self.qubits is None else tuple(self.qubits)
+        )
         self._circuit = Circuit(self.nqubits)
         self.backend = _check_backend(self.backend)
         self._circuit.add(gates.M(*self.qubits))
@@ -47,8 +48,10 @@ class QuantumDecoding:
             return True
         return False
 
+    def __hash__(self) -> int:
+        return hash((self.qubits, self.nshots, self.backend))
 
-@dataclass
+
 class Probabilities(QuantumDecoding):
     # TODO: collapse on ExpectationDecoding if not analytic
 
@@ -71,10 +74,7 @@ class Expectation(QuantumDecoding):
 
     def __post_init__(self):
         if self.observable is None:
-            raise_error(
-                RuntimeError,
-                "Please provide an observable for expectation value calculation.",
-            )
+            self.observable = Z(self.nqubits, dense=True, backend=self.backend)
         super().__post_init__()
 
     def __call__(self, x: Circuit) -> ndarray:
@@ -96,8 +96,10 @@ class Expectation(QuantumDecoding):
         super().set_backend(backend)
         self.observable.backend = backend
 
+    def __hash__(self) -> int:
+        return hash((self.qubits, self.nshots, self.backend, self.observable))
 
-@dataclass
+
 class State(QuantumDecoding):
 
     def __call__(self, x: Circuit) -> ndarray:
@@ -115,7 +117,6 @@ class State(QuantumDecoding):
         return True
 
 
-@dataclass
 class Samples(QuantumDecoding):
 
     def __post_init__(self):
