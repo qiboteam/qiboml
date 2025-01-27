@@ -40,7 +40,16 @@ class PSR(Differentiation):
     rules.
     """
 
-    def evaluate(self, x: ndarray, encoding, training, decoding, backend, *parameters):
+    def evaluate(
+        self,
+        x: ndarray,
+        encoding,
+        training,
+        decoding,
+        backend,
+        *parameters,
+        wrt_inputs: bool = False,
+    ):
         if decoding.output_shape != (1, 1):
             raise_error(
                 NotImplementedError,
@@ -49,11 +58,17 @@ class PSR(Differentiation):
         # construct circuit
         circuit = encoding(x) + training
 
-        # compute first gradient part, wrt data
-        gradient = self.gradient_from_data(
-            data=x,
-            backend=backend,
-        )
+        if wrt_inputs:
+            # compute first gradient part, wrt data
+            gradient = self.gradient_wrt_inputs(
+                x,
+                encoding,
+                circuit,
+                decoding,
+                backend=backend,
+            )
+        else:
+            gradient = np.zeros(x.shape).tolist()
 
         # compute second gradient part, wrt parameters
         for i in range(len(parameters)):
@@ -88,17 +103,21 @@ class PSR(Differentiation):
         backward = decoding(circuit)
         return generator_eigenval * (forward - backward)
 
-    def gradient_from_data(
+    def gradient_wrt_inputs(
         self,
-        data,
+        x,
+        encoding,
+        circuit,
+        decoding,
         backend,
     ):
-        """
-        Pad the gradient w.r.t. inputs.
-        """
-        # TODO: adapt this to the discussed strategy
-        x_size = backend.to_numpy(data).size
-        return [np.array([[(0.0,) * x_size]])]
+        shift = 1e-2
+        gradient = []
+        for input in x:
+            forward = encoding(input + shift) + circuit
+            backward = encoding(input - shift) + circuit
+            gradient.append(decoding(forward) - decoding(backward))
+        return gradient
 
     @staticmethod
     def shift_parameter(parameters, i, epsilon, backend):
@@ -123,8 +142,16 @@ class Jax(Differentiation):
         self._argnums: list[int] = None
         self._circuit = None
 
-    def evaluate(self, x: ndarray, encoding, training, decoding, backend, *parameters):
-        binary = isinstance(encoding, BinaryEncoding)
+    def evaluate(
+        self,
+        x: ndarray,
+        encoding,
+        training,
+        decoding,
+        backend,
+        *parameters,
+        wrt_inputs: bool = False,
+    ):
         x = backend.to_numpy(x)
         x = self._jax.cast(x, self._jax.precision)
         if self._argnums is None:
@@ -137,14 +164,14 @@ class Jax(Differentiation):
             )
         parameters = backend.to_numpy(list(parameters))
         parameters = self._jax.cast(parameters, parameters.dtype)
-        if binary:
+        if wrt_inputs:
             self._circuit = encoding(x) + training
         else:
             self._encoding = encoding
             self._training = training
         self._decoding = decoding
         self._decoding.set_backend(self._jax)
-        if binary:
+        if wrt_inputs:
             gradients = (
                 self._jax.numpy.zeros((decoding.output_shape[-1], x.shape[-1])),
                 self._jacobian_without_inputs(*parameters),  # pylint: disable=no-member

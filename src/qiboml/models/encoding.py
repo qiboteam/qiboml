@@ -32,6 +32,10 @@ class QuantumEncoding(ABC):
     ):
         return self._circuit
 
+    @property
+    def differentiable(self):
+        return True
+
 
 @dataclass
 class PhaseEncoding(QuantumEncoding):
@@ -65,3 +69,7 @@ class BinaryEncoding(QuantumEncoding):
         for qubit, bit in zip(self.qubits, x.ravel()):
             circuit.add(gates.RX(qubit, theta=bit * np.pi, trainable=False))
         return circuit
+
+    @property
+    def differentiable(self):
+        return False
