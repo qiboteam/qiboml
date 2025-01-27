@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from functools import partial
 
 import jax
 import numpy as np
@@ -139,17 +140,17 @@ class Jax(Differentiation):
 
     def __init__(self):
         self._jax: Backend = JaxBackend()
-        self._encoding = None
-        self._training: Circuit = None
-        self._decoding: QuantumDecoding = None
-        self._argnums: list[int] = None
-        self._circuit = None
+        # self._encoding = None
+        # self._training: Circuit = None
+        # self._decoding: QuantumDecoding = None
+        self._argnums: tuple[int] = None
+        # self._circuit = None
 
     def evaluate(
         self,
         x: ndarray,
         encoding,
-        training,
+        circuit,
         decoding,
         backend,
         *parameters,
@@ -158,15 +159,34 @@ class Jax(Differentiation):
         x = backend.to_numpy(x)
         x = self._jax.cast(x, self._jax.precision)
         if self._argnums is None:
-            self._argnums = range(len(parameters) + 1)
-            setattr(self, "_jacobian", jax.jit(jax.jacfwd(self._run, self._argnums)))
+            self._argnums = tuple(range(4, len(parameters) + 4))
+            setattr(
+                self,
+                "_jacobian",
+                partial(jax.jit, static_argnums=(1, 2, 3))(
+                    jax.jacfwd(self._run, (0,) + self._argnums)
+                ),
+            )
             setattr(
                 self,
                 "_jacobian_without_inputs",
-                jax.jit(jax.jacfwd(self._run_without_inputs, self._argnums[:-1])),
+                partial(jax.jit, static_argnums=(1, 2, 3))(
+                    jax.jacfwd(self._run, self._argnums)
+                ),
             )
         parameters = backend.to_numpy(list(parameters))
         parameters = self._jax.cast(parameters, parameters.dtype)
+        decoding.set_backend(self._jax)
+        if wrt_inputs:
+            gradients = self._jacobian(x, encoding, circuit, decoding, *parameters)
+        else:
+            gradients = (
+                self._jax.numpy.zeros((decoding.output_shape[-1], x.shape[-1])),
+                self._jacobian_without_inputs(
+                    x, encoding, circuit, decoding, *parameters
+                ),
+            )
+        """
         if not wrt_inputs:
             self._circuit = encoding(x) + training
         else:
@@ -181,17 +201,22 @@ class Jax(Differentiation):
             )
         else:
             gradients = self._jacobian(x, *parameters)  # pylint: disable=no-member
+        """
         decoding.set_backend(backend)
         return [
             backend.cast(self._jax.to_numpy(grad).tolist(), backend.precision)
             for grad in gradients
         ]
 
-    def _run(self, x, *parameters):
-        circuit = self._encoding(x) + self._training
+    @staticmethod
+    @partial(jax.jit, static_argnums=(1, 2, 3))
+    def _run(x, encoding, circuit, decoding, *parameters):
+        circuit = encoding(x) + circuit
         circuit.set_parameters(parameters)
-        return self._decoding(circuit)
+        return decoding(circuit)
 
+    """
     def _run_without_inputs(self, *parameters):
         self._circuit.set_parameters(parameters)
         return self._decoding(self._circuit)
+    """
