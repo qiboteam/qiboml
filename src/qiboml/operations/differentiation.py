@@ -58,17 +58,20 @@ class PSR(Differentiation):
         # construct circuit
         circuit = encoding(x) + training
 
+        gradient = []
         if wrt_inputs:
             # compute first gradient part, wrt data
-            gradient = self.gradient_wrt_inputs(
-                x,
-                encoding,
-                circuit,
-                decoding,
-                backend=backend,
+            gradient.append(
+                self.gradient_wrt_inputs(
+                    x,
+                    encoding,
+                    circuit,
+                    decoding,
+                    backend=backend,
+                )
             )
         else:
-            gradient = np.zeros(x.shape).tolist()
+            gradient.append(backend.np.zeros((decoding.output_shape[-1], x.shape[-1])))
 
         # compute second gradient part, wrt parameters
         for i in range(len(parameters)):
@@ -164,14 +167,14 @@ class Jax(Differentiation):
             )
         parameters = backend.to_numpy(list(parameters))
         parameters = self._jax.cast(parameters, parameters.dtype)
-        if wrt_inputs:
+        if not wrt_inputs:
             self._circuit = encoding(x) + training
         else:
             self._encoding = encoding
             self._training = training
         self._decoding = decoding
         self._decoding.set_backend(self._jax)
-        if wrt_inputs:
+        if not wrt_inputs:
             gradients = (
                 self._jax.numpy.zeros((decoding.output_shape[-1], x.shape[-1])),
                 self._jacobian_without_inputs(*parameters),  # pylint: disable=no-member
