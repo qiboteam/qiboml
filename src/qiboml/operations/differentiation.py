@@ -178,9 +178,9 @@ class Jax(Differentiation):
         parameters = self._jax.cast(parameters, parameters.dtype)
         decoding.set_backend(self._jax)
         if wrt_inputs:
-            gradients = self._jacobian(
+            gradients = self._jacobian(  # pylint: disable=no-member
                 x, encoding, circuit, decoding, *parameters
-            )  # pylint: disable=no-member
+            )
         else:
             gradients = (
                 self._jax.numpy.zeros((decoding.output_shape[-1], x.shape[-1])),
