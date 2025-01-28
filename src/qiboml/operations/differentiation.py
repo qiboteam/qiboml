@@ -68,7 +68,6 @@ class PSR(Differentiation):
                     encoding,
                     circuit,
                     decoding,
-                    backend=backend,
                 )
             )
         else:
@@ -113,11 +112,11 @@ class PSR(Differentiation):
         encoding,
         circuit,
         decoding,
-        backend,
     ):
-        shift = 1e-2
+        gates = encoding(input).queue
         gradient = []
-        for input in x:
+        for input, gate in zip(x, gates):
+            shift = np.pi / (4 * gate.generator_eigenvalue())
             forward = encoding(input + shift) + circuit
             backward = encoding(input - shift) + circuit
             gradient.append(decoding(forward) - decoding(backward))

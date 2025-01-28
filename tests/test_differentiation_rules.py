@@ -4,6 +4,7 @@ import torch
 from qibo import hamiltonians
 from qibo.backends import NumpyBackend
 from qibojit.backends import NumbaBackend
+from test_models_interfaces import build_activation, build_sequential_model
 
 from qiboml.backends import PyTorchBackend
 from qiboml.models.ansatze import ReuploadingCircuit
@@ -14,7 +15,10 @@ from qiboml.operations.differentiation import PSR
 # TODO: use the classical conftest mechanism or customize mechanism for this test
 EXECUTION_BACKENDS = [NumbaBackend(), NumpyBackend(), PyTorchBackend()]
 
-TARGET_GRAD = np.array([0.130832955241203, 0.0, -1.806316614151001, 0.0])
+TARGET_GRAD = {
+    "no_activation": np.array([0.130832955241203, 0.0, -1.806316614151001, 0.0]),
+    "with_activation": np.array([0.94183249, 0.0, 0.24366996, 0.0]),
+}
 
 torch.set_default_dtype(torch.float64)
 torch.set_printoptions(precision=15, sci_mode=False)
@@ -44,7 +48,8 @@ def compute_gradient(frontend, model, x):
 
 @pytest.mark.parametrize("nshots", [None, 500000])
 @pytest.mark.parametrize("backend", EXECUTION_BACKENDS)
-def test_expval_grad_PSR(frontend, backend, nshots):
+@pytest.mark.parametrize("activation", [True, False])
+def test_expval_grad_PSR(frontend, backend, nshots, activation):
     """
     Compute test gradient of < 0 | model^dag observable model | 0 > w.r.t model's
     parameters. In this test the system size is fixed to two qubits and all the
@@ -86,11 +91,17 @@ def test_expval_grad_PSR(frontend, backend, nshots):
         differentiation=PSR(),
     )
 
+    target_grad = TARGET_GRAD["no_activation"]
+    if activation:
+        activation = build_activation(frontend)
+        q_model = build_sequential_model(frontend, [activation, q_model])
+        target_grad = TARGET_GRAD["with_activation"]
+
     grad = compute_gradient(frontend, q_model, x)
 
     assert np.round(grad[0], decimals=decimals) == np.round(
-        TARGET_GRAD[0], decimals=decimals
+        target_grad[0], decimals=decimals
     )
     assert np.round(grad[2], decimals=decimals) == np.round(
-        TARGET_GRAD[2], decimals=decimals
+        target_grad[2], decimals=decimals
     )
