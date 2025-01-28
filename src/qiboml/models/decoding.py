@@ -74,7 +74,7 @@ class Expectation(QuantumDecoding):
 
     def __post_init__(self):
         if self.observable is None:
-            self.observable = Z(self.nqubits, dense=True, backend=self.backend)
+            self.observable = Z(self.nqubits, dense=False, backend=self.backend)
         super().__post_init__()
 
     def __call__(self, x: Circuit) -> ndarray:
