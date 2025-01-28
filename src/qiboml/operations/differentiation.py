@@ -144,11 +144,7 @@ class Jax(Differentiation):
 
     def __init__(self):
         self._jax: Backend = JaxBackend()
-        # self._encoding = None
-        # self._training: Circuit = None
-        # self._decoding: QuantumDecoding = None
         self._argnums: tuple[int] = None
-        # self._circuit = None
 
     def evaluate(
         self,
@@ -192,22 +188,6 @@ class Jax(Differentiation):
                     x, encoding, circuit, decoding, *parameters
                 ),
             )
-        """
-        if not wrt_inputs:
-            self._circuit = encoding(x) + training
-        else:
-            self._encoding = encoding
-            self._training = training
-        self._decoding = decoding
-        self._decoding.set_backend(self._jax)
-        if not wrt_inputs:
-            gradients = (
-                self._jax.numpy.zeros((decoding.output_shape[-1], x.shape[-1])),
-                self._jacobian_without_inputs(*parameters),  # pylint: disable=no-member
-            )
-        else:
-            gradients = self._jacobian(x, *parameters)  # pylint: disable=no-member
-        """
         decoding.set_backend(backend)
         return [
             backend.cast(self._jax.to_numpy(grad).tolist(), backend.precision)
@@ -220,9 +200,3 @@ class Jax(Differentiation):
         circuit = encoding(x) + circuit
         circuit.set_parameters(parameters)
         return decoding(circuit)
-
-    """
-    def _run_without_inputs(self, *parameters):
-        self._circuit.set_parameters(parameters)
-        return self._decoding(self._circuit)
-    """
