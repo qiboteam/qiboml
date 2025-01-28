@@ -4,7 +4,6 @@ import torch
 from qibo import hamiltonians
 from qibo.backends import NumpyBackend
 from qibojit.backends import NumbaBackend
-from test_models_interfaces import build_activation, build_sequential_model
 
 from qiboml.backends import PyTorchBackend
 from qiboml.models.ansatze import ReuploadingCircuit
@@ -15,18 +14,22 @@ from qiboml.operations.differentiation import PSR
 # TODO: use the classical conftest mechanism or customize mechanism for this test
 EXECUTION_BACKENDS = [NumbaBackend(), NumpyBackend(), PyTorchBackend()]
 
+TARGET_GRAD = np.array([0.130832955241203, 0.0, -1.806316614151001, 0.0])
 TARGET_GRAD = {
-    "no_activation": np.array([0.130832955241203, 0.0, -1.806316614151001, 0.0]),
-    "with_activation": np.array([0.94183249, 0.0, 0.24366996, 0.0]),
+    "no_inputs": np.array([0.130832955241203, 0.0, -1.806316614151001, 0.0]),
+    "wrt_inputs": np.array([0.0257030516, 0.0, -0.948796222, 0.0]),
 }
 
 torch.set_default_dtype(torch.float64)
 torch.set_printoptions(precision=15, sci_mode=False)
 
 
-def construct_x(frontend):
+def construct_x(frontend, with_factor=False):
     if frontend.__name__ == "qiboml.interfaces.pytorch":
-        return frontend.torch.tensor([0.5, 0.8])
+        x = frontend.torch.tensor([0.5, 0.8])
+        if with_factor:
+            return torch.tensor(2.0, requires_grad=True) * x
+        return x
     elif frontend.__name__ == "qiboml.interfaces.keras":
         return frontend.tf.Variable([0.5, 0.8])
 
@@ -46,10 +49,10 @@ def compute_gradient(frontend, model, x):
         return grad
 
 
-@pytest.mark.parametrize("nshots", [None, 500000])
+@pytest.mark.parametrize("nshots", [None, 600000])
 @pytest.mark.parametrize("backend", EXECUTION_BACKENDS)
-@pytest.mark.parametrize("activation", [True, False])
-def test_expval_grad_PSR(frontend, backend, nshots, activation):
+@pytest.mark.parametrize("wrt_inputs", [True, False])
+def test_expval_grad_PSR(frontend, backend, nshots, wrt_inputs):
     """
     Compute test gradient of < 0 | model^dag observable model | 0 > w.r.t model's
     parameters. In this test the system size is fixed to two qubits and all the
@@ -65,7 +68,7 @@ def test_expval_grad_PSR(frontend, backend, nshots, activation):
 
     frontend.np.random.seed(42)
 
-    x = construct_x(frontend)
+    x = construct_x(frontend, with_factor=wrt_inputs)
 
     nqubits = 2
 
@@ -91,11 +94,7 @@ def test_expval_grad_PSR(frontend, backend, nshots, activation):
         differentiation=PSR(),
     )
 
-    target_grad = TARGET_GRAD["no_activation"]
-    if activation:
-        activation = build_activation(frontend)
-        q_model = build_sequential_model(frontend, [activation, q_model])
-        target_grad = TARGET_GRAD["with_activation"]
+    target_grad = TARGET_GRAD["wrt_inputs"] if wrt_inputs else TARGET_GRAD["no_inputs"]
 
     grad = compute_gradient(frontend, q_model, x)
 

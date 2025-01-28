@@ -63,11 +63,16 @@ class PSR(Differentiation):
         if wrt_inputs:
             # compute first gradient part, wrt data
             gradient.append(
-                self.gradient_wrt_inputs(
-                    x,
-                    encoding,
-                    circuit,
-                    decoding,
+                backend.np.reshape(
+                    backend.np.hstack(
+                        self.gradient_wrt_inputs(
+                            x,
+                            encoding,
+                            circuit,
+                            decoding,
+                        )
+                    ),
+                    (decoding.output_shape[-1], x.shape[-1]),
                 )
             )
         else:
@@ -113,7 +118,7 @@ class PSR(Differentiation):
         circuit,
         decoding,
     ):
-        gates = encoding(input).queue
+        gates = encoding(x).queue
         gradient = []
         for input, gate in zip(x, gates):
             shift = np.pi / (4 * gate.generator_eigenvalue())
