@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import Optional
 
 import numpy as np
 from qibo import Circuit, gates
@@ -12,14 +13,16 @@ from qiboml import ndarray
 class QuantumEncoding(ABC):
 
     nqubits: int
-    qubits: list[int] = None
+    qubits: Optional[tuple[int]] = None
     _circuit: Circuit = None
 
     def __post_init__(
         self,
     ):
-        if self.qubits is None:
-            self.qubits = list(range(self.nqubits))
+        self.qubits = (
+            tuple(range(self.nqubits)) if self.qubits is None else tuple(self.qubits)
+        )
+
         self._circuit = Circuit(self.nqubits)
 
     @abstractmethod
@@ -32,8 +35,14 @@ class QuantumEncoding(ABC):
     ):
         return self._circuit
 
+    @property
+    def differentiable(self):
+        return True
 
-@dataclass
+    def __hash__(self) -> int:
+        return hash(self.qubits)
+
+
 class PhaseEncoding(QuantumEncoding):
 
     def __post_init__(
@@ -52,7 +61,6 @@ class PhaseEncoding(QuantumEncoding):
         return self._circuit
 
 
-@dataclass
 class BinaryEncoding(QuantumEncoding):
 
     def __call__(self, x: ndarray) -> Circuit:
@@ -65,3 +73,7 @@ class BinaryEncoding(QuantumEncoding):
         for qubit, bit in zip(self.qubits, x.ravel()):
             circuit.add(gates.RX(qubit, theta=bit * np.pi, trainable=False))
         return circuit
+
+    @property
+    def differentiable(self):
+        return False
