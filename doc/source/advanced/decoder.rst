@@ -13,24 +13,52 @@ Hence, the decoder is a function :math:`f_d: C \rightarrow \mathbf{y}\in\mathbb{
         H = - \sum _{k=0}^{N} \, \left(Z_{k} \, Z_{k + 1} + h \, X_{k}\right) \, ,
 
 on the final state of our system.
-Handily ``qibo`` provides the implementation for the hamiltonian already, thus we only need to create a decoding layer that constructs the hamiltonian, executes circuit and calculates the expecation value:
+Handily ``qibo`` provides the implementation for the hamiltonian already, thus we only need to create a decoding layer that constructs the hamiltonian, executes the circuit and calculates the expecation value:
 
 .. testcode::
 
+   from qibo import Circuit
    from qiboml.models.decoding import QuantumDecoding
    from qibo.hamiltonian.models import TFIM
 
    class ExpectationTFIM(QuantumDecoding):
 
-       def __init__(self, nqubits):
+       def __init__(self, nqubits: int):
            super().__init__(nqubits)
 
 	   # build the hamiltionan
 	   self.observable = TFIM(nqubits)
 
-       def __call__(self, x):
-           final_state = super().__call__(x)
-	   return self.observable.expectation(final_state)
+       def __call__(self, x: Circuit):
+           result = super().__call__(x)
+	   return self.observable.expectation(result.state())
 
+       @property
+       def output_shape(self) -> tuple(int):
+           (1, 1)
 
-TODO: add more comments on the backend used and what the abstract class does...
+The ``super().__init__`` and ``super().__call__`` calls here are useful to simplify the implementation of the custom decoder. The ``super().__init__`` sets up the initial features needed, i.e. mainly an empty ``nqubits`` ``qibo.Circuit`` with a measurement appended on each qubit. Whereas, the ``super().__call__`` takes care of executing the ``qibo.Circuit`` passed as input ``x`` and returns a ``qibo.result`` object, hence one in ``(QuantumState, MeasurementOutcomes, CircuitResult)``.
+
+In case you needed an even more fine-grained customization, you could always get rid of them and fully customize the initialization and call of the decoder. However, keep in mind that in order for a decoder to correctly work inside a ``qiboml`` pipeline, several components should be defined:
+
+* A ``qibo`` compatible ``Backend``:
+
+  if not manually specified, the :py:meth:`qiboml.models.decoding.QuantumDecoding.__init__` prepares the globally set backend and assigns it to its attribute :py:attr:`qiboml.models.decoding.QuantumDecoding.backend`, which is then used to execute the circuit inside of :py:meth:`qiboml.models.decoding.QuantumDecoding.__call__`. Therefore, make sure that at all times your custom decoder is provided with a valid ``Backend`` through its ``.backend`` attribute, and, moreover, that this backend choice is consistent in all the elements that care about it. For instance, in this example, even the ``TFIM`` object allows for backend specification and a mismatch between the decoder's and hamiltonian's backend may result in several problems.
+
+.. code::
+
+   class ExpectationTFIMCustomBackend(QuantumDecoding):
+
+       # always use my custom backend for execution and
+       # expectation value calculation
+       def __init__(self, nqubits: int):
+           self.backend = MyCustomBackend()
+
+	   # build the hamiltionan, the backends should match!
+	   self.observable = TFIM(nqubits, backend=self.backend)
+
+       def __call__(self, x: Circuit):
+           result = self.backend.execute_circuit(x)
+	   return self.observable.expectation(result.state())
+
+* Is it `analytically` differentiable?

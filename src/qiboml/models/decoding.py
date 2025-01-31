@@ -5,6 +5,7 @@ from qibo import Circuit, gates
 from qibo.backends import Backend, _check_backend
 from qibo.config import raise_error
 from qibo.hamiltonians import Hamiltonian
+from qibo.result import CircuitResult, MeasurementOutcomes, QuantumState
 
 from qiboml import ndarray
 
@@ -25,7 +26,9 @@ class QuantumDecoding:
         self.backend = _check_backend(self.backend)
         self._circuit.add(gates.M(*self.qubits))
 
-    def __call__(self, x: Circuit) -> "CircuitResult":
+    def __call__(
+        self, x: Circuit
+    ) -> Union[CircuitResult, QuantumState, MeasurementOutcomes]:
         return self.backend.execute_circuit(x + self._circuit, nshots=self.nshots)
 
     @property
