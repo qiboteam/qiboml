@@ -56,7 +56,7 @@ class Probabilities(QuantumDecoding):
     # TODO: collapse on ExpectationDecoding if not analytic
 
     def __call__(self, x: Circuit) -> ndarray:
-        return super().__call__(x).probabilities()
+        return super().__call__(x).probabilities(self.qubits)
 
     @property
     def output_shape(self):
