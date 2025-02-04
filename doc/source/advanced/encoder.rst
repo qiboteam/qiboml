@@ -7,12 +7,43 @@ For instance, basic examples of this can be found in the :py:class:`qiboml.model
 
 Hence, broadly speaking, the quantum `Encoder` is a function :math:`f_e: \mathbf{x}\in\mathbb{R}^n \rightarrow C` that maps an input array of floats :math:`\mathbf{x}`, be it a ``torch.Tensor`` for the :py:class:`qiboml.interfaces.pytorch.QuantumModel` or a ``tensorflow.Tensor`` for the :py:class:`qiboml.interfaces.keras.QuantumModel`, to an instance of a ``qibo.Circuit`` :math:`C`.
 
-To define a custom encoder, then, one only has to write a custom function like that. Let's take as an example the amplitude encoding, whch aims at embedding the input data in the amplitudes of our quantum state.
-
-In particular, a practical realization of this can be achieved, for instance, through the Mottonen state preparation (`Mottonen et al. (2004) <https://arxiv.org/abs/quant-ph/0407010>`_). The idea is to prepare a set of controlled rotations which, under a suitable choice of angles, reproduce the desired amplitudes. In detail, the angles needed are given by the following expression:
+To define a custom encoder, ``qiboml`` handily provides an abstract :py:class:`qiboml.models.encoding.QuantumEncoding` class to inherit from. Let's say for example, that we had some heterogeneous data consisting of both real :math:`x_{real}` and binary :math:`x_{bin}` data stacked on top of each other in a single array
 
 .. math::
 
-   \alpha_j^s = 2 \arcsin \frac{ \sqrt{\sum_{l=1}^{2^{s-1}} \mid a_{(2j-1)2^{s-1} + l}  \mid^2 } }{ \sqrt{\sum_{l=1}^{2^s} \mid a_{(j-1)2^s + l}  \mid^2 } }
+   \mathbf{x} = x_{real} \lvert x_{bin}\;.
 
-TODO...
+To encode at the same time these two type of data we could define a mixture of the :py:class:`qiboml.models.encoding.BinaryEncoding` and  :py:class:`qiboml.models.encoding.PhaseEncoding` encoders
+
+.. testcode::
+
+   import numpy as np
+   from qiboml.models.encoding import QuantumEncoding
+
+   class HeterogeneousEncoder(QuantumEncoding):
+
+       def __init__(self, nqubits, real_part_len, bin_part_len):
+           if real_part_len + bin_part_len != nqubits:
+	       raise RuntimeError("``real_part_len`` and ``bin_part_len`` don't sum to ``nqubits``.")
+
+	   super.__init__(nqubits)
+
+	   self.real_qubits = self.qubits[:real_part_len]
+	   self.bin_qubits = self.qubits[real_part_len:]
+
+       def __call__(self, x) -> Circuit:
+           # check that the data is binary
+           if any(x[1] != 1 or x[1] != 0):
+	       raise RuntimeError("Received non binary data")
+
+           circuit = self.circuit.copy()
+
+	   # the first row of x contains the real data
+           for qubit, value in zip(self.real_qubits, x[0]):
+               circuit.add(gates.RY(qubit, theta=value, trainable=False))
+
+	   # the second row contains the binary data
+	   for qubit, bit in zip(self.real_qubits, x[1]):
+               circuit.add(gates.RX(qubit, theta=bit * np.pi, trainable=False))
+
+        return circuit

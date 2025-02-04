@@ -1,6 +1,0 @@
-Defining a custom Decoder
--------------------------
-
-The `Decoder` is the part of the model in charge of transforming back the quantum information contained in a quantum state, to some classical representation consumable by classical calculators. This, in practice, translates to: obtaining the final quantum state, first, and, second, performing any suitable postprocessing onto it.
-
-A very simple decoder, for instance, is the :py:class:`qiboml.models.decoding.Probabilities`, which extracts the probabilities from the final state. Similarly, :py:class:`qiboml.models.decoding.Samples` and :py:class:`qiboml.models.decoding.Expectation` respectively reconstruct the measured samples and calculate the expectation value of an observable on the final state.

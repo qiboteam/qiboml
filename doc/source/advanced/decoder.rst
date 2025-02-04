@@ -5,7 +5,7 @@ The `Decoder` is the part of the model in charge of transforming back the quantu
 
 A very simple decoder, for instance, is the :py:class:`qiboml.models.decoding.Probabilities`, which extracts the probabilities from the final state. Similarly, :py:class:`qiboml.models.decoding.Samples` and :py:class:`qiboml.models.decoding.Expectation` respectively reconstruct the measured samples and calculate the expectation value of an observable on the final state.
 
-Hence, the decoder is a function :math:`f_d: C \rightarrow \mathbf{y}\in\mathbb{R}^n`, that expects as input a ``qibo.Circuit``, executes it and finally perform some operation on the obtained final state to recover some classical output data :math:`\mathbb{y}` in the form of a float array.
+Hence, the decoder is a function :math:`f_d: C \rightarrow \mathbf{y}\in\mathbb{R}^n`, that expects as input a ``qibo.Circuit``, executes it and finally perform some operation on the obtained final state to recover some classical output data :math:`\mathbf{y}` in the form of a float array.
 
 ``qiboml`` provides an abstract :py:class:`qiboml.models.decoding.QuantumDecoding` object which can be subclassed to define custom decoding layers. Let's say, for instance, that we would like to calculate the expectation values of two different observables:
 
@@ -51,7 +51,7 @@ To do this we only need to create a decoding layer that constructs the two obser
        def output_shape(self) -> tuple(int):
            (1, 1)
 
-Note that it is important to also specify what is the expected output shape of the decoder, for example as in this case we are just dealing with expectation values and, thus, scalars, we are going to set it as :math:`(1,1)`.
+Note that it is important to also specify what is the expected output shape of the decoder, for example as in this case we are just dealing with expectation values and, thus, scalars, we are going to set it to :math:`(1,1)`.
 
 The ``super().__init__`` and ``super().__call__`` calls here are useful to simplify the implementation of the custom decoder. The ``super().__init__`` sets up the initial features needed, i.e. mainly an empty ``nqubits`` ``qibo.Circuit`` with a measurement appended on each qubit. Whereas, the ``super().__call__`` takes care of executing the ``qibo.Circuit`` passed as input ``x`` and returns a ``qibo.result`` object, hence one in ``(QuantumState, MeasurementOutcomes, CircuitResult)``.
 
@@ -70,8 +70,8 @@ In case you needed an even more fine-grained customization, you could always get
        def __init__(self, nqubits: int):
            self.backend = MyCustomBackend()
 	   # the backends should match!
-	   self.o_even = SymbolicHamiltonian(Z(0)*Z(2), nqubits=nqubits)
-	   self.o_odd = SymbolicHamiltonian(Z(1)*Z(3), nqubits=nqubits)
+	   self.o_even = SymbolicHamiltonian(Z(0)*Z(2), nqubits=nqubits, backend=self.backend)
+	   self.o_odd = SymbolicHamiltonian(Z(1)*Z(3), nqubits=nqubits, backend=self.backend)
 
        def __call__(self, x: Circuit):
            final_state = self.backend.execute_circuit(x).state()
@@ -89,6 +89,6 @@ In case you needed an even more fine-grained customization, you could always get
 
        @property
        def analytic(self,) --> bool:
-           if some_condition:
+           if is_my_custom_decoder_differentiable:
                return True
 	   return False
