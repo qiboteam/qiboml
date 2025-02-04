@@ -16,6 +16,7 @@ DEFAULT_DIFFERENTIATION = {
     "qiboml-pytorch": None,
     "qiboml-tensorflow": Jax,
     "qiboml-jax": Jax,
+    "numpy": Jax,
 }
 
 
@@ -129,10 +130,17 @@ class QuantumModelAutoGrad(torch.autograd.Function):
             )
             for par in parameters
         ]
+        wrt_inputs = not x.is_leaf and ctx.encoding.differentiable
         grad_input, *gradients = (
             torch.as_tensor(ctx.backend.to_numpy(grad).tolist())
             for grad in ctx.differentiation.evaluate(
-                x_clone, ctx.encoding, ctx.circuit, ctx.decoding, ctx.backend, *params
+                x_clone,
+                ctx.encoding,
+                ctx.circuit,
+                ctx.decoding,
+                ctx.backend,
+                *params,
+                wrt_inputs=wrt_inputs,
             )
         )
         gradients = torch.vstack(gradients).view((-1,) + grad_output.shape)

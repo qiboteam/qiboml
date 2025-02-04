@@ -28,20 +28,27 @@ def test_state_layer(backend):
 
 
 @pytest.mark.parametrize("nshots", [None, 10000])
-def test_expectation_layer(backend, nshots):
+@pytest.mark.parametrize(
+    "observable",
+    [
+        None,
+        lambda n, b: hamiltonians.SymbolicHamiltonian(
+            sum([Z(i) for i in range(n)]), nqubits=n, backend=b
+        ),
+    ],
+)
+def test_expectation_layer(backend, nshots, observable):
     backend.set_seed(42)
     rng = np.random.default_rng(42)
     nqubits = 5
-    # test observable error
-    with pytest.raises(RuntimeError):
-        layer = dec.Expectation(nqubits, backend=backend)
+    if observable is None:
+        pytest.skip(
+            "This fails due to qibo, it should be solved by qibo#1548: remove this skip after merge"
+        )
 
     c = random_clifford(nqubits, seed=rng, backend=backend)
-    observable = hamiltonians.SymbolicHamiltonian(
-        sum([Z(i) for i in range(nqubits)]),
-        nqubits=nqubits,
-        backend=backend,
-    )
+    if observable is not None:
+        observable = observable(nqubits, backend)
     layer = dec.Expectation(
         nqubits,
         observable=observable,
@@ -49,6 +56,8 @@ def test_expectation_layer(backend, nshots):
         backend=backend,
     )
     layer_expv = layer(c)
+    if observable is None:
+        observable = hamiltonians.Z(nqubits, dense=False, backend=backend)
     expv = (
         observable.expectation(backend.execute_circuit(c).state())
         if nshots is None
