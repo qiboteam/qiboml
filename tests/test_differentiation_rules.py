@@ -98,9 +98,4 @@ def test_expval_grad_PSR(frontend, backend, nshots, wrt_inputs):
 
     grad = compute_gradient(frontend, q_model, x)
 
-    assert np.round(grad[0], decimals=decimals) == np.round(
-        target_grad[0], decimals=decimals
-    )
-    assert np.round(grad[2], decimals=decimals) == np.round(
-        target_grad[2], decimals=decimals
-    )
+    backend.assert_allclose(grad, target_grad, atol=1e-2)
