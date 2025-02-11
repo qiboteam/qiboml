@@ -13,3 +13,6 @@ Subpackages
    :maxdepth: 4
 
    qiboml.backends
+   qiboml.models
+   qiboml.interfaces
+   qiboml.differentiation

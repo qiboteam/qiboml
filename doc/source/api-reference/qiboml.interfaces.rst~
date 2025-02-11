@@ -1,0 +1,18 @@
+qiboml.interfaces
+=================
+
+.. automodule:: qiboml.interfaces
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Submodules
+----------
+
+qiboml.interfaces.pytorch
+-------------------------
+
+.. automodule:: qiboml.models.encoding
+   :members:
+   :undoc-members:
+   :show-inheritance:
