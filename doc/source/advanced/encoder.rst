@@ -23,7 +23,7 @@ To encode at the same time these two type of data we could define a mixture of t
 
    class HeterogeneousEncoder(QuantumEncoding):
 
-       def __init__(self, nqubits, real_part_len, bin_part_len):
+       def __init__(self, nqubits: int, real_part_len: int, bin_part_len: int):
            if real_part_len + bin_part_len != nqubits:
 	       raise RuntimeError(
 	       "``real_part_len`` and ``bin_part_len`` don't sum to ``nqubits``."
@@ -67,8 +67,8 @@ The abstract :py:meth:`qiboml.models.encoding.QuantumEncoding` provides a proper
 .. code::
 
    @property
-   def differentiable(self):
-       if some_condition:
+   def differentiable(self) -> bool:
+       if is_my_encoder_differentiable:
            return True
        return False
 

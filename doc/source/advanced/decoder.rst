@@ -27,7 +27,7 @@ To do this we only need to create a decoding layer that constructs the two obser
    from qiboml.models.decoding import QuantumDecoding
    from qibo import Circuit
    from qibo.symbols import Z
-   from qibo.hamiltonian import SymbolicHamiltonian
+   from qibo.hamiltonians import SymbolicHamiltonian
 
    class MyCustomDecoder(QuantumDecoding):
 
@@ -48,8 +48,8 @@ To do this we only need to create a decoding layer that constructs the two obser
 
        # specify the shape of the output
        @property
-       def output_shape(self) -> tuple(int):
-           (1, 1)
+       def output_shape(self) -> tuple[int]:
+           return (1, 1)
 
 Note that it is important to also specify what is the expected output shape of the decoder, for example as in this case we are just dealing with expectation values and, thus, scalars, we are going to set it to :math:`(1,1)`.
 
@@ -88,7 +88,7 @@ In case you needed an even more fine-grained customization, you could always get
    class MyCustomDecoder(QuantumDecoding):
 
        @property
-       def analytic(self,) --> bool:
+       def analytic(self,) -> bool:
            if is_my_custom_decoder_differentiable:
                return True
 	   return False
