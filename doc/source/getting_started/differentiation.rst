@@ -17,7 +17,7 @@ To set the differentiation engine for your own model you just have to set its ``
    # to use PSR
    quantum_model = QuantumModel(encoding, circuit, decoding, differentiation=PSR)
 
-If you don't specify any ``differentiation`` engine a default one is going to be used, depending on the in interface and backend in use. The table below summarize the default choices:
+If you don't specify any ``differentiation`` engine a default one is going to be used, depending on the in interface and backend in use. The table below summarizes the default choices:
 
 
 .. raw:: html
@@ -43,7 +43,7 @@ If you don't specify any ``differentiation`` engine a default one is going to be
                 <td>torch</td>
             </tr>
             <tr>
-                <td>tensorflow / jax</td>
+                <td>tensorflow / jax / numpy</td>
                 <td>Jax</td>
             </tr>
             <tr>
@@ -56,7 +56,7 @@ If you don't specify any ``differentiation`` engine a default one is going to be
                 <td>tensorflow</td>
             </tr>
             <tr>
-                <td>torch / jax</td>
+                <td>torch / jax / numpy</td>
                 <td>Jax</td>
             </tr>
             <tr>
