@@ -15,6 +15,7 @@ qiboml.models.encoding
 .. automodule:: qiboml.models.encoding
    :members:
    :undoc-members:
+   :special-members: __call__,
    :show-inheritance:
 
 qiboml.models.ansatze
@@ -32,4 +33,5 @@ qiboml.models.decoding
 .. automodule:: qiboml.models.decoding
    :members:
    :undoc-members:
+   :special-members: __call__,
    :show-inheritance:

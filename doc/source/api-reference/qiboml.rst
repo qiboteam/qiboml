@@ -1,13 +1,13 @@
-qiboml package
-==============
+API Reference
+=============
 
 .. automodule:: qiboml
    :members:
    :undoc-members:
    :show-inheritance:
 
-Subpackages
------------
+Submodules
+----------
 
 .. toctree::
    :maxdepth: 4

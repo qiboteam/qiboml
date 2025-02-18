@@ -1,3 +1,5 @@
+.. _differentiation_engines
+
 ==========================================
  Switching the Autodifferentiation engine
 ==========================================

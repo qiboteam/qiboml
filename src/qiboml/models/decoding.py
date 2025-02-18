@@ -238,5 +238,5 @@ class Samples(QuantumDecoding):
         return (self.nshots, len(self.qubits))
 
     @property
-    def anaytic(self) -> bool:
+    def analytic(self) -> bool:  # pragma: no cover
         return False

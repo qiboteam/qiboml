@@ -9,5 +9,3 @@ We provide here some more in detail description of the ingredients quickly intro
     encoder
     ansatz
     decoder
-    backend
-    differentiation
