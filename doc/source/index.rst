@@ -32,6 +32,12 @@ Contents
    advanced/index
 
 .. toctree::
+   :maxdepth: 2
+   :caption: Tutorials
+
+   tutorials/binary_mnist
+
+.. toctree::
     :maxdepth: 1
     :caption: Main documentation
 
