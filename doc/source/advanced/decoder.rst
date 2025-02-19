@@ -33,7 +33,7 @@ To do this we only need to create a decoding layer that constructs the two obser
 
        def __init__(self, nqubits: int):
            super().__init__(nqubits)
-	   # build the observables
+	   # build the observables using qibo's SymbolicHamiltonian
 	   self.o_even = SymbolicHamiltonian(Z(0)*Z(2), nqubits=nqubits)
 	   self.o_odd = SymbolicHamiltonian(Z(1)*Z(3), nqubits=nqubits)
 

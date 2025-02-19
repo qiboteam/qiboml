@@ -11,11 +11,14 @@ from qibo.config import raise_error
 from qiboml import ndarray
 from qiboml.backends.jax import JaxBackend
 from qiboml.models.decoding import QuantumDecoding
-from qiboml.models.encoding import BinaryEncoding, QuantumEncoding
+from qiboml.models.encoding import QuantumEncoding
 
 
 @dataclass
 class Differentiation(ABC):
+    """
+    Abstract differentiator object.
+    """
 
     @abstractmethod
     def evaluate(
@@ -25,32 +28,58 @@ class Differentiation(ABC):
         training: Circuit,  # TODO: replace with an abstract TrainableLayer
         decoding: QuantumDecoding,
         backend: Backend,
-        *parameters: ndarray,
+        *parameters: list[ndarray],
+        wrt_inputs: bool = False
     ):
         """
         Evaluate the gradient of a quantum model w.r.t inputs and parameters,
         respectively represented by `x` and `parameters`.
+
+        Args:
+            x (ndarray): the input data.
+            encoding (QunatumEncoding): the encoding layer.
+            training (Circuit): the trainable quantum circuit.
+            decoding (QunatumDecoding): the decoding layer.
+            backend (Backend): the backend to execute the circuit with.
+            parameters (list(ndarray)): the parameters at which to evaluate the model,
+            and thus the derivative.
+            wrt_inputs (bool): whether to calculate the derivate with respect to inputs
+            or not, by default ``False``.
         """
         pass
 
 
 class PSR(Differentiation):
     """
-    Compute the gradient of the expectation value of a target observable w.r.t
-    features and parameters contained in a quantum model using the parameter shift
-    rules.
+    The Parameter Shift Rule differentiatior. Especially useful for non analytical
+    derivative calculation which, thus, makes it hardware compatible.
     """
 
     def evaluate(
         self,
         x: ndarray,
-        encoding,
-        training,
-        decoding,
-        backend,
-        *parameters,
-        wrt_inputs: bool = False,
+        encoding: QuantumEncoding,
+        training: Circuit,  # TODO: replace with an abstract TrainableLayer
+        decoding: QuantumDecoding,
+        backend: Backend,
+        *parameters: list[ndarray],
+        wrt_inputs: bool = False
     ):
+        """
+        Evaluate the gradient of a quantum model w.r.t inputs and parameters,
+        respectively represented by `x` and `parameters`.
+
+        Args:
+            x (ndarray): the input data.
+            encoding (QunatumEncoding): the encoding layer.
+            training (Circuit): the trainable quantum circuit.
+            decoding (QunatumDecoding): the decoding layer.
+            backend (Backend): the backend to execute the circuit with.
+            parameters (list(ndarray)): the parameters at which to evaluate the model,
+            and thus the derivative.
+            wrt_inputs (bool): whether to calculate the derivate with respect to inputs
+            or not, by default ``False``.
+        """
         if decoding.output_shape != (1, 1):
             raise_error(
                 NotImplementedError,
@@ -141,6 +170,11 @@ class PSR(Differentiation):
 
 
 class Jax(Differentiation):
+    """
+    The Jax differentiator object. Particularly useful for enabling gradient calculation in
+    those backends that do not provide it. Note however, that for this reason the circuit is
+    executed with the JaxBackend whenever a derivative is needed
+    """
 
     def __init__(self):
         self._jax: Backend = JaxBackend()
@@ -149,13 +183,28 @@ class Jax(Differentiation):
     def evaluate(
         self,
         x: ndarray,
-        encoding,
-        circuit,
-        decoding,
-        backend,
-        *parameters,
-        wrt_inputs: bool = False,
+        encoding: QuantumEncoding,
+        circuit: Circuit,  # TODO: replace with an abstract TrainableLayer
+        decoding: QuantumDecoding,
+        backend: Backend,
+        *parameters: list[ndarray],
+        wrt_inputs: bool = False
     ):
+        """
+        Evaluate the gradient of a quantum model w.r.t inputs and parameters,
+        respectively represented by `x` and `parameters`.
+
+        Args:
+            x (ndarray): the input data.
+            encoding (QunatumEncoding): the encoding layer.
+            training (Circuit): the trainable quantum circuit.
+            decoding (QunatumDecoding): the decoding layer.
+            backend (Backend): the backend to execute the circuit with.
+            parameters (list(ndarray)): the parameters at which to evaluate the model,
+            and thus the derivative.
+            wrt_inputs (bool): whether to calculate the derivate with respect to inputs
+            or not, by default ``False``.
+        """
         x = backend.to_numpy(x)
         x = self._jax.cast(x, self._jax.precision)
         if self._argnums is None:
