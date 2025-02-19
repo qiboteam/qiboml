@@ -45,6 +45,9 @@ class Differentiation(ABC):
             and thus the derivative.
             wrt_inputs (bool): whether to calculate the derivate with respect to inputs
             or not, by default ``False``.
+
+        Returns:
+            (list[ndarray]): the calculated gradients.
         """
         pass
 
@@ -79,6 +82,10 @@ class PSR(Differentiation):
             and thus the derivative.
             wrt_inputs (bool): whether to calculate the derivate with respect to inputs
             or not, by default ``False``.
+
+
+        Returns:
+            (list[ndarray]): the calculated gradients.
         """
         if decoding.output_shape != (1, 1):
             raise_error(
@@ -204,6 +211,10 @@ class Jax(Differentiation):
             and thus the derivative.
             wrt_inputs (bool): whether to calculate the derivate with respect to inputs
             or not, by default ``False``.
+
+
+        Returns:
+            (list[ndarray]): the calculated gradients.
         """
         x = backend.to_numpy(x)
         x = self._jax.cast(x, self._jax.precision)
