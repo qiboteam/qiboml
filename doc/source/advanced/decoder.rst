@@ -51,11 +51,12 @@ To do this we only need to create a decoding layer that constructs the two obser
        def output_shape(self) -> tuple[int]:
            return (1, 1)
 
-Note that it is important to also specify what is the expected output shape of the decoder, for example as in this case we are just dealing with expectation values and, thus, scalars, we are going to set it to :math:`(1,1)`.
+.. note::
+    It is important to also specify what is the expected output shape of the decoder, for example as in this case we are just dealing with expectation values and, thus, scalars, we are going to set it to :math:`(1,1)`.
 
 The ``super().__init__`` and ``super().__call__`` calls here are useful to simplify the implementation of the custom decoder. The ``super().__init__`` sets up the initial features needed, i.e. mainly an empty ``nqubits`` ``qibo.Circuit`` with a measurement appended on each qubit. Whereas, the ``super().__call__`` takes care of executing the ``qibo.Circuit`` passed as input ``x`` and returns a ``qibo.result`` object, hence one in ``(QuantumState, MeasurementOutcomes, CircuitResult)``.
 
-In case you needed an even more fine-grained customization, you could always get rid of them and fully customize the initialization and call of the decoder. However, keep in mind that in order for a decoder to correctly work inside a ``qiboml`` pipeline, several components should be defined:
+In case you needed an even more fine-grained customization, you could always get rid of them and fully customize the initialization and call of the decoder. However, keep in mind that in order for a decoder to correctly work inside a ``qiboml`` pipeline, some components should be defined:
 
 * A ``qibo`` compatible ``Backend``:
 

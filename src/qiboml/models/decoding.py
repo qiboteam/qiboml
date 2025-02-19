@@ -40,7 +40,7 @@ class QuantumDecoding:
     def __call__(
         self, x: Circuit
     ) -> Union[CircuitResult, QuantumState, MeasurementOutcomes]:
-        """Combines the input circuir with the internal one and executes them with the internal backend.
+        """Combine the input circuir with the internal one and execute them with the internal backend.
 
         Args:
             x (Circuit): input circuit.
@@ -62,7 +62,7 @@ class QuantumDecoding:
         return self._circuit.copy()
 
     def set_backend(self, backend: Backend):
-        """Sets the internal backend.
+        """Set the internal backend.
 
         Args:
             backend (Backend): backend to be set.
@@ -138,7 +138,7 @@ class Expectation(QuantumDecoding):
         super().__post_init__()
 
     def __call__(self, x: Circuit) -> ndarray:
-        """Executes the input circuit and calculate the expectation value of the internal observal on
+        """Execute the input circuit and calculate the expectation value of the internal observable on
         the final state
 
         Args:
@@ -167,7 +167,7 @@ class Expectation(QuantumDecoding):
         return (1, 1)
 
     def set_backend(self, backend: Backend):
-        """Sets the internal and observable's backends.
+        """Set the internal and observable's backends.
 
         Args:
             backend (Backend): backend to be set.
@@ -183,7 +183,7 @@ class State(QuantumDecoding):
     """The state decoder."""
 
     def __call__(self, x: Circuit) -> ndarray:
-        """Computes the final state of the input circuit and separates it in its real and
+        """Compute the final state of the input circuit and separates it in its real and
         imaginary parts stacked on top of each other.
 
         Args:
@@ -218,7 +218,7 @@ class Samples(QuantumDecoding):
         super().__post_init__()
 
     def __call__(self, x: Circuit) -> ndarray:
-        """Samples the final state of the circuit.
+        """Sample the final state of the circuit.
 
         Args:
             x (Circuit): input Circuit.

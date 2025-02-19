@@ -68,7 +68,7 @@ class QuantumModel(torch.nn.Module):
 
     def forward(self, x: torch.Tensor):
         """
-        performs one forward pass of the model: encodes the classical data
+        Perform one forward pass of the model: encode the classical data
         in a quantum circuit, executes it and decodes it.
 
         Args:

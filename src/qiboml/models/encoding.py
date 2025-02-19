@@ -76,7 +76,7 @@ class PhaseEncoding(QuantumEncoding):
             gate.parameters = phase
 
     def __call__(self, x: ndarray) -> Circuit:
-        """Constructs the circuit encoding the ``x`` data in the rotation angles of some
+        """Construct the circuit encoding the ``x`` data in the rotation angles of some
         ``RY`` gates.
 
         Args:
@@ -92,7 +92,7 @@ class PhaseEncoding(QuantumEncoding):
 class BinaryEncoding(QuantumEncoding):
 
     def __call__(self, x: ndarray) -> Circuit:
-        r"""Constructs the circuit encoding the ``x`` binary data in some ``RX`` rotation gates
+        r"""Construct the circuit encoding the ``x`` binary data in some ``RX`` rotation gates
         with angles either :math:`\pi` (for ones) or 0 (for zeros).
 
         Args:

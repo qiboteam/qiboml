@@ -7,11 +7,11 @@ For instance, basic examples of this can be found in the :py:class:`qiboml.model
 
 Hence, broadly speaking, the quantum `Encoder` is a function :math:`f_e: \mathbf{x}\in\mathbb{R}^n \rightarrow C` that maps an input array of :math:`n` floats :math:`\mathbf{x}`, be it a ``torch.Tensor`` for the :py:class:`qiboml.interfaces.pytorch.QuantumModel` or a ``tensorflow.Tensor`` for the :py:class:`qiboml.interfaces.keras.QuantumModel`, to an instance of a ``qibo.Circuit`` :math:`C`.
 
-To define a custom encoder, ``qiboml`` handily provides an abstract :py:class:`qiboml.models.encoding.QuantumEncoding` class to inherit from. Let's say for example, that we had some heterogeneous data consisting of both real :math:`x_{real}` and binary :math:`x_{bin}` data stacked on top of each other in a single array
+To define a custom encoder, ``qiboml`` handily provides an abstract :py:class:`qiboml.models.encoding.QuantumEncoding` class to inherit from. Let's say for example, that we had some heterogeneous data consisting of both real :math:`x_{\rm real}` and binary :math:`x_{\rm bin}` data stacked on top of each other in a single array
 
 .. math::
 
-   \mathbf{x} = x_{real} \lvert x_{bin}\;.
+   \mathbf{x} = x_{\rm real} \lvert x_{\rm bin}\;.
 
 To encode at the same time these two type of data we could define a mixture of the :py:class:`qiboml.models.encoding.BinaryEncoding` and  :py:class:`qiboml.models.encoding.PhaseEncoding` encoders:
 

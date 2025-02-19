@@ -3,9 +3,9 @@ Building your first Quantum Model
 
 In order to build a Quantum Model you need to define three fundamental ingredients:
 
-* An ``Encoder`` which takes care of embedding classical data inside of a Quantum Circuit.
-* (`Optionally`) A parametrized quantum ``Circuit`` defining the actual computation the model will perform.
-* A ``Decoder`` in charge of decoding the quantum information contained in the final state.
+* an ``Encoder`` which takes care of embedding classical data inside of a Quantum Circuit;
+* (`optionally`) A parametrized quantum ``Circuit`` defining the actual computation the model will perform;
+* a ``Decoder`` in charge of decoding the quantum information contained in the final state.
 
 Such that a single evaluation of the model, divided in the three steps `Encoding` -> `Computation` -> `Decoding`, takes as input classical data and outputs classical data once again.
 
