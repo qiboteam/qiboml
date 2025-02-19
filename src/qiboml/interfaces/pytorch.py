@@ -30,9 +30,7 @@ class QuantumModel(torch.nn.Module):
         encoding (QuantumEncoding): the encoding layer.
         circuit (Circuit): the trainable circuit.
         decoding (QuantumDecoding): the decoding layer.
-        differentiation (Differentiation, optional): the differentiation engine,
-        if not provided a default one will be picked following what described in
-        the :ref:`docs <_differentiation_engine>`.
+        differentiation (Differentiation, optional): the differentiation engine, if not provided a default one will be picked following what described in the :ref:`docs <_differentiation_engine>`.
     """
 
     encoding: QuantumEncoding

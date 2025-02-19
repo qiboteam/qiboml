@@ -41,10 +41,8 @@ class Differentiation(ABC):
             training (Circuit): the trainable quantum circuit.
             decoding (QunatumDecoding): the decoding layer.
             backend (Backend): the backend to execute the circuit with.
-            parameters (list(ndarray)): the parameters at which to evaluate the model,
-            and thus the derivative.
-            wrt_inputs (bool): whether to calculate the derivate with respect to inputs
-            or not, by default ``False``.
+            parameters (list[ndarray]): the parameters at which to evaluate the model, and thus the derivative.
+            wrt_inputs (bool): whether to calculate the derivate with respect to inputs or not, by default ``False``.
 
         Returns:
             (list[ndarray]): the calculated gradients.
@@ -78,10 +76,8 @@ class PSR(Differentiation):
             training (Circuit): the trainable quantum circuit.
             decoding (QunatumDecoding): the decoding layer.
             backend (Backend): the backend to execute the circuit with.
-            parameters (list(ndarray)): the parameters at which to evaluate the model,
-            and thus the derivative.
-            wrt_inputs (bool): whether to calculate the derivate with respect to inputs
-            or not, by default ``False``.
+            parameters (list[ndarray]): the parameters at which to evaluate the model, and thus the derivative.
+            wrt_inputs (bool): whether to calculate the derivate with respect to inputs or not, by default ``False``.
 
 
         Returns:
@@ -207,10 +203,8 @@ class Jax(Differentiation):
             training (Circuit): the trainable quantum circuit.
             decoding (QunatumDecoding): the decoding layer.
             backend (Backend): the backend to execute the circuit with.
-            parameters (list(ndarray)): the parameters at which to evaluate the model,
-            and thus the derivative.
-            wrt_inputs (bool): whether to calculate the derivate with respect to inputs
-            or not, by default ``False``.
+            parameters (list[ndarray]): the parameters at which to evaluate the model, and thus the derivative.
+            wrt_inputs (bool): whether to calculate the derivate with respect to inputs or not, by default ``False``.
 
 
         Returns:
