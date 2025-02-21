@@ -30,7 +30,7 @@ Alternatively, you can also directly construct an instance of the backend you wi
    # construct a local istance of the backend
    backend = PyTorchBackend()
    # assign it to the decoding layer upon initialization
-   decoding = Probabilities(nqubits, backend=backend)
+   decoding = Probabilities(nqubits=3, backend=backend)
    # you can even switch it after initialization,
    # however, pay always attention to consistency!
    tf_backend = TensorflowBackend()
