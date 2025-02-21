@@ -13,6 +13,7 @@ To set the differentiation engine for your own model you just have to set its ``
 .. code::
 
    from qiboml.operations.differentiation import Jax, PSR
+   from qiboml.interfaces.pytorch import QuantumModel
 
    # to use jax
    quantum_model = QuantumModel(encoding, circuit, decoding, differentiation=Jax)
