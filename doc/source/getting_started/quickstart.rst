@@ -20,17 +20,20 @@ Therefore, building a ``qiboml`` model is rather immediate. For instance using t
 .. testcode::
 
    import torch
-   from qibo import Circuit, gates
+   from qibo import Circuit, gates, hamiltonians
    from qiboml.models.encoding import PhaseEncoding
-   from qiboml.models.decoding import Probabilities
+   from qiboml.models.decoding import Expectation
    from qiboml.interfaces.pytorch import QuantumModel
 
    # define the encoding
    encoding = PhaseEncoding(nqubits=3)
-   # define the decoding
-   decoding = Probabilities(nqubits=3)
+   # define the decoding given an observable
+   observable = hamiltonians.Z(nqubits=3)
+   decoding = Expectation(nqubits=3, observable=observable)
    # build the computation circuit
    circuit = Circuit(3)
+   circuit.add((gates.RY(i, theta=0.4) for i in range(3)))
+   circuit.add((gates.RZ(i, theta=0.2) for i in range(3)))
    circuit.add((gates.H(i) for i in range(3)))
    circuit.add((gates.CNOT(0,1), gates.CNOT(0,2)))
    circuit.draw()
@@ -58,11 +61,12 @@ and it can be trained using a ``torch.optim`` optimizer:
 .. testcode::
 
    optimizer = torch.optim.Adam(model.parameters())
-   for _ in range(10):
-       data = torch.randn(8)
-       target = 2 * data
-       optimizer.zero_grad()
-       outputs = model(data)
-       loss = torch.nn.functional.mse_loss(outputs, target)
-       loss.backward()
-       optimizer.step()
+   data = torch.randn(8)
+
+   for i in range(10):
+      target = torch.tensor([[0.5]])
+      optimizer.zero_grad()
+      outputs = model(data)
+      loss = torch.nn.functional.mse_loss(outputs, target)
+      loss.backward()
+      optimizer.step()
