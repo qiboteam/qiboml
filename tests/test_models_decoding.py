@@ -13,7 +13,7 @@ def test_probabilities_layer(backend):
     layer = dec.Probabilities(nqubits, qubits=qubits, backend=backend)
     c = random_clifford(nqubits, backend=backend)
     backend.assert_allclose(
-        layer(c).ravel(), backend.execute_circuit(c).probabilities()
+        layer(c).ravel(), backend.execute_circuit(c).probabilities(qubits)
     )
 
 

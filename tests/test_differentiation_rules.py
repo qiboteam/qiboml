@@ -49,7 +49,7 @@ def compute_gradient(frontend, model, x):
         return grad
 
 
-@pytest.mark.parametrize("nshots", [None, 600000])
+@pytest.mark.parametrize("nshots", [None, 12000000])
 @pytest.mark.parametrize("backend", EXECUTION_BACKENDS)
 @pytest.mark.parametrize("wrt_inputs", [True, False])
 def test_expval_grad_PSR(frontend, backend, nshots, wrt_inputs):
@@ -67,6 +67,7 @@ def test_expval_grad_PSR(frontend, backend, nshots, wrt_inputs):
     decimals = 6 if nshots is None else 1
 
     frontend.np.random.seed(42)
+    backend.set_seed(42)
 
     x = construct_x(frontend, with_factor=wrt_inputs)
 
@@ -97,10 +98,4 @@ def test_expval_grad_PSR(frontend, backend, nshots, wrt_inputs):
     target_grad = TARGET_GRAD["wrt_inputs"] if wrt_inputs else TARGET_GRAD["no_inputs"]
 
     grad = compute_gradient(frontend, q_model, x)
-
-    assert np.round(grad[0], decimals=decimals) == np.round(
-        target_grad[0], decimals=decimals
-    )
-    assert np.round(grad[2], decimals=decimals) == np.round(
-        target_grad[2], decimals=decimals
-    )
+    backend.assert_allclose(grad, target_grad, atol=1e-3)
