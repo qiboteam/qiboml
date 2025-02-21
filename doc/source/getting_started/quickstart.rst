@@ -7,6 +7,10 @@ In order to build a Quantum Model you need to define three fundamental ingredien
 * (`optionally`) A parametrized quantum ``Circuit`` defining the actual computation the model will perform;
 * a ``Decoder`` in charge of decoding the quantum information contained in the final state.
 
+.. image:: qiboml_triad.svg
+   :width: 600
+   :align: center
+
 Such that a single evaluation of the model, divided in the three steps `Encoding` -> `Computation` -> `Decoding`, takes as input classical data and outputs classical data once again.
 
 In ``qiboml`` we provide some standard pre-defined encoding and decoding layers, whereas the `Computation` part can be delegated to any ``qibo`` circuit (some standard quantum circuit ansaetze are available as well). The different pieces can be joined together through a ``qiboml`` interface, which exposes a ``QuantumModel`` object in one of the popular ML frameworks (such as ``torch`` and ``keras``).
