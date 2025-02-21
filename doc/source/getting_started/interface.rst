@@ -26,7 +26,7 @@ Note that, since the pre-defined encoding, decoding and ansatz layers provided i
 
    # these are interface agnostic
    encoding = BinaryEncoding(2)
-   decoding = Probabilties(2)
+   decoding = Probabilities(2)
    circuit = ReuploadingCircuit(2)
 
    # build the torch model
