@@ -78,6 +78,10 @@ class PyTorchBackend(NumpyBackend):
     def set_device(self, device):  # pragma: no cover
         self.device = device
 
+    def set_seed(self, seed):
+        np.random.seed(seed)
+        self.np.manual_seed(np.random.get_state()[1][0])
+
     def cast(
         self,
         x,
@@ -204,10 +208,6 @@ class PyTorchBackend(NumpyBackend):
         else:
             probs = self.np.sum(self.cast(state, dtype=rtype), axis=unmeasured_qubits)
         return self._order_probabilities(probs, qubits, nqubits).ravel()
-
-    def set_seed(self, seed):
-        self.np.manual_seed(seed)
-        np.random.seed(seed)
 
     def sample_shots(self, probabilities, nshots):
         return self.np.multinomial(
