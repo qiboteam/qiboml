@@ -193,8 +193,11 @@ class State(QuantumDecoding):
             (ndarray): the final state.
         """
         state = super().__call__(x).state()
-        return self.backend.np.vstack(
-            (self.backend.np.real(state), self.backend.np.imag(state))
+        return self.backend.np.vstack(  # pylint: disable=no-member
+            (
+                self.backend.np.real(state),  # pylint: disable=no-member
+                self.backend.np.imag(state),  # pylint: disable=no-member
+            )
         ).reshape(self.output_shape)
 
     @property
