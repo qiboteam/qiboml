@@ -1,16 +1,15 @@
 """Torch interface to qiboml layers"""
 
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Optional
 
-import numpy as np
 import torch
 from qibo import Circuit
 from qibo.backends import Backend
-from qibo.config import raise_error
 
 from qiboml.models.decoding import QuantumDecoding
-from qiboml.models.encoding import QuantumEncoding
+from qiboml.models.encoding import DataReuploading, QuantumEncoding
 from qiboml.operations.differentiation import PSR, Differentiation, Jax
 
 DEFAULT_DIFFERENTIATION = {
@@ -43,7 +42,19 @@ class QuantumModel(torch.nn.Module):
     ):
         super().__init__()
 
-        params = [p for param in self.circuit.get_parameters() for p in param]
+        if isinstance(self.encoding, DataReuploading):
+            # In order to have nlayers different trainable circuits
+            self.circuits = [
+                deepcopy(self.circuit) for _ in range(self.encoding.nlayers)
+            ]
+            params = []
+            for l in range(self.encoding.nlayers):
+                params.extend(
+                    [p for param in self.circuits[l].get_parameters() for p in param]
+                )
+        else:
+            params = [p for param in self.circuit.get_parameters() for p in param]
+
         params = torch.as_tensor(self.backend.to_numpy(x=params)).ravel()
         params.requires_grad = True
         self.circuit_parameters = torch.nn.Parameter(params)
@@ -75,10 +86,22 @@ class QuantumModel(torch.nn.Module):
             (torch.tensor): the computed outputs.
         """
         if self.differentiation is None:
-            self.circuit.set_parameters(list(self.parameters())[0])
-            x = self.encoding(x) + self.circuit
+
+            circuit = Circuit(self.encoding.nqubits)
+
+            if isinstance(self.encoding, DataReuploading):
+                for l in range(self.encoding.nlayers):
+                    circuit += self.encoding(x) + self.circuits[l]
+            else:
+                circuit = self.encoding(x) + self.circuit
+
+            circuit.set_parameters(list(self.parameters())[0])
             x = self.decoding(x)
         else:
+            if isinstance(self.encoding, DataReuploading):
+                raise ValueError(
+                    "DataReauploading is not supported yet in hardware-compatible differentiation."
+                )
             x = QuantumModelAutoGrad.apply(
                 x,
                 self.encoding,
