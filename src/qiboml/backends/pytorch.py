@@ -66,6 +66,10 @@ class PyTorchBackend(NumpyBackend):
         self.np.sign = self.np.sgn
         self.np.flatnonzero = lambda x: self.np.nonzero(x).flatten()
 
+        # set the engine of the quantum info operators
+        self.qinfo.ENGINE = torch
+        self.qinfo.expm = torch.linalg.matrix_exp
+
     def _torch_dtype(self, dtype):
         if dtype == "float":
             dtype += "32"
