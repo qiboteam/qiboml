@@ -1,3 +1,4 @@
+import inspect
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Optional
@@ -66,7 +67,7 @@ class PhaseEncoding(QuantumEncoding):
         """Ancillary post initialization: builds the internal circuit with the rotation gates."""
         super().__post_init__()
 
-        signature = signature(self.encoding_gate)
+        signature = inspect.signature(self.encoding_gate)
         allowed_params = {"theta", "phi", "lam"}
         gate_params = {p for p in signature.parameters.keys()} & allowed_params
 
@@ -132,4 +133,4 @@ class BinaryEncoding(QuantumEncoding):
 
 @dataclass
 class DataReuploading(PhaseEncoding):
-    nlayers: int
+    nlayers: int = 1
