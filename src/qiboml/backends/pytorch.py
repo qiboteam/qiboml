@@ -37,6 +37,7 @@ class PyTorchBackend(NumpyBackend):
         import torch  # pylint: disable=import-outside-toplevel  # type: ignore
 
         self.np = torch
+        self.np.set_default_dtype(torch.float64)
 
         self.name = "qiboml"
         self.platform = "pytorch"
@@ -64,11 +65,30 @@ class PyTorchBackend(NumpyBackend):
         self.np.mod = self.np.remainder
         self.np.right_shift = self.np.bitwise_right_shift
         self.np.sign = self.np.sgn
-        self.np.flatnonzero = lambda x: self.np.nonzero(x).flatten()
+        self.np.flatnonzero = lambda x: self.np.nonzero(x).ravel()
 
         # set the engine of the quantum info operators
-        self.qinfo.ENGINE = torch
+        self.qinfo.ENGINE = self.np
         self.qinfo.expm = torch.linalg.matrix_exp
+        self.qinfo.ENGINE.sqrt = np.sqrt
+        self.qinfo.ENGINE.Tensor.astype = self.qinfo.ENGINE.Tensor.type
+        self.qinfo.ENGINE.random.normal = lambda loc, scale, size: torch.normal(
+            torch.tensor(loc).repeat(size), torch.tensor(scale).repeat(size)
+        )
+        self.qinfo.ENGINE.random.standard_normal = lambda size: torch.normal(
+            torch.zeros(size), torch.ones(size)
+        )
+        self.qinfo.ENGINE.random.uniform = (
+            lambda low, high, size: (low - high) * torch.rand(size) + high
+        )
+        self.qinfo.ENGINE.random.randint = torch.randint
+
+        # load some custom qinfo operators
+        from qiboml.quantum_info.quantum_info_pytorch import QINFO
+
+        for method in dir(QINFO):
+            if method[:2] != "__":
+                setattr(self.qinfo, method, getattr(QINFO, method))
 
     def _torch_dtype(self, dtype):
         if dtype == "float":
