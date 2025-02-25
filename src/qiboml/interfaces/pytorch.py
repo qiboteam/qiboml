@@ -1,16 +1,16 @@
 """Torch interface to qiboml layers"""
 
+from copy import deepcopy
 from dataclasses import dataclass
-from typing import Optional
+from typing import List, Optional, Union
 
-import numpy as np
 import torch
 from qibo import Circuit
 from qibo.backends import Backend
-from qibo.config import raise_error
+from qibo.ui import plot_circuit
 
 from qiboml.models.decoding import QuantumDecoding
-from qiboml.models.encoding import QuantumEncoding
+from qiboml.models.encoding import DataReuploading, QuantumEncoding
 from qiboml.operations.differentiation import PSR, Differentiation, Jax
 
 DEFAULT_DIFFERENTIATION = {
@@ -43,7 +43,19 @@ class QuantumModel(torch.nn.Module):
     ):
         super().__init__()
 
-        params = [p for param in self.circuit.get_parameters() for p in param]
+        if isinstance(self.encoding, DataReuploading):
+            # In order to have nlayers different trainable circuits
+            self.circuits = [
+                deepcopy(self.circuit) for _ in range(self.encoding.nlayers)
+            ]
+            params = []
+            for l in range(self.encoding.nlayers):
+                params.extend(
+                    [p for param in self.circuits[l].get_parameters() for p in param]
+                )
+        else:
+            params = [p for param in self.circuit.get_parameters() for p in param]
+
         params = torch.as_tensor(self.backend.to_numpy(x=params)).ravel()
         params.requires_grad = True
         self.circuit_parameters = torch.nn.Parameter(params)
@@ -75,14 +87,27 @@ class QuantumModel(torch.nn.Module):
             (torch.tensor): the computed outputs.
         """
         if self.differentiation is None:
-            self.circuit.set_parameters(list(self.parameters())[0])
-            x = self.encoding(x) + self.circuit
-            x = self.decoding(x)
+
+            circuit = Circuit(self.encoding.nqubits)
+
+            if isinstance(self.encoding, DataReuploading):
+                for l in range(self.encoding.nlayers):
+                    circuit += self.encoding(x) + self.circuits[l]
+            else:
+                circuit = self.encoding(x) + self.circuit
+
+            circuit.set_parameters(list(self.parameters())[0])
+            x = self.decoding(circuit)
         else:
+            if isinstance(self.encoding, DataReuploading):
+                circuit = self.circuits
+            else:
+                circuit = self.circuit
+
             x = QuantumModelAutoGrad.apply(
                 x,
                 self.encoding,
-                self.circuit,
+                circuit,
                 self.decoding,
                 self.backend,
                 self.differentiation,
@@ -125,6 +150,16 @@ class QuantumModel(torch.nn.Module):
         """
         return self.decoding.output_shape
 
+    def draw(self):
+        """Draw the full circuit structure."""
+        circ = Circuit(self.nqubits)
+        if isinstance(self.encoding, DataReuploading):
+            for _ in range(self.encoding.nlayers):
+                circ += self.encoding.circuit + self.circuit
+        else:
+            circ += self.encoding.circuit + self.circuit
+        plot_circuit(circ)
+
 
 class QuantumModelAutoGrad(torch.autograd.Function):
     """
@@ -137,7 +172,7 @@ class QuantumModelAutoGrad(torch.autograd.Function):
         ctx,
         x: torch.Tensor,
         encoding: QuantumEncoding,
-        circuit: Circuit,
+        circuit: Union[Circuit, List[Circuit]],
         decoding: QuantumDecoding,
         backend,
         differentiation,
@@ -155,9 +190,16 @@ class QuantumModelAutoGrad(torch.autograd.Function):
             backend.cast(par.clone().detach().cpu().numpy(), dtype=backend.precision)
             for par in parameters
         ]
-        x_clone = encoding(x_clone) + circuit
-        x_clone.set_parameters(params)
-        x_clone = decoding(x_clone)
+
+        # temporary circuit
+        circ = Circuit(encoding.nqubits)
+        if isinstance(encoding, DataReuploading):
+            for l in range(encoding.nlayers):
+                circ += encoding(x_clone) + circuit[l]
+        else:
+            circ = encoding(x_clone) + circuit
+        circ.set_parameters(params)
+        x_clone = decoding(circ)
         x_clone = torch.as_tensor(backend.to_numpy(x_clone).tolist())
         return x_clone
 
