@@ -70,7 +70,6 @@ class PyTorchBackend(NumpyBackend):
         # set the engine of the quantum info operators
         self.qinfo.ENGINE = self.np
         self.qinfo.expm = torch.linalg.matrix_exp
-        self.qinfo.ENGINE.sqrt = np.sqrt
         self.qinfo.ENGINE.Tensor.astype = self.qinfo.ENGINE.Tensor.type
         self.qinfo.ENGINE.random.normal = lambda loc, scale, size: torch.normal(
             torch.tensor(loc).repeat(size), torch.tensor(scale).repeat(size)
