@@ -36,6 +36,7 @@ sphinx-copybutton = "^0.5.2"
 sphinxcontrib-katex = "^0.9.9"
 recommonmark = "^0.7.1"
 nbsphinx = "^0.9.6"
+setuptools = "^75.8.2"
 
 [tool.poetry.group.dev]
 optional = true
