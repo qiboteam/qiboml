@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import partial
+from typing import List, Union
 
 import jax
 import numpy as np
@@ -11,7 +12,7 @@ from qibo.config import raise_error
 from qiboml import ndarray
 from qiboml.backends.jax import JaxBackend
 from qiboml.models.decoding import QuantumDecoding
-from qiboml.models.encoding import QuantumEncoding
+from qiboml.models.encoding import DataReuploading, QuantumEncoding
 
 
 @dataclass
@@ -29,7 +30,7 @@ class Differentiation(ABC):
         decoding: QuantumDecoding,
         backend: Backend,
         *parameters: list[ndarray],
-        wrt_inputs: bool = False
+        wrt_inputs: bool = False,
     ):
         """
         Evaluate the gradient of a quantum model w.r.t inputs and parameters,
@@ -49,6 +50,24 @@ class Differentiation(ABC):
         """
         pass
 
+    def _full_circuit(
+        self,
+        x: ndarray,
+        encoding: QuantumEncoding,
+        training: Union[Circuit, List[Circuit]],
+    ):
+        """
+        Helper method to reconstruct the full circuit to cover the reuploading
+        strategy.
+        """
+        circ = Circuit(encoding.nqubits)
+        if isinstance(encoding, DataReuploading):
+            for l in range(encoding.nlayers):
+                circ += encoding(x) + training[l]
+        else:
+            circ += encoding(x) + training
+        return circ
+
 
 class PSR(Differentiation):
     """
@@ -64,7 +83,7 @@ class PSR(Differentiation):
         decoding: QuantumDecoding,
         backend: Backend,
         *parameters: list[ndarray],
-        wrt_inputs: bool = False
+        wrt_inputs: bool = False,
     ):
         """
         Evaluate the gradient of a quantum model w.r.t inputs and parameters,
@@ -89,7 +108,7 @@ class PSR(Differentiation):
                 "Parameter Shift Rule only supports expectation value decoding.",
             )
         # construct circuit
-        circuit = encoding(x) + training
+        circuit = self._full_circuit(x=x, encoding=encoding, training=training)
 
         gradient = []
         if wrt_inputs:
@@ -150,6 +169,10 @@ class PSR(Differentiation):
         circuit,
         decoding,
     ):
+        if isinstance(encoding, DataReuploading):
+            raise NotImplementedError(
+                f"DataReuploading encoding does not support derivative wrt inputs yet."
+            )
         gates = encoding(x).queue
         gradient = []
         for input, gate in zip(x, gates):
@@ -191,7 +214,7 @@ class Jax(Differentiation):
         decoding: QuantumDecoding,
         backend: Backend,
         *parameters: list[ndarray],
-        wrt_inputs: bool = False
+        wrt_inputs: bool = False,
     ):
         """
         Evaluate the gradient of a quantum model w.r.t inputs and parameters,
@@ -250,7 +273,8 @@ class Jax(Differentiation):
 
     @staticmethod
     @partial(jax.jit, static_argnums=(1, 2, 3))
-    def _run(x, encoding, circuit, decoding, *parameters):
-        circuit = encoding(x) + circuit
-        circuit.set_parameters(parameters)
-        return decoding(circuit)
+    def _run(x, encoding, training, decoding, *parameters):
+        # Use the shared full_circuit method from Differentiation
+        circ = Differentiation.full_circuit(x, encoding, training)
+        circ.set_parameters(parameters)
+        return decoding(circ)
