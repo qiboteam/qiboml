@@ -73,6 +73,9 @@ class TensorflowBackend(NumpyBackend):
 
         self.tensor_types = (np.ndarray, tf.Tensor, tf.Variable)
 
+        # set the engine of the quantum info operators
+        self.qinfo.ENGINE = self.np
+
     def set_device(self, device):  # pragma: no cover
         self.device = device
 

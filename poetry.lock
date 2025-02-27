@@ -2769,8 +2769,8 @@ torch = ["torch (>=2.1.1,<2.4)"]
 [package.source]
 type = "git"
 url = "https://github.com/qiboteam/qibo"
-reference = "qinfo_jit"
-resolved_reference = "6f99d0643f155259f7450c386113c2cfcf669931"
+reference = "HEAD"
+resolved_reference = "1c126e19c8de65edf9a0a735e0f389f089563ad9"
 
 [[package]]
 name = "qibojit"
@@ -2948,14 +2948,14 @@ test = ["Cython", "array-api-strict (>=2.0,<2.1.1)", "asv", "gmpy2", "hypothesis
 
 [[package]]
 name = "setuptools"
-version = "75.8.1"
+version = "75.8.2"
 description = "Easily download, build, install, upgrade, and uninstall Python packages"
 optional = false
 python-versions = ">=3.9"
 groups = ["main", "dev", "docs", "tests"]
 files = [
-    {file = "setuptools-75.8.1-py3-none-any.whl", hash = "sha256:3bc32c0b84c643299ca94e77f834730f126efd621de0cc1de64119e0e17dab1f"},
-    {file = "setuptools-75.8.1.tar.gz", hash = "sha256:65fb779a8f28895242923582eadca2337285f0891c2c9e160754df917c3d2530"},
+    {file = "setuptools-75.8.2-py3-none-any.whl", hash = "sha256:558e47c15f1811c1fa7adbd0096669bf76c1d3f433f58324df69f3f5ecac4e8f"},
+    {file = "setuptools-75.8.2.tar.gz", hash = "sha256:4880473a969e5f23f2a2be3646b2dfd84af9028716d398e46192f84bc36900d2"},
 ]
 markers = {main = "sys_platform != \"linux\" and sys_platform != \"darwin\" and python_version >= \"3.12\" or sys_platform == \"linux\" or sys_platform == \"darwin\"", dev = "sys_platform == \"linux\" or sys_platform == \"darwin\" or sys_platform != \"linux\" and sys_platform != \"darwin\"", docs = "(sys_platform == \"linux\" or sys_platform == \"darwin\" or sys_platform != \"linux\" and sys_platform != \"darwin\") and python_version >= \"3.12\"", tests = "sys_platform != \"linux\" and sys_platform != \"darwin\" and python_version >= \"3.12\" or sys_platform == \"linux\" or sys_platform == \"darwin\""}
 
@@ -3891,4 +3891,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.9,<3.13"
-content-hash = "27a57397d2d31b1721410f6c8cdb7ef78d30bd7af091371ecfae139c37d9c11d"
+content-hash = "18076fca47ca4241df21c792b0ff49ff68df43163ff0e88debf042da6e9d6217"
