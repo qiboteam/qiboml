@@ -12,15 +12,8 @@ jobs:
     steps:
       - name: Check label for deployment
         id: label_step
-        run: |
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-              echo "version=latest" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.ref_type }}" == "tag" ]]; then
-              echo "version=stable" >> $GITHUB_OUTPUT
-          else
-              echo "No deployment for this ref" >&2
-              exit 1
-          fi
+        run: echo "version=stable" >> $GITHUB_OUTPUT
+          
 
   deploy-docs:
     needs: [evaluate-label]
