@@ -34,6 +34,11 @@ furo = "^2023.3.27"
 sphinxcontrib-bibtex = "^2.5.0"
 sphinx-copybutton = "^0.5.2"
 sphinxcontrib-katex = "^0.9.9"
+recommonmark = "^0.7.1"
+nbsphinx = "^0.9.6"
+setuptools = "^75.8.2"
+ipykernel = "^6.29.5"
+torcheval = "^0.0.7"
 
 [tool.poetry.group.dev]
 optional = true
