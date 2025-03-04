@@ -27,19 +27,19 @@ def _gamma_delta_matrices(nqubits: int, hadamards, permutations):
     delta_matrix = ENGINE.eye(nqubits, dtype=int)
     delta_matrix_prime = ENGINE.copy(delta_matrix)
 
-    gamma_matrix_prime = ENGINE.random.randint(0, 2, size=nqubits)
+    gamma_matrix_prime = ENGINE.random.randint(0, 2, size=(nqubits,))
     gamma_matrix_prime = ENGINE.diag(gamma_matrix_prime)
 
-    gamma_matrix = ENGINE.random.randint(0, 2, size=nqubits)
+    gamma_matrix = ENGINE.random.randint(0, 2, size=(nqubits,))
     gamma_matrix = hadamards * gamma_matrix
     gamma_matrix = ENGINE.diag(gamma_matrix)
 
     tril_indices = ENGINE.tril_indices(nqubits, k=-1)
     delta_matrix_prime.at[tril_indices].set(
-        ENGINE.random.randint(0, 2, size=len(tril_indices[0]))
+        ENGINE.random.randint(0, 2, size=(len(tril_indices[0]),))
     )
     gamma_matrix_prime.at[tril_indices].set(
-        ENGINE.random.randint(0, 2, size=len(tril_indices[0]))
+        ENGINE.random.randint(0, 2, size=(len(tril_indices[0]),))
     )
     triu_indices = ENGINE.triu_indices(nqubits, k=1)
     gamma_matrix_prime.at[triu_indices].set(gamma_matrix_prime[tril_indices])
@@ -51,12 +51,12 @@ def _gamma_delta_matrices(nqubits: int, hadamards, permutations):
     h_col_eq_0 = hadamards[triu_indices[1]] == 0
 
     idx = (h_row_eq_0 * h_col_eq_0 ^ True) * p_col_neq_row
-    elements = ENGINE.random.randint(0, 2, size=len(idx.nonzero()[0]))
+    elements = ENGINE.random.randint(0, 2, size=(len(idx.nonzero()[0]),))
     gamma_matrix.at[triu_indices[0][idx], triu_indices[1][idx]].set(elements)
     gamma_matrix.at[triu_indices[1][idx], triu_indices[0][idx]].set(elements)
 
     idx = p_col_gt_row | (p_col_le_row * h_row_eq_0 * h_col_eq_0)
-    elements = ENGINE.random.randint(0, 2, size=len(idx.nonzero()[0]))
+    elements = ENGINE.random.randint(0, 2, size=(len(idx.nonzero()[0]),))
     delta_matrix.at[triu_indices[1][idx], triu_indices[0][idx]].set(elements)
 
     return gamma_matrix, gamma_matrix_prime, delta_matrix, delta_matrix_prime
