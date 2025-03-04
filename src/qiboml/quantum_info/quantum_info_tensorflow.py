@@ -1,6 +1,6 @@
 import numpy as np
 import tensorflow as tf
-import tensorflow.experimental.numpy as tnp
+import tensorflow.experimental.numpy as tnp  # pylint: disable=import-error
 
 ENGINE = tnp
 
