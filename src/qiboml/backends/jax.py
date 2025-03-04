@@ -24,6 +24,34 @@ class JaxBackend(NumpyBackend):
         self.tensor_types = (jnp.ndarray, numpy.ndarray)
         self.matrices.np = jnp
 
+        self.random_key = self.jax.random.PRNGKey(self.numpy.random.get_state()[1][0])
+
+        # set the engine of the quantum info operators
+        self.qinfo.ENGINE = self.np
+
+        class Random:
+            pass
+
+        random = Random()
+        random.randint = lambda minval, maxval, size: self.jax.random.randint(
+            self.random_key, minval=minval, maxval=maxval, shape=size
+        )
+        random.uniform = lambda minval, maxval, size: self.jax.random.uniform(
+            self.random_key, minval=minval, maxval=maxval, shape=size
+        )
+        self.qinfo.ENGINE.random = random
+
+        # load some custom qinfo operators
+        from qiboml.quantum_info.quantum_info_jax import QINFO
+
+        for method in dir(QINFO):
+            if method[:2] != "__":
+                setattr(self.qinfo, method, getattr(QINFO, method))
+
+    def set_seed(self, seed):
+        self.numpy.random.seed(seed)
+        self.random_key = self.jax.random.PRNGKey(self.numpy.random.get_state()[1][0])
+
     def set_precision(self, precision):
         if precision != self.precision:
             if precision == "single":
@@ -52,10 +80,6 @@ class JaxBackend(NumpyBackend):
             return self.numpy.asarray([self.to_numpy(i) for i in x])
 
         return self.numpy.asarray(x)
-
-    # TODO: using numpy's rng for now. Shall we use Jax's?
-    def set_seed(self, seed):
-        self.numpy.random.seed(seed)
 
     def sample_shots(self, probabilities, nshots):
         return self.numpy.random.choice(
