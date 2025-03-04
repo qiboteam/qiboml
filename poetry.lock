@@ -2399,31 +2399,36 @@ files = [
 
 [[package]]
 name = "qibo"
-version = "0.2.16"
+version = "0.2.17"
 description = "A framework for quantum computing with hardware acceleration."
 optional = false
-python-versions = "<3.13,>=3.9"
+python-versions = ">=3.9,<3.13"
 groups = ["main"]
 markers = "sys_platform == \"linux\" or sys_platform == \"darwin\" or sys_platform != \"linux\" and sys_platform != \"darwin\""
-files = [
-    {file = "qibo-0.2.16-py3-none-any.whl", hash = "sha256:6a854e144dc0384fc6ee472ec0467c90f23661701a96821ad55fe1e33e386603"},
-    {file = "qibo-0.2.16.tar.gz", hash = "sha256:3063fae1c92314c93b179f220e09406e8efc59876f6b6d5a99a6b583c6d428fd"},
-]
+files = []
+develop = false
 
 [package.dependencies]
-cma = ">=3.3.0,<4.0.0"
-joblib = ">=1.2.0,<2.0.0"
-networkx = ">=3.2.1,<4.0.0"
-numpy = ">=1.26.4,<2.0.0"
+cma = "^3.3.0"
+joblib = "^1.2.0"
+networkx = "^3.2.1"
+numpy = "^1.26.4"
 openqasm3 = {version = ">=0.5.0", extras = ["parser"]}
-optuna = ">=4.0.0,<5.0.0"
-scipy = ">=1.10.1,<2.0.0"
-sympy = ">=1.11.1,<2.0.0"
-tabulate = ">=0.9.0,<0.10.0"
+optuna = "^4.0.0"
+scipy = "^1.10.1"
+sympy = "^1.11.1"
+tabulate = "^0.9.0"
 
 [package.extras]
+qinfo = []
 qulacs = ["qulacs (>=0.6.4,<0.7.0) ; python_version > \"3.9\" or sys_platform != \"darwin\""]
 torch = ["torch (>=2.1.1,<2.4)"]
+
+[package.source]
+type = "git"
+url = "https://github.com/qiboteam/qibo/"
+reference = "qinfo_jit"
+resolved_reference = "19f8cdee9bc113db8f435c90ad3362da99fde9c4"
 
 [[package]]
 name = "requests"
@@ -3523,4 +3528,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.9,<3.13"
-content-hash = "76b24e1acd0001638f5ae3bbef2f2bbc2cbcd6bef715bdc000ccebc02d76e27e"
+content-hash = "9b16392e210851717a1cd766c5c3d95f285b82756c9ba7835e5a6dd54907a5d2"
