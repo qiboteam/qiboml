@@ -1,5 +1,5 @@
 import numpy as np
-import tensorflow as tf
+import tensorflow as tf  # pylint: disable=import-error
 import tensorflow.experimental.numpy as tnp  # pylint: disable=import-error
 
 ENGINE = tnp
