@@ -67,7 +67,7 @@ docs-clean = "make -C doc clean"
 test-docs = "make -C doc doctest"
 
 [tool.coverage.run]
-omit = ["quantum_info/*"]
+omit = ["src/qiboml/quantum_info/*"]
 
 [tool.pytest.ini_options]
 testpaths = ['tests/', 'benchmarks/']
