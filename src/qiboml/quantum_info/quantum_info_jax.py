@@ -62,11 +62,11 @@ def _gamma_delta_matrices(nqubits: int, hadamards, permutations):
     return gamma_matrix, gamma_matrix_prime, delta_matrix, delta_matrix_prime
 
 
-class QinfoTensorflow:
+class QinfoJax:
     pass
 
 
-QINFO = QinfoTensorflow()
+QINFO = QinfoJax()
 
 for function in (_sample_from_quantum_mallows_distribution, _gamma_delta_matrices):
     setattr(QINFO, function.__name__, function)
