@@ -73,6 +73,26 @@ class TensorflowBackend(NumpyBackend):
 
         self.tensor_types = (np.ndarray, tf.Tensor, tf.Variable)
 
+        # set the engine of the quantum info operators
+        self.qinfo.ENGINE = self.np
+        self.qinfo.ENGINE.einsum = np.einsum
+        self.qinfo.ENGINE.nonzero = np.nonzero
+        self.qinfo.ENGINE.random.normal = (
+            lambda loc, scale, size: self.tf.random.normal(
+                shape=size, mean=loc, stddev=scale
+            )
+        )
+        # load some custom qinfo operators
+        from qiboml.quantum_info.quantum_info_tensorflow import QINFO
+
+        for method in dir(QINFO):
+            if method[:2] != "__":
+                setattr(self.qinfo, method, getattr(QINFO, method))
+
+    def set_seed(self, seed):
+        np.random.seed(seed)
+        self.np.random.seed(np.random.get_state()[1][0])
+
     def set_device(self, device):  # pragma: no cover
         self.device = device
 
