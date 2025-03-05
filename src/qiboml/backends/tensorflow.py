@@ -75,6 +75,13 @@ class TensorflowBackend(NumpyBackend):
 
         # set the engine of the quantum info operators
         self.qinfo.ENGINE = self.np
+        self.qinfo.ENGINE.einsum = np.einsum
+        self.qinfo.ENGINE.nonzero = np.nonzero
+        self.qinfo.ENGINE.random.normal = (
+            lambda loc, scale, size: self.tf.random.normal(
+                shape=size, mean=loc, stddev=scale
+            )
+        )
         # load some custom qinfo operators
         from qiboml.quantum_info.quantum_info_tensorflow import QINFO
 
