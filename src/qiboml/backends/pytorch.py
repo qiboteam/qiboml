@@ -71,6 +71,18 @@ class PyTorchBackend(NumpyBackend):
         self.np.sign = self.np.sgn
         self.np.flatnonzero = lambda x: self.np.nonzero(x).flatten()
 
+        # These functions are device dependent
+        torch_zeros = self.np.zeros
+
+        def zeros(shape, dtype=None, device=None):
+            if dtype is None:
+                dtype = self.dtype
+            if device is None:
+                device = self.device
+            return torch_zeros(shape, dtype=dtype, device=device)
+
+        setattr(self.np, "zeros", zeros)
+
     def _torch_dtype(self, dtype):
         if dtype == "float":
             dtype += "32"
@@ -177,16 +189,6 @@ class PyTorchBackend(NumpyBackend):
         return self.np.tensor(
             x, dtype=self.dtype, requires_grad=trainable, device=self.device
         )
-
-    def zero_state(self, nqubits):
-        state = self.np.zeros(2**nqubits, dtype=self.dtype, device=self.device)
-        state[0] = 1
-        return state
-
-    def zero_density_matrix(self, nqubits):
-        state = self.np.zeros(2 * (2**nqubits,), dtype=self.dtype, device=self.device)
-        state[0, 0] = 1
-        return state
 
     def is_sparse(self, x):
         if isinstance(x, self.np.Tensor):

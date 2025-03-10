@@ -131,7 +131,7 @@ class PSR(Differentiation):
         generator_eigenval = gate.generator_eigenvalue()
         s = np.pi / (4 * generator_eigenval)
 
-        tmp_params = backend.cast(parameters, copy=True)
+        tmp_params = backend.cast(parameters, copy=True, dtype=parameters[0].dtype)
         tmp_params = self.shift_parameter(tmp_params, parameter_index, s, backend)
 
         circuit.set_parameters(tmp_params)
