@@ -1,6 +1,7 @@
 """Torch interface to qiboml layers"""
 
 from dataclasses import dataclass
+from typing import Optional
 
 import numpy as np
 import torch
@@ -16,16 +17,26 @@ DEFAULT_DIFFERENTIATION = {
     "qiboml-pytorch": None,
     "qiboml-tensorflow": Jax,
     "qiboml-jax": Jax,
+    "numpy": Jax,
 }
 
 
 @dataclass(eq=False)
 class QuantumModel(torch.nn.Module):
+    """
+    The pytorch interface to qiboml models.
+
+    Args:
+        encoding (QuantumEncoding): the encoding layer.
+        circuit (Circuit): the trainable circuit.
+        decoding (QuantumDecoding): the decoding layer.
+        differentiation (Differentiation, optional): the differentiation engine, if not provided a default one will be picked following what described in the :ref:`docs <_differentiation_engine>`.
+    """
 
     encoding: QuantumEncoding
     circuit: Circuit
     decoding: QuantumDecoding
-    differentiation: Differentiation = None
+    differentiation: Optional[Differentiation] = None
 
     def __post_init__(
         self,
@@ -54,6 +65,15 @@ class QuantumModel(torch.nn.Module):
                     self.differentiation = PSR()
 
     def forward(self, x: torch.Tensor):
+        """
+        Perform one forward pass of the model: encode the classical data
+        in a quantum circuit, executes it and decodes it.
+
+        Args:
+            x (torch.tensor): the input data.
+        Returns:
+            (torch.tensor): the computed outputs.
+        """
         if self.differentiation is None:
             self.circuit.set_parameters(list(self.parameters())[0])
             x = self.encoding(x) + self.circuit
@@ -74,20 +94,43 @@ class QuantumModel(torch.nn.Module):
     def nqubits(
         self,
     ) -> int:
+        """
+        The total number of qubits of the model.
+
+        Returns:
+            (int): the total number of qubits.
+        """
         return self.encoding.nqubits
 
     @property
     def backend(
         self,
     ) -> Backend:
+        """
+        The execution backend of the model, which is inherited by the decoder.
+
+        Returns:
+            (Backend): the backend.
+        """
         return self.decoding.backend
 
     @property
     def output_shape(self):
+        """
+        The shape of the output tensor produced by the model, which is
+        defined by the decoder.
+
+        Returns:
+            (tuple(int)): the shape.
+        """
         return self.decoding.output_shape
 
 
 class QuantumModelAutoGrad(torch.autograd.Function):
+    """
+    Custom Autograd to enable the autodifferentiation of the QuantumModel for
+    non-pytorch backends.
+    """
 
     @staticmethod
     def forward(
@@ -129,10 +172,17 @@ class QuantumModelAutoGrad(torch.autograd.Function):
             )
             for par in parameters
         ]
+        wrt_inputs = not x.is_leaf and ctx.encoding.differentiable
         grad_input, *gradients = (
             torch.as_tensor(ctx.backend.to_numpy(grad).tolist())
             for grad in ctx.differentiation.evaluate(
-                x_clone, ctx.encoding, ctx.circuit, ctx.decoding, ctx.backend, *params
+                x_clone,
+                ctx.encoding,
+                ctx.circuit,
+                ctx.decoding,
+                ctx.backend,
+                *params,
+                wrt_inputs=wrt_inputs,
             )
         )
         gradients = torch.vstack(gradients).view((-1,) + grad_output.shape)

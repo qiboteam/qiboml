@@ -55,6 +55,7 @@ extensions = [
     "sphinx.ext.todo",
     "sphinx_copybutton",
     "sphinxcontrib.bibtex",
+    "nbsphinx",
 ]
 
 bibtex_bibfiles = ["refs.bib"]
