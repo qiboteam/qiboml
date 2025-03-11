@@ -108,7 +108,11 @@ class PSR(Differentiation):
                 )
             )
         else:
-            gradient.append(backend.np.zeros((decoding.output_shape[-1], x.shape[-1])))
+            gradient.append(
+                backend.np.zeros(
+                    (decoding.output_shape[-1], x.shape[-1]), dtype=x.dtype
+                )
+            )
 
         # compute second gradient part, wrt parameters
         for i in range(len(parameters)):
