@@ -9,23 +9,17 @@ What is Qiboml?
 Qiboml is an open-source and full-stack quantum machine learning package based on Qibo.
 Among the goals of Qiboml we have:
 
-* provide automatic differentiable backends for any Qibo application;
-* render Qibo circuits as differentiable layers of well-known machine learning frameworks such as Tensorflow and Pytorch;
-* extend quantum machine learning algorithm execution to self-hosted devices through Qibolab;
-* integrate hardware-level routines into higher-level quantum machine learning algorithms through Qibocal.
+* provide automatically differentiable backends for any Qibo application;
+* render Qibo circuits as differentiable layers of well-known machine learning frameworks such as `Tensorflow <https://www.tensorflow.org/>`_ and `Pytorch <https://pytorch.org/>`_;
+* extend quantum machine learning algorithm execution to self-hosted devices through `Qibolab <https://github.com/qiboteam/qibolab>`_;
+* integrate hardware-level routines into higher-level quantum machine learning algorithms through `Qibocal <https://github.com/qiboteam/qibocal>`_.
 
 
 How to Use the Documentation
 ============================
 
 Welcome to the comprehensive documentation for Qiboml!
-This guide will help you navigate through the various sections and make the most of the resources available.
-
-
-1. **Getting started**: Begin by referring to the
-   :doc:`/getting-started/installation/` guide to set up the ``Qiboml`` library in your environment.
-2. Learn how to setup a differentiable Qibo backend for quantum machine learning applications with
-   :doc:`/getting-started/construct_backends/` guide.
+This guide will help you navigate through the various sections and make the most out of the resources available.
 
 Contents
 --------
@@ -34,7 +28,14 @@ Contents
    :maxdepth: 2
    :caption: Introduction
 
-   getting-started/index
+   getting_started/index
+   advanced/index
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Tutorials
+
+   tutorials/binary_mnist
 
 .. toctree::
     :maxdepth: 1

@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+<<<<<<< HEAD
 import qibo
 import torch
 from qibo import hamiltonians
@@ -7,38 +8,50 @@ from qibo.backends import NumpyBackend, PyTorchBackend
 
 from qibojit.backends import NumbaBackend
 
+=======
+import torch
+from qibo import hamiltonians
+from qibo.backends import NumpyBackend
+from qibojit.backends import NumbaBackend
+
+from qiboml.backends import PyTorchBackend
+>>>>>>> main
 from qiboml.models.ansatze import ReuploadingCircuit
 from qiboml.models.decoding import Expectation
 from qiboml.models.encoding import PhaseEncoding
 from qiboml.operations.differentiation import PSR
 
 # TODO: use the classical conftest mechanism or customize mechanism for this test
-EXECUTION_BACKENDS = [NumpyBackend(), PyTorchBackend()]
+EXECUTION_BACKENDS = [NumbaBackend(), NumpyBackend(), PyTorchBackend()]
 
 TARGET_GRAD = np.array([0.130832955241203, 0.0, -1.806316614151001, 0.0])
+TARGET_GRAD = {
+    "no_inputs": np.array([0.130832955241203, 0.0, -1.806316614151001, 0.0]),
+    "wrt_inputs": np.array([0.0257030516, 0.0, -0.948796222, 0.0]),
+}
 
 torch.set_default_dtype(torch.float64)
 torch.set_printoptions(precision=15, sci_mode=False)
 
 
-def construct_x(frontend):
+def construct_x(frontend, with_factor=False):
     if frontend.__name__ == "qiboml.interfaces.pytorch":
-        return frontend.torch.tensor([0.5, 0.8])
+        x = frontend.torch.tensor([0.5, 0.8])
+        if with_factor:
+            return torch.tensor(2.0, requires_grad=True) * x
+        return x
     elif frontend.__name__ == "qiboml.interfaces.keras":
         return frontend.tf.Variable([0.5, 0.8])
 
 
 def compute_gradient(frontend, model, x):
-    breakpoint()
-    if frontend.__name__ == "qiboml.models.keras":
-        breakpoint()
+    if frontend.__name__ == "qiboml.interfaces.keras":
         # TODO: to check if this work once keras interface is introduced
         with frontend.tf.GradientTape() as tape:
-            breakpoint()
             expval = model(x)
         return tape.gradient(expval, model.parameters)
 
-    elif frontend.__name__ == "qiboml.models.pytorch":
+    elif frontend.__name__ == "qiboml.interfaces.pytorch":
         expval = model(x)
         expval.backward()
         # TODO: standardize this output with keras' one and use less convolutions
@@ -46,9 +59,10 @@ def compute_gradient(frontend, model, x):
         return grad
 
 
-@pytest.mark.parametrize("nshots", [None, 500000])
+@pytest.mark.parametrize("nshots", [None, 12000000])
 @pytest.mark.parametrize("backend", EXECUTION_BACKENDS)
-def test_expval_grad_PSR(frontend, backend, nshots):
+@pytest.mark.parametrize("wrt_inputs", [True, False])
+def test_expval_grad_PSR(frontend, backend, nshots, wrt_inputs):
     """
     Compute test gradient of < 0 | model^dag observable model | 0 > w.r.t model's
     parameters. In this test the system size is fixed to two qubits and all the
@@ -56,18 +70,20 @@ def test_expval_grad_PSR(frontend, backend, nshots):
     """
 
     if frontend.__name__ == "qiboml.interfaces.keras":
-        from qiboml.interfaces.keras import QuantumModel
+        pytest.skip("keras interface not ready.")
     elif frontend.__name__ == "qiboml.interfaces.pytorch":
-        pytest.skip("torch interface not ready.")
+        from qiboml.interfaces.pytorch import QuantumModel
 
     decimals = 6 if nshots is None else 1
 
     frontend.np.random.seed(42)
+    backend.set_seed(42)
 
-    x = construct_x(frontend)
+    x = construct_x(frontend, with_factor=wrt_inputs)
 
     nqubits = 2
-    obs = hamiltonians.Z(nqubits=nqubits)
+
+    obs = hamiltonians.Z(nqubits=nqubits, backend=backend)
 
     encoding_layer = PhaseEncoding(nqubits=nqubits)
     training_layer = ReuploadingCircuit(nqubits=nqubits, nlayers=1)
@@ -80,20 +96,16 @@ def test_expval_grad_PSR(frontend, backend, nshots):
 
     nparams = len(training_layer.get_parameters())
     initial_params = np.linspace(0.0, 2 * np.pi, nparams)
-    training_layer.set_parameters(initial_params)
+    training_layer.set_parameters(backend.cast(initial_params))
 
-    q_model = frontend.QuantumModel(
+    q_model = QuantumModel(
         encoding=encoding_layer,
         circuit=training_layer,
         decoding=decoding_layer,
         differentiation=PSR(),
     )
 
-    grad = compute_gradient(frontend, q_model, x)
+    target_grad = TARGET_GRAD["wrt_inputs"] if wrt_inputs else TARGET_GRAD["no_inputs"]
 
-    assert np.round(grad[0], decimals=decimals) == np.round(
-        TARGET_GRAD[0], decimals=decimals
-    )
-    assert np.round(grad[2], decimals=decimals) == np.round(
-        TARGET_GRAD[2], decimals=decimals
-    )
+    grad = compute_gradient(frontend, q_model, x)
+    backend.assert_allclose(grad, target_grad, atol=1e-3)

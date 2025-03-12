@@ -10,8 +10,8 @@ def test_binary_encoding_layer(backend):
     layer = ed.BinaryEncoding(nqubits, qubits=qubits)
     data = backend.cast(np.random.choice([0, 1], size=(len(qubits),)))
     c = layer(data)
-    indices = [gate.qubits[0] for gate in c.queue if gate.name == "x"]
-    assert [qubits[i] for i in np.flatnonzero(data == 1)] == indices
+    for bit, gate in zip(data, c.queue):
+        assert bit == gate.init_kwargs["theta"] / np.pi
     # test shape error
     with pytest.raises(RuntimeError):
         layer(backend.cast(np.random.choice([0, 1], size=(len(qubits) - 1,))))

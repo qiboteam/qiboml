@@ -12,7 +12,7 @@ ndarray = npt.NDArray
 try:
     from tensorflow import Tensor as tf_tensor
 
-    from qiboml.models import keras
+    from qiboml.interfaces import keras
 
     ndarray = Union[ndarray, tf_tensor]
 except ImportError:  # pragma: no cover
@@ -21,7 +21,7 @@ except ImportError:  # pragma: no cover
 try:
     from torch import Tensor as pt_tensor
 
-    from qiboml.models import pytorch
+    from qiboml.interfaces import pytorch
 
     ndarray = Union[ndarray, pt_tensor]
 except ImportError:  # pragma: no cover

@@ -13,7 +13,7 @@ def test_probabilities_layer(backend):
     layer = dec.Probabilities(nqubits, qubits=qubits, backend=backend)
     c = random_clifford(nqubits, backend=backend)
     backend.assert_allclose(
-        layer(c).ravel(), backend.execute_circuit(c).probabilities()
+        layer(c).ravel(), backend.execute_circuit(c).probabilities(qubits)
     )
 
 
@@ -27,32 +27,40 @@ def test_state_layer(backend):
     )
 
 
-@pytest.mark.parametrize("analytic", [True, False])
-def test_expectation_layer(backend, analytic):
+@pytest.mark.parametrize("nshots", [None, 10000])
+@pytest.mark.parametrize(
+    "observable",
+    [
+        None,
+        lambda n, b: hamiltonians.SymbolicHamiltonian(
+            sum([Z(i) for i in range(n)]), nqubits=n, backend=b
+        ),
+    ],
+)
+def test_expectation_layer(backend, nshots, observable):
     backend.set_seed(42)
     rng = np.random.default_rng(42)
     nqubits = 5
-    # test observable error
-    with pytest.raises(RuntimeError):
-        layer = dec.Expectation(nqubits, backend=backend)
+    if observable is None:
+        pytest.skip(
+            "This fails due to qibo, it should be solved by qibo#1548: remove this skip after merge"
+        )
 
     c = random_clifford(nqubits, seed=rng, backend=backend)
-    observable = hamiltonians.SymbolicHamiltonian(
-        sum([Z(i) for i in range(nqubits)]),
-        nqubits=nqubits,
-        backend=backend,
-    )
+    if observable is not None:
+        observable = observable(nqubits, backend)
     layer = dec.Expectation(
         nqubits,
         observable=observable,
-        nshots=int(1e5),
+        nshots=nshots,
         backend=backend,
-        analytic=analytic,
     )
     layer_expv = layer(c)
+    if observable is None:
+        observable = hamiltonians.Z(nqubits, dense=False, backend=backend)
     expv = (
         observable.expectation(backend.execute_circuit(c).state())
-        if analytic
+        if nshots is None
         else observable.expectation_from_samples(
             layer.circuit.measurements[0].result.frequencies()
         )
