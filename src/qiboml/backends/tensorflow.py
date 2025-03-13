@@ -118,7 +118,11 @@ class TensorflowBackend(NumpyBackend):
 
     def matrix(self, gate):
         npmatrix = super().matrix(gate)
-        return self.tf.cast(npmatrix, dtype=self.dtype)
+        # delete cached matrix if it's symbolic
+        if self.tf.is_symbolic_tensor(npmatrix):
+            delattr(self.matrices, gate.__class__.__name__)
+        return npmatrix
+        # return self.tf.cast(npmatrix, dtype=self.dtype)
 
     def matrix_parametrized(self, gate):
         npmatrix = super().matrix_parametrized(gate)

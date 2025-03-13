@@ -35,26 +35,6 @@ def random_subset(nqubits, k):
     return np.random.choice(range(nqubits), size=(k,), replace=False).tolist()
 
 
-def build_linear_layer_adding(frontend, q_model):
-    model = frontend.keras.Sequential()
-    model.add(
-        frontend.keras.layers.Dense(
-            5,
-            name="Dense0",
-            activation="relu",
-            input_shape=(input_size,),
-        )
-    )
-    model.add(q_model)
-    model.add(
-        frontend.keras.layers.Dense(
-            12,
-            name="Dense1",
-            activation="relu",
-        )
-    )
-
-
 def build_linear_layer(frontend, input_dim, output_dim):
     if frontend.__name__ == "qiboml.interfaces.pytorch":
         return frontend.torch.nn.Linear(input_dim, output_dim)
@@ -67,13 +47,6 @@ def build_linear_layer(frontend, input_dim, output_dim):
 def build_sequential_model(frontend, layers):
     if frontend.__name__ == "qiboml.interfaces.pytorch":
         return frontend.torch.nn.Sequential(*layers)
-    """
-    elif frontend.__name__ == "qiboml.models.keras":
-        input_dim = 32
-        model = frontend.keras.Sequential(layers)
-        model.build((None, input_dim))
-        return model
-    """
     elif frontend.__name__ == "qiboml.interfaces.keras":
         return frontend.keras.Sequential(layers)
     else:
@@ -93,7 +66,16 @@ def build_activation(frontend, binary=False):
                 return x
 
     elif frontend.__name__ == "qiboml.interfaces.keras":
-        pass
+
+        class Activation(frontend.keras.layers.Layer):
+            def call(self, x):
+                if not binary:
+                    # normalize
+                    x = x / x.max()
+                    # apply the tanh and rescale by pi
+                    return np.pi * frontend.keras.activations.tanh(x)
+                return x
+
     else:
         raise_error(RuntimeError, f"Unknown frontend {frontend}.")
 
@@ -111,9 +93,11 @@ def random_tensor(frontend, shape, binary=False):
         )
     elif frontend.__name__ == "qiboml.interfaces.keras":
         tensor = (
-            frontend.tf.random.uniform(shape, minval=0, maxval=2, dtype=tf.int32)
+            frontend.tf.random.uniform(
+                shape, minval=0, maxval=2, dtype=frontend.tf.int32
+            )
             if binary
-            else tf.random.normal(shape)
+            else frontend.tf.random.normal(shape)
         )
     else:
         raise_error(RuntimeError, f"Unknown frontend {frontend}.")
@@ -177,7 +161,7 @@ def eval_model(frontend, model, data, target=None):
             reduction="sum_over_batch_size",
         )
         for x in data:
-            x = tf.expand_dims(x, axis=0)
+            x = frontend.tf.expand_dims(x, axis=0)
             outputs.append(model(x))
         outputs = frontend.tf.stack(outputs, axis=0)
     if target is not None:
@@ -203,8 +187,8 @@ def random_parameters(frontend, model):
             # of the original parameters
     elif frontend.__name__ == "qiboml.interfaces.keras":
         new_params = []
-        for i in range(len(model.get_weights())):
-            new_params += [frontend.tf.random.uniform(model.get_weights()[i].shape)]
+        for weight in model.get_weights():
+            new_params += [weight + frontend.tf.random.uniform(weight.shape) / 5]
     return new_params
 
 
@@ -252,8 +236,8 @@ def backprop_test(frontend, model, data, target):
 
 @pytest.mark.parametrize("layer,seed", zip(ENCODING_LAYERS, [4, 1]))
 def test_encoding(backend, frontend, layer, seed):
-    if frontend.__name__ == "qiboml.interfaces.keras":
-        pytest.skip("keras interface not ready.")
+    # if frontend.__name__ == "qiboml.interfaces.keras":
+    #    pytest.skip("keras interface not ready.")
 
     set_seed(frontend, seed)
 
