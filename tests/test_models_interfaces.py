@@ -159,7 +159,7 @@ def train_model(frontend, model, data, target):
 
         dummy_in = data[-1][None, :]
         dummy_out = model(data[-1][None, :])
-        avg_grad = [grad.mean() for grad in train_step(dummy_in, dummy_out)]
+        avg_grad = [frontend.tf.norm(grad) for grad in train_step(dummy_in, dummy_out)]
         return sum(avg_grad) / len(avg_grad)
 
 

@@ -57,7 +57,6 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
         if self.differentiation is None:
-            print("--> running call")
             # this 1 * is needed otherwise a TypeError is raised
             self.circuit.set_parameters(1 * self.circuit_parameters)
 
