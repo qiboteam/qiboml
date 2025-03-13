@@ -143,6 +143,25 @@ def train_model(frontend, model, data, target):
             epochs=max_epochs,
         )
 
+        @frontend.tf.function
+        def train_step(x, y):
+            with frontend.tf.GradientTape() as tape:
+                predictions = model(x)
+                loss = loss_f(y, predictions)
+
+            gradients = tape.gradient(
+                loss, model.trainable_variables
+            )  # Compute gradients
+            optimizer.apply_gradients(
+                zip(gradients, model.trainable_variables)
+            )  # Apply gradients
+            return gradients
+
+        dummy_in = data[-1][None, :]
+        dummy_out = model(data[-1][None, :])
+        avg_grad = [grad.mean() for grad in train_step(dummy_in, dummy_out)]
+        return sum(avg_grad) / len(avg_grad)
+
 
 def eval_model(frontend, model, data, target=None):
     loss = None
@@ -208,22 +227,16 @@ def set_parameters(frontend, model, params):
 
 def prepare_targets(frontend, model, data):
     target_params = random_parameters(frontend, model)
-
     init_params = get_parameters(frontend, model)
-
     set_parameters(frontend, model, target_params)
-
     target, _ = eval_model(frontend, model, data)
     set_parameters(frontend, model, init_params)
     return target
 
 
 def backprop_test(frontend, model, data, target):
-    # Calcolo la loss coi parametri iniziali
     _, loss_untrained = eval_model(frontend, model, data, target)
-    # Calcolo i gradienti
     grad = train_model(frontend, model, data, target)
-    # Calcolo la loss
     _, loss_trained = eval_model(frontend, model, data, target)
     assert grad < 1e-2
     assert round(float(loss_untrained), 6) >= round(float(loss_trained), 6)
