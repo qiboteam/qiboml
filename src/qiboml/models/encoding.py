@@ -22,6 +22,7 @@ class QuantumEncoding(ABC):
 
     nqubits: int
     qubits: Optional[tuple[int]] = None
+
     _circuit: Circuit = None
 
     def __post_init__(
@@ -129,8 +130,3 @@ class BinaryEncoding(QuantumEncoding):
     @property
     def differentiable(self) -> bool:
         return False
-
-
-@dataclass
-class DataReuploading(PhaseEncoding):
-    nlayers: int = 1

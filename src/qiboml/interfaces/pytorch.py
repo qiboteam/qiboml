@@ -1,6 +1,5 @@
 """Torch interface to qiboml layers"""
 
-from copy import deepcopy
 from dataclasses import dataclass
 from typing import List, Optional, Union
 
@@ -10,7 +9,7 @@ from qibo.backends import Backend
 from qibo.ui import plot_circuit
 
 from qiboml.models.decoding import QuantumDecoding
-from qiboml.models.encoding import DataReuploading, QuantumEncoding
+from qiboml.models.encoding import QuantumEncoding
 from qiboml.operations.differentiation import PSR, Differentiation, Jax
 
 DEFAULT_DIFFERENTIATION = {
@@ -30,11 +29,11 @@ class QuantumModel(torch.nn.Module):
         encoding (QuantumEncoding): the encoding layer.
         circuit (Circuit): the trainable circuit.
         decoding (QuantumDecoding): the decoding layer.
-        differentiation (Differentiation, optional): the differentiation engine, if not provided a default one will be picked following what described in the :ref:`docs <_differentiation_engine>`.
+        differentiation (Differentiation, optional): the differentiation engine,
+            if not provided a default one will be picked following what described in the :ref:`docs <_differentiation_engine>`.
     """
 
-    encoding: QuantumEncoding
-    circuit: Circuit
+    circuit_structure: List[Union[QuantumEncoding, Circuit]]
     decoding: QuantumDecoding
     differentiation: Optional[Differentiation] = None
 
@@ -43,18 +42,10 @@ class QuantumModel(torch.nn.Module):
     ):
         super().__init__()
 
-        if isinstance(self.encoding, DataReuploading):
-            # In order to have nlayers different trainable circuits
-            self.circuits = [
-                deepcopy(self.circuit) for _ in range(self.encoding.nlayers)
-            ]
-            params = []
-            for l in range(self.encoding.nlayers):
-                params.extend(
-                    [p for param in self.circuits[l].get_parameters() for p in param]
-                )
-        else:
-            params = [p for param in self.circuit.get_parameters() for p in param]
+        params = []
+        for circ in self.circuit_structure:
+            if not isinstance(circ, QuantumEncoding):
+                params.extend([p for param in circ.get_parameters() for p in param])
 
         params = torch.as_tensor(self.backend.to_numpy(x=params)).ravel()
         params.requires_grad = True
@@ -88,26 +79,19 @@ class QuantumModel(torch.nn.Module):
         """
         if self.differentiation is None:
 
-            circuit = Circuit(self.encoding.nqubits)
-
-            if isinstance(self.encoding, DataReuploading):
-                for l in range(self.encoding.nlayers):
-                    circuit += self.encoding(x) + self.circuits[l]
-            else:
-                circuit = self.encoding(x) + self.circuit
+            circuit = Circuit(self.nqubits)
+            for circ in self.circuit_structure:
+                if isinstance(circ, QuantumEncoding):
+                    circuit += circ(x)
+                else:
+                    circuit += circ
 
             circuit.set_parameters(list(self.parameters())[0])
             x = self.decoding(circuit)
         else:
-            if isinstance(self.encoding, DataReuploading):
-                circuit = self.circuits
-            else:
-                circuit = self.circuit
-
             x = QuantumModelAutoGrad.apply(
                 x,
-                self.encoding,
-                circuit,
+                self.circuit_structure,
                 self.decoding,
                 self.backend,
                 self.differentiation,
@@ -125,7 +109,7 @@ class QuantumModel(torch.nn.Module):
         Returns:
             (int): the total number of qubits.
         """
-        return self.encoding.nqubits
+        return self.decoding.nqubits
 
     @property
     def backend(
@@ -150,15 +134,27 @@ class QuantumModel(torch.nn.Module):
         """
         return self.decoding.output_shape
 
-    def draw(self):
-        """Draw the full circuit structure."""
-        circ = Circuit(self.nqubits)
-        if isinstance(self.encoding, DataReuploading):
-            for _ in range(self.encoding.nlayers):
-                circ += self.encoding.circuit + self.circuit
+    def draw(self, plt_drawing=True, **plt_kwargs):
+        """
+        Draw the full circuit structure.
+
+        Args:
+            plt_drawing (bool): if True, the `qibo.ui.plot_circuit` function is used.
+                If False, the default `circuit.draw` method is used.
+            plt_kwargs (dict): extra arguments which can be set to customize the
+                `qibo.ui.plot_circuit` function.
+        """
+        circuit = Circuit(self.nqubits)
+        for circ in self.circuit_structure:
+            if isinstance(circ, QuantumEncoding):
+                circuit += circ.circuit
+            else:
+                circuit += circ
+
+        if plt_drawing:
+            plot_circuit(circuit, **plt_kwargs)
         else:
-            circ += self.encoding.circuit + self.circuit
-        plot_circuit(circ)
+            circuit.draw()
 
 
 class QuantumModelAutoGrad(torch.autograd.Function):
@@ -171,19 +167,18 @@ class QuantumModelAutoGrad(torch.autograd.Function):
     def forward(
         ctx,
         x: torch.Tensor,
-        encoding: QuantumEncoding,
-        circuit: Union[Circuit, List[Circuit]],
+        circuit_structure: List[Union[QuantumEncoding, Circuit]],
         decoding: QuantumDecoding,
         backend,
         differentiation,
-        *parameters: list[torch.nn.Parameter],
+        *parameters: List[torch.nn.Parameter],
     ):
         ctx.save_for_backward(x, *parameters)
-        ctx.encoding = encoding
-        ctx.circuit = circuit
+        ctx.circuit_structure = circuit_structure
         ctx.decoding = decoding
         ctx.backend = backend
         ctx.differentiation = differentiation
+
         x_clone = x.clone().detach().cpu().numpy()
         x_clone = backend.cast(x_clone, dtype=x_clone.dtype)
         params = [
@@ -191,15 +186,16 @@ class QuantumModelAutoGrad(torch.autograd.Function):
             for par in parameters
         ]
 
-        # temporary circuit
-        circ = Circuit(encoding.nqubits)
-        if isinstance(encoding, DataReuploading):
-            for l in range(encoding.nlayers):
-                circ += encoding(x_clone) + circuit[l]
-        else:
-            circ = encoding(x_clone) + circuit
-        circ.set_parameters(params)
-        x_clone = decoding(circ)
+        # Build the temporary circuit based on the number of layers
+        circuit = Circuit(decoding.nqubits)
+        for circ in circuit_structure:
+            if isinstance(circ, QuantumEncoding):
+                circuit += circ(x_clone)
+            else:
+                circuit += circ
+
+        circuit.set_parameters(params)
+        x_clone = decoding(circuit)
         x_clone = torch.as_tensor(backend.to_numpy(x_clone).tolist())
         return x_clone
 
@@ -215,18 +211,21 @@ class QuantumModelAutoGrad(torch.autograd.Function):
             for par in parameters
         ]
         wrt_inputs = not x.is_leaf and ctx.encoding.differentiable
-        grad_input, *gradients = (
-            torch.as_tensor(ctx.backend.to_numpy(grad).tolist())
-            for grad in ctx.differentiation.evaluate(
-                x_clone,
-                ctx.encoding,
-                ctx.circuit,
-                ctx.decoding,
-                ctx.backend,
-                *params,
-                wrt_inputs=wrt_inputs,
-            )
+        # Evaluate the gradients using the differentiation engine
+        grad_vals = ctx.differentiation.evaluate(
+            x_clone,
+            ctx.circuit_structure,
+            ctx.decoding,
+            ctx.backend,
+            *params,
+            wrt_inputs=wrt_inputs,
         )
+        # Convert each gradient to a torch tenso
+        grad_tensors = [
+            torch.as_tensor(ctx.backend.to_numpy(g).tolist()) for g in grad_vals
+        ]
+        grad_input, *gradients = grad_tensors
+
         gradients = torch.vstack(gradients).view((-1,) + grad_output.shape)
         left_indices = tuple(range(len(gradients.shape)))
         right_indices = left_indices[::-1][: len(gradients.shape) - 2] + (
@@ -235,7 +234,6 @@ class QuantumModelAutoGrad(torch.autograd.Function):
         gradients = torch.einsum(gradients, left_indices, grad_output.T, right_indices)
         return (
             grad_output @ grad_input,
-            None,
             None,
             None,
             None,
