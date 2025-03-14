@@ -1,6 +1,7 @@
 import inspect
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from functools import cached_property
 from typing import Optional
 
 import numpy as np
@@ -34,6 +35,8 @@ class QuantumEncoding(ABC):
         )
 
         self._circuit = Circuit(self.nqubits)
+        # Dictionary which helps to map each data component into a gate in the circuit
+        self._data_to_gate = {}
 
     @abstractmethod
     def __call__(self, x: ndarray) -> Circuit:
@@ -82,12 +85,22 @@ class PhaseEncoding(QuantumEncoding):
         for q in self.qubits:
             self._circuit.add(self.encoding_gate(q, **params))
 
+    @cached_property
+    def _data_to_gate(self):
+        """
+        Associate each data component with its index in the gates queue.
+        In this case, the correspondence it's simply that the i-th component
+        of the data is uploaded in the i-th gate of the queue.
+        """
+        return {f"{i}": [i] for i in range(len(self._circuit.parametrized_gates))}
+
     def _set_phases(self, x: ndarray):
         """Helper method to set the phases of the rotations of the internal circuit.
 
         Args:
             x (ndarray): the input rotation angles.
         """
+
         for gate, phase in zip(self._circuit.parametrized_gates, x.ravel()):
             gate.parameters = phase
 

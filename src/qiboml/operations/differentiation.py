@@ -12,7 +12,7 @@ from qibo.config import raise_error
 from qiboml import ndarray
 from qiboml.backends.jax import JaxBackend
 from qiboml.models.decoding import QuantumDecoding
-from qiboml.models.encoding import DataReuploading, QuantumEncoding
+from qiboml.models.encoding import QuantumEncoding
 
 
 @dataclass
@@ -25,91 +25,56 @@ class Differentiation(ABC):
     def evaluate(
         self,
         x: ndarray,
-        encoding: QuantumEncoding,
-        training: Circuit,  # TODO: replace with an abstract TrainableLayer
+        circuit_structure: List[Union[Circuit, QuantumEncoding]],
         decoding: QuantumDecoding,
         backend: Backend,
+        nlayers: int,
         *parameters: list[ndarray],
         wrt_inputs: bool = False,
     ):
         """
-        Evaluate the gradient of a quantum model w.r.t inputs and parameters,
-        respectively represented by `x` and `parameters`.
-
-        Args:
-            x (ndarray): the input data.
-            encoding (QunatumEncoding): the encoding layer.
-            training (Circuit): the trainable quantum circuit.
-            decoding (QunatumDecoding): the decoding layer.
-            backend (Backend): the backend to execute the circuit with.
-            parameters (list[ndarray]): the parameters at which to evaluate the model, and thus the derivative.
-            wrt_inputs (bool): whether to calculate the derivate with respect to inputs or not, by default ``False``.
-
-        Returns:
-            (list[ndarray]): the calculated gradients.
+        Evaluate the gradient of a quantum model w.r.t inputs and parameters.
         """
         pass
 
-    def _full_circuit(
-        self,
-        x: ndarray,
-        encoding: QuantumEncoding,
-        training: Union[Circuit, List[Circuit]],
+    @staticmethod
+    def full_circuit(
+        x: ndarray, circuit_structure: List[Union[Circuit, QuantumEncoding]]
     ):
         """
-        Helper method to reconstruct the full circuit to cover the reuploading
-        strategy.
+        Helper method to reconstruct the full circuit covering the reuploading strategy.
         """
-        circ = Circuit(encoding.nqubits)
-        if isinstance(encoding, DataReuploading):
-            for l in range(encoding.nlayers):
-                circ += encoding(x) + training[l]
-        else:
-            circ += encoding(x) + training
-        return circ
+        circuit = Circuit(circuit_structure[0].nqubits)
+        for circ in circuit_structure:
+            if isinstance(circ, QuantumEncoding):
+                circuit += circ(x)
+            else:
+                circuit += circ
+        return circuit
 
 
 class PSR(Differentiation):
     """
-    The Parameter Shift Rule differentiatior. Especially useful for non analytical
+    The Parameter Shift Rule differentiator. Especially useful for non analytical
     derivative calculation which, thus, makes it hardware compatible.
     """
 
     def evaluate(
         self,
         x: ndarray,
-        encoding: QuantumEncoding,
-        training: Circuit,  # TODO: replace with an abstract TrainableLayer
+        circuit_structure: List[Union[Circuit, QuantumEncoding]],
         decoding: QuantumDecoding,
         backend: Backend,
         *parameters: list[ndarray],
         wrt_inputs: bool = False,
     ):
-        """
-        Evaluate the gradient of a quantum model w.r.t inputs and parameters,
-        respectively represented by `x` and `parameters`.
-
-        Args:
-            x (ndarray): the input data.
-            encoding (QunatumEncoding): the encoding layer.
-            training (Circuit): the trainable quantum circuit.
-            decoding (QunatumDecoding): the decoding layer.
-            backend (Backend): the backend to execute the circuit with.
-            parameters (list[ndarray]): the parameters at which to evaluate the model, and thus the derivative.
-            wrt_inputs (bool): whether to calculate the derivate with respect to inputs or not, by default ``False``.
-
-
-        Returns:
-            (list[ndarray]): the calculated gradients.
-        """
         if decoding.output_shape != (1, 1):
             raise_error(
                 NotImplementedError,
                 "Parameter Shift Rule only supports expectation value decoding.",
             )
-        # construct circuit
-        circuit = self._full_circuit(x=x, encoding=encoding, training=training)
-
+        # construct circuit using the full circuit helper
+        circuit = Differentiation.full_circuit(x, circuit_structure)
         gradient = []
         if wrt_inputs:
             # compute first gradient part, wrt data
@@ -117,10 +82,11 @@ class PSR(Differentiation):
                 backend.np.reshape(
                     backend.np.hstack(
                         self.gradient_wrt_inputs(
-                            x,
-                            encoding,
-                            circuit,
-                            decoding,
+                            x=x,
+                            parameters=parameters,
+                            circuit_structure=circuit_structure,
+                            decoding=decoding,
+                            backend=backend,
                         )
                     ),
                     (decoding.output_shape[-1], x.shape[-1]),
@@ -162,25 +128,114 @@ class PSR(Differentiation):
         backward = decoding(circuit)
         return generator_eigenval * (forward - backward)
 
-    def gradient_wrt_inputs(
-        self,
-        x,
-        encoding,
-        circuit,
-        decoding,
-    ):
-        if isinstance(encoding, DataReuploading):
-            raise NotImplementedError(
-                f"DataReuploading encoding does not support derivative wrt inputs yet."
-            )
-        gates = encoding(x).queue
-        gradient = []
-        for input, gate in zip(x, gates):
-            shift = np.pi / (4 * gate.generator_eigenvalue())
-            forward = encoding(input + shift) + circuit
-            backward = encoding(input - shift) + circuit
-            gradient.append(decoding(forward) - decoding(backward))
+    def gradient_wrt_inputs(self, x, parameters, circuit_structure, decoding, backend):
+        """Compute the gradient of the given model w.r.t inputs."""
+
+        # The gradient w.r.t. x has to be the same dimension of x
+        backend.np.zeros(len(x))
+
+        # Scanning the circuit structure to search encodings
+        for i_circ, circ in enumerate(circuit_structure):
+            if isinstance(circ, QuantumEncoding):
+                # For each encoding, we need to track input vals locations
+                gradient += self.data_gradient_from_encoding(
+                    x=x,
+                    parameters=parameters,
+                    circ_index=i_circ,
+                    circuit_structure=circuit_structure,
+                    decoding=decoding,
+                    backend=backend,
+                )
+
         return gradient
+
+    def data_gradient_from_encoding(
+        self,
+        x: ndarray,
+        parameters: ndarray,
+        circ_index: int,
+        circuit_structure: List[Union[Circuit, QuantumEncoding]],
+        decoding: QuantumDecoding,
+        backend: Backend,
+    ):
+        """
+        Compute the contribution to the gradient w.r.t inputs due to a specific
+        encoding layer in the circuit structure.
+        """
+        gradient = backend.np.zeros(len(x))
+
+        for i_x in len(x):
+            # Collecting the indices of the gates, in the queue of encoding
+            # which are affected by the i-th component of x
+            affected_gates_indices = circuit_structure[circ_index]._data_to_gate[
+                str(i_x)
+            ]
+            for gate in circuit_structure[circ_index](x).queue[affected_gates_indices]:
+                if len(gate.parameters) != 1:
+                    raise_error(
+                        NotImplementedError,
+                        "For now, shift rules are supported for 1-parameters gates only.",
+                    )
+                else:
+                    shift = np.pi / (4 * gate.generator_eigenvalue())
+                    # Forward circuit
+                    forward = self.shifted_circuit(
+                        x=x,
+                        parameters=parameters,
+                        angle_index=i_x,
+                        circuit_index=circ_index,
+                        shift=shift,
+                        circuit_structure=circuit_structure,
+                        backend=backend,
+                    )
+                    # Backward circuit
+                    backward = self.shifted_circuit(
+                        x=x,
+                        parameters=parameters,
+                        angle_index=i_x,
+                        circuit_index=circ_index,
+                        shift=-shift,
+                        circuit_structure=circuit_structure,
+                        backend=backend,
+                    )
+                    gradient[i_x] += (
+                        decoding(forward) - decoding(backward)
+                    ) * gate.generator_eigenvalue()
+        return gradient
+
+    def shifted_circuit(
+        self,
+        x: ndarray,
+        parameters: ndarray,
+        angle_index: int,
+        circuit_index: int,
+        shift: float,
+        circuit_structure: List[Union[QuantumEncoding, Circuit]],
+        backend: Backend,
+    ):
+        """
+        Helper function to reconstruct a circuit by shifting only one of the
+        angles.
+        """
+
+        # Shift data or parameters depending on the task
+        if isinstance(circuit_structure[circuit_index], QuantumEncoding):
+            tmp_array = backend.cast(x, copy=True)
+            tmp_array = self.shift_parameter(tmp_array, angle_index, shift, backend)
+            tmp_circ = circuit_structure[circuit_index](tmp_array)
+        else:
+            tmp_array = backend.cast(parameters, copy=True)
+            tmp_array = self.shift_parameter(tmp_array, angle_index, shift, backend)
+            tmp_circ = circuit_structure[circuit_index]
+            tmp_circ.set_parameters(tmp_array)
+
+        circuit = Circuit(circuit_structure[0].nqubits)
+        circuit += Differentiation.full_circuit(
+            x, circuit_structure=circuit_structure[:circuit_index]
+        )
+        circuit += tmp_circ
+        circuit += Differentiation.full_circuit[circuit_index + 1 :]
+        return circuit
 
     @staticmethod
     def shift_parameter(parameters, i, epsilon, backend):
@@ -189,17 +244,32 @@ class PSR(Differentiation):
                 [parameters[j] + int(i == j) * epsilon for j in range(len(parameters))]
             )
         elif backend.platform == "jax":
-            parameters.at[i].set(parameters[i] + epsilon)
+            parameters = parameters.at[i].set(parameters[i] + epsilon)
         else:
             parameters[i] = parameters[i] + epsilon
         return parameters
 
 
+class _StaticArgWrapper:
+    """
+    A thin wrapper to make non-hashable objects hashable by using their id.
+    """
+
+    def __init__(self, obj):
+        self.obj = obj
+
+    def __hash__(self):
+        return id(self.obj)
+
+    def __eq__(self, other):
+        return id(self.obj) == id(other.obj)
+
+
 class Jax(Differentiation):
     """
     The Jax differentiator object. Particularly useful for enabling gradient calculation in
-    those backends that do not provide it. Note however, that for this reason the circuit is
-    executed with the JaxBackend whenever a derivative is needed
+    those backends that do not provide it. Note, however, that for this reason the circuit is
+    executed with the JaxBackend whenever a derivative is needed.
     """
 
     def __init__(self):
@@ -209,60 +279,45 @@ class Jax(Differentiation):
     def evaluate(
         self,
         x: ndarray,
-        encoding: QuantumEncoding,
-        circuit: Circuit,  # TODO: replace with an abstract TrainableLayer
+        circuit_structure: List[Union[Circuit, QuantumEncoding]],
         decoding: QuantumDecoding,
         backend: Backend,
         *parameters: list[ndarray],
         wrt_inputs: bool = False,
     ):
-        """
-        Evaluate the gradient of a quantum model w.r.t inputs and parameters,
-        respectively represented by `x` and `parameters`.
-
-        Args:
-            x (ndarray): the input data.
-            encoding (QunatumEncoding): the encoding layer.
-            training (Circuit): the trainable quantum circuit.
-            decoding (QunatumDecoding): the decoding layer.
-            backend (Backend): the backend to execute the circuit with.
-            parameters (list[ndarray]): the parameters at which to evaluate the model, and thus the derivative.
-            wrt_inputs (bool): whether to calculate the derivate with respect to inputs or not, by default ``False``.
-
-
-        Returns:
-            (list[ndarray]): the calculated gradients.
-        """
         x = backend.to_numpy(x)
         x = self._jax.cast(x, self._jax.precision)
+        # Wrap the static arguments (non-hashable objects) so they can be used as static args.
+        circuit_structure_static = _StaticArgWrapper(circuit_structure)
+        decoding_static = _StaticArgWrapper(decoding)
         if self._argnums is None:
-            self._argnums = tuple(range(4, len(parameters) + 4))
+            self._argnums = tuple(range(3, len(parameters) + 3))
             setattr(
                 self,
                 "_jacobian",
-                partial(jax.jit, static_argnums=(1, 2, 3))(
-                    jax.jacfwd(self._run, (0,) + self._argnums),
+                partial(jax.jit, static_argnums=(1, 2))(
+                    jax.jacfwd(self._run, (0,) + self._argnums)
                 ),
             )
             setattr(
                 self,
                 "_jacobian_without_inputs",
-                partial(jax.jit, static_argnums=(1, 2, 3))(
-                    jax.jacfwd(self._run, self._argnums),
+                partial(jax.jit, static_argnums=(1, 2))(
+                    jax.jacfwd(self._run, self._argnums)
                 ),
             )
         parameters = backend.to_numpy(list(parameters))
         parameters = self._jax.cast(parameters, parameters.dtype)
         decoding.set_backend(self._jax)
         if wrt_inputs:
-            gradients = self._jacobian(  # pylint: disable=no-member
-                x, encoding, circuit, decoding, *parameters
+            gradients = self._jacobian(
+                x, circuit_structure_static, decoding_static, *parameters
             )
         else:
             gradients = (
                 self._jax.numpy.zeros((decoding.output_shape[-1], x.shape[-1])),
-                self._jacobian_without_inputs(  # pylint: disable=no-member
-                    x, encoding, circuit, decoding, *parameters
+                self._jacobian_without_inputs(
+                    x, circuit_structure_static, decoding_static, *parameters
                 ),
             )
         decoding.set_backend(backend)
@@ -272,9 +327,13 @@ class Jax(Differentiation):
         ]
 
     @staticmethod
-    @partial(jax.jit, static_argnums=(1, 2, 3))
-    def _run(x, encoding, training, decoding, *parameters):
-        # Use the shared full_circuit method from Differentiation
-        circ = Differentiation.full_circuit(x, encoding, training)
+    @partial(jax.jit, static_argnums=(1, 2))
+    def _run(x, circuit_structure_static, decoding_static, *parameters):
+        # Unwrap the static objects
+        circuit_structure = circuit_structure_static.obj
+        decoding = decoding_static.obj
+
+        # Build the full circuit using the shared helper from Differentiation.
+        circ = Differentiation.full_circuit(x, circuit_structure)
         circ.set_parameters(parameters)
         return decoding(circ)
