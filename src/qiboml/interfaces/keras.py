@@ -34,11 +34,12 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
         super().__init__()
 
         params = [p for param in self.circuit.get_parameters() for p in param]
-        params = self.backend.to_numpy(params)
+        params = keras.ops.cast(params, "float64")
 
         self.circuit_parameters = self.add_weight(
-            shape=params.shape, initializer="random_normal", trainable=True
+            shape=params.shape, initializer="zeros", trainable=True
         )
+        self.set_weights([params])
 
         backend_string = (
             f"{self.decoding.backend.name}-{self.decoding.backend.platform}"

@@ -3,8 +3,6 @@ from dataclasses import dataclass
 from typing import Optional
 
 import numpy as np
-import tensorflow as tf
-import tensorflow.experimental.numpy as tnp
 from qibo import Circuit, gates
 from qibo.config import raise_error
 
