@@ -17,7 +17,6 @@ EXECUTION_BACKENDS = [NumbaBackend(), NumpyBackend(), PyTorchBackend()]
 TARGET_GRAD = np.array([0.130832955241203, 0.0, -1.806316614151001, 0.0])
 TARGET_GRAD = {
     "no_inputs": np.array([0.130832955241203, 0.0, -1.806316614151001, 0.0]),
-    # "wrt_inputs": np.array([0.0257030516, 0.0, -0.948796222, 0.0]),
     "wrt_inputs": np.array([0.740709794, 0.0, -0.730872325, 0.0]),
 }
 

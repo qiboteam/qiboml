@@ -66,15 +66,6 @@ class PhaseEncoding(QuantumEncoding):
         for q in self.qubits:
             self._circuit.add(gates.RY(q, theta=0.0, trainable=False))
 
-    def _set_phases(self, x: ndarray):
-        """Helper method to set the phases of the rotations of the internal circuit.
-
-        Args:
-            x (ndarray): the input rotation angles.
-        """
-        for gate, phase in zip(self._circuit.parametrized_gates, x.ravel()):
-            gate.parameters = phase
-
     def __call__(self, x: ndarray) -> Circuit:
         """Construct the circuit encoding the ``x`` data in the rotation angles of some
         ``RY`` gates.
@@ -89,7 +80,6 @@ class PhaseEncoding(QuantumEncoding):
         x = x.ravel()
         for i, q in enumerate(self.qubits):
             circuit.add(gates.RY(q, theta=x[i], trainable=False))
-        # self._set_phases(x)
         return circuit
 
 

@@ -334,7 +334,6 @@ def test_encoding(backend, frontend, layer, seed):
 
 
 @pytest.mark.parametrize("layer,seed", zip(DECODING_LAYERS, [1, 3, 1, 26]))
-# @pytest.mark.parametrize("layer,seed", zip([DECODING_LAYERS[-1] for i in range(50)], list(range(50))))
 def test_decoding(backend, frontend, layer, seed):
     if frontend.__name__ == "qiboml.interfaces.keras" and (
         backend.platform != "tensorflow" or layer.__name__ == "Samples"
