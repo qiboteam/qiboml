@@ -34,7 +34,7 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
         super().__init__()
 
         params = [p for param in self.circuit.get_parameters() for p in param]
-        params = keras.ops.cast(params, "float64")
+        params = keras.ops.cast(params, "float64")  # pylint: disable=no-member
 
         self.circuit_parameters = self.add_weight(
             shape=params.shape, initializer="zeros", trainable=True

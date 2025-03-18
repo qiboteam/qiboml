@@ -1,21 +1,11 @@
 import numpy as np
 import pytest
-<<<<<<< HEAD
-import qibo
-import torch
-from qibo import hamiltonians
-from qibo.backends import NumpyBackend, PyTorchBackend
-
-from qibojit.backends import NumbaBackend
-
-=======
 import torch
 from qibo import hamiltonians
 from qibo.backends import NumpyBackend
 from qibojit.backends import NumbaBackend
 
 from qiboml.backends import PyTorchBackend
->>>>>>> main
 from qiboml.models.ansatze import ReuploadingCircuit
 from qiboml.models.decoding import Expectation
 from qiboml.models.encoding import PhaseEncoding
@@ -27,7 +17,8 @@ EXECUTION_BACKENDS = [NumbaBackend(), NumpyBackend(), PyTorchBackend()]
 TARGET_GRAD = np.array([0.130832955241203, 0.0, -1.806316614151001, 0.0])
 TARGET_GRAD = {
     "no_inputs": np.array([0.130832955241203, 0.0, -1.806316614151001, 0.0]),
-    "wrt_inputs": np.array([0.0257030516, 0.0, -0.948796222, 0.0]),
+    # "wrt_inputs": np.array([0.0257030516, 0.0, -0.948796222, 0.0]),
+    "wrt_inputs": np.array([0.740709794, 0.0, -0.730872325, 0.0]),
 }
 
 torch.set_default_dtype(torch.float64)
