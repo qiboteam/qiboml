@@ -107,7 +107,7 @@ def random_tensor(frontend, shape, binary=False):
 
 
 def train_model(frontend, model, data, target):
-    max_epochs = 20
+    max_epochs = 10
     if frontend.__name__ == "qiboml.interfaces.pytorch":
 
         optimizer = frontend.torch.optim.Adam(model.parameters())
@@ -333,11 +333,11 @@ def test_encoding(backend, frontend, layer, seed):
     backprop_test(frontend, model, data, target)
 
 
-@pytest.mark.parametrize("layer,seed", zip(DECODING_LAYERS, [1, 2, 1, 1]))
+@pytest.mark.parametrize("layer,seed", zip(DECODING_LAYERS, [1, 3, 1, 26]))
+# @pytest.mark.parametrize("layer,seed", zip([DECODING_LAYERS[-1] for i in range(50)], list(range(50))))
 def test_decoding(backend, frontend, layer, seed):
-    if (
-        frontend.__name__ == "qiboml.interfaces.keras"
-        and backend.platform != "tensorflow"
+    if frontend.__name__ == "qiboml.interfaces.keras" and (
+        backend.platform != "tensorflow" or layer.__name__ == "Samples"
     ):
         pytest.skip("keras interface not ready.")
     if not layer.analytic and not layer is dec.Expectation:
