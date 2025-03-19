@@ -75,8 +75,8 @@ optional = true
 jax = {extras = ["cuda12"], version = "^0.4.25"}
 
 [tool.poe.tasks]
-#bench = "pytest benchmarks/"
 test = "pytest"
+#bench = "pytest benchmarks/"
 lint = "pylint src/**/*.py -E"
 lint-warnings = "pylint src/**/*.py --exit-zero"
 docs = "make -C doc html"
@@ -84,8 +84,8 @@ docs-clean = "make -C doc clean"
 test-docs = "make -C doc doctest"
 
 [tool.pytest.ini_options]
-#testpaths = ['tests/', 'benchmarks/']
 testpaths = ['tests/']
+#testpaths = ['tests/', 'benchmarks/']
 #python_files = ['test_*.py', 'bench_*.py']
 #python_classes = ['Test*', 'Benchmark*']
 #python_functions = ['test_*', 'bench_*']
