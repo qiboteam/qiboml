@@ -74,7 +74,6 @@ optional = true
 [tool.poetry.group.cuda12.dependencies]
 jax = {extras = ["cuda12"], version = "^0.4.25"}
 
-
 [tool.poe.tasks]
 #bench = "pytest benchmarks/"
 test = "pytest"
