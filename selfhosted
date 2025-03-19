@@ -7,7 +7,7 @@ tmpdir=$(mktemp -d selfhosted.qiboml.XXXXXXX)
 cp -r tests $tmpdir
 cp pyproject.toml $tmpdir
 cd $tmpdir/tests
-source /nfs/users/github/actions-runner/_work/qibo/qibo/testenv/bin/activate
+source /nfs/users/github/actions-runner/_work/qiboml/qiboml/testenv/bin/activate
 pytest
 pytest_status=$?
 if [[ $pytest_status -ne 0 ]]
