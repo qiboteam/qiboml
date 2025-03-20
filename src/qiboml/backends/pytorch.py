@@ -32,6 +32,9 @@ class TorchMatrices(NumpyMatrices):
         ]
         return self.np.stack(tensor_list).reshape(len(x), len(x))
 
+    def I(self, n=2):
+        return self.np.eye(n, dtype=self.dtype, device=self.device)
+
     def Unitary(self, u):
         return self._cast(u, dtype=self.dtype, device=self.device)
 
