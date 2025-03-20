@@ -59,11 +59,19 @@ keras = { version = "^3.0.0", optional = true }
 tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux' or sys_platform == 'darwin'"}
 torch = { version = "^2.3.1"}
 
-[tool.poetry.group.benchmark.dependencies]
-pytest-benchmark = { version = "^4.0.0", extras = ["histogram"] }
+[tool.poetry.group.cuda11]
+optional = true
+
+[tool.poetry.group.cuda11.dependencies]
+jax = {extras = ["cuda11"], version = "^0.4.25"}
+
+[tool.poetry.group.cuda12]
+optional = true
+
+[tool.poetry.group.cuda12.dependencies]
+jax = {extras = ["cuda12"], version = "^0.4.25"}
 
 [tool.poe.tasks]
-bench = "pytest benchmarks/"
 test = "pytest"
 lint = "pylint src/**/*.py -E"
 lint-warnings = "pylint src/**/*.py --exit-zero"
@@ -72,15 +80,8 @@ docs-clean = "make -C doc clean"
 test-docs = "make -C doc doctest"
 
 [tool.pytest.ini_options]
-testpaths = ['tests/', 'benchmarks/']
-python_files = ['test_*.py', 'bench_*.py']
-python_classes = ['Test*', 'Benchmark*']
-python_functions = ['test_*', 'bench_*']
+testpaths = ['tests/']
 addopts = [
-  "--benchmark-warmup=on",
-  "--benchmark-warmup-iterations=100000",
-  "--benchmark-disable-gc",
-  "--benchmark-histogram=bench-hists/bench",
   '--cov=qiboml',
   '--cov-append',
   '--cov-report=xml',
