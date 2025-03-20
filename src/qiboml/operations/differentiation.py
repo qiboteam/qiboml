@@ -152,10 +152,13 @@ class PSR(Differentiation):
     ):
         gates = encoding(x).queue
         gradient = []
-        for input, gate in zip(x, gates):
-            shift = np.pi / (4 * gate.generator_eigenvalue())
-            forward = encoding(input + shift) + circuit
-            backward = encoding(input - shift) + circuit
+        x = decoding.backend.cast(x, dtype=x.dtype, copy=True)
+        for i in range(x.shape[-1]):
+            shift = np.pi / (4 * gates[i].generator_eigenvalue())
+            x[i] += shift
+            forward = encoding(x) + circuit
+            x[i] -= 2 * shift
+            backward = encoding(x) + circuit
             gradient.append(decoding(forward) - decoding(backward))
         return gradient
 

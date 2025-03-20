@@ -1,6 +1,7 @@
 """Keras interface to qiboml layers"""
 
 from dataclasses import dataclass
+from typing import Optional
 
 import keras
 import numpy as np
@@ -11,12 +12,13 @@ from qibo.config import raise_error
 
 from qiboml.models.decoding import QuantumDecoding
 from qiboml.models.encoding import QuantumEncoding
-from qiboml.operations import differentiation as Diff
+from qiboml.operations.differentiation import PSR, Differentiation, Jax
 
-BACKEND_2_DIFFERENTIATION = {
-    "pytorch": "PSR",
-    "tensorflow": None,
-    "jax": "PSR",
+DEFAULT_DIFFERENTIATION = {
+    "qiboml-pytorch": None,
+    "qiboml-tensorflow": None,
+    "qiboml-jax": None,
+    "numpy": Jax,
 }
 
 
@@ -26,35 +28,51 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
     encoding: QuantumEncoding
     circuit: Circuit
     decoding: QuantumDecoding
-    differentiation: str = "auto"
+    differentiation: Optional[Differentiation] = None
 
     def __post_init__(self):
         super().__init__()
 
         params = [p for param in self.circuit.get_parameters() for p in param]
-        params = tf.Variable(self.backend.to_numpy(params))
-        self.circuit_parameters = self.add_weight(shape=params.shape, trainable=True)
+        params = keras.ops.cast(params, "float64")  # pylint: disable=no-member
+
+        self.circuit_parameters = self.add_weight(
+            shape=params.shape, initializer="zeros", trainable=True
+        )
         self.set_weights([params])
 
+        backend_string = (
+            f"{self.decoding.backend.name}-{self.decoding.backend.platform}"
+            if self.decoding.backend.platform is not None
+            else self.decoding.backend.name
+        )
+        if self.differentiation is None:
+            if not self.decoding.analytic:
+                self.differentiation = PSR()
+            else:
+                if backend_string in DEFAULT_DIFFERENTIATION.keys():
+                    diff = DEFAULT_DIFFERENTIATION[backend_string]
+                    self.differentiation = diff() if diff is not None else None
+                else:
+                    self.differentiation = PSR()
+
     def call(self, x: tf.Tensor) -> tf.Tensor:
-        if self.backend.name != "tensorflow":
-            pass
-        # @tf.custom_gradient
-        # def custom_call(x: tf.Tensor):
-        #    x = self.backend.cast(np.array(x))
+        if self.differentiation is None:
+            # this 1 * is needed otherwise a TypeError is raised
+            self.circuit.set_parameters(1 * self.circuit_parameters)
 
-        else:
-            self.circuit.set_parameters(self.get_weights()[0])
-            # self.circuit.set_parameters(self.circuit_parameters)
-            x = self.encoding(x) + self.circuit
-            x = self.decoding(x)
+            output = self.decoding(self.encoding(x) + self.circuit)
+            return output[None, :]
 
-        return x
-
-    def compute_output_shape(
-        self,
-    ):
-        return self.output_shape
+        raise NotImplementedError
+        # return custom_operation(
+        #    self.encoding,
+        #    self.circuit,
+        #    self.decoding,
+        #    self.differentiation,
+        #    self.circuit_parameters,
+        #    x,
+        # )
 
     @property
     def output_shape(
