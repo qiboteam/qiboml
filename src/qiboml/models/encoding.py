@@ -94,29 +94,15 @@ class PhaseEncoding(QuantumEncoding):
         """
         return {f"{i}": [i] for i in range(len(self._circuit.parametrized_gates))}
 
-    def _set_phases(self, x: torch.Tensor):
-        """Set the phases of the rotation gates in a differentiable manner.
+    def _set_phases(self, x: ndarray):
+        """Helper method to set the phases of the rotations of the internal circuit.
 
         Args:
-            x (torch.Tensor): a tensor of input rotation angles.
+            x (ndarray): the input rotation angles.
         """
-        new_phases = x.ravel()  # Ensure this is a torch tensor with gradients.
-        for i, gate in enumerate(self._circuit.parametrized_gates):
-            for param in ["theta", "phi", "lam"]:
-                if param in gate.parameters:
-                    # Convert the existing parameter to a tensor if needed.
-                    # (This assumes gate.parameters[param] can be converted; adjust if your backend uses a different type.)
-                    current_value = torch.as_tensor(
-                        gate.parameters[param],
-                        dtype=new_phases.dtype,
-                        device=new_phases.device,
-                    )
-                    # Now, update the parameter in a differentiable way.
-                    # Here we simply “replace” it with new_phases[i] in a way that retains the graph.
-                    # One way to do this is to add the difference:
-                    new_value = current_value + (new_phases[i] - current_value)
-                    # Update the gate parameter with the new differentiable tensor.
-                    gate.parameters[param] = new_value
+
+        for gate, phase in zip(self._circuit.parametrized_gates, x.ravel()):
+            gate.parameters = phase
 
     def __call__(self, x: ndarray) -> Circuit:
         """Construct the circuit encoding the ``x`` data in the rotation angles of some
