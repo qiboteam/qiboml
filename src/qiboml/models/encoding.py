@@ -100,9 +100,11 @@ class PhaseEncoding(QuantumEncoding):
         Args:
             x (ndarray): the input rotation angles.
         """
-
         for gate, phase in zip(self._circuit.parametrized_gates, x.ravel()):
-            gate.parameters = phase
+            # Check for the allowed parameter keys and update the first one found.
+            for param in ["theta", "phi", "lam"]:
+                if param in gate.parameters:
+                    gate.parameters[param] = phase
 
     def __call__(self, x: ndarray) -> Circuit:
         """Construct the circuit encoding the ``x`` data in the rotation angles of some
