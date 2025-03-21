@@ -63,16 +63,16 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
 
             output = self.decoding(self.encoding(x) + self.circuit)
             return output[None, :]
-
-        raise NotImplementedError
-        # return custom_operation(
-        #    self.encoding,
-        #    self.circuit,
-        #    self.decoding,
-        #    self.differentiation,
-        #    self.circuit_parameters,
-        #    x,
-        # )
+        x = quantum_model_gradient(
+            x,
+            self.encoding,
+            self.circuit,
+            self.decoding,
+            self.backend,
+            self.differentiation,
+            *self.get_weights()[0],
+        )
+        return x
 
     @property
     def output_shape(
@@ -91,3 +91,33 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
         self,
     ) -> Backend:
         return self.decoding.backend
+
+
+@tf.custom_gradient
+def quantum_model_gradient(
+    x, encoding, circuit, decoding, backend, differentiation, *params
+):
+    # check whether we have to derive wrt inputs
+    wrt_inputs = x.trainable and encoding.differentiable
+
+    x = backend.cast(keras.ops.convert_to_numpy(x), dtype=backend.np.float64)
+    x = encoding(x) + circuit
+    x.set_parameters(params)
+    y = decoding(x)
+    y = keras.ops.cast(y, dtype=y.dtype)
+
+    # Custom gradient
+    def grad(dy):
+        d_x, d_params = differentiation.evaluate(
+            x,
+            encoding,
+            circuit,
+            decoding,
+            backend,
+            *params,
+            wrt_inputs=wrt_inputs,
+        )
+        # breakpoint()
+        return dy * d_x, None, None, None, None, None, dy * d_params
+
+    return y, grad

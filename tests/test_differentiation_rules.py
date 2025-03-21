@@ -60,7 +60,9 @@ def test_expval_grad_PSR(frontend, backend, nshots, wrt_inputs):
     """
 
     if frontend.__name__ == "qiboml.interfaces.keras":
-        pytest.skip("keras interface not ready.")
+        from qiboml.interfaces.keras import QuantumModel
+
+        # pytest.skip("keras interface not ready.")
     elif frontend.__name__ == "qiboml.interfaces.pytorch":
         from qiboml.interfaces.pytorch import QuantumModel
 
