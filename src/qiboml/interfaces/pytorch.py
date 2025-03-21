@@ -183,7 +183,7 @@ class QuantumModelAutoGrad(torch.autograd.Function):
         x_clone = x.clone().detach().cpu().numpy()
         x_clone = backend.cast(x_clone, dtype=x_clone.dtype)
         params = [
-            backend.cast(par.clone().detach().cpu().numpy(), dtype=backend.precision)
+            backend.cast(par.clone().detach().cpu().numpy(), dtype=x_clone.dtype)
             for par in parameters
         ]
 
@@ -212,9 +212,7 @@ class QuantumModelAutoGrad(torch.autograd.Function):
         x_clone = x.clone().detach().cpu().numpy()
         x_clone = ctx.backend.cast(x_clone, dtype=x_clone.dtype)
         params = [
-            ctx.backend.cast(
-                par.clone().detach().cpu().numpy(), dtype=ctx.backend.precision
-            )
+            ctx.backend.cast(par.clone().detach().cpu().numpy(), dtype=x_clone.dtype)
             for par in parameters
         ]
         # Use the flag determined during the forward pass based on the encoding(s)

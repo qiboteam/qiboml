@@ -71,7 +71,7 @@ class QuantumEncoding(ABC):
 class PhaseEncoding(QuantumEncoding):
     encoding_gate: type = field(default_factory=lambda: gates.RY)
 
-    def __post_init__(
+    def ___post_init__(
         self,
     ):
         """Ancillary post initialization: builds the internal circuit with the rotation gates."""
@@ -121,8 +121,11 @@ class PhaseEncoding(QuantumEncoding):
         Returns:
             (Circuit): the constructed ``qibo.Circuit``.
         """
-        self._set_phases(x)
-        return self.circuit
+        circuit = self.circuit
+        x = x.ravel()
+        for i, q in enumerate(self.qubits):
+            circuit.add(gates.RY(q, theta=x[i], trainable=False))
+        return circuit
 
 
 class BinaryEncoding(QuantumEncoding):
@@ -143,8 +146,9 @@ class BinaryEncoding(QuantumEncoding):
                 f"Invalid input dimension {x.shape[-1]}, but the allocated qubits are {self.qubits}.",
             )
         circuit = self.circuit
-        for qubit, bit in zip(self.qubits, x.ravel()):
-            circuit.add(gates.RX(qubit, theta=bit * np.pi, trainable=False))
+        x = x.ravel()
+        for i, q in enumerate(self.qubits):
+            circuit.add(gates.RX(q, theta=x[i] * np.pi, trainable=False))
         return circuit
 
     @property
