@@ -36,7 +36,13 @@ class QuantumEncoding(ABC):
 
         self._circuit = Circuit(self.nqubits)
         # Dictionary which helps to map each data component into a gate in the circuit
-        self._data_to_gate = {}
+
+    @cached_property
+    def _data_to_gate(self):
+        raise_error(
+            NotImplementedError,
+            f"_data_to_gate method is not implemented for encoding {self}.",
+        )
 
     @abstractmethod
     def __call__(self, x: ndarray) -> Circuit:
@@ -92,7 +98,7 @@ class PhaseEncoding(QuantumEncoding):
         In this case, the correspondence it's simply that the i-th component
         of the data is uploaded in the i-th gate of the queue.
         """
-        return {f"{i}": [i] for i in range(len(self._circuit.parametrized_gates))}
+        return {f"{i}": [i] for i in range(len(self._circuit.queue))}
 
     def _set_phases(self, x: ndarray):
         """Helper method to set the phases of the rotations of the internal circuit.
@@ -102,9 +108,8 @@ class PhaseEncoding(QuantumEncoding):
         """
         for gate, phase in zip(self._circuit.parametrized_gates, x.ravel()):
             # Check for the allowed parameter keys and update the first one found.
-            for param in ["theta", "phi", "lam"]:
-                if param in gate.parameters:
-                    gate.parameters[param] = phase
+            gate.parameters = phase
+            gate.trainable = False
 
     def __call__(self, x: ndarray) -> Circuit:
         """Construct the circuit encoding the ``x`` data in the rotation angles of some

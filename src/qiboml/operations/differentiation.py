@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from copy import deepcopy
 from dataclasses import dataclass
 from functools import partial
 from typing import List, Union
@@ -39,12 +40,14 @@ class Differentiation(ABC):
 
     @staticmethod
     def full_circuit(
-        x: ndarray, circuit_structure: List[Union[Circuit, QuantumEncoding]]
+        x: ndarray,
+        nqubits: int,
+        circuit_structure: List[Union[Circuit, QuantumEncoding]],
     ):
         """
         Helper method to reconstruct the full circuit covering the reuploading strategy.
         """
-        circuit = Circuit(circuit_structure[0].nqubits)
+        circuit = Circuit(nqubits)
         for circ in circuit_structure:
             if isinstance(circ, QuantumEncoding):
                 circuit += circ(x)
@@ -74,7 +77,9 @@ class PSR(Differentiation):
                 "Parameter Shift Rule only supports expectation value decoding.",
             )
         # construct circuit using the full circuit helper
-        circuit = Differentiation.full_circuit(x, circuit_structure)
+        circuit = Differentiation.full_circuit(
+            x, circuit_structure[0].nqubits, circuit_structure
+        )
         gradient = []
         if wrt_inputs:
             # compute first gradient part, wrt data
@@ -132,7 +137,7 @@ class PSR(Differentiation):
         """Compute the gradient of the given model w.r.t inputs."""
 
         # The gradient w.r.t. x has to be the same dimension of x
-        backend.np.zeros(len(x))
+        gradient = backend.np.zeros(len(x))
 
         # Scanning the circuit structure to search encodings
         for i_circ, circ in enumerate(circuit_structure):
@@ -164,13 +169,16 @@ class PSR(Differentiation):
         """
         gradient = backend.np.zeros(len(x))
 
-        for i_x in len(x):
+        for i_x in range(len(x)):
             # Collecting the indices of the gates, in the queue of encoding
             # which are affected by the i-th component of x
             affected_gates_indices = circuit_structure[circ_index]._data_to_gate[
                 str(i_x)
             ]
-            for gate in circuit_structure[circ_index](x).queue[affected_gates_indices]:
+            for gate in [
+                circuit_structure[circ_index](x).queue[i]
+                for i in affected_gates_indices
+            ]:
                 if len(gate.parameters) != 1:
                     raise_error(
                         NotImplementedError,
@@ -222,19 +230,22 @@ class PSR(Differentiation):
         if isinstance(circuit_structure[circuit_index], QuantumEncoding):
             tmp_array = backend.cast(x, copy=True)
             tmp_array = self.shift_parameter(tmp_array, angle_index, shift, backend)
-            tmp_circ = circuit_structure[circuit_index](tmp_array)
+            tmp_circ = deepcopy(circuit_structure[circuit_index](tmp_array))
         else:
             tmp_array = backend.cast(parameters, copy=True)
             tmp_array = self.shift_parameter(tmp_array, angle_index, shift, backend)
-            tmp_circ = circuit_structure[circuit_index]
+            tmp_circ = deepcopy(circuit_structure[circuit_index])
             tmp_circ.set_parameters(tmp_array)
 
-        circuit = Circuit(circuit_structure[0].nqubits)
+        nqubits = circuit_structure[0].nqubits
+        circuit = Circuit(nqubits)
         circuit += Differentiation.full_circuit(
-            x, circuit_structure=circuit_structure[:circuit_index]
+            x, nqubits=nqubits, circuit_structure=circuit_structure[:circuit_index]
         )
         circuit += tmp_circ
-        circuit += Differentiation.full_circuit[circuit_index + 1 :]
+        circuit += Differentiation.full_circuit(
+            x, nqubits=nqubits, circuit_structure=circuit_structure[circuit_index + 1 :]
+        )
         return circuit
 
     @staticmethod
@@ -334,6 +345,8 @@ class Jax(Differentiation):
         decoding = decoding_static.obj
 
         # Build the full circuit using the shared helper from Differentiation.
-        circ = Differentiation.full_circuit(x, circuit_structure)
+        circ = Differentiation.full_circuit(
+            x, circuit_structure[0].nqubits, circuit_structure
+        )
         circ.set_parameters(parameters)
         return decoding(circ)
