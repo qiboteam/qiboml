@@ -77,7 +77,7 @@ class PhaseEncoding(QuantumEncoding):
             (Circuit): the constructed ``qibo.Circuit``.
         """
         circuit = self.circuit
-        x = x.ravel()
+        # x = x.ravel()
         for i, q in enumerate(self.qubits):
             circuit.add(gates.RY(q, theta=x[i], trainable=False))
         return circuit
