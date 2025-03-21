@@ -1,5 +1,6 @@
 """Keras interface to qiboml layers"""
 
+import string
 from dataclasses import dataclass
 from typing import Optional
 
@@ -8,7 +9,6 @@ import numpy as np
 import tensorflow as tf  # pylint: disable=import-error
 from qibo import Circuit
 from qibo.backends import Backend
-from qibo.config import raise_error
 
 from qiboml.models.decoding import QuantumDecoding
 from qiboml.models.encoding import QuantumEncoding
@@ -55,6 +55,14 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
                     self.differentiation = diff() if diff is not None else None
                 else:
                     self.differentiation = PSR()
+        if self.differentiation is not None:
+            self.custom_gradient = QuantumModelCustomGradient(
+                self.encoding,
+                self.circuit,
+                self.decoding,
+                self.backend,
+                self.differentiation,
+            )
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
         if self.differentiation is None:
@@ -63,6 +71,7 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
 
             output = self.decoding(self.encoding(x) + self.circuit)
             return output[None, :]
+        """
         x = quantum_model_gradient(
             x,
             self.encoding,
@@ -72,6 +81,8 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
             self.differentiation,
             *self.get_weights()[0],
         )
+        """
+        x = self.custom_gradient.evaluate(x, *self.get_weights()[0])
         return x
 
     @property
@@ -93,46 +104,51 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
         return self.decoding.backend
 
 
-@tf.custom_gradient
-def quantum_model_gradient(
-    x, encoding, circuit, decoding, backend, differentiation, *params
-):
-    # check whether we have to derive wrt inputs
-    wrt_inputs = x.trainable and encoding.differentiable
+@dataclass
+class QuantumModelCustomGradient:
 
-    x = backend.cast(keras.ops.convert_to_numpy(x), dtype=backend.np.float64)
-    """
-    breakpoint()
-    grad = differentiation.evaluate(
-            x,
-            encoding,
-            circuit,
-            decoding,
-            backend,
-            *params,
-            wrt_inputs=wrt_inputs,
+    encoding: QuantumEncoding
+    circuit: Circuit
+    decoding: QuantumDecoding
+    backend: Backend
+    differentiation: Differentiation
+
+    @tf.custom_gradient
+    def evaluate(self, x, *params):
+        # check whether we have to derive wrt inputs
+        wrt_inputs = x.trainable and self.encoding.differentiable
+
+        x = self.backend.cast(
+            keras.ops.convert_to_numpy(x), dtype=self.backend.np.float64
         )
-    """
-    x = encoding(x) + circuit
-    x.set_parameters(params)
-    y = decoding(x)
-    y = keras.ops.cast(y, dtype=y.dtype)
+        circuit = self.encoding(x) + self.circuit
+        circuit.set_parameters(params)
+        y = self.decoding(circuit)
+        y = keras.ops.cast(y, dtype=y.dtype)
 
-    # Custom gradient
-    def grad(dy):
-        d_x, *d_params = differentiation.evaluate(
-            x,
-            encoding,
-            circuit,
-            decoding,
-            backend,
-            *params,
-            wrt_inputs=wrt_inputs,
-        )
-        d_params = backend.cast(d_params, dtype=backend.np.float64)
-        breakpoint()
-        d_x = keras.ops.cast(d_x, d_x.dtype)
-        d_params = keras.ops.cast(d_params, d_params.dtype)
-        return d_x, None, None, None, None, None, *d_params
+        # Custom gradient
+        def grad(dy):
+            d_x, *d_params = self.differentiation.evaluate(
+                x,
+                self.encoding,
+                self.circuit,
+                self.decoding,
+                self.backend,
+                *params,
+                wrt_inputs=wrt_inputs,
+            )
+            d_params = self.backend.cast(d_params, dtype=self.backend.np.float64)
+            d_x = keras.ops.cast(d_x, d_x.dtype)
+            d_params = keras.ops.cast(d_params, d_params.dtype)
+            left_indices = tuple(range(len(d_params.shape)))
+            right_indices = left_indices[::-1][: len(d_params.shape) - 2] + (
+                len(left_indices),
+            )
+            left_indices = "".join(string.ascii_letters[i] for i in left_indices)
+            right_indices = "".join(string.ascii_letters[i] for i in right_indices)
+            d_params = keras.ops.einsum(
+                f"{left_indices},{right_indices}", d_params, dy.T
+            )
+            return dy @ d_x, *d_params
 
-    return y, grad
+        return y, grad

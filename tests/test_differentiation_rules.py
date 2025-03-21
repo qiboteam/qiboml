@@ -36,15 +36,24 @@ def construct_x(frontend, with_factor=False):
 
 def compute_gradient(frontend, model, x):
     if frontend.__name__ == "qiboml.interfaces.keras":
-        # TODO: to check if this work once keras interface is introduced
-        with frontend.tf.GradientTape() as tape:
+        if frontend.keras.backend.backend() == "tensorflow":
+            with frontend.tf.GradientTape() as tape:
+                tape.watch(x)
+                expval = model(x)
+            grad = tape.gradient(expval, model.circuit_parameters)
+            # breakpoint()
+            return tape.gradient(expval, model.circuit_parameters)
+        elif frontend.keras.backend.backend() == "pytorch":
             expval = model(x)
-        return tape.gradient(expval, model.parameters)
+            expval.backward()
+            grad = np.array(list(model.parameters())[-1].grad)
+            return grad
+        else:
+            raise NotImplementedError
 
     elif frontend.__name__ == "qiboml.interfaces.pytorch":
         expval = model(x)
         expval.backward()
-        # TODO: standardize this output with keras' one and use less convolutions
         grad = np.array(list(model.parameters())[-1].grad)
         return grad
 
@@ -61,8 +70,6 @@ def test_expval_grad_PSR(frontend, backend, nshots, wrt_inputs):
 
     if frontend.__name__ == "qiboml.interfaces.keras":
         from qiboml.interfaces.keras import QuantumModel
-
-        # pytest.skip("keras interface not ready.")
     elif frontend.__name__ == "qiboml.interfaces.pytorch":
         from qiboml.interfaces.pytorch import QuantumModel
 

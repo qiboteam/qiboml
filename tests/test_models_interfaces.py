@@ -335,9 +335,7 @@ def test_encoding(backend, frontend, layer, seed):
 
 @pytest.mark.parametrize("layer,seed", zip(DECODING_LAYERS, [1, 3, 1, 26]))
 def test_decoding(backend, frontend, layer, seed):
-    if frontend.__name__ == "qiboml.interfaces.keras" and (
-        backend.platform != "tensorflow" or layer.__name__ == "Samples"
-    ):
+    if frontend.__name__ == "qiboml.interfaces.keras" and layer.__name__ == "Samples":
         pytest.skip("keras interface not ready.")
     if not layer.analytic and not layer is dec.Expectation:
         pytest.skip(
