@@ -101,14 +101,9 @@ def quantum_model_gradient(
     wrt_inputs = x.trainable and encoding.differentiable
 
     x = backend.cast(keras.ops.convert_to_numpy(x), dtype=backend.np.float64)
-    x = encoding(x) + circuit
-    x.set_parameters(params)
-    y = decoding(x)
-    y = keras.ops.cast(y, dtype=y.dtype)
-
-    # Custom gradient
-    def grad(dy):
-        d_x, d_params = differentiation.evaluate(
+    """
+    breakpoint()
+    grad = differentiation.evaluate(
             x,
             encoding,
             circuit,
@@ -117,7 +112,27 @@ def quantum_model_gradient(
             *params,
             wrt_inputs=wrt_inputs,
         )
-        # breakpoint()
-        return dy * d_x, None, None, None, None, None, dy * d_params
+    """
+    x = encoding(x) + circuit
+    x.set_parameters(params)
+    y = decoding(x)
+    y = keras.ops.cast(y, dtype=y.dtype)
+
+    # Custom gradient
+    def grad(dy):
+        d_x, *d_params = differentiation.evaluate(
+            x,
+            encoding,
+            circuit,
+            decoding,
+            backend,
+            *params,
+            wrt_inputs=wrt_inputs,
+        )
+        d_params = backend.cast(d_params, dtype=backend.np.float64)
+        breakpoint()
+        d_x = keras.ops.cast(d_x, d_x.dtype)
+        d_params = keras.ops.cast(d_params, d_params.dtype)
+        return d_x, None, None, None, None, None, *d_params
 
     return y, grad
