@@ -2990,8 +2990,8 @@ qulacs = ["qulacs (>=0.6.4,<0.7.0) ; python_version < \"3.13\""]
 [package.source]
 type = "git"
 url = "https://github.com/qiboteam/qibo"
-reference = "HEAD"
-resolved_reference = "0154fe4282e58cf577fd6a598568722c5fc1d146"
+reference = "qiboml_gpu"
+resolved_reference = "028de36339c29aac3990850d80f587829027b146"
 
 [[package]]
 name = "qibojit"
@@ -4269,4 +4269,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.13"
-content-hash = "490e09e41e85097a2d62463b426e2e73344095e1eea71b46f1b4c03ab2a47c4e"
+content-hash = "bf7d5dbdd82b34200bbc1c9cc65813b6b36c4d39e5a2c10d40684640bf93486e"

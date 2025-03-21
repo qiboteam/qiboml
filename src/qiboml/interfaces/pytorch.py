@@ -152,13 +152,15 @@ class QuantumModelAutoGrad(torch.autograd.Function):
         x_clone = x.clone().detach().cpu().numpy()
         x_clone = backend.cast(x_clone, dtype=x_clone.dtype)
         params = [
-            backend.cast(par.clone().detach().cpu().numpy(), dtype=backend.precision)
+            backend.cast(par.clone().detach().cpu().numpy(), dtype=x_clone.dtype)
             for par in parameters
         ]
         x_clone = encoding(x_clone) + circuit
         x_clone.set_parameters(params)
         x_clone = decoding(x_clone)
-        x_clone = torch.as_tensor(backend.to_numpy(x_clone).tolist())
+        x_clone = torch.as_tensor(
+            backend.to_numpy(x_clone).tolist(), dtype=x.dtype, device=x.device
+        )
         return x_clone
 
     @staticmethod
@@ -167,14 +169,14 @@ class QuantumModelAutoGrad(torch.autograd.Function):
         x_clone = x.clone().detach().cpu().numpy()
         x_clone = ctx.backend.cast(x_clone, dtype=x_clone.dtype)
         params = [
-            ctx.backend.cast(
-                par.clone().detach().cpu().numpy(), dtype=ctx.backend.precision
-            )
+            ctx.backend.cast(par.clone().detach().cpu().numpy(), dtype=x_clone.dtype)
             for par in parameters
         ]
         wrt_inputs = not x.is_leaf and ctx.encoding.differentiable
         grad_input, *gradients = (
-            torch.as_tensor(ctx.backend.to_numpy(grad).tolist())
+            torch.as_tensor(
+                ctx.backend.to_numpy(grad).tolist(), dtype=x.dtype, device=x.device
+            )
             for grad in ctx.differentiation.evaluate(
                 x_clone,
                 ctx.encoding,
