@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass
 from functools import partial
-from typing import List, Union
+from typing import Callable, List, Union
 
 import jax
 import numpy as np
@@ -290,6 +290,8 @@ class Jax(Differentiation):
     def __init__(self):
         self._jax: Backend = JaxBackend()
         self._argnums: tuple[int] = None
+        self._jacobian: Callable = lambda *args, **kwargs: None
+        self._jacobian_without_inputs: Callable = lambda *args, **kwargs: None
 
     def evaluate(
         self,
@@ -329,7 +331,7 @@ class Jax(Differentiation):
                 x,
                 circuit_structure_static,
                 decoding_static,
-                *parameters,  # pylint: disable=E1101
+                *parameters,
             )
         else:
             gradients = (
@@ -338,7 +340,7 @@ class Jax(Differentiation):
                     x,
                     circuit_structure_static,
                     decoding_static,
-                    *parameters,  # pylint: disable=E1101
+                    *parameters,
                 ),
             )
         decoding.set_backend(backend)
