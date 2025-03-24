@@ -290,8 +290,6 @@ class Jax(Differentiation):
     def __init__(self):
         self._jax: Backend = JaxBackend()
         self._argnums: tuple[int] = None
-        self._jacobian = None
-        self._jacobian_without_inputs = None
 
     def evaluate(
         self,
@@ -328,13 +326,19 @@ class Jax(Differentiation):
         decoding.set_backend(self._jax)
         if wrt_inputs:
             gradients = self._jacobian(
-                x, circuit_structure_static, decoding_static, *parameters
+                x,
+                circuit_structure_static,
+                decoding_static,
+                *parameters,  # pylint: disable=E1102
             )
         else:
             gradients = (
                 self._jax.numpy.zeros((decoding.output_shape[-1], x.shape[-1])),
                 self._jacobian_without_inputs(
-                    x, circuit_structure_static, decoding_static, *parameters
+                    x,
+                    circuit_structure_static,
+                    decoding_static,
+                    *parameters,  # pylint: disable=E1102
                 ),
             )
         decoding.set_backend(backend)
