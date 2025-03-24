@@ -290,6 +290,8 @@ class Jax(Differentiation):
     def __init__(self):
         self._jax: Backend = JaxBackend()
         self._argnums: tuple[int] = None
+        self._jacobian = None
+        self._jacobian_without_inputs = None
 
     def evaluate(
         self,
