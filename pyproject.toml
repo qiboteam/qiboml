@@ -21,7 +21,7 @@ tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux' or sys_pl
 # TODO: the marker is a temporary solution due to the lack of the tensorflow-io 0.32.0's wheels for Windows, this package is one of
 # the tensorflow requirements
 torch = { version = "^2.3.1", optional = true}
-qibo = {git="https://github.com/qiboteam/qibo", branch="qiboml_gpu"}
+qibo = "^0.2.17"
 jax = "^0.4.25"
 jaxlib = "^0.4.25"
 
@@ -39,6 +39,9 @@ nbsphinx = "^0.9.6"
 setuptools = "^75.8.2"
 ipykernel = "^6.29.5"
 torcheval = "^0.0.7"
+keras = { version = "^3.0.0" }
+tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux' or sys_platform == 'darwin'"}
+torch = { version = "^2.3.1"}
 
 [tool.poetry.group.dev]
 optional = true
