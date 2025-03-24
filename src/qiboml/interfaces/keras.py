@@ -1,12 +1,14 @@
 """Keras interface to qiboml layers"""
 
+import os
 import string
 from dataclasses import dataclass
+from importlib import reload
 from typing import Optional
 
 import keras
 import numpy as np
-import tensorflow as tf  # pylint: disable=import-error
+import tensorflow as tf  # pylint: disable=import-erro
 from qibo import Circuit
 from qibo.backends import Backend
 
@@ -18,7 +20,14 @@ DEFAULT_DIFFERENTIATION = {
     "qiboml-pytorch": None,
     "qiboml-tensorflow": None,
     "qiboml-jax": None,
-    "numpy": Jax,
+    "numpy": None,
+}
+
+QIBO_2_KERAS_BACKEND = {
+    "qiboml-pytorch": "torch",
+    "qiboml-tensorflow": "tensorflow",
+    "qiboml-jax": "jax",
+    "numpy": "numpy",
 }
 
 
@@ -32,6 +41,12 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
 
     def __post_init__(self):
         super().__init__()
+
+        if str(self.backend) in QIBO_2_KERAS_BACKEND:
+            breakpoint()
+            os.environ["KERAS_BACKEND"] = QIBO_2_KERAS_BACKEND.get(str(self.backend))
+            # reload keras
+            reload(keras)
 
         params = [p for param in self.circuit.get_parameters() for p in param]
         params = keras.ops.cast(params, "float64")  # pylint: disable=no-member
@@ -65,25 +80,13 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
             )
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
-        if self.differentiation is None:
-            # this 1 * is needed otherwise a TypeError is raised
-            self.circuit.set_parameters(1 * self.circuit_parameters)
+        # this 1 * is needed otherwise a TypeError is raised
+        self.circuit.set_parameters(1 * self.circuit_parameters)
 
+        if self.differentiation is None:
             output = self.decoding(self.encoding(x) + self.circuit)
             return output[None, :]
-        """
-        x = quantum_model_gradient(
-            x,
-            self.encoding,
-            self.circuit,
-            self.decoding,
-            self.backend,
-            self.differentiation,
-            *self.get_weights()[0],
-        )
-        """
-        x = self.custom_gradient.evaluate(x, *self.get_weights()[0])
-        return x
+        return self.custom_gradient.evaluate(x, *self.get_weights()[0])
 
     @property
     def output_shape(

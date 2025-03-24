@@ -86,14 +86,19 @@ def build_activation(frontend, binary=False):
 
 
 def random_tensor(frontend, shape, binary=False):
-
-    if frontend.__name__ == "qiboml.interfaces.pytorch":
+    if (
+        frontend.__name__ == "qiboml.interfaces.pytorch"
+        or frontend.keras.backend.backend() == "pytorch"
+    ):
         tensor = (
             frontend.torch.randint(0, 2, shape).double()
             if binary
             else frontend.torch.randn(shape)
         )
-    elif frontend.__name__ == "qiboml.interfaces.keras":
+    elif (
+        frontend.__name__ == "qiboml.interfaces.keras"
+        and frontend.keras.backend.backend() == "tensorflow"
+    ):
         tensor = (
             frontend.tf.random.uniform(
                 shape, minval=0, maxval=2, dtype=frontend.tf.int64
@@ -227,7 +232,13 @@ def random_parameters(frontend, model):
     elif frontend.__name__ == "qiboml.interfaces.keras":
         new_params = []
         for weight in model.get_weights():
-            new_params += [weight + frontend.tf.random.uniform(weight.shape) / 5]
+            if frontend.keras.backend.backend() == "tensorflow":
+                val = frontend.tf.random.uniform(weight.shape)
+            elif frontend.keras.backend.backend() == "pytorch":
+                val = frontend.torch.randn(weight.shape)
+            elif frontend.keras.backend.backend() == "jax":
+                raise NotImplementedError
+            new_params += [weight + val / 5]
     return new_params
 
 
