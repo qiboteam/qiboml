@@ -31,17 +31,21 @@ def construct_x(frontend, with_factor=False):
             return torch.tensor(2.0, requires_grad=True) * x
         return x
     elif frontend.__name__ == "qiboml.interfaces.keras":
-        return frontend.tf.Variable([0.5, 0.8])
-
+        if frontend.keras.backend.backend() == "tensorflow":
+            return frontend.tf.Variable([0.5, 0.8])
+        elif frontend.keras.backend.backend() == "pytorch":
+            return frontend.torch.tensor([0.5, 0.8])
+        else:
+            raise NotImplementedError
 
 def compute_gradient(frontend, model, x):
     if frontend.__name__ == "qiboml.interfaces.keras":
         if frontend.keras.backend.backend() == "tensorflow":
+            model.circuit_parameters = frontend.tf.Variable(model.circuit_parameters)
             with frontend.tf.GradientTape() as tape:
-                tape.watch(x)
+                #tape.watch(x)
+                #tape.watch(model.circuit_parameters)
                 expval = model(x)
-            grad = tape.gradient(expval, model.circuit_parameters)
-            # breakpoint()
             return tape.gradient(expval, model.circuit_parameters)
         elif frontend.keras.backend.backend() == "pytorch":
             expval = model(x)
