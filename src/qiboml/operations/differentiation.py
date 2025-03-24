@@ -329,7 +329,7 @@ class Jax(Differentiation):
                 x,
                 circuit_structure_static,
                 decoding_static,
-                *parameters,  # pylint: disable=E1102
+                *parameters,  # pylint: disable=E1101
             )
         else:
             gradients = (
@@ -338,7 +338,7 @@ class Jax(Differentiation):
                     x,
                     circuit_structure_static,
                     decoding_static,
-                    *parameters,  # pylint: disable=E1102
+                    *parameters,  # pylint: disable=E1101
                 ),
             )
         decoding.set_backend(backend)
