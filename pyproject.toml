@@ -39,6 +39,9 @@ nbsphinx = "^0.9.6"
 setuptools = "^75.8.2"
 ipykernel = "^6.29.5"
 torcheval = "^0.0.7"
+keras = { version = "^3.0.0" }
+tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux' or sys_platform == 'darwin'"}
+torch = { version = "^2.3.1"}
 
 [tool.poetry.group.dev]
 optional = true
