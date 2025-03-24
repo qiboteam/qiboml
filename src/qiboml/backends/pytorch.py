@@ -15,20 +15,28 @@ class TorchMatrices(NumpyMatrices):
         dtype (torch.dtype): Data type of the matrices.
     """
 
-    def __init__(self, dtype):
+    def __init__(self, dtype, device):
         import torch  # pylint: disable=import-outside-toplevel  # type: ignore
 
         super().__init__(dtype)
         self.np = torch
         self.dtype = dtype
+        self.device = device
 
-    def _cast(self, x, dtype):
+    def _cast(self, x, dtype, device=None):
+        if device is None:
+            device = self.device
         flattened = [item for sublist in x for item in sublist]
-        tensor_list = [self.np.as_tensor(i, dtype=dtype) for i in flattened]
+        tensor_list = [
+            self.np.as_tensor(i, dtype=dtype, device=device) for i in flattened
+        ]
         return self.np.stack(tensor_list).reshape(len(x), len(x))
 
+    def I(self, n=2):
+        return self.np.eye(n, dtype=self.dtype, device=self.device)
+
     def Unitary(self, u):
-        return self._cast(u, dtype=self.dtype)
+        return self._cast(u, dtype=self.dtype, device=self.device)
 
 
 class PyTorchBackend(NumpyBackend):
@@ -51,8 +59,8 @@ class PyTorchBackend(NumpyBackend):
         self.dtype = self._torch_dtype(self.dtype)
         # Default data type used for the real gate parameters is float64
         self.parameter_dtype = self._torch_dtype("float64")
-        self.matrices = TorchMatrices(self.dtype)
         self.device = self.np.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.matrices = TorchMatrices(self.dtype, self.device)
         self.nthreads = 0
         self.tensor_types = (self.np.Tensor, np.ndarray)
 
@@ -65,6 +73,18 @@ class PyTorchBackend(NumpyBackend):
         self.np.right_shift = self.np.bitwise_right_shift
         self.np.sign = self.np.sgn
         self.np.flatnonzero = lambda x: self.np.nonzero(x).flatten()
+
+        # These functions are device dependent
+        torch_zeros = self.np.zeros
+
+        def zeros(shape, dtype=None, device=None):
+            if dtype is None:
+                dtype = self.dtype
+            if device is None:
+                device = self.device
+            return torch_zeros(shape, dtype=dtype, device=device)
+
+        setattr(self.np, "zeros", zeros)
 
     def _torch_dtype(self, dtype):
         if dtype == "float":
@@ -79,6 +99,7 @@ class PyTorchBackend(NumpyBackend):
         x,
         dtype=None,
         copy: bool = False,
+        device=None,
     ):
         """Casts input as a Torch tensor of the specified dtype.
 
@@ -102,6 +123,9 @@ class PyTorchBackend(NumpyBackend):
         elif not isinstance(dtype, self.np.dtype):
             dtype = self._torch_dtype(str(dtype))
 
+        if device is None:
+            device = self.device
+
         if isinstance(x, self.np.Tensor):
             x = x.to(dtype)
         elif (
@@ -114,8 +138,8 @@ class PyTorchBackend(NumpyBackend):
             x = self.np.tensor(x, dtype=dtype)
 
         if copy:
-            return x.clone()
-        return x
+            return x.clone().to(device)
+        return x.to(device)
 
     def matrix_parametrized(self, gate):
         """Convert a parametrized gate to its matrix representation in the computational basis."""
@@ -160,9 +184,14 @@ class PyTorchBackend(NumpyBackend):
             return self.np.tensor(x, dtype=self.parameter_dtype, requires_grad=True)
         if isinstance(x, float):
             return self.np.tensor(
-                x, dtype=self.parameter_dtype, requires_grad=trainable
+                x,
+                dtype=self.parameter_dtype,
+                requires_grad=trainable,
+                device=self.device,
             )
-        return self.np.tensor(x, dtype=self.dtype, requires_grad=trainable)
+        return self.np.tensor(
+            x, dtype=self.dtype, requires_grad=trainable, device=self.device
+        )
 
     def is_sparse(self, x):
         if isinstance(x, self.np.Tensor):
@@ -175,7 +204,7 @@ class PyTorchBackend(NumpyBackend):
             return np.asarray([self.to_numpy(i) for i in x])
 
         if isinstance(x, self.np.Tensor):
-            return x.numpy(force=True)
+            return x.cpu().numpy(force=True)
 
         return x
 

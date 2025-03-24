@@ -238,6 +238,16 @@ def get_parameters(frontend, model):
         return model.get_weights()
 
 
+def set_device(frontend):
+    if frontend.__name__ == "qiboml.interfaces.pytorch":
+        frontend.torch.set_default_device(
+            "cuda:0" if frontend.torch.cuda.is_available() else "cpu"
+        )
+    elif frontend.__name__ == "qiboml.interfaces.keras":
+        # tf should automatically use GPU by default when available
+        pass
+
+
 def set_parameters(frontend, model, params):
     if frontend.__name__ == "qiboml.interfaces.pytorch":
         model.load_state_dict(params)
@@ -275,6 +285,7 @@ def test_encoding(backend, frontend, layer, seed):
     ):
         pytest.skip("keras interface not ready.")
 
+    set_device(frontend)
     set_seed(frontend, seed)
 
     nqubits = 2
@@ -342,6 +353,7 @@ def test_decoding(backend, frontend, layer, seed):
             "Expectation layer is the only differentiable decoding when the diffrule is not analytical."
         )
 
+    set_device(frontend)
     set_seed(frontend, seed)
 
     nqubits = 2

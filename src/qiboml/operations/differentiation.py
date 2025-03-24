@@ -108,7 +108,11 @@ class PSR(Differentiation):
                 )
             )
         else:
-            gradient.append(backend.np.zeros((decoding.output_shape[-1], x.shape[-1])))
+            gradient.append(
+                backend.np.zeros(
+                    (decoding.output_shape[-1], x.shape[-1]), dtype=x.dtype
+                )
+            )
 
         # compute second gradient part, wrt parameters
         for i in range(len(parameters)):
@@ -131,7 +135,7 @@ class PSR(Differentiation):
         generator_eigenval = gate.generator_eigenvalue()
         s = np.pi / (4 * generator_eigenval)
 
-        tmp_params = backend.cast(parameters, copy=True)
+        tmp_params = backend.cast(parameters, copy=True, dtype=parameters[0].dtype)
         tmp_params = self.shift_parameter(tmp_params, parameter_index, s, backend)
 
         circuit.set_parameters(tmp_params)
