@@ -174,7 +174,9 @@ def train_model(frontend, model, data, target):
                     self.stopped_epoch = epoch
                     self.model.stop_training = True
 
-        model.compile(loss=loss_f, optimizer=optimizer)
+        run_eagerly = model.backend.platform != "tensorflow"
+
+        model.compile(loss=loss_f, optimizer=optimizer, run_eagerly=run_eagerly)
         history = model.fit(
             data,
             target,
@@ -294,7 +296,8 @@ def test_encoding(backend, frontend, layer, seed):
         frontend.__name__ == "qiboml.interfaces.keras"
         and backend.platform != "tensorflow"
     ):
-        pytest.skip("keras interface not ready.")
+        # pytest.skip("keras interface not ready.")
+        pass
 
     set_device(frontend)
     set_seed(frontend, seed)
@@ -334,6 +337,7 @@ def test_encoding(backend, frontend, layer, seed):
             ),
         ],
     )
+    q_model.decoding = decoding
 
     data = random_tensor(frontend, (100, dim), binary)
     target = prepare_targets(frontend, q_model, data)
@@ -349,6 +353,7 @@ def test_encoding(backend, frontend, layer, seed):
             build_linear_layer(frontend, 1, 1),
         ],
     )
+    model.decoding = decoding
 
     target = prepare_targets(frontend, model, data)
 

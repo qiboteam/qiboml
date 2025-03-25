@@ -1,9 +1,7 @@
 """Keras interface to qiboml layers"""
 
-import os
 import string
 from dataclasses import dataclass
-from importlib import reload
 from typing import Optional
 
 import keras
@@ -11,22 +9,23 @@ import numpy as np
 import tensorflow as tf  # pylint: disable=import-erro
 from qibo import Circuit
 from qibo.backends import Backend
+from qibo.src.qibo.config import raise_error
 
 from qiboml.models.decoding import QuantumDecoding
 from qiboml.models.encoding import QuantumEncoding
 from qiboml.operations.differentiation import PSR, Differentiation, Jax
 
 DEFAULT_DIFFERENTIATION = {
-    "qiboml-pytorch": None,
+    "qiboml-pytorch": Jax,  # None,
     "qiboml-tensorflow": None,
-    "qiboml-jax": None,
-    "numpy": None,
+    "qiboml-jax": Jax,  # None,
+    "numpy": Jax,
 }
 
 QIBO_2_KERAS_BACKEND = {
-    "qiboml-pytorch": "torch",
-    "qiboml-tensorflow": "tensorflow",
-    "qiboml-jax": "jax",
+    "qiboml (pytorch)": "torch",
+    "qiboml (tensorflow)": "tensorflow",
+    "qiboml (jax)": "jax",
     "numpy": "numpy",
 }
 
@@ -42,11 +41,13 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
     def __post_init__(self):
         super().__init__()
 
+        """
+        # switch keras backend
         if str(self.backend) in QIBO_2_KERAS_BACKEND:
-            breakpoint()
             os.environ["KERAS_BACKEND"] = QIBO_2_KERAS_BACKEND.get(str(self.backend))
             # reload keras
             reload(keras)
+        """
 
         params = [p for param in self.circuit.get_parameters() for p in param]
         params = keras.ops.cast(params, "float64")  # pylint: disable=no-member
@@ -86,6 +87,14 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
         if self.differentiation is None:
             output = self.decoding(self.encoding(x) + self.circuit)
             return output[None, :]
+        # if tensor is symbolic replace it with a placeholder
+        # --> can't use symbolic tensors with non-tf backends
+        if tf.is_symbolic_tensor(x):
+            # return self.custom_gradient.evaluate(np.zeros(x.shape), *np.zeros(self.circuit_parameters.shape))
+            raise_error(
+                RuntimeError,
+                "Symbolic execution with non-native differentiation is not supported. Please switch to eager execution instead: model.compile(loss, optimizer, run_eagerly=True).",
+            )
         return self.custom_gradient.evaluate(x, *self.get_weights()[0])
 
     @property
@@ -119,14 +128,17 @@ class QuantumModelCustomGradient:
     @tf.custom_gradient
     def evaluate(self, x, *params):
         # check whether we have to derive wrt inputs
-        wrt_inputs = x.trainable and self.encoding.differentiable
-
+        wrt_inputs = self.encoding.differentiable  # how to check if tf.tensor is leaf?
+        if tf.is_symbolic_tensor(x):
+            x = np.zeros(x.shape)
+            params = np.zeros(len(params))
         x = self.backend.cast(
             keras.ops.convert_to_numpy(x), dtype=self.backend.np.float64
         )
         circuit = self.encoding(x) + self.circuit
         circuit.set_parameters(params)
         y = self.decoding(circuit)
+        y = self.backend.to_numpy(y)
         y = keras.ops.cast(y, dtype=y.dtype)
 
         # Custom gradient
