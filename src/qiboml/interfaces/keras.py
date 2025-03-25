@@ -6,10 +6,10 @@ from typing import Optional
 
 import keras
 import numpy as np
-import tensorflow as tf  # pylint: disable=import-erro
+import tensorflow as tf  # pylint: disable=import-error
 from qibo import Circuit
 from qibo.backends import Backend
-from qibo.src.qibo.config import raise_error
+from qibo.config import raise_error
 
 from qiboml.models.decoding import QuantumDecoding
 from qiboml.models.encoding import QuantumEncoding

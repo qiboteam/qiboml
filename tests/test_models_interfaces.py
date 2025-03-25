@@ -174,7 +174,10 @@ def train_model(frontend, model, data, target):
                     self.stopped_epoch = epoch
                     self.model.stop_training = True
 
-        run_eagerly = model.backend.platform != "tensorflow"
+        run_eagerly = (
+            model.decoding.backend.platform != "tensorflow"
+            or not model.decoding.analytic
+        )
 
         model.compile(loss=loss_f, optimizer=optimizer, run_eagerly=run_eagerly)
         history = model.fit(
@@ -202,6 +205,10 @@ def eval_model(frontend, model, data, target=None):
     elif frontend.__name__ == "qiboml.interfaces.keras":
         loss_f = frontend.keras.losses.MeanSquaredError(
             reduction="sum_over_batch_size",
+        )
+        model.run_eagerly = (
+            model.decoding.backend.platform != "tensorflow"
+            or not model.decoding.analytic
         )
         for x in data:
             x = frontend.tf.expand_dims(x, axis=0)
@@ -337,7 +344,7 @@ def test_encoding(backend, frontend, layer, seed):
             ),
         ],
     )
-    q_model.decoding = decoding
+    setattr(q_model, "decoding", decoding_layer)
 
     data = random_tensor(frontend, (100, dim), binary)
     target = prepare_targets(frontend, q_model, data)
@@ -353,7 +360,7 @@ def test_encoding(backend, frontend, layer, seed):
             build_linear_layer(frontend, 1, 1),
         ],
     )
-    model.decoding = decoding
+    setattr(model, "decoding", decoding_layer)
 
     target = prepare_targets(frontend, model, data)
 
