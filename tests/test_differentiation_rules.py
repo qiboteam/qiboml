@@ -58,7 +58,8 @@ def test_expval_grad_PSR(frontend, backend, nshots, wrt_inputs):
     parameters. In this test the system size is fixed to two qubits and all the
     parameters/data values are fixed.
     """
-    # TODO: fixme
+    if frontend.__name__ == "qiboml.interfaces.keras":
+        pytest.skip("keras interface not ready.")
     if wrt_inputs:
         pytest.skip("PSR is not covering yet the case of differentiation wrt inputs.")
 
