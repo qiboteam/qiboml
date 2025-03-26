@@ -304,59 +304,45 @@ class Jax(Differentiation):
     ):
         x = backend.to_numpy(x)
         x = self._jax.cast(x, self._jax.precision)
-        # Wrap the static arguments (non-hashable objects) so they can be used as static args.
+
         circuit_structure_static = _StaticArgWrapper(circuit_structure)
         decoding_static = _StaticArgWrapper(decoding)
+
         if self._argnums is None:
-            self._argnums = tuple(range(3, len(parameters) + 3))
-            setattr(
-                self,
-                "_jacobian",
-                partial(jax.jit, static_argnums=(1, 2))(
-                    jax.jacfwd(self._run, (0,) + self._argnums)
-                ),
+            self._argnums = (0, 3)
+            self._jacobian = partial(jax.jit, static_argnums=(1, 2))(
+                jax.jacfwd(self._run, (0, 3))
             )
-            setattr(
-                self,
-                "_jacobian_without_inputs",
-                partial(jax.jit, static_argnums=(1, 2))(
-                    jax.jacfwd(self._run, self._argnums)
-                ),
-            )
-        parameters = backend.to_numpy(list(parameters))
-        parameters = self._jax.cast(parameters, parameters.dtype)
+
+        params = np.array(list(parameters))  # shape: (n_params,)
+        params = self._jax.cast(params, params.dtype)
         decoding.set_backend(self._jax)
-        if wrt_inputs:
-            gradients = self._jacobian(
-                x,
-                circuit_structure_static,
-                decoding_static,
-                *parameters,
+
+        grad_inputs, grad_params = self._jacobian(
+            x, circuit_structure_static, decoding_static, params
+        )
+
+        if not wrt_inputs:
+            grad_inputs = self._jax.numpy.zeros(
+                (decoding.output_shape[-1], x.shape[-1])
             )
-        else:
-            gradients = (
-                self._jax.numpy.zeros((decoding.output_shape[-1], x.shape[-1])),
-                self._jacobian_without_inputs(
-                    x,
-                    circuit_structure_static,
-                    decoding_static,
-                    *parameters,
-                ),
-            )
+
+        if grad_params.ndim == 3 and grad_params.shape[1] == 1:
+            grad_params = self._jax.numpy.squeeze(grad_params, axis=1)
+        num_params = int(grad_params.shape[1])
+        split_param_grads = list(self._jax.numpy.split(grad_params, num_params, axis=1))
         decoding.set_backend(backend)
+
         return [
             backend.cast(self._jax.to_numpy(grad).tolist(), backend.precision)
-            for grad in gradients
+            for grad in ([grad_inputs] + split_param_grads)
         ]
 
     @staticmethod
     @partial(jax.jit, static_argnums=(1, 2))
-    def _run(x, circuit_structure_static, decoding_static, *parameters):
-        # Unwrap the static objects
+    def _run(x, circuit_structure_static, decoding_static, parameters):
         circuit_structure = circuit_structure_static.obj
         decoding = decoding_static.obj
-
-        # Build the full circuit using the shared helper from Differentiation.
         circ = Differentiation.full_circuit(
             x, circuit_structure[0].nqubits, circuit_structure
         )

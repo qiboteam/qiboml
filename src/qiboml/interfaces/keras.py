@@ -1,7 +1,7 @@
 """Keras interface to qiboml layers"""
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import List, Optional, Union
 
 import keras
 import numpy as np
@@ -10,9 +10,10 @@ from qibo import Circuit
 from qibo.backends import Backend
 from qibo.config import raise_error
 
+from qiboml.interfaces import utils
 from qiboml.models.decoding import QuantumDecoding
 from qiboml.models.encoding import QuantumEncoding
-from qiboml.operations.differentiation import PSR, Differentiation, Jax
+from qiboml.operations.differentiation import Differentiation, Jax
 
 DEFAULT_DIFFERENTIATION = {
     "qiboml-pytorch": None,
@@ -24,16 +25,28 @@ DEFAULT_DIFFERENTIATION = {
 
 @dataclass(eq=False)
 class QuantumModel(keras.Model):  # pylint: disable=no-member
+    """
+    The Keras interface to qiboml models.
 
-    encoding: QuantumEncoding
-    circuit: Circuit
+    Args:
+        circuit_structure (Union[List[QuantumEncoding, Circuit], Circuit]):
+            a list of Qibo circuits and Qiboml encoding layers, which defines
+            the complete structure of the model. The whole circuit will be mounted
+            by sequentially add the elements of the given list. It is also possible
+            to pass a single circuit, in the case a sequential structure is not needed.
+        decoding (QuantumDecoding): the decoding layer.
+        differentiation (Differentiation, optional): the differentiation engine,
+            if not provided a default one will be picked following what described in the :ref:`docs <_differentiation_engine>`.
+    """
+
+    circuit_structure: Union[Circuit, List[Union[Circuit, QuantumEncoding]]]
     decoding: QuantumDecoding
     differentiation: Optional[Differentiation] = None
 
     def __post_init__(self):
         super().__init__()
 
-        params = [p for param in self.circuit.get_parameters() for p in param]
+        params = utils.get_params_from_circuit_structure(self.circuit_structure)
         params = keras.ops.cast(params, "float64")  # pylint: disable=no-member
 
         self.circuit_parameters = self.add_weight(
@@ -41,27 +54,22 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
         )
         self.set_weights([params])
 
-        backend_string = (
-            f"{self.decoding.backend.name}-{self.decoding.backend.platform}"
-            if self.decoding.backend.platform is not None
-            else self.decoding.backend.name
-        )
         if self.differentiation is None:
-            if not self.decoding.analytic:
-                self.differentiation = PSR()
-            else:
-                if backend_string in DEFAULT_DIFFERENTIATION.keys():
-                    diff = DEFAULT_DIFFERENTIATION[backend_string]
-                    self.differentiation = diff() if diff is not None else None
-                else:
-                    self.differentiation = PSR()
+            self.differentiation = utils.get_default_differentiation(
+                decoding=self.decoding,
+                instructions=DEFAULT_DIFFERENTIATION,
+            )
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
         if self.differentiation is None:
+            circuit = utils.circuit_from_structure(
+                circuit_structure=self.circuit_structure,
+                x=x,
+            )
             # this 1 * is needed otherwise a TypeError is raised
-            self.circuit.set_parameters(1 * self.circuit_parameters)
+            circuit.set_parameters(1 * self.circuit_parameters)
 
-            output = self.decoding(self.encoding(x) + self.circuit)
+            output = self.decoding(circuit)
             return output[None, :]
 
         raise NotImplementedError
