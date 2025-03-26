@@ -58,11 +58,6 @@ def test_expval_grad_PSR(frontend, backend, nshots, wrt_inputs):
     parameters. In this test the system size is fixed to two qubits and all the
     parameters/data values are fixed.
     """
-
-    if frontend.__name__ == "qiboml.interfaces.keras":
-        pytest.skip("keras interface not ready.")
-    elif frontend.__name__ == "qiboml.interfaces.pytorch":
-        from qiboml.interfaces.pytorch import QuantumModel
     # TODO: fixme
     if wrt_inputs:
         pytest.skip("PSR is not covering yet the case of differentiation wrt inputs.")
@@ -92,7 +87,7 @@ def test_expval_grad_PSR(frontend, backend, nshots, wrt_inputs):
     initial_params = np.linspace(0.0, 2 * np.pi, nparams)
     training_layer.set_parameters(backend.cast(initial_params))
 
-    q_model = QuantumModel(
+    q_model = frontend.QuantumModel(
         circuit_structure=[encoding_layer, training_layer],
         decoding=decoding_layer,
         differentiation=PSR(),
