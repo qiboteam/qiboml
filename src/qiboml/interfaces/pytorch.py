@@ -160,8 +160,8 @@ class QuantumModel(torch.nn.Module):
 
 class QuantumModelAutoGrad(torch.autograd.Function):
     """
-    Custom Autograd to enable autodifferentiation of the QuantumModel.
-    Now includes an option (compute_input_gradients) to disable input gradients.
+    Custom Autograd to enable the autodifferentiation of the QuantumModel for
+    non-pytorch backends.
     """
 
     @staticmethod
