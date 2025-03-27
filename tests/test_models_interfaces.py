@@ -206,10 +206,11 @@ def eval_model(frontend, model, data, target=None):
         loss_f = frontend.keras.losses.MeanSquaredError(
             reduction="sum_over_batch_size",
         )
-        model.run_eagerly = (
+        run_eagerly = (
             model.decoding.backend.platform != "tensorflow"
             or not model.decoding.analytic
         )
+        # model.compile(loss=loss_f, run_eagerly=run_eagerly)
         for x in data:
             x = frontend.tf.expand_dims(x, axis=0)
             outputs.append(model(x))

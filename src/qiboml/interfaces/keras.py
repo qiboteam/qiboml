@@ -41,14 +41,8 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
     def __post_init__(self):
         super().__init__()
 
-        """
-        # switch keras backend
-        if str(self.backend) in QIBO_2_KERAS_BACKEND:
-            os.environ["KERAS_BACKEND"] = QIBO_2_KERAS_BACKEND.get(str(self.backend))
-            # reload keras
-            reload(keras)
-        """
-
+        # directly building the weigths in the init as they don't depend
+        # on the inputs
         params = [p for param in self.circuit.get_parameters() for p in param]
         params = keras.ops.cast(params, "float64")  # pylint: disable=no-member
 
@@ -80,6 +74,9 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
                 self.differentiation,
             )
 
+    def compute_output_shape(self, input_shape):
+        return self.decoding.output_shape
+
     def call(self, x: tf.Tensor) -> tf.Tensor:
         # this 1 * is needed otherwise a TypeError is raised
         self.circuit.set_parameters(1 * self.circuit_parameters)
@@ -87,15 +84,7 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
         if self.differentiation is None:
             output = self.decoding(self.encoding(x) + self.circuit)
             return output[None, :]
-        # if tensor is symbolic replace it with a placeholder
-        # --> can't use symbolic tensors with non-tf backends
-        if tf.is_symbolic_tensor(x):
-            # return self.custom_gradient.evaluate(np.zeros(x.shape), *np.zeros(self.circuit_parameters.shape))
-            raise_error(
-                RuntimeError,
-                "Symbolic execution with non-native differentiation is not supported. Please switch to eager execution instead: model.compile(loss, optimizer, run_eagerly=True).",
-            )
-        return self.custom_gradient.evaluate(x, *self.get_weights()[0])
+        return self.custom_gradient.evaluate(x, 1 * self.circuit_parameters)
 
     @property
     def output_shape(
@@ -126,23 +115,27 @@ class QuantumModelCustomGradient:
     differentiation: Differentiation
 
     @tf.custom_gradient
-    def evaluate(self, x, *params):
+    def evaluate(self, x, params):
         # check whether we have to derive wrt inputs
         wrt_inputs = self.encoding.differentiable  # how to check if tf.tensor is leaf?
-        if tf.is_symbolic_tensor(x):
-            x = np.zeros(x.shape)
-            params = np.zeros(len(params))
-        x = self.backend.cast(
-            keras.ops.convert_to_numpy(x), dtype=self.backend.np.float64
-        )
-        circuit = self.encoding(x) + self.circuit
-        circuit.set_parameters(params)
-        y = self.decoding(circuit)
-        y = self.backend.to_numpy(y)
-        y = keras.ops.cast(y, dtype=y.dtype)
 
-        # Custom gradient
-        def grad(dy):
+        def forward(x, params):
+            x = self.backend.cast(
+                keras.ops.convert_to_numpy(x), dtype=self.backend.np.float64
+            )
+            circuit = self.encoding(x) + self.circuit
+            circuit.set_parameters(params)
+            y = self.decoding(circuit)
+            y = self.backend.to_numpy(y)
+            return keras.ops.cast(y, dtype=y.dtype)
+
+        y = tf.numpy_function(func=forward, inp=[x, params], Tout=tf.float64)
+        if tf.is_symbolic_tensor(y):
+            y.set_shape(self.decoding.output_shape)
+        else:
+            y = keras.ops.reshape(y, self.decoding.output_shape)
+
+        def get_gradients(x, params):
             d_x, *d_params = self.differentiation.evaluate(
                 x,
                 self.encoding,
@@ -155,15 +148,25 @@ class QuantumModelCustomGradient:
             d_params = self.backend.cast(d_params, dtype=self.backend.np.float64)
             d_x = keras.ops.cast(d_x, d_x.dtype)
             d_params = keras.ops.cast(d_params, d_params.dtype)
-            left_indices = tuple(range(len(d_params.shape)))
-            right_indices = left_indices[::-1][: len(d_params.shape) - 2] + (
-                len(left_indices),
+            return d_x, d_params
+
+        # Custom gradient
+        def grad(dy):
+            # breakpoint()
+            d_x, d_params = tf.numpy_function(
+                func=get_gradients, inp=[x, params], Tout=[tf.float64, tf.float64]
             )
-            left_indices = "".join(string.ascii_letters[i] for i in left_indices)
-            right_indices = "".join(string.ascii_letters[i] for i in right_indices)
-            d_params = keras.ops.einsum(
-                f"{left_indices},{right_indices}", d_params, dy.T
+            if tf.is_symbolic_tensor(d_x):
+                d_x.set_shape(dy.shape + x.shape)
+                d_params.set_shape(tuple(params.shape) + dy.shape)
+            indices = tuple(range(len(dy.shape)))
+            lhs = "".join(string.ascii_letters[i] for i in indices)
+            rhs = string.ascii_letters[len(indices)] + lhs
+            d_params = keras.ops.einsum(f"{lhs},{rhs}", dy, d_params)
+            rhs = lhs + "".join(
+                string.ascii_letters[i] for i in range(len(indices), len(d_x.shape))
             )
-            return dy @ d_x, *d_params
+            d_x = keras.ops.einsum(f"{lhs},{rhs}", dy, d_x)
+            return d_x, d_params
 
         return y, grad
