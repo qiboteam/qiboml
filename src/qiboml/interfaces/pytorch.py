@@ -181,6 +181,9 @@ class QuantumModelAutoGrad(torch.autograd.Function):
         ctx.backend = backend
         ctx.differentiation = differentiation
 
+        # Checking whether input data require grad
+        x_requires_grad = x.requires_grad
+
         # Process the input
         x_clone = x.clone().detach().cpu().numpy()
         x_clone = backend.cast(x_clone, dtype=x_clone.dtype)
@@ -190,15 +193,14 @@ class QuantumModelAutoGrad(torch.autograd.Function):
         ]
 
         # Build the temporary circuit from the circuit structure.
-        ctx.differentiable_encodings = False
+        ctx.differentiable_encodings = x_requires_grad
         circuit = Circuit(decoding.nqubits)
         for circ in circuit_structure:
             if isinstance(circ, QuantumEncoding):
                 circuit += circ(x_clone)
                 # Record if any encoding is differentiable.
-                if not ctx.differentiable_encodings:
-                    if not x.is_leaf and circ.differentiable:
-                        ctx.differentiable_encodings = True
+                if not circ.differentiable:
+                    ctx.differentiable_encodings = False
             else:
                 circuit += circ
 

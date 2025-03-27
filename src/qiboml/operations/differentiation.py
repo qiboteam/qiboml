@@ -155,7 +155,6 @@ class PSR(Differentiation):
                     decoding=decoding,
                     backend=backend,
                 )
-
         return gradient
 
     def data_gradient_from_encoding(

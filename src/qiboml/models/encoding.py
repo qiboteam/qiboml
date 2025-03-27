@@ -96,7 +96,7 @@ class PhaseEncoding(QuantumEncoding):
         In this case, the correspondence it's simply that the i-th component
         of the data is uploaded in the i-th gate of the queue.
         """
-        return {f"{i}": [i] for i in range(len(self._circuit.queue))}
+        return {f"{i}": [i] for i in range(len(self.qubits))}
 
     def __call__(self, x: ndarray) -> Circuit:
         """Construct the circuit encoding the ``x`` data in the chosen encoding gate.
