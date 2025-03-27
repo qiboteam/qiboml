@@ -133,6 +133,9 @@ class QuantumModelCustomGradient:
         if tf.is_symbolic_tensor(y):
             y.set_shape(self.decoding.output_shape)
         else:
+            # check output shape of decoding layers, they returned tensor
+            # shape should match the output_shape attribute and this should
+            # not be necessary!!
             y = keras.ops.reshape(y, self.decoding.output_shape)
 
         def get_gradients(x, params):
@@ -145,20 +148,26 @@ class QuantumModelCustomGradient:
                 *params,
                 wrt_inputs=wrt_inputs,
             )
-            d_params = self.backend.cast(d_params, dtype=self.backend.np.float64)
+            d_params = self.backend.to_numpy(
+                self.backend.cast(d_params, dtype=self.backend.np.float64)
+            )
+            d_x = self.backend.to_numpy(d_x)
             d_x = keras.ops.cast(d_x, d_x.dtype)
             d_params = keras.ops.cast(d_params, d_params.dtype)
             return d_x, d_params
 
         # Custom gradient
         def grad(dy):
-            # breakpoint()
             d_x, d_params = tf.numpy_function(
                 func=get_gradients, inp=[x, params], Tout=[tf.float64, tf.float64]
             )
             if tf.is_symbolic_tensor(d_x):
                 d_x.set_shape(dy.shape + x.shape)
                 d_params.set_shape(tuple(params.shape) + dy.shape)
+            else:
+                # PSR is producing an incompatible shape, double check this
+                # the reshape here should not be needed
+                d_x = keras.ops.reshape(d_x, dy.shape + x.shape)
             indices = tuple(range(len(dy.shape)))
             lhs = "".join(string.ascii_letters[i] for i in indices)
             rhs = string.ascii_letters[len(indices)] + lhs

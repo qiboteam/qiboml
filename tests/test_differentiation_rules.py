@@ -26,25 +26,29 @@ torch.set_printoptions(precision=15, sci_mode=False)
 
 def construct_x(frontend, with_factor=False):
     if frontend.__name__ == "qiboml.interfaces.pytorch":
-        x = frontend.torch.tensor([0.5, 0.8])
+        x = frontend.torch.tensor([[0.5, 0.8]])
         if with_factor:
             return torch.tensor(2.0, requires_grad=True) * x
         return x
     elif frontend.__name__ == "qiboml.interfaces.keras":
         if frontend.keras.backend.backend() == "tensorflow":
-            return frontend.tf.Variable([0.5, 0.8])
+            return frontend.tf.Variable([[0.5, 0.8]])
         elif frontend.keras.backend.backend() == "pytorch":
-            return frontend.torch.tensor([0.5, 0.8])
+            return frontend.torch.tensor([[0.5, 0.8]])
         else:
             raise NotImplementedError
+
 
 def compute_gradient(frontend, model, x):
     if frontend.__name__ == "qiboml.interfaces.keras":
         if frontend.keras.backend.backend() == "tensorflow":
-            model.circuit_parameters = frontend.tf.Variable(model.circuit_parameters)
+            # model.circuit_parameters = frontend.tf.Variable(model.circuit_parameters)
             with frontend.tf.GradientTape() as tape:
-                #tape.watch(x)
-                #tape.watch(model.circuit_parameters)
+                model.circuit_parameters = frontend.tf.Variable(
+                    model.circuit_parameters
+                )
+                tape.watch(x)
+                # tape.watch(model.circuit_parameters)
                 expval = model(x)
             return tape.gradient(expval, model.circuit_parameters)
         elif frontend.keras.backend.backend() == "pytorch":
@@ -74,6 +78,9 @@ def test_expval_grad_PSR(frontend, backend, nshots, wrt_inputs):
 
     if frontend.__name__ == "qiboml.interfaces.keras":
         from qiboml.interfaces.keras import QuantumModel
+
+        frontend.keras.backend.set_floatx("float64")
+
     elif frontend.__name__ == "qiboml.interfaces.pytorch":
         from qiboml.interfaces.pytorch import QuantumModel
 
