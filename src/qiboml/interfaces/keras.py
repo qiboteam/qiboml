@@ -103,7 +103,7 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
             None,
         )
         dummy_data = (
-            self.decoding.backend.np.zeros(len(encoding_layer.qubits))
+            self.decoding.backend.cast(np.zeros(len(encoding_layer.qubits)))
             if encoding_layer is not None
             else None
         )
