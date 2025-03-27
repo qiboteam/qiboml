@@ -51,13 +51,10 @@ def get_default_differentiation(decoding: QuantumDecoding, instructions: Dict):
         else decoding.backend.name
     )
 
-    if not decoding.analytic:
+    if not decoding.analytic or backend_string not in instructions.keys():
         differentiation = PSR()
     else:
-        if backend_string in instructions.keys():
-            diff = instructions[backend_string]
-            differentiation = diff() if diff is not None else None
-        else:
-            differentiation = PSR()
+        diff = instructions[backend_string]
+        differentiation = diff() if diff is not None else None
 
     return differentiation
