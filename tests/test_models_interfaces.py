@@ -86,14 +86,19 @@ def build_activation(frontend, binary=False):
 
 
 def random_tensor(frontend, shape, binary=False):
-
-    if frontend.__name__ == "qiboml.interfaces.pytorch":
+    if (
+        frontend.__name__ == "qiboml.interfaces.pytorch"
+        or frontend.keras.backend.backend() == "pytorch"
+    ):
         tensor = (
             frontend.torch.randint(0, 2, shape).double()
             if binary
             else frontend.torch.randn(shape)
         )
-    elif frontend.__name__ == "qiboml.interfaces.keras":
+    elif (
+        frontend.__name__ == "qiboml.interfaces.keras"
+        and frontend.keras.backend.backend() == "tensorflow"
+    ):
         tensor = (
             frontend.tf.random.uniform(
                 shape, minval=0, maxval=2, dtype=frontend.tf.int64
@@ -169,7 +174,12 @@ def train_model(frontend, model, data, target):
                     self.stopped_epoch = epoch
                     self.model.stop_training = True
 
-        model.compile(loss=loss_f, optimizer=optimizer)
+        run_eagerly = (
+            model.decoding.backend.platform != "tensorflow"
+            or not model.decoding.analytic
+        )
+
+        model.compile(loss=loss_f, optimizer=optimizer, run_eagerly=run_eagerly)
         history = model.fit(
             data,
             target,
@@ -196,6 +206,11 @@ def eval_model(frontend, model, data, target=None):
         loss_f = frontend.keras.losses.MeanSquaredError(
             reduction="sum_over_batch_size",
         )
+        run_eagerly = (
+            model.decoding.backend.platform != "tensorflow"
+            or not model.decoding.analytic
+        )
+        # model.compile(loss=loss_f, run_eagerly=run_eagerly)
         for x in data:
             x = frontend.tf.expand_dims(x, axis=0)
             outputs.append(model(x))
@@ -227,7 +242,13 @@ def random_parameters(frontend, model):
     elif frontend.__name__ == "qiboml.interfaces.keras":
         new_params = []
         for weight in model.get_weights():
-            new_params += [weight + frontend.tf.random.uniform(weight.shape) / 5]
+            if frontend.keras.backend.backend() == "tensorflow":
+                val = frontend.tf.random.uniform(weight.shape)
+            elif frontend.keras.backend.backend() == "pytorch":
+                val = frontend.torch.randn(weight.shape)
+            elif frontend.keras.backend.backend() == "jax":
+                raise NotImplementedError
+            new_params += [weight + val / 5]
     return new_params
 
 
@@ -283,7 +304,8 @@ def test_encoding(backend, frontend, layer, seed):
         frontend.__name__ == "qiboml.interfaces.keras"
         and backend.platform != "tensorflow"
     ):
-        pytest.skip("keras interface not ready.")
+        # pytest.skip("keras interface not ready.")
+        pass
 
     set_device(frontend)
     set_seed(frontend, seed)
@@ -323,6 +345,7 @@ def test_encoding(backend, frontend, layer, seed):
             ),
         ],
     )
+    setattr(q_model, "decoding", decoding_layer)
 
     data = random_tensor(frontend, (100, dim), binary)
     target = prepare_targets(frontend, q_model, data)
@@ -338,6 +361,7 @@ def test_encoding(backend, frontend, layer, seed):
             build_linear_layer(frontend, 1, 1),
         ],
     )
+    setattr(model, "decoding", decoding_layer)
 
     target = prepare_targets(frontend, model, data)
 
@@ -346,9 +370,7 @@ def test_encoding(backend, frontend, layer, seed):
 
 @pytest.mark.parametrize("layer,seed", zip(DECODING_LAYERS, [1, 3, 1, 26]))
 def test_decoding(backend, frontend, layer, seed):
-    if frontend.__name__ == "qiboml.interfaces.keras" and (
-        backend.platform != "tensorflow" or layer.__name__ == "Samples"
-    ):
+    if frontend.__name__ == "qiboml.interfaces.keras" and layer.__name__ == "Samples":
         pytest.skip("keras interface not ready.")
     if not layer.analytic and not layer is dec.Expectation:
         pytest.skip(
