@@ -9,6 +9,7 @@ import tensorflow as tf  # pylint: disable=import-error
 from qibo import Circuit
 from qibo.backends import Backend
 from qibo.config import raise_error
+from qibo.ui.mpldrawer import plot_circuit
 
 from qiboml.interfaces import utils
 from qiboml.models.decoding import QuantumDecoding
@@ -81,6 +82,36 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
         #    self.circuit_parameters,
         #    x,
         # )
+
+    def draw(self, plt_drawing=True, **plt_kwargs):
+        """
+        Draw the full circuit structure.
+
+        Args:
+            plt_drawing (bool): if True, the `qibo.ui.plot_circuit` function is used.
+                If False, the default `circuit.draw` method is used.
+            plt_kwargs (dict): extra arguments which can be set to customize the
+                `qibo.ui.plot_circuit` function.
+        """
+
+        encoding_layer = next(
+            (
+                circ
+                for circ in self.circuit_structure
+                if isinstance(circ, QuantumEncoding)
+            ),
+            None,
+        )
+        dummy_data = (
+            self.decoding.backend.np.zeros(len(encoding_layer.qubits))
+            if encoding_layer is not None
+            else None
+        )
+        circuit = utils.circuit_from_structure(self.circuit_structure, dummy_data)
+        if plt_drawing:
+            plot_circuit(circuit, **plt_kwargs)
+        else:
+            circuit.draw()
 
     @property
     def output_shape(

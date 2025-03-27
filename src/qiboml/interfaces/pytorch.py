@@ -137,13 +137,21 @@ class QuantumModel(torch.nn.Module):
             plt_kwargs (dict): extra arguments which can be set to customize the
                 `qibo.ui.plot_circuit` function.
         """
-        circuit = Circuit(self.nqubits)
-        for circ in self.circuit_structure:
-            if isinstance(circ, QuantumEncoding):
-                circuit += circ.circuit
-            else:
-                circuit += circ
 
+        encoding_layer = next(
+            (
+                circ
+                for circ in self.circuit_structure
+                if isinstance(circ, QuantumEncoding)
+            ),
+            None,
+        )
+        dummy_data = (
+            self.decoding.backend.np.zeros(len(encoding_layer.qubits))
+            if encoding_layer is not None
+            else None
+        )
+        circuit = utils.circuit_from_structure(self.circuit_structure, dummy_data)
         if plt_drawing:
             plot_circuit(circuit, **plt_kwargs)
         else:
