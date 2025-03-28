@@ -58,7 +58,7 @@ pytest = "^7.2.1"
 pylint = "3.1.0"
 pytest-cov = "4.0.0"
 qibojit = "^0.1.7"
-keras = { version = "^3.0.0", optional = true }
+keras = { version = "^3.0.0" }
 tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux' or sys_platform == 'darwin'"}
 torch = { version = "^2.3.1"}
 
