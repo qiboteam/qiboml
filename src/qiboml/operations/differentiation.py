@@ -85,14 +85,12 @@ class PSR(Differentiation):
             # compute first gradient part, wrt data
             gradient.append(
                 backend.np.reshape(
-                    backend.np.hstack(
-                        self.gradient_wrt_inputs(
-                            x=x,
-                            parameters=parameters,
-                            circuit_structure=circuit_structure,
-                            decoding=decoding,
-                            backend=backend,
-                        )
+                    self.gradient_wrt_inputs(
+                        x=x,
+                        parameters=parameters,
+                        circuit_structure=circuit_structure,
+                        decoding=decoding,
+                        backend=backend,
                     ),
                     (decoding.output_shape[-1], x.shape[-1]),
                 )
@@ -140,14 +138,15 @@ class PSR(Differentiation):
     def gradient_wrt_inputs(self, x, parameters, circuit_structure, decoding, backend):
         """Compute the gradient of the given model w.r.t inputs."""
 
-        # The gradient w.r.t. x has to be the same dimension of x
-        gradient = backend.np.zeros(len(x))
+        gradient = backend.np.zeros(
+            (decoding.output_shape[-1], x.shape[-1]), dtype=x.dtype
+        )
 
-        # Scanning the circuit structure to search encodings
+        # Scan the circuit structure for encoding layers
         for i_circ, circ in enumerate(circuit_structure):
             if isinstance(circ, QuantumEncoding):
-                # For each encoding, we need to track input vals locations
-                gradient += self.data_gradient_from_encoding(
+                # Compute the contribution from this encoding layer
+                grad_enc = self.data_gradient_from_encoding(
                     x=x,
                     parameters=parameters,
                     circ_index=i_circ,
@@ -155,6 +154,11 @@ class PSR(Differentiation):
                     decoding=decoding,
                     backend=backend,
                 )
+                # Ensure the per-encoding gradient is of shape (1, n_inputs)
+                grad_enc = backend.np.reshape(
+                    backend.cast(grad_enc, dtype=x.dtype), (1, x.shape[-1])
+                )
+                gradient += grad_enc
         return gradient
 
     def data_gradient_from_encoding(
@@ -169,50 +173,55 @@ class PSR(Differentiation):
         """
         Compute the contribution to the gradient w.r.t inputs due to a specific
         encoding layer in the circuit structure.
+        This version returns a NumPy array of shape (1, n_inputs).
         """
-        gradient = backend.np.zeros(len(x))
 
-        for i_x in range(len(x)):
-            # Collecting the indices of the gates, in the queue of encoding
-            # which are affected by the i-th component of x
-            affected_gates_indices = circuit_structure[circ_index]._data_to_gate[
-                str(i_x)
-            ]
+        n_inputs = x.shape[-1]
+        grad = backend.np.zeros((1, n_inputs), dtype=x.dtype)
+
+        # Iterate over the features. Note that using x.shape[-1] ensures that if x is a 1D vector,
+        for i in range(n_inputs):
+            # Identify the indices of the encoding gates affected by the i-th input feature.
+            affected_indices = circuit_structure[circ_index]._data_to_gate[str(i)]
+            # For each such gate, compute the contribution using the parameter-shift rule.
             for gate in [
-                circuit_structure[circ_index](x).queue[i]
-                for i in affected_gates_indices
+                circuit_structure[circ_index](x).queue[i] for i in affected_indices
             ]:
                 if len(gate.parameters) != 1:
                     raise_error(
                         NotImplementedError,
-                        "For now, shift rules are supported for 1-parameters gates only.",
+                        "For now, shift rules are supported for 1-parameter gates only.",
                     )
                 else:
+                    # Calculate the shift amount based on the generator eigenvalue.
                     shift = np.pi / (4 * gate.generator_eigenvalue())
-                    # Forward circuit
+                    # Build the forward-shifted circuit.
                     forward = self.shifted_circuit(
                         x=x,
                         parameters=parameters,
-                        angle_index=i_x,
+                        angle_index=i,
                         circuit_index=circ_index,
                         shift=shift,
                         circuit_structure=circuit_structure,
                         backend=backend,
                     )
-                    # Backward circuit
+                    # Build the backward-shifted circuit.
                     backward = self.shifted_circuit(
                         x=x,
                         parameters=parameters,
-                        angle_index=i_x,
+                        angle_index=i,
                         circuit_index=circ_index,
                         shift=-shift,
                         circuit_structure=circuit_structure,
                         backend=backend,
                     )
-                    gradient[i_x] += (
-                        decoding(forward) - decoding(backward)
-                    ) * gate.generator_eigenvalue()
-        return gradient
+                    # Calculate the gradient contribution for this gate.
+                    grad_value = (
+                        float(decoding(forward) - decoding(backward))
+                        * gate.generator_eigenvalue()
+                    )
+                    grad[0, i] += grad_value
+        return grad
 
     def shifted_circuit(
         self,
