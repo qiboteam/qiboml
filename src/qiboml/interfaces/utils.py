@@ -2,7 +2,6 @@ from typing import Dict, List, Union
 
 from qibo import Circuit
 
-from qiboml import ndarray
 from qiboml.models.decoding import QuantumDecoding
 from qiboml.models.encoding import QuantumEncoding
 from qiboml.operations.differentiation import PSR
@@ -23,8 +22,8 @@ def get_params_from_circuit_structure(
 
 
 def circuit_from_structure(
-    circuit_structure: Union[Circuit, List[Union[Circuit, QuantumEncoding]]],
-    x: ndarray = None,
+    circuit_structure,
+    x,
 ):
     """
     Helper function to reconstruct the whole circuit from a circuit structure.
