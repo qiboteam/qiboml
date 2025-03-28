@@ -3,7 +3,7 @@ import random
 
 import numpy as np
 import pytest
-from qibo import callbacks, hamiltonians
+from qibo import hamiltonians
 from qibo.config import raise_error
 from qibo.symbols import Z
 
@@ -93,6 +93,7 @@ def random_tensor(frontend, shape, binary=False):
             if binary
             else frontend.torch.randn(shape)
         )
+        tensor.requires_grad_(False)
     elif frontend.__name__ == "qiboml.interfaces.keras":
         tensor = (
             frontend.tf.random.uniform(
@@ -284,14 +285,13 @@ def test_encoding(backend, frontend, layer, seed):
         and backend.platform != "tensorflow"
     ):
         pytest.skip("keras interface not ready.")
-
     set_device(frontend)
     set_seed(frontend, seed)
 
     nqubits = 2
     dim = 2
 
-    training_layer = ans.ReuploadingCircuit(
+    training_layer = ans.HardwareEfficient(
         nqubits,
         random_subset(nqubits, dim),
     )
@@ -310,6 +310,9 @@ def test_encoding(backend, frontend, layer, seed):
     )
 
     encoding_layer = layer(nqubits, random_subset(nqubits, dim))
+
+    circuit_structure = [encoding_layer, training_layer]
+
     binary = True if encoding_layer.__class__.__name__ == "BinaryEncoding" else False
     activation = build_activation(frontend, binary)
     q_model = build_sequential_model(
@@ -317,8 +320,7 @@ def test_encoding(backend, frontend, layer, seed):
         [
             activation,
             frontend.QuantumModel(
-                encoding=encoding_layer,
-                circuit=training_layer,
+                circuit_structure=circuit_structure,
                 decoding=decoding_layer,
             ),
         ],
@@ -346,8 +348,9 @@ def test_encoding(backend, frontend, layer, seed):
 
 @pytest.mark.parametrize("layer,seed", zip(DECODING_LAYERS, [1, 3, 1, 26]))
 def test_decoding(backend, frontend, layer, seed):
-    if frontend.__name__ == "qiboml.interfaces.keras" and (
-        backend.platform != "tensorflow" or layer.__name__ == "Samples"
+    if (
+        frontend.__name__ == "qiboml.interfaces.keras"
+        and backend.platform != "tensorflow"
     ):
         pytest.skip("keras interface not ready.")
     if not layer.analytic and not layer is dec.Expectation:
@@ -360,7 +363,7 @@ def test_decoding(backend, frontend, layer, seed):
 
     nqubits = 2
     dim = 2
-    training_layer = ans.ReuploadingCircuit(
+    training_layer = ans.HardwareEfficient(
         nqubits,
         random_subset(nqubits, dim),
     )
@@ -390,8 +393,7 @@ def test_decoding(backend, frontend, layer, seed):
         [
             activation,
             frontend.QuantumModel(
-                encoding=encoding_layer,
-                circuit=training_layer,
+                circuit_structure=[encoding_layer, training_layer],
                 decoding=decoding_layer,
             ),
         ],
@@ -399,13 +401,13 @@ def test_decoding(backend, frontend, layer, seed):
 
     data = random_tensor(frontend, (100, dim))
 
-    target = prepare_targets(frontend, q_model, data)
-
     if layer is dec.Samples:
         with pytest.raises(NotImplementedError):
+            target = prepare_targets(frontend, q_model, data)
             _ = backprop_test(frontend, q_model, data, target)
         pytest.skip("Skipping the rest of the test for Samples decoding.")
 
+    target = prepare_targets(frontend, q_model, data)
     backprop_test(frontend, q_model, data, target)
 
     model = build_sequential_model(
