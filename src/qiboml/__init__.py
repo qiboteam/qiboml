@@ -9,20 +9,20 @@ __version__ = im.version(__package__)
 
 ndarray = npt.NDArray
 
-try:
-    from tensorflow import Tensor as tf_tensor
 
-    from qiboml.interfaces import keras
+def __getattr__(name: str):
+    if name == "keras":
+        try:
+            from importlib import import_module
 
-    ndarray = Union[ndarray, tf_tensor]
-except ImportError:  # pragma: no cover
-    pass
+            return import_module("qiboml.interfaces.keras")
+        except ImportError:
+            return None
+    if name == "pytorch":
+        try:
+            from importlib import import_module
 
-try:
-    from torch import Tensor as pt_tensor
-
-    from qiboml.interfaces import pytorch
-
-    ndarray = Union[ndarray, pt_tensor]
-except ImportError:  # pragma: no cover
-    pass
+            return import_module("qiboml.interfaces.pytorch")
+        except ImportError:
+            return None
+    raise AttributeError(f"module {__name__} has no attribute {name}")
