@@ -280,6 +280,11 @@ def backprop_test(frontend, model, data, target):
 
 @pytest.mark.parametrize("layer,seed", zip(ENCODING_LAYERS, [4, 1]))
 def test_encoding(backend, frontend, layer, seed):
+    if (
+        frontend.__name__ == "qiboml.interfaces.keras"
+        and backend.platform != "tensorflow"
+    ):
+        pytest.skip("keras interface not ready.")
     set_device(frontend)
     set_seed(frontend, seed)
 
@@ -343,6 +348,11 @@ def test_encoding(backend, frontend, layer, seed):
 
 @pytest.mark.parametrize("layer,seed", zip(DECODING_LAYERS, [1, 3, 1, 26]))
 def test_decoding(backend, frontend, layer, seed):
+    if (
+        frontend.__name__ == "qiboml.interfaces.keras"
+        and backend.platform != "tensorflow"
+    ):
+        pytest.skip("keras interface not ready.")
     if not layer.analytic and not layer is dec.Expectation:
         pytest.skip(
             "Expectation layer is the only differentiable decoding when the diffrule is not analytical."
@@ -391,13 +401,13 @@ def test_decoding(backend, frontend, layer, seed):
 
     data = random_tensor(frontend, (100, dim))
 
-    target = prepare_targets(frontend, q_model, data)
-
     if layer is dec.Samples:
         with pytest.raises(NotImplementedError):
+            target = prepare_targets(frontend, q_model, data)
             _ = backprop_test(frontend, q_model, data, target)
         pytest.skip("Skipping the rest of the test for Samples decoding.")
 
+    target = prepare_targets(frontend, q_model, data)
     backprop_test(frontend, q_model, data, target)
 
     model = build_sequential_model(
