@@ -5,6 +5,7 @@ from qibo import hamiltonians
 from qibo.backends import NumpyBackend
 from qibojit.backends import NumbaBackend
 
+import qiboml.interfaces as interface
 from qiboml.backends import PyTorchBackend
 from qiboml.models.ansatze import ReuploadingCircuit
 from qiboml.models.decoding import Expectation
@@ -32,9 +33,12 @@ def construct_x(frontend, with_factor=False):
         return x
     elif frontend.__name__ == "qiboml.interfaces.keras":
         if frontend.keras.backend.backend() == "tensorflow":
-            return frontend.tf.Variable([[0.5, 0.8]])
+            x = frontend.tf.constant([[0.5, 0.8]])
+            if with_factor:
+                return frontend.tf.Variable(2.0) * x
+            return x
         elif frontend.keras.backend.backend() == "pytorch":
-            return frontend.torch.tensor([[0.5, 0.8]])
+            return construct_x(interface.pytorch, with_factor)
         else:
             raise NotImplementedError
 

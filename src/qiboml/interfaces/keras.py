@@ -43,7 +43,11 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
 
         # directly building the weigths in the init as they don't depend
         # on the inputs
-        params = [p for param in self.circuit.get_parameters() for p in param]
+        params = [
+            self.backend.to_numpy(p)
+            for param in self.circuit.get_parameters()
+            for p in param
+        ]
         params = keras.ops.cast(params, "float64")  # pylint: disable=no-member
 
         self.circuit_parameters = self.add_weight(
@@ -117,7 +121,9 @@ class QuantumModelCustomGradient:
     @tf.custom_gradient
     def evaluate(self, x, params):
         # check whether we have to derive wrt inputs
-        wrt_inputs = self.encoding.differentiable  # how to check if tf.tensor is leaf?
+        wrt_inputs = self.encoding.differentiable
+        if tf.is_symbolic_tensor(x):  # how to check if tf.tensor is leaf?
+            wrt_inputs = wrt_inputs and hasattr(x, "op") and len(x.op.inputs) > 0
 
         def forward(x, params):
             x = self.backend.cast(
@@ -165,9 +171,10 @@ class QuantumModelCustomGradient:
                 d_x.set_shape(dy.shape + x.shape)
                 d_params.set_shape(tuple(params.shape) + dy.shape)
             else:
-                # PSR is producing an incompatible shape, double check this
+                # double check this
                 # the reshape here should not be needed
                 d_x = keras.ops.reshape(d_x, dy.shape + x.shape)
+                d_params = keras.ops.reshape(d_params, tuple(params.shape) + dy.shape)
             indices = tuple(range(len(dy.shape)))
             lhs = "".join(string.ascii_letters[i] for i in indices)
             rhs = string.ascii_letters[len(indices)] + lhs

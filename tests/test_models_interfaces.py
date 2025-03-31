@@ -93,7 +93,7 @@ def random_tensor(frontend, shape, binary=False):
         tensor = (
             frontend.torch.randint(0, 2, shape).double()
             if binary
-            else frontend.torch.randn(shape)
+            else frontend.torch.randn(shape).double()
         )
     elif (
         frontend.__name__ == "qiboml.interfaces.keras"
@@ -101,10 +101,10 @@ def random_tensor(frontend, shape, binary=False):
     ):
         tensor = (
             frontend.tf.random.uniform(
-                shape, minval=0, maxval=2, dtype=frontend.tf.int64
+                shape, minval=0, maxval=2, dtype=frontend.tf.float64
             )
             if binary
-            else frontend.tf.random.normal(shape)
+            else frontend.tf.random.normal(shape, dtype=frontend.tf.float64)
         )
     else:
         raise_error(RuntimeError, f"Unknown frontend {frontend}.")
@@ -151,18 +151,12 @@ def train_model(frontend, model, data, target):
             gradients = tape.gradient(
                 loss, model.trainable_variables
             )  # Compute gradients
-            optimizer.apply_gradients(
-                zip(gradients, model.trainable_variables)
-            )  # Apply gradients
             return gradients
 
         def get_avg_grad():
             avg_grad = 0.0
             for x, y in zip(data, target):
-                tmp = [
-                    frontend.tf.norm(grad)
-                    for grad in train_step(x[None, :], y[None, :])
-                ]
+                tmp = [frontend.tf.norm(grad) for grad in train_step(x[None, :], y)]
                 avg_grad += sum(tmp) / len(tmp)
             return avg_grad / len(data)
 
@@ -206,11 +200,6 @@ def eval_model(frontend, model, data, target=None):
         loss_f = frontend.keras.losses.MeanSquaredError(
             reduction="sum_over_batch_size",
         )
-        run_eagerly = (
-            model.decoding.backend.platform != "tensorflow"
-            or not model.decoding.analytic
-        )
-        # model.compile(loss=loss_f, run_eagerly=run_eagerly)
         for x in data:
             x = frontend.tf.expand_dims(x, axis=0)
             outputs.append(model(x))
@@ -227,6 +216,8 @@ def set_seed(frontend, seed):
         frontend.torch.set_default_dtype(frontend.torch.float64)
         frontend.torch.manual_seed(seed)
     elif frontend.__name__ == "qiboml.interfaces.keras":
+        frontend.keras.backend.set_floatx("float64")
+        frontend.tf.keras.backend.set_floatx("float64")
         frontend.keras.utils.set_random_seed(seed)
         frontend.tf.config.experimental.enable_op_determinism()
 
@@ -298,15 +289,8 @@ def backprop_test(frontend, model, data, target):
     # specific (rare) cases
 
 
-@pytest.mark.parametrize("layer,seed", zip(ENCODING_LAYERS, [4, 1]))
+@pytest.mark.parametrize("layer,seed", zip(ENCODING_LAYERS, [6, 3]))
 def test_encoding(backend, frontend, layer, seed):
-    if (
-        frontend.__name__ == "qiboml.interfaces.keras"
-        and backend.platform != "tensorflow"
-    ):
-        # pytest.skip("keras interface not ready.")
-        pass
-
     set_device(frontend)
     set_seed(frontend, seed)
 
@@ -371,7 +355,8 @@ def test_encoding(backend, frontend, layer, seed):
 @pytest.mark.parametrize("layer,seed", zip(DECODING_LAYERS, [1, 3, 1, 26]))
 def test_decoding(backend, frontend, layer, seed):
     if frontend.__name__ == "qiboml.interfaces.keras" and layer.__name__ == "Samples":
-        pytest.skip("keras interface not ready.")
+        # pytest.skip("keras interface not ready.")
+        pass
     if not layer.analytic and not layer is dec.Expectation:
         pytest.skip(
             "Expectation layer is the only differentiable decoding when the diffrule is not analytical."
@@ -418,6 +403,7 @@ def test_decoding(backend, frontend, layer, seed):
             ),
         ],
     )
+    setattr(q_model, "decoding", decoding_layer)
 
     data = random_tensor(frontend, (100, dim))
 
@@ -438,6 +424,7 @@ def test_decoding(backend, frontend, layer, seed):
             build_linear_layer(frontend, decoding_layer.output_shape[-1], 1),
         ],
     )
+    setattr(q_model, "decoding", decoding_layer)
 
     data = random_tensor(frontend, (100, 4))
     target = prepare_targets(frontend, model, data)
