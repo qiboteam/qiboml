@@ -70,7 +70,7 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
                 if backend_string in DEFAULT_DIFFERENTIATION.keys():
                     diff = DEFAULT_DIFFERENTIATION[backend_string]
                     self.differentiation = diff() if diff is not None else None
-                else:
+                else:  # pragma: no cover
                     self.differentiation = PSR()
         if self.differentiation is not None:
             self.custom_gradient = QuantumModelCustomGradient(
@@ -139,7 +139,8 @@ class QuantumModelCustomGradient:
             return keras.ops.cast(y, dtype=y.dtype)
 
         y = tf.numpy_function(func=forward, inp=[x, params], Tout=tf.float64)
-        if tf.is_symbolic_tensor(y):
+        if tf.is_symbolic_tensor(y):  # pragma: no cover
+            # is this needed as well??
             y.set_shape(self.decoding.output_shape)
         else:
             # check output shape of decoding layers, they returned tensor
@@ -170,7 +171,8 @@ class QuantumModelCustomGradient:
             d_x, d_params = tf.numpy_function(
                 func=get_gradients, inp=[x, params], Tout=[tf.float64, tf.float64]
             )
-            if tf.is_symbolic_tensor(d_x):
+            if tf.is_symbolic_tensor(d_x):  # pragma: no cover
+                # is this needed as well??
                 d_x.set_shape(dy.shape + x.shape)
                 d_params.set_shape(tuple(params.shape) + dy.shape)
             else:

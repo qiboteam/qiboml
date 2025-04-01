@@ -333,22 +333,6 @@ def test_encoding(backend, frontend, layer, seed):
     target = prepare_targets(frontend, q_model, data)
 
     backprop_test(frontend, q_model, data, target)
-    """
-    data = random_tensor(frontend, (100, 4))
-    model = build_sequential_model(
-        frontend,
-        [
-            build_linear_layer(frontend, 4, dim),
-            q_model,
-            build_linear_layer(frontend, 1, 1),
-        ],
-    )
-    setattr(model, "decoding", decoding_layer)
-
-    target = prepare_targets(frontend, model, data)
-
-    backprop_test(frontend, model, data, target)
-    """
 
 
 @pytest.mark.parametrize("layer,seed", zip(DECODING_LAYERS, [1, 3, 1, 26]))
@@ -411,21 +395,6 @@ def test_decoding(backend, frontend, layer, seed):
         pytest.skip("Skipping the rest of the test for Samples decoding.")
 
     backprop_test(frontend, q_model, data, target)
-    """
-    model = build_sequential_model(
-        frontend,
-        [
-            build_linear_layer(frontend, 4, dim),
-            q_model,
-            build_linear_layer(frontend, decoding_layer.output_shape[-1], 1),
-        ],
-    )
-    setattr(model, "decoding", decoding_layer)
-
-    data = random_tensor(frontend, (100, 4))
-    target = prepare_targets(frontend, model, data)
-    backprop_test(frontend, model, data, target)
-    """
 
 
 def test_composition(backend, frontend):
@@ -435,7 +404,9 @@ def test_composition(backend, frontend):
     nqubits = 2
     encoding_layer = random.choice(ENCODING_LAYERS)(nqubits)
     training_layer = ans.ReuploadingCircuit(nqubits)
-    decoding_layer = random.choice(DECODING_LAYERS)(nqubits, backend=backend)
+    decoding_layer = random.choice(DECODING_LAYERS)(
+        nqubits, backend=backend
+    )  # make sure it's not Samples
 
     activation = build_activation(frontend, binary=False)
     model = build_sequential_model(
