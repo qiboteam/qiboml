@@ -1,5 +1,8 @@
 """Keras interface to qiboml layers"""
 
+# pylint: disable=no-member
+# pylint: disable=unexpected-keyword-arg
+
 import string
 from dataclasses import dataclass
 from typing import Optional
