@@ -111,8 +111,7 @@ def random_tensor(frontend, shape, binary=False):
     return tensor
 
 
-def train_model(frontend, model, data, target):
-    max_epochs = 10
+def train_model(frontend, model, data, target, max_epochs=10):
     if frontend.__name__ == "qiboml.interfaces.pytorch":
 
         optimizer = frontend.torch.optim.Adam(model.parameters())
@@ -427,3 +426,36 @@ def test_decoding(backend, frontend, layer, seed):
     target = prepare_targets(frontend, model, data)
     backprop_test(frontend, model, data, target)
     """
+
+
+def test_composition(backend, frontend):
+    set_device(frontend)
+    set_seed(frontend, 42)
+
+    nqubits = 2
+    encoding_layer = random.choice(ENCODING_LAYERS)(nqubits)
+    training_layer = ans.ReuploadingCircuit(nqubits)
+    decoding_layer = random.choice(DECODING_LAYERS)(nqubits, backend=backend)
+
+    activation = build_activation(frontend, binary=False)
+    model = build_sequential_model(
+        frontend,
+        [
+            build_linear_layer(frontend, 1, nqubits),
+            activation,
+            frontend.QuantumModel(
+                encoding=encoding_layer,
+                circuit=training_layer,
+                decoding=decoding_layer,
+            ),
+            build_linear_layer(frontend, decoding_layer.output_shape[-1], 1),
+        ],
+    )
+    setattr(model, "decoding", decoding_layer)
+
+    data = random_tensor(frontend, (100, 1))
+    target = prepare_targets(frontend, model, data)
+    _, loss_untrained = eval_model(frontend, model, data, target)
+    train_model(frontend, model, data, target, max_epochs=3)
+    _, loss_trained = eval_model(frontend, model, data, target)
+    assert loss_untrained > loss_trained
