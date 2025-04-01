@@ -3,7 +3,7 @@ import random
 
 import numpy as np
 import pytest
-from qibo import callbacks, hamiltonians
+from qibo import hamiltonians
 from qibo.config import raise_error
 from qibo.symbols import Z
 

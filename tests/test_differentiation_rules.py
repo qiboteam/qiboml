@@ -25,6 +25,19 @@ torch.set_default_dtype(torch.float64)
 torch.set_printoptions(precision=15, sci_mode=False)
 
 
+def set_seed(frontend, seed):
+    np.random.seed(seed)
+    frontend.np.random.seed(seed)
+    if frontend.__name__ == "qiboml.interfaces.pytorch":
+        frontend.torch.set_default_dtype(frontend.torch.float64)
+        frontend.torch.manual_seed(seed)
+    elif frontend.__name__ == "qiboml.interfaces.keras":
+        frontend.keras.backend.set_floatx("float64")
+        frontend.tf.keras.backend.set_floatx("float64")
+        frontend.keras.utils.set_random_seed(seed)
+        frontend.tf.config.experimental.enable_op_determinism()
+
+
 def construct_x(frontend, with_factor=False):
     if frontend.__name__ == "qiboml.interfaces.pytorch":
         x = frontend.torch.tensor([[0.5, 0.8]])
@@ -90,7 +103,8 @@ def test_expval_grad_PSR(frontend, backend, nshots, wrt_inputs):
 
     decimals = 6 if nshots is None else 1
 
-    frontend.np.random.seed(42)
+    # frontend.np.random.seed(42)
+    set_seed(frontend, 42)
     backend.set_seed(42)
 
     x = construct_x(frontend, with_factor=wrt_inputs)
