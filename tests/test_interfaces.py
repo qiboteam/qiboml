@@ -6,7 +6,6 @@ import pytest
 from qibo import hamiltonians
 from qibo.config import raise_error
 from qibo.symbols import Z
-from tensorflow.python.framework.errors import UnimplementedError
 
 import qiboml.models.ansatze as ans
 import qiboml.models.decoding as dec
@@ -389,7 +388,7 @@ def test_decoding(backend, frontend, layer, seed):
         error = (
             NotImplementedError
             if frontend.__name__ != "qiboml.interfaces.keras"
-            else UnimplementedError
+            else frontend.tf.errors.UnimplementedError
         )
         with pytest.raises(error):
             _ = backprop_test(frontend, q_model, data, target)
