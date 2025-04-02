@@ -158,12 +158,14 @@ class PSR(Differentiation):
         gradient = []
         x = decoding.backend.cast(x, dtype=x.dtype, copy=True)
         for i in range(x.shape[-1]):
+            bkup_val = decoding.backend.cast(x[:, i], dtype=x.dtype, copy=True)
             shift = np.pi / (4 * gates[i].generator_eigenvalue())
-            x[i] += shift
-            forward = encoding(x) + circuit
-            x[i] -= 2 * shift
-            backward = encoding(x) + circuit
-            gradient.append(decoding(forward) - decoding(backward))
+            x[:, i] += shift
+            forward = decoding(encoding(x) + circuit)
+            x[:, i] -= 2 * shift
+            backward = decoding(encoding(x) + circuit)
+            gradient.append( (forward - backward) * gates[i].generator_eigenvalue() )
+            x[:, i] = bkup_val
         return gradient
 
     @staticmethod
