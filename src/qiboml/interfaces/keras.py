@@ -25,13 +25,6 @@ DEFAULT_DIFFERENTIATION = {
     "numpy": Jax,
 }
 
-QIBO_2_KERAS_BACKEND = {
-    "qiboml (pytorch)": "torch",
-    "qiboml (tensorflow)": "tensorflow",
-    "qiboml (jax)": "jax",
-    "numpy": "numpy",
-}
-
 
 @dataclass(eq=False)
 class QuantumModel(keras.Model):  # pylint: disable=no-member

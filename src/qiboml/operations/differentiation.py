@@ -164,7 +164,7 @@ class PSR(Differentiation):
             forward = decoding(encoding(x) + circuit)
             x[:, i] -= 2 * shift
             backward = decoding(encoding(x) + circuit)
-            gradient.append(forward - backward)
+            gradient.append( (forward - backward) * gates[i].generator_eigenvalue() )
             x[:, i] = bkup_val
         return gradient
 
