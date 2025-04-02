@@ -85,7 +85,9 @@ class PhaseEncoding(QuantumEncoding):
         } & allowed_params
 
         if len(self.gate_encoding_params) != 1:
-            raise ValueError(f"{self} currently support only gates with one parameter.")
+            raise NotImplementedError(
+                f"{self} currently support only gates with one parameter."
+            )
 
         # TODO: mount the circuit here and check whether it works with Keras
 

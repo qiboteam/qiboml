@@ -188,7 +188,7 @@ class PSR(Differentiation):
                 circuit_structure[circ_index](x).queue[i] for i in affected_indices
             ]:
                 if len(gate.parameters) != 1:
-                    raise_error(
+                    raise_error(  # pragma: no cover (we are covering an equivalent error in the encoding itself)
                         NotImplementedError,
                         "For now, shift rules are supported for 1-parameter gates only.",
                     )
