@@ -32,7 +32,7 @@ class Differentiation(ABC):
         nlayers: int,
         *parameters: list[ndarray],
         wrt_inputs: bool = False,
-    ):
+    ):  # pragma: no cover
         """
         Evaluate the gradient of a quantum model w.r.t inputs and parameters.
         """
@@ -87,7 +87,7 @@ class PSR(Differentiation):
                 backend.np.reshape(
                     self.gradient_wrt_inputs(
                         x=x,
-                        parameters=parameters,
+                        parameters=np.array(parameters),
                         circuit_structure=circuit_structure,
                         decoding=decoding,
                         backend=backend,

@@ -62,8 +62,6 @@ def test_expval_grad_PSR(frontend, backend, nshots, wrt_inputs):
     if frontend.__name__ == "qiboml.interfaces.keras":
         pytest.skip("keras interface not ready.")
 
-    decimals = 6 if nshots is None else 1
-
     frontend.np.random.seed(42)
     backend.set_seed(42)
 
