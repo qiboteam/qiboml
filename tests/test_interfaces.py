@@ -6,6 +6,7 @@ import pytest
 from qibo import hamiltonians
 from qibo.config import raise_error
 from qibo.symbols import Z
+from tensorflow.python.framework.errors import UnimplementedError
 
 import qiboml.models.ansatze as ans
 import qiboml.models.decoding as dec
@@ -166,12 +167,7 @@ def train_model(frontend, model, data, target, max_epochs=10):
                     self.stopped_epoch = epoch
                     self.model.stop_training = True
 
-        run_eagerly = (
-            model.decoding.backend.platform != "tensorflow"
-            or not model.decoding.analytic
-        )
-
-        model.compile(loss=loss_f, optimizer=optimizer, run_eagerly=run_eagerly)
+        model.compile(loss=loss_f, optimizer=optimizer)
         history = model.fit(
             data,
             target,
@@ -390,11 +386,16 @@ def test_decoding(backend, frontend, layer, seed):
     target = prepare_targets(frontend, q_model, data)
 
     if layer is dec.Samples:
-        with pytest.raises(NotImplementedError):
+        error = (
+            NotImplementedError
+            if frontend.__name__ != "qiboml.interfaces.keras"
+            else UnimplementedError
+        )
+        with pytest.raises(error):
             _ = backprop_test(frontend, q_model, data, target)
-        pytest.skip("Skipping the rest of the test for Samples decoding.")
-
-    backprop_test(frontend, q_model, data, target)
+        assert q_model(data[0][None, :]).shape == (kwargs["nshots"], nqubits)
+    else:
+        backprop_test(frontend, q_model, data, target)
 
 
 def test_composition(backend, frontend):

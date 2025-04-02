@@ -120,13 +120,17 @@ class QuantumModelCustomGradient:
     decoding: QuantumDecoding
     backend: Backend
     differentiation: Differentiation
+    wrt_inputs: bool = False
 
     @tf.custom_gradient
     def evaluate(self, x, params):
         # check whether we have to derive wrt inputs
-        wrt_inputs = self.encoding.differentiable
         if tf.is_symbolic_tensor(x):  # how to check if tf.tensor is leaf?
-            wrt_inputs = wrt_inputs and hasattr(x, "op") and len(x.op.inputs) > 0
+            self.wrt_inputs = (
+                self.encoding.differentiable
+                and hasattr(x, "op")
+                and len(x.op.inputs) > 0
+            )
 
         def forward(x, params):
             x = self.backend.cast(
@@ -139,16 +143,13 @@ class QuantumModelCustomGradient:
             return keras.ops.cast(y, dtype=y.dtype)
 
         y = tf.numpy_function(func=forward, inp=[x, params], Tout=tf.float64)
-        if tf.is_symbolic_tensor(y):  # pragma: no cover
-            # is this needed as well??
-            y.set_shape(self.decoding.output_shape)
-        else:
-            # check output shape of decoding layers, they returned tensor
-            # shape should match the output_shape attribute and this should
-            # not be necessary!!
-            y = keras.ops.reshape(y, self.decoding.output_shape)
+        # check output shape of decoding layers, their returned tensor
+        # shape should match the output_shape attribute and this should
+        # not be necessary (only useful for symbolic execution)!!
+        y = keras.ops.reshape(y, self.decoding.output_shape)
 
         def get_gradients(x, params):
+            x = self.backend.cast(x, dtype=self.backend.np.float64)
             d_x, *d_params = self.differentiation.evaluate(
                 x,
                 self.encoding,
@@ -156,7 +157,7 @@ class QuantumModelCustomGradient:
                 self.decoding,
                 self.backend,
                 *params,
-                wrt_inputs=wrt_inputs,
+                wrt_inputs=self.wrt_inputs,
             )
             d_params = self.backend.to_numpy(
                 self.backend.cast(d_params, dtype=self.backend.np.float64)
@@ -171,15 +172,10 @@ class QuantumModelCustomGradient:
             d_x, d_params = tf.numpy_function(
                 func=get_gradients, inp=[x, params], Tout=[tf.float64, tf.float64]
             )
-            if tf.is_symbolic_tensor(d_x):  # pragma: no cover
-                # is this needed as well??
-                d_x.set_shape(dy.shape + x.shape)
-                d_params.set_shape(tuple(params.shape) + dy.shape)
-            else:
-                # double check this
-                # the reshape here should not be needed
-                d_x = keras.ops.reshape(d_x, dy.shape + x.shape)
-                d_params = keras.ops.reshape(d_params, tuple(params.shape) + dy.shape)
+            # double check this
+            # the reshape here should be needed for symbolic execution only
+            d_x = keras.ops.reshape(d_x, dy.shape + x.shape)
+            d_params = keras.ops.reshape(d_params, tuple(params.shape) + dy.shape)
             indices = tuple(range(len(dy.shape)))
             lhs = "".join(string.ascii_letters[i] for i in indices)
             rhs = string.ascii_letters[len(indices)] + lhs
