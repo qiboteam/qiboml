@@ -227,7 +227,7 @@ def random_parameters(frontend, model):
         new_params = []
         for weight in model.get_weights():
             if frontend.keras.backend.backend() == "tensorflow":
-                val = frontend.tf.random.uniform(weight.shape)
+                val = frontend.tf.random.normal(weight.shape)
             elif frontend.keras.backend.backend() == "pytorch":
                 val = frontend.torch.randn(weight.shape)
             elif frontend.keras.backend.backend() == "jax":
@@ -282,7 +282,7 @@ def backprop_test(frontend, model, data, target):
     # specific (rare) cases
 
 
-@pytest.mark.parametrize("layer,seed", zip(ENCODING_LAYERS, [6, 3]))
+@pytest.mark.parametrize("layer,seed", zip(ENCODING_LAYERS, [6, 4]))
 def test_encoding(backend, frontend, layer, seed):
     set_device(frontend)
     set_seed(frontend, seed)
