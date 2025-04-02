@@ -153,9 +153,11 @@ class QuantumModel(torch.nn.Module):
         )
         circuit = utils.circuit_from_structure(self.circuit_structure, dummy_data)
         if plt_drawing:
-            plot_circuit(circuit, **plt_kwargs)
+            _, fig = plot_circuit(circuit, **plt_kwargs)
+            return fig
         else:
             circuit.draw()
+            return str(circuit)
 
 
 class QuantumModelAutoGrad(torch.autograd.Function):

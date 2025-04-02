@@ -109,9 +109,11 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
         )
         circuit = utils.circuit_from_structure(self.circuit_structure, dummy_data)
         if plt_drawing:
-            plot_circuit(circuit, **plt_kwargs)
+            _, fig = plot_circuit(circuit, **plt_kwargs)
+            return fig
         else:
             circuit.draw()
+            return str(circuit)
 
     @property
     def output_shape(
