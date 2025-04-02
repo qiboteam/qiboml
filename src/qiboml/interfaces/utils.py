@@ -3,7 +3,7 @@ from typing import Dict, List, Union
 from qibo import Circuit
 
 from qiboml.models.decoding import QuantumDecoding
-from qiboml.models.encoding import QuantumEncoding
+from qiboml.models.encoding import QuantumEncoding, TrainableEncoding
 from qiboml.operations.differentiation import PSR
 
 
@@ -18,6 +18,11 @@ def get_params_from_circuit_structure(
     for circ in circuit_structure:
         if not isinstance(circ, QuantumEncoding):
             params.extend([p for param in circ.get_parameters() for p in param])
+        else:
+            if isinstance(circ, TrainableEncoding):
+                params.extend(
+                    [p for param in circ.circuit.get_parameters() for p in param]
+                )
     return params
 
 

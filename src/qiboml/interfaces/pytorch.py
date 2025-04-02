@@ -11,7 +11,7 @@ from qibo.ui import plot_circuit
 
 from qiboml.interfaces import utils
 from qiboml.models.decoding import QuantumDecoding
-from qiboml.models.encoding import QuantumEncoding
+from qiboml.models.encoding import QuantumEncoding, TrainableEncoding
 from qiboml.operations.differentiation import PSR, Differentiation, Jax
 
 DEFAULT_DIFFERENTIATION = {
@@ -52,6 +52,10 @@ class QuantumModel(torch.nn.Module):
             self.circuit_structure = [self.circuit_structure]
 
         params = utils.get_params_from_circuit_structure(self.circuit_structure)
+
+        for i, circ in enumerate(self.circuit_structure):
+            if isinstance(circ, TrainableEncoding):
+                self.add_module(f"enc{i}", circ.encoding_rule)
 
         params = torch.as_tensor(self.backend.to_numpy(x=params)).ravel()
         params.requires_grad = True

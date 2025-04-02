@@ -144,3 +144,75 @@ class BinaryEncoding(QuantumEncoding):
     @property
     def differentiable(self) -> bool:
         return False
+
+
+@dataclass
+class TrainableEncoding(QuantumEncoding):
+    """
+    Trainable Encoder class that applies an ML layer (EncodingRule) to data before encoding.
+
+    Args:
+        nqubits (int): total number of qubits.
+        encoding_gate (type): The gate type to use for encoding (e.g., gates.RY).
+        encoding_rule: A machine learning layer that processes input data.
+        qubits (tuple[int], optional): set of qubits it acts on, by default range(nqubits).
+    """
+
+    encoding_gate: type = field(default_factory=lambda: gates.RY)
+    encoding_rule: any = None
+
+    def __post_init__(self):
+        """Ancillary post initialization: builds the internal circuit structure."""
+        super().__post_init__()
+
+        # Retrieving information about the given encoding gate
+        signature = inspect.signature(self.encoding_gate)
+        allowed_params = {"theta", "phi", "lam"}
+        self.gate_encoding_params = {
+            p for p in signature.parameters.keys()
+        } & allowed_params
+
+        if len(self.gate_encoding_params) != 1:
+            raise NotImplementedError(
+                f"{self} currently support only gates with one parameter."
+            )
+
+        if self.encoding_rule is None:
+            raise_error(
+                ValueError, "An encoding_rule must be provided for TrainableEncoding."
+            )
+
+    @cached_property
+    def _data_to_gate(self):
+        """
+        Associate each data component with its index in the gates queue.
+        In this case, the correspondence it's simply that the i-th component
+        of the data is uploaded in the i-th gate of the queue.
+        """
+        return {f"{i}": [i] for i in range(len(self.qubits))}
+
+    def __call__(self, x: ndarray) -> Circuit:
+        """Construct the circuit encoding the x data processed by encoding_rule in the chosen encoding gate.
+
+        Args:
+            x (ndarray): the input data to process with encoding_rule and encode in gates.
+
+        Returns:
+            (Circuit): the constructed qibo.Circuit.
+        """
+        circuit = self.circuit
+
+        # Apply the encoding rule to transform the input data
+        transformed_x = self.encoding_rule(x)
+        transformed_x = transformed_x.ravel()
+
+        # Apply the encoding gate with the transformed data
+        for i, q in enumerate(self.qubits):
+            this_gate_params = {"trainable": False}
+            [
+                this_gate_params.update({p: transformed_x[i]})
+                for p in self.gate_encoding_params
+            ]
+            circuit.add(self.encoding_gate(q=q, **this_gate_params))
+
+        return circuit
