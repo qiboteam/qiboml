@@ -3,7 +3,7 @@ import random
 
 import numpy as np
 import pytest
-from qibo import hamiltonians
+from qibo import callbacks, hamiltonians
 from qibo.config import raise_error
 from qibo.symbols import Z
 
@@ -39,7 +39,9 @@ def build_linear_layer(frontend, input_dim, output_dim):
     if frontend.__name__ == "qiboml.interfaces.pytorch":
         return frontend.torch.nn.Linear(input_dim, output_dim)
     elif frontend.__name__ == "qiboml.interfaces.keras":
-        return frontend.keras.layers.Dense(output_dim)
+        layer = frontend.keras.layers.Dense(output_dim)
+        layer.build((input_dim,))
+        return layer
     else:
         raise_error(RuntimeError, f"Unknown frontend {frontend}.")
 
@@ -66,7 +68,16 @@ def build_activation(frontend, binary=False):
                 return x
 
     elif frontend.__name__ == "qiboml.interfaces.keras":
-        pass
+
+        class Activation(frontend.keras.layers.Layer):
+            def call(self, x):
+                if not binary:
+                    # normalize
+                    x = x / x.max()
+                    # apply the tanh and rescale by pi
+                    return np.pi * frontend.keras.activations.tanh(x)
+                return x
+
     else:
         raise_error(RuntimeError, f"Unknown frontend {frontend}.")
 
@@ -75,6 +86,7 @@ def build_activation(frontend, binary=False):
 
 
 def random_tensor(frontend, shape, binary=False):
+
     if frontend.__name__ == "qiboml.interfaces.pytorch":
         tensor = (
             frontend.torch.randint(0, 2, shape).double()
@@ -82,7 +94,13 @@ def random_tensor(frontend, shape, binary=False):
             else frontend.torch.randn(shape)
         )
     elif frontend.__name__ == "qiboml.interfaces.keras":
-        tensor = frontend.tf.random.uniform(shape)
+        tensor = (
+            frontend.tf.random.uniform(
+                shape, minval=0, maxval=2, dtype=frontend.tf.int64
+            )
+            if binary
+            else frontend.tf.random.normal(shape)
+        )
     else:
         raise_error(RuntimeError, f"Unknown frontend {frontend}.")
     return tensor
@@ -116,16 +134,50 @@ def train_model(frontend, model, data, target):
         return avg_grad / len(data)
 
     elif frontend.__name__ == "qiboml.interfaces.keras":
-
         optimizer = frontend.keras.optimizers.Adam()
         loss_f = frontend.keras.losses.MeanSquaredError()
+
+        @frontend.tf.function
+        def train_step(x, y):
+            with frontend.tf.GradientTape() as tape:
+                predictions = model(x)
+                loss = loss_f(y, predictions)
+
+            gradients = tape.gradient(
+                loss, model.trainable_variables
+            )  # Compute gradients
+            optimizer.apply_gradients(
+                zip(gradients, model.trainable_variables)
+            )  # Apply gradients
+            return gradients
+
+        def get_avg_grad():
+            avg_grad = 0.0
+            for x, y in zip(data, target):
+                tmp = [
+                    frontend.tf.norm(grad)
+                    for grad in train_step(x[None, :], y[None, :])
+                ]
+                avg_grad += sum(tmp) / len(tmp)
+            return avg_grad / len(data)
+
+        class GradientStopCallback(frontend.keras.callbacks.Callback):
+            def on_epoch_end(self, epoch, logs=None):
+                grad = get_avg_grad()
+                logs["grad"] = grad
+                if grad < 1e-2:
+                    self.stopped_epoch = epoch
+                    self.model.stop_training = True
+
         model.compile(loss=loss_f, optimizer=optimizer)
-        model.fit(
+        history = model.fit(
             data,
             target,
             batch_size=1,
-            epochs=epochs,
+            epochs=max_epochs,
+            callbacks=[GradientStopCallback()],
         )
+        return history.history["grad"][-1]
 
 
 def eval_model(frontend, model, data, target=None):
@@ -145,6 +197,7 @@ def eval_model(frontend, model, data, target=None):
             reduction="sum_over_batch_size",
         )
         for x in data:
+            x = frontend.tf.expand_dims(x, axis=0)
             outputs.append(model(x))
         outputs = frontend.tf.stack(outputs, axis=0)
     if target is not None:
@@ -158,6 +211,9 @@ def set_seed(frontend, seed):
     if frontend.__name__ == "qiboml.interfaces.pytorch":
         frontend.torch.set_default_dtype(frontend.torch.float64)
         frontend.torch.manual_seed(seed)
+    elif frontend.__name__ == "qiboml.interfaces.keras":
+        frontend.keras.utils.set_random_seed(seed)
+        frontend.tf.config.experimental.enable_op_determinism()
 
 
 def random_parameters(frontend, model):
@@ -169,7 +225,9 @@ def random_parameters(frontend, model):
             )  # perturbation of max +- 0.2
             # of the original parameters
     elif frontend.__name__ == "qiboml.interfaces.keras":
-        new_params = [frontend.tf.random.uniform(model.get_weights()[0].shape)]
+        new_params = []
+        for weight in model.get_weights():
+            new_params += [weight + frontend.tf.random.uniform(weight.shape) / 5]
     return new_params
 
 
@@ -178,6 +236,16 @@ def get_parameters(frontend, model):
         return {k: v.clone() for k, v in model.state_dict().items()}
     elif frontend.__name__ == "qiboml.interfaces.keras":
         return model.get_weights()
+
+
+def set_device(frontend):
+    if frontend.__name__ == "qiboml.interfaces.pytorch":
+        frontend.torch.set_default_device(
+            "cuda:0" if frontend.torch.cuda.is_available() else "cpu"
+        )
+    elif frontend.__name__ == "qiboml.interfaces.keras":
+        # tf should automatically use GPU by default when available
+        pass
 
 
 def set_parameters(frontend, model, params):
@@ -211,9 +279,13 @@ def backprop_test(frontend, model, data, target):
 
 @pytest.mark.parametrize("layer,seed", zip(ENCODING_LAYERS, [4, 1]))
 def test_encoding(backend, frontend, layer, seed):
-    if frontend.__name__ == "qiboml.interfaces.keras":
+    if (
+        frontend.__name__ == "qiboml.interfaces.keras"
+        and backend.platform != "tensorflow"
+    ):
         pytest.skip("keras interface not ready.")
 
+    set_device(frontend)
     set_seed(frontend, seed)
 
     nqubits = 2
@@ -254,6 +326,7 @@ def test_encoding(backend, frontend, layer, seed):
 
     data = random_tensor(frontend, (100, dim), binary)
     target = prepare_targets(frontend, q_model, data)
+
     backprop_test(frontend, q_model, data, target)
 
     data = random_tensor(frontend, (100, 4))
@@ -267,18 +340,22 @@ def test_encoding(backend, frontend, layer, seed):
     )
 
     target = prepare_targets(frontend, model, data)
+
     backprop_test(frontend, model, data, target)
 
 
-@pytest.mark.parametrize("layer,seed", zip(DECODING_LAYERS, [1, 2, 1, 1]))
+@pytest.mark.parametrize("layer,seed", zip(DECODING_LAYERS, [1, 3, 1, 26]))
 def test_decoding(backend, frontend, layer, seed):
-    if frontend.__name__ == "qiboml.interfaces.keras":
+    if frontend.__name__ == "qiboml.interfaces.keras" and (
+        backend.platform != "tensorflow" or layer.__name__ == "Samples"
+    ):
         pytest.skip("keras interface not ready.")
     if not layer.analytic and not layer is dec.Expectation:
         pytest.skip(
             "Expectation layer is the only differentiable decoding when the diffrule is not analytical."
         )
 
+    set_device(frontend)
     set_seed(frontend, seed)
 
     nqubits = 2
@@ -336,7 +413,7 @@ def test_decoding(backend, frontend, layer, seed):
         [
             build_linear_layer(frontend, 4, dim),
             q_model,
-            build_linear_layer(frontend, q_model[1].output_shape[-1], 1),
+            build_linear_layer(frontend, decoding_layer.output_shape[-1], 1),
         ],
     )
 

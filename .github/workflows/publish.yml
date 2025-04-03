@@ -23,7 +23,7 @@ jobs:
               echo "No deployment for this ref" >&2
               exit 1
           fi
-          
+
 
   deploy-docs:
     needs: [evaluate-label]
