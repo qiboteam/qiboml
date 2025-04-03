@@ -22,12 +22,12 @@ Note that, since the pre-defined encoding, decoding and ansatz layers provided i
 
    from qiboml.models.encoding import BinaryEncoding
    from qiboml.models.decoding import Probabilities
-   from qiboml.models.ansatze import ReuploadingCircuit
+   from qiboml.models.ansatze import HardwareEfficient
 
    # these are interface agnostic
    encoding = BinaryEncoding(2)
    decoding = Probabilities(2)
-   circuit = ReuploadingCircuit(2)
+   circuit = HardwareEfficient(2)
 
    # build the torch model
    torch_model = pt.QuantumModel(encoding, circuit, decoding)
