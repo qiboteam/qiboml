@@ -76,7 +76,7 @@ optional = true
 jax = {extras = ["cuda12"], version = "^0.4.25"}
 
 [tool.poe.tasks]
-test = "pytest -rs"
+test = "pytest"
 lint = "pylint src/**/*.py -E"
 lint-warnings = "pylint src/**/*.py --exit-zero"
 docs = "make -C doc html"
