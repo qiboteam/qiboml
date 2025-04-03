@@ -31,7 +31,7 @@ class QuantumModel(torch.nn.Module):
         circuit_structure (Union[List[QuantumEncoding, Circuit], Circuit]):
             a list of Qibo circuits and Qiboml encoding layers, which defines
             the complete structure of the model. The whole circuit will be mounted
-            by sequentially add the elements of the given list. It is also possible
+            by sequentially stacking the elements of the given list. It is also possible
             to pass a single circuit, in the case a sequential structure is not needed.
         decoding (QuantumDecoding): the decoding layer.
         differentiation (Differentiation, optional): the differentiation engine,
@@ -47,7 +47,6 @@ class QuantumModel(torch.nn.Module):
     ):
         super().__init__()
 
-        # The following code works with list of objects
         if isinstance(self.circuit_structure, Circuit):
             self.circuit_structure = [self.circuit_structure]
 
@@ -176,7 +175,7 @@ class QuantumModelAutoGrad(torch.autograd.Function):
         differentiation,
         *parameters: List[torch.nn.Parameter],
     ):
-        # Save the flag and other context
+        # Save the context
         ctx.save_for_backward(x, *parameters)
         ctx.circuit_structure = circuit_structure
         ctx.decoding = decoding
@@ -208,7 +207,7 @@ class QuantumModelAutoGrad(torch.autograd.Function):
 
         circuit.set_parameters(params)
         x_clone = decoding(circuit)
-        x_clone = torch.as_tensor(backend.to_numpy(x_clone).tolist())
+        x_clone = torch.as_tensor(backend.to_numpy(x_clone).tolist(), dtype=x.dtype, devide=x.device)
         return x_clone
 
     @staticmethod

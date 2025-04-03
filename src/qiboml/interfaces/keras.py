@@ -33,7 +33,7 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
         circuit_structure (Union[List[QuantumEncoding, Circuit], Circuit]):
             a list of Qibo circuits and Qiboml encoding layers, which defines
             the complete structure of the model. The whole circuit will be mounted
-            by sequentially add the elements of the given list. It is also possible
+            by sequentially stacking the elements of the given list. It is also possible
             to pass a single circuit, in the case a sequential structure is not needed.
         decoding (QuantumDecoding): the decoding layer.
         differentiation (Differentiation, optional): the differentiation engine,
@@ -61,7 +61,7 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
                 instructions=DEFAULT_DIFFERENTIATION,
             )
 
-    def call(self, x: tf.Tensor) -> tf.Tensor:
+    def call(self, x: Optional[tf.Tensor] = None) -> tf.Tensor:
         if self.differentiation is None:
             circuit = utils.circuit_from_structure(
                 circuit_structure=self.circuit_structure,
