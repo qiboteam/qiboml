@@ -39,14 +39,13 @@ def test_state_layer(backend):
 )
 def test_expectation_layer(backend, nshots, observable):
     backend.set_seed(42)
-    rng = np.random.default_rng(42)
     nqubits = 5
     if observable is None:
         pytest.skip(
             "This fails due to qibo, it should be solved by qibo#1548: remove this skip after merge"
         )
 
-    c = random_clifford(nqubits, seed=rng, backend=backend)
+    c = random_clifford(nqubits, seed=42, backend=backend)
     if observable is not None:
         observable = observable(nqubits, backend)
     layer = dec.Expectation(

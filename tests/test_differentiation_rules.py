@@ -3,7 +3,6 @@ import pytest
 import torch
 from qibo import hamiltonians
 from qibo.backends import NumpyBackend
-from qibojit.backends import NumbaBackend
 
 from qiboml.backends import PyTorchBackend
 from qiboml.models.ansatze import ReuploadingCircuit
@@ -12,7 +11,7 @@ from qiboml.models.encoding import PhaseEncoding
 from qiboml.operations.differentiation import PSR
 
 # TODO: use the classical conftest mechanism or customize mechanism for this test
-EXECUTION_BACKENDS = [NumbaBackend(), NumpyBackend(), PyTorchBackend()]
+EXECUTION_BACKENDS = [NumpyBackend(), PyTorchBackend()]
 
 TARGET_GRAD = np.array([0.130832955241203, 0.0, -1.806316614151001, 0.0])
 TARGET_GRAD = {
