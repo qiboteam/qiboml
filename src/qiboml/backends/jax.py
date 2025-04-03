@@ -3,6 +3,8 @@ from qibo.backends import einsum_utils
 from qibo.backends.numpy import NumpyBackend
 from qibo.config import raise_error
 
+from qiboml.quantum_info.quantum_info_jax import QINFO
+
 
 class JaxBackend(NumpyBackend):
     def __init__(self):
@@ -42,8 +44,6 @@ class JaxBackend(NumpyBackend):
         self.qinfo.ENGINE.random = random
 
         # load some custom qinfo operators
-        from qiboml.quantum_info.quantum_info_jax import QINFO
-
         for method in dir(QINFO):
             if method[:2] != "__":
                 setattr(self.qinfo, method, getattr(QINFO, method))
