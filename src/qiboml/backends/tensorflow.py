@@ -75,7 +75,8 @@ class TensorflowBackend(NumpyBackend):
 
         # set the engine of the quantum info operators
         self.qinfo.ENGINE = self.np
-        self.qinfo.ENGINE.einsum = np.einsum
+        # this causes problems with symbolic execution
+        # self.qinfo.ENGINE.einsum = np.einsum
         self.qinfo.ENGINE.nonzero = np.nonzero
         self.qinfo.ENGINE.random.normal = (
             lambda loc, scale, size: self.tf.random.normal(
