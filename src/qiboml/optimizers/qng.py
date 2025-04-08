@@ -2,27 +2,48 @@
 
 from typing import List, Optional
 
+import tensorflow as tf
 import torch
-from qibo.config import raise_error
+from qibo.backends import _check_backend
 from qibo.quantum_info.metrics import quantum_fisher_information_matrix
 from torch import Tensor
 from torch.optim import SGD
-from torch.optim.optimizer import (
-    _default_to_fused_or_foreach,
-    _use_grad_for_differentiable,
-)
-from torch.optim.sgd import _fused_sgd, _multi_tensor_sgd
+from torch.optim.optimizer import _use_grad_for_differentiable
 
 from qiboml.backends.pytorch import PyTorchBackend
+from qiboml.backends.tensorflow import TensorflowBackend
 
 
-class QuantumNaturalGradient(SGD):
-    def __init__(self, params, circuit, lr: float = 1e-3, **kwargs):
-        kwargs["lr"] = lr
+class _QuantumNaturalGradientTensorflow(tf.Module):
+    def __init__(self, learning_rate: float = 1e-3, **kwargs):
+        self.learning_rate = learning_rate
 
-        super().__init__(params, **kwargs)
+        self._circuit = kwargs["circuit"]
+
+        self.backend = kwargs.get("backend", None)
+        self.backend = _check_backend(self.backend)
+
+    def apply_gradients(self, grads, params):
+        inv_metric = quantum_fisher_information_matrix(
+            self._circuit, params[0], backend=TensorflowBackend()
+        )
+        inv_metric = tf.linalg.inv(inv_metric)
+
+        natural_grad = inv_metric @ grads[0]
+
+        params[0].assign_sub(self.learning_rate * natural_grad)
+
+
+class _QuantumNaturalGradientTorch(SGD):
+    def __init__(self, circuit, learning_rate: float = 1e-3, **kwargs):
+        kwargs["lr"] = learning_rate
+
+        super().__init__(**kwargs)
 
         self._circuit = circuit
+
+        self.backend = kwargs.get("backend", None)
+        self.backend = _check_backend(self.backend)
 
     @_use_grad_for_differentiable
     def step(self, closure=None):
@@ -40,7 +61,7 @@ class QuantumNaturalGradient(SGD):
 
             _ = self._init_group(group, params, grads, momentum_buffer_list)
 
-            _single_tensor_qng(
+            self._single_tensor_qng(
                 params,
                 circuit=self._circuit,
                 grads=grads,
@@ -53,30 +74,52 @@ class QuantumNaturalGradient(SGD):
 
         return loss
 
+    def _single_tensor_qng(
+        self,
+        params: List[Tensor],
+        circuit,
+        grads: List[Tensor],
+        grad_scale: Optional[Tensor],
+        found_inf: Optional[Tensor],
+        *,
+        weight_decay: float,
+        lr: float,
+        maximize: bool,
+    ):
+        assert grad_scale is None and found_inf is None
 
-def _single_tensor_qng(
-    params: List[Tensor],
-    circuit,
-    grads: List[Tensor],
-    grad_scale: Optional[Tensor],
-    found_inf: Optional[Tensor],
-    *,
-    weight_decay: float,
-    lr: float,
-    maximize: bool,
+        for k, param in enumerate(params):
+            grad = -grads[k] if maximize else grads[k]
+
+            if weight_decay != 0:
+                grad = grad.add(param, alpha=weight_decay)
+
+            metric = quantum_fisher_information_matrix(
+                circuit, param, backend=self.backend
+            )
+            inv_metric = torch.linalg.inv(metric)
+            raised_grad = inv_metric @ grad
+
+            param.add_(raised_grad, alpha=-lr)
+
+
+class QuantumNaturalGradient(
+    _QuantumNaturalGradientTorch, _QuantumNaturalGradientTensorflow
 ):
-    assert grad_scale is None and found_inf is None
 
-    for k, param in enumerate(params):
-        grad = -grads[k] if maximize else grads[k]
+    def __init__(self, circuit, learning_rate: float = 1e-3, backend=None, **kwargs):
+        backend = _check_backend(backend)
 
-        if weight_decay != 0:
-            grad = grad.add(param, alpha=weight_decay)
+        if isinstance(backend, PyTorchBackend):
+            params = kwargs["params"]
+            _QuantumNaturalGradientTorch.__init__(
+                self, params, circuit=circuit, lr=learning_rate, **kwargs
+            )
+        elif isinstance(backend, TensorflowBackend):
+            _QuantumNaturalGradientTensorflow.__init__(
+                self,
+                learning_rate=learning_rate,
+                circuit=circuit,
+            )
 
-        metric = quantum_fisher_information_matrix(
-            circuit, param, backend=PyTorchBackend()
-        )
-        inv_metric = torch.linalg.inv(metric)
-        raised_grad = inv_metric @ grad
-
-        param.add_(raised_grad, alpha=-lr)
+        # return _QuantumNaturalGradientTensorflow(params, circuit, lr, **kwargs)
