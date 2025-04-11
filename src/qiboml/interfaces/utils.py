@@ -1,7 +1,8 @@
-from typing import Dict, List, Union
+from typing import Dict, List, Optional, Union
 
 from qibo import Circuit
 
+from qiboml import ndarray
 from qiboml.models.decoding import QuantumDecoding
 from qiboml.models.encoding import QuantumEncoding
 from qiboml.operations.differentiation import PSR
@@ -23,13 +24,22 @@ def get_params_from_circuit_structure(
 
 def circuit_from_structure(
     circuit_structure,
-    x,
+    x: Optional[ndarray],
 ):
     """
     Helper function to reconstruct the whole circuit from a circuit structure.
     In the case the circuit structure involves encodings, the encoding data has
     to be provided as well.
     """
+
+    if (
+        any(isinstance(circ, QuantumEncoding) for circ in circuit_structure)
+        and x is None
+    ):
+        raise ValueError(
+            "x cannot be None when encoding layers are present in the circuit structure."
+        )
+
     circuit = Circuit(circuit_structure[0].nqubits)
     for circ in circuit_structure:
         if isinstance(circ, QuantumEncoding):
