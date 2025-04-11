@@ -89,8 +89,6 @@ class PhaseEncoding(QuantumEncoding):
                 f"{self} currently support only gates with one parameter."
             )
 
-        # TODO: mount the circuit here and check whether it works with Keras
-
     @cached_property
     def _data_to_gate(self):
         """
