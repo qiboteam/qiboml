@@ -3,16 +3,14 @@
 from dataclasses import dataclass
 from typing import List, Optional, Union
 
-import numpy as np
 import torch
 from qibo import Circuit
 from qibo.backends import Backend
-from qibo.ui import plot_circuit
 
 from qiboml.interfaces import utils
 from qiboml.models.decoding import QuantumDecoding
 from qiboml.models.encoding import QuantumEncoding
-from qiboml.operations.differentiation import PSR, Differentiation, Jax
+from qiboml.operations.differentiation import Differentiation, Jax
 
 DEFAULT_DIFFERENTIATION = {
     "qiboml-pytorch": None,
@@ -137,26 +135,14 @@ class QuantumModel(torch.nn.Module):
                 `qibo.ui.plot_circuit` function.
         """
 
-        encoding_layer = next(
-            (
-                circ
-                for circ in self.circuit_structure
-                if isinstance(circ, QuantumEncoding)
-            ),
-            None,
+        fig = utils.draw_circuit(
+            circuit_structure=self.circuit_structure,
+            backend=self.decoding.backend,
+            plt_drawing=plt_drawing,
+            plt_kwargs=plt_kwargs,
         )
-        dummy_data = (
-            self.decoding.backend.cast(np.zeros(len(encoding_layer.qubits)))
-            if encoding_layer is not None
-            else None
-        )
-        circuit = utils.circuit_from_structure(self.circuit_structure, dummy_data)
-        if plt_drawing:
-            _, fig = plot_circuit(circuit, **plt_kwargs)
-            return fig
-        else:
-            circuit.draw()
-            return str(circuit)
+
+        return fig
 
 
 class QuantumModelAutoGrad(torch.autograd.Function):

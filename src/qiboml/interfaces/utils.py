@@ -1,6 +1,8 @@
 from typing import Dict, List, Optional, Union
 
+import numpy as np
 from qibo import Circuit
+from qibo.ui.mpldrawer import plot_circuit
 
 from qiboml import ndarray
 from qiboml.models.decoding import QuantumDecoding
@@ -67,3 +69,32 @@ def get_default_differentiation(decoding: QuantumDecoding, instructions: Dict):
         differentiation = diff() if diff is not None else None
 
     return differentiation
+
+
+def draw_circuit(circuit_structure, backend, plt_drawing=True, **plt_kwargs):
+    """
+    Draw the full circuit structure.
+
+    Args:
+        plt_drawing (bool): if True, the `qibo.ui.plot_circuit` function is used.
+            If False, the default `circuit.draw` method is used.
+        plt_kwargs (dict): extra arguments which can be set to customize the
+            `qibo.ui.plot_circuit` function.
+    """
+
+    encoding_layer = next(
+        (circ for circ in circuit_structure if isinstance(circ, QuantumEncoding)),
+        None,
+    )
+    dummy_data = (
+        backend.cast(np.zeros(len(encoding_layer.qubits)))
+        if encoding_layer is not None
+        else None
+    )
+    circuit = circuit_from_structure(circuit_structure, dummy_data)
+    if plt_drawing:
+        _, fig = plot_circuit(circuit, **plt_kwargs)
+        return fig
+    else:
+        circuit.draw()
+        return str(circuit)
