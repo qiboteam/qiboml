@@ -139,7 +139,7 @@ class QuantumModel(torch.nn.Module):
             circuit_structure=self.circuit_structure,
             backend=self.decoding.backend,
             plt_drawing=plt_drawing,
-            plt_kwargs=plt_kwargs,
+            **plt_kwargs,
         )
 
         return fig
