@@ -47,6 +47,9 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
     def __post_init__(self):
         super().__init__()
 
+        if isinstance(self.circuit_structure, Circuit):
+            self.circuit_structure = [self.circuit_structure]
+
         params = utils.get_params_from_circuit_structure(self.circuit_structure)
         params = keras.ops.cast(params, "float64")  # pylint: disable=no-member
 

@@ -207,7 +207,9 @@ class QuantumModelAutoGrad(torch.autograd.Function):
 
         circuit.set_parameters(params)
         x_clone = decoding(circuit)
-        x_clone = torch.as_tensor(backend.to_numpy(x_clone).tolist(), dtype=x.dtype, devide=x.device)
+        x_clone = torch.as_tensor(
+            backend.to_numpy(x_clone).tolist(), dtype=x.dtype, device=x.device
+        )
         return x_clone
 
     @staticmethod
