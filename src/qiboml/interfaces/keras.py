@@ -1,5 +1,9 @@
 """Keras interface to qiboml layers"""
 
+# pylint: disable=no-member
+# pylint: disable=unexpected-keyword-arg
+
+import string
 from dataclasses import dataclass
 from typing import Optional
 
@@ -15,9 +19,9 @@ from qiboml.models.encoding import QuantumEncoding
 from qiboml.operations.differentiation import PSR, Differentiation, Jax
 
 DEFAULT_DIFFERENTIATION = {
-    "qiboml-pytorch": None,
+    "qiboml-pytorch": Jax,  # None,
     "qiboml-tensorflow": None,
-    "qiboml-jax": None,
+    "qiboml-jax": Jax,  # None,
     "numpy": Jax,
 }
 
@@ -33,7 +37,13 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
     def __post_init__(self):
         super().__init__()
 
-        params = [p for param in self.circuit.get_parameters() for p in param]
+        # directly building the weigths in the init as they don't depend
+        # on the inputs
+        params = [
+            self.backend.to_numpy(p)
+            for param in self.circuit.get_parameters()
+            for p in param
+        ]
         params = keras.ops.cast(params, "float64")  # pylint: disable=no-member
 
         self.circuit_parameters = self.add_weight(
@@ -53,26 +63,28 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
                 if backend_string in DEFAULT_DIFFERENTIATION.keys():
                     diff = DEFAULT_DIFFERENTIATION[backend_string]
                     self.differentiation = diff() if diff is not None else None
-                else:
+                else:  # pragma: no cover
                     self.differentiation = PSR()
+        if self.differentiation is not None:
+            self.custom_gradient = QuantumModelCustomGradient(
+                self.encoding,
+                self.circuit,
+                self.decoding,
+                self.backend,
+                self.differentiation,
+            )
+
+    def compute_output_shape(self, input_shape):
+        return self.decoding.output_shape
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
-        if self.differentiation is None:
-            # this 1 * is needed otherwise a TypeError is raised
-            self.circuit.set_parameters(1 * self.circuit_parameters)
+        # this 1 * is needed otherwise a TypeError is raised
+        self.circuit.set_parameters(1 * self.circuit_parameters)
 
+        if self.differentiation is None:
             output = self.decoding(self.encoding(x) + self.circuit)
             return output[None, :]
-
-        raise NotImplementedError
-        # return custom_operation(
-        #    self.encoding,
-        #    self.circuit,
-        #    self.decoding,
-        #    self.differentiation,
-        #    self.circuit_parameters,
-        #    x,
-        # )
+        return self.custom_gradient.evaluate(x, 1 * self.circuit_parameters)
 
     @property
     def output_shape(
@@ -91,3 +103,80 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
         self,
     ) -> Backend:
         return self.decoding.backend
+
+
+@dataclass
+class QuantumModelCustomGradient:
+
+    encoding: QuantumEncoding
+    circuit: Circuit
+    decoding: QuantumDecoding
+    backend: Backend
+    differentiation: Differentiation
+    wrt_inputs: bool = False
+
+    @tf.custom_gradient
+    def evaluate(self, x, params):
+        # check whether we have to derive wrt inputs
+        if tf.is_symbolic_tensor(x):  # how to check if tf.tensor is leaf?
+            self.wrt_inputs = (
+                self.encoding.differentiable
+                and hasattr(x, "op")
+                and len(x.op.inputs) > 0
+            )
+
+        def forward(x, params):
+            x = self.backend.cast(
+                keras.ops.convert_to_numpy(x), dtype=self.backend.np.float64
+            )
+            circuit = self.encoding(x) + self.circuit
+            circuit.set_parameters(params)
+            y = self.decoding(circuit)
+            y = self.backend.to_numpy(y)
+            return keras.ops.cast(y, dtype=y.dtype)
+
+        y = tf.numpy_function(func=forward, inp=[x, params], Tout=tf.float64)
+        # check output shape of decoding layers, their returned tensor
+        # shape should match the output_shape attribute and this should
+        # not be necessary (only useful for symbolic execution)!!
+        y = keras.ops.reshape(y, self.decoding.output_shape)
+
+        def get_gradients(x, params):
+            x = self.backend.cast(x, dtype=self.backend.np.float64)
+            d_x, *d_params = self.differentiation.evaluate(
+                x,
+                self.encoding,
+                self.circuit,
+                self.decoding,
+                self.backend,
+                *params,
+                wrt_inputs=self.wrt_inputs,
+            )
+            d_params = self.backend.to_numpy(
+                self.backend.cast(d_params, dtype=self.backend.np.float64)
+            )
+            d_x = self.backend.to_numpy(d_x)
+            d_x = keras.ops.cast(d_x, d_x.dtype)
+            d_params = keras.ops.cast(d_params, d_params.dtype)
+            return d_x, d_params
+
+        # Custom gradient
+        def grad(dy):
+            d_x, d_params = tf.numpy_function(
+                func=get_gradients, inp=[x, params], Tout=[tf.float64, tf.float64]
+            )
+            # double check this
+            # the reshape here should be needed for symbolic execution only
+            d_x = keras.ops.reshape(d_x, dy.shape + x.shape)
+            d_params = keras.ops.reshape(d_params, tuple(params.shape) + dy.shape)
+            indices = tuple(range(len(dy.shape)))
+            lhs = "".join(string.ascii_letters[i] for i in indices)
+            rhs = string.ascii_letters[len(indices)] + lhs
+            d_params = keras.ops.einsum(f"{lhs},{rhs}", dy, d_params)
+            rhs = lhs + "".join(
+                string.ascii_letters[i] for i in range(len(indices), len(d_x.shape))
+            )
+            d_x = keras.ops.einsum(f"{lhs},{rhs}", dy, d_x)
+            return d_x, d_params
+
+        return y, grad
