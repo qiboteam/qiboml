@@ -164,7 +164,7 @@ class PSR(Differentiation):
             forward = decoding(encoding(x) + circuit)
             x[:, i] -= 2 * shift
             backward = decoding(encoding(x) + circuit)
-            gradient.append( (forward - backward) * gates[i].generator_eigenvalue() )
+            gradient.append((forward - backward) * gates[i].generator_eigenvalue())
             x[:, i] = bkup_val
         return gradient
 
@@ -220,7 +220,7 @@ class Jax(Differentiation):
             (list[ndarray]): the calculated gradients.
         """
         x = backend.to_numpy(x)
-        x = self._jax.cast(x, self._jax.precision)
+        x = self._jax.cast(x, x.dtype)
         if self._argnums is None:
             self._argnums = tuple(range(4, len(parameters) + 4))
             setattr(
@@ -253,7 +253,9 @@ class Jax(Differentiation):
             )
         decoding.set_backend(backend)
         return [
-            backend.cast(self._jax.to_numpy(grad).tolist(), backend.precision)
+            backend.cast(
+                self._jax.to_numpy(grad).tolist(), getattr(backend.np, str(x.dtype))
+            )
             for grad in gradients
         ]
 
