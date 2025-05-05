@@ -71,6 +71,21 @@ class PSR(Differentiation):
         *parameters: list[ndarray],
         wrt_inputs: bool = False,
     ):
+        """
+        Evaluate the gradient of a quantum model w.r.t inputs and parameters,
+        respectively represented by `x` and `parameters`.
+        Args:
+            x (ndarray): the input data.
+            circuit_structure (List[Union[Circuit, QuantumEncoding]]): structure
+                of the circuit. It can be composed of `QuantumEncoding`s and
+                Qibo's circuits.
+            decoding (QuantumDecoding): the decoding layer.
+            backend (Backend): the backend to execute the circuit with.
+            parameters (list[ndarray]): the parameters at which to evaluate the model, and thus the derivative.
+            wrt_inputs (bool): whether to calculate the derivate with respect to inputs or not, by default ``False``.
+        Returns:
+            (list[ndarray]): the calculated gradients.
+        """
         if decoding.output_shape != (1, 1):
             raise_error(
                 NotImplementedError,
@@ -310,6 +325,21 @@ class Jax(Differentiation):
         *parameters: list[ndarray],
         wrt_inputs: bool = False,
     ):
+        """
+        Evaluate the gradient of a quantum model w.r.t inputs and parameters,
+        respectively represented by `x` and `parameters`.
+        Args:
+            x (ndarray): the input data.
+            circuit_structure (List[Union[Circuit, QuantumEncoding]]): structure
+                of the circuit. It can be composed of `QuantumEncoding`s and
+                Qibo's circuits.
+            decoding (QuantumDecoding): the decoding layer.
+            backend (Backend): the backend to execute the circuit with.
+            parameters (list[ndarray]): the parameters at which to evaluate the model, and thus the derivative.
+            wrt_inputs (bool): whether to calculate the derivate with respect to inputs or not, by default ``False``.
+        Returns:
+            (list[ndarray]): the calculated gradients.
+        """
         x = backend.to_numpy(x)
         x = self._jax.cast(x, self._jax.precision)
 
