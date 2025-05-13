@@ -48,6 +48,8 @@ class QuantumDecoding:
         Returns:
             (CircuitResult | QuantumState | MeasurementOutcomes): the execution ``qibo.result`` object.
         """
+        self._circuit.density_matrix = x.density_matrix
+        self._circuit.init_kwargs["density_matrix"] = x.density_matrix
         return self.backend.execute_circuit(x + self._circuit, nshots=self.nshots)
 
     @property

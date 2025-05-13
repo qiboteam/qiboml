@@ -128,9 +128,47 @@ class TensorflowBackend(NumpyBackend):
         npmatrix = super().matrix_parametrized(gate)
         return self.tf.cast(npmatrix, dtype=self.dtype)
 
-    def matrix_fused(self, gate):
-        npmatrix = super().matrix_fused(gate)
-        return self.tf.cast(npmatrix, dtype=self.dtype)
+    def matrix_fused(self, fgate):
+        rank = len(fgate.target_qubits)
+        # tf only supports coo sparse arrays
+        # however they are probably not as efficient as csr ones
+        # at this point it is maybe better to just use dense arrays
+        matrix = self.np.eye(2**rank, dtype=self.dtype)
+
+        for gate in fgate.gates:
+            # transfer gate matrix to numpy as it is more efficient for
+            # small tensor calculations
+            # explicit to_numpy see https://github.com/qiboteam/qibo/issues/928
+            gmatrix = gate.matrix(self)
+            # add controls if controls were instantiated using
+            # the ``Gate.controlled_by`` method
+            num_controls = len(gate.control_qubits)
+            if num_controls > 0:
+                gmatrix = block_diag(
+                    self.np.eye(2 ** len(gate.qubits) - len(gmatrix)), gmatrix
+                )
+            # Kronecker product with identity is needed to make the
+            # original matrix have shape (2**rank x 2**rank)
+            eye = self.np.eye(2 ** (rank - len(gate.qubits)))
+            gmatrix = self.np.kron(gmatrix, eye)
+            # Transpose the new matrix indices so that it targets the
+            # target qubits of the original gate
+            original_shape = gmatrix.shape
+            gmatrix = self.np.reshape(gmatrix, 2 * rank * (2,))
+            qubits = list(gate.qubits)
+            indices = qubits + [q for q in fgate.target_qubits if q not in qubits]
+            indices = np.argsort(indices)
+            transpose_indices = list(indices)
+            transpose_indices.extend(indices + rank)
+            gmatrix = self.np.transpose(gmatrix, transpose_indices)
+            gmatrix = self.np.reshape(gmatrix, original_shape)
+            # fuse the individual gate matrix to the total ``FusedGate`` matrix
+            # we are using sparse matrices to improve perfomances
+            matrix = self.tf.sparse.sparse_dense_matmul(
+                self.tf.sparse.from_dense(gmatrix), matrix
+            )
+
+        return matrix
 
     def execute_circuit(self, circuit, initial_state=None, nshots=1000):
         with self.tf.device(self.device):

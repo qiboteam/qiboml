@@ -21,6 +21,7 @@ class QuantumEncoding(ABC):
 
     nqubits: int
     qubits: Optional[tuple[int]] = None
+    density_matrix: Optional[bool] = False
     _circuit: Circuit = None
 
     def __post_init__(
@@ -31,7 +32,7 @@ class QuantumEncoding(ABC):
             tuple(range(self.nqubits)) if self.qubits is None else tuple(self.qubits)
         )
 
-        self._circuit = Circuit(self.nqubits)
+        self._circuit = Circuit(self.nqubits, density_matrix=self.density_matrix)
 
     @abstractmethod
     def __call__(self, x: ndarray) -> Circuit:
