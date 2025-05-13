@@ -118,7 +118,6 @@ class JaxBackend(NumpyBackend):
         # however they are probably not as efficient as csr ones
         # at this point it is maybe better to just use dense arrays
         matrix = sparse.BCOO.fromdense(self.np.eye(2**rank), nse=2**rank)
-        dot = sparse.sparsify(lambda m1, m2: m1.dot(m2))
 
         for gate in fgate.gates:
             # transfer gate matrix to numpy as it is more efficient for
