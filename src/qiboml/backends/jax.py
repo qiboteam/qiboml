@@ -114,6 +114,9 @@ class JaxBackend(NumpyBackend):
 
     def matrix_fused(self, fgate):
         rank = len(fgate.target_qubits)
+        # jax only supports coo sparse arrays
+        # however they are probably not as efficient as csr ones
+        # at this point it is maybe better to just use dense arrays
         matrix = sparse.BCOO.fromdense(self.np.eye(2**rank), nse=2**rank)
         dot = sparse.sparsify(lambda m1, m2: m1.dot(m2))
 
@@ -146,7 +149,6 @@ class JaxBackend(NumpyBackend):
             gmatrix = self.np.reshape(gmatrix, original_shape)
             # fuse the individual gate matrix to the total ``FusedGate`` matrix
             # we are using sparse matrices to improve perfomances
-            # matrix = self.np.dot(sparse.BCOO.fromdense(gmatrix, nse=2 ** rank), matrix)
             matrix = sparse.BCOO.fromdense(gmatrix, nse=2**rank) @ matrix
 
         return matrix.todense()
