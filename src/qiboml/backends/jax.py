@@ -128,7 +128,7 @@ class JaxBackend(NumpyBackend):
             # the ``Gate.controlled_by`` method
             num_controls = len(gate.control_qubits)
             if num_controls > 0:
-                gmatrix = block_diag(
+                gmatrix = self.jax.scipy.linalg.block_diag(
                     self.np.eye(2 ** len(gate.qubits) - len(gmatrix)), gmatrix
                 )
             # Kronecker product with identity is needed to make the

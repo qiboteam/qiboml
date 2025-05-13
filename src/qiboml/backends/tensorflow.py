@@ -128,6 +128,30 @@ class TensorflowBackend(NumpyBackend):
         npmatrix = super().matrix_parametrized(gate)
         return self.tf.cast(npmatrix, dtype=self.dtype)
 
+    def block_diag(self, *mats):
+        """Tensorflow implementation of scipy.linalg.block_diag"""
+        rows = [self.tf.shape(m)[0] for m in mats]
+        cols = [self.tf.shape(m)[1] for m in mats]
+
+        row_offset = 0
+        col_offset = 0
+        blocks = []
+        for i, mat in enumerate(mats):
+            r, c = rows[i], cols[i]
+
+            top_pad = row_offset
+            bottom_pad = self.tf.reduce_sum(rows) - row_offset - r
+            left_pad = col_offset
+            right_pad = self.tf.reduce_sum(cols) - col_offset - c
+
+            padded = self.tf.pad(mat, [[top_pad, bottom_pad], [left_pad, right_pad]])
+            blocks.append(padded)
+
+            row_offset += r
+            col_offset += c
+
+        return self.tf.add_n(blocks)
+
     def matrix_fused(self, fgate):
         rank = len(fgate.target_qubits)
         # tf only supports coo sparse arrays
@@ -144,7 +168,7 @@ class TensorflowBackend(NumpyBackend):
             # the ``Gate.controlled_by`` method
             num_controls = len(gate.control_qubits)
             if num_controls > 0:
-                gmatrix = block_diag(
+                gmatrix = self.block_diag(
                     self.np.eye(2 ** len(gate.qubits) - len(gmatrix)), gmatrix
                 )
             # Kronecker product with identity is needed to make the
