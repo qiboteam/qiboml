@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from typing import List, Optional, Union
 
+import numpy as np
 import torch
 from qibo import Circuit
 from qibo.backends import Backend
@@ -177,7 +178,7 @@ class QuantumModelAutoGrad(torch.autograd.Function):
         ]
 
         # Build the temporary circuit from the circuit structure.
-        ctx.differentiable_encodings = x.requires_grad
+        ctx.differentiable_encodings = True
         circuit = Circuit(decoding.nqubits)
         for circ in circuit_structure:
             if isinstance(circ, QuantumEncoding):
@@ -187,7 +188,6 @@ class QuantumModelAutoGrad(torch.autograd.Function):
                 # differentiable if at least one it is not
                 if not circ.differentiable:
                     ctx.differentiable_encodings = False
-                    break
             else:
                 circuit += circ
 

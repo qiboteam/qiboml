@@ -7,7 +7,6 @@ from qibo.ui.mpldrawer import plot_circuit
 from qiboml import ndarray
 from qiboml.models.decoding import QuantumDecoding
 from qiboml.models.encoding import QuantumEncoding
-from qiboml.operations.differentiation import PSR
 
 
 def get_params_from_circuit_structure(
@@ -63,6 +62,8 @@ def get_default_differentiation(decoding: QuantumDecoding, instructions: Dict):
     )
 
     if not decoding.analytic or backend_string not in instructions.keys():
+        from qiboml.operations.differentiation import PSR
+
         differentiation = PSR()
     else:
         diff = instructions[backend_string]
