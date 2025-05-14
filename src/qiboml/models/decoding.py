@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Union
+from typing import List, Union
 
 from qibo import Circuit, gates
 from qibo.backends import Backend, _check_backend
@@ -8,6 +8,7 @@ from qibo.hamiltonians import Hamiltonian, Z
 from qibo.result import CircuitResult, MeasurementOutcomes, QuantumState
 
 from qiboml import ndarray
+from qiboml.result import BatchedResult
 
 
 @dataclass
@@ -38,7 +39,7 @@ class QuantumDecoding:
         self._circuit.add(gates.M(*self.qubits))
 
     def __call__(
-        self, x: Circuit
+        self, x: List[Circuit]
     ) -> Union[CircuitResult, QuantumState, MeasurementOutcomes]:
         """Combine the input circuir with the internal one and execute them with the internal backend.
 
@@ -48,7 +49,11 @@ class QuantumDecoding:
         Returns:
             (CircuitResult | QuantumState | MeasurementOutcomes): the execution ``qibo.result`` object.
         """
-        return self.backend.execute_circuit(x + self._circuit, nshots=self.nshots)
+        return BatchedResult(
+            self.backend.execute_circuits(
+                [circ + self._circuit for circ in x], nshots=self.nshots
+            )
+        )
 
     @property
     def circuit(
@@ -111,9 +116,9 @@ class Probabilities(QuantumDecoding):
         """Shape of the output probabilities.
 
         Returns:
-            (tuple[int, int]): a ``(1, 2**nqubits)`` shape.
+            (tuple[int]): a ``(2**nqubits,)`` shape.
         """
-        return (1, 2**self.nqubits)
+        return (2**self.nqubits,)
 
     @property
     def analytic(self) -> bool:
@@ -198,7 +203,7 @@ class State(QuantumDecoding):
                 self.backend.np.real(state),  # pylint: disable=no-member
                 self.backend.np.imag(state),  # pylint: disable=no-member
             )
-        ).reshape(self.output_shape)
+        ).reshape(-1, self.output_shape)
 
     @property
     def output_shape(self) -> tuple[int, int, int]:

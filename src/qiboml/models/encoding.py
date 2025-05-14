@@ -35,10 +35,10 @@ class QuantumEncoding(ABC):
         )
 
         self._circuit = Circuit(self.nqubits)
-        # Dictionary which helps to map each data component into a gate in the circuit
 
     @cached_property
     def _data_to_gate(self):
+        """Mapping between each input component and the corresponding gates it contributes to."""
         raise_error(
             NotImplementedError,
             f"_data_to_gate method is not implemented for encoding {self}.",
@@ -107,13 +107,25 @@ class PhaseEncoding(QuantumEncoding):
         Returns:
             (Circuit): the constructed ``qibo.Circuit``.
         """
-        circuit = self.circuit
-        x = x.ravel()
-        for i, q in enumerate(self.qubits):
-            this_gate_params = {"trainable": False}
-            [this_gate_params.update({p: x[i]}) for p in self.gate_encoding_params]
-            circuit.add(self.encoding_gate(q=q, **this_gate_params))
-        return circuit
+        if x.shape[-1] != len(self.qubits):
+            raise_error(
+                RuntimeError,
+                f"Invalid input dimension {x.shape[-1]} for the allocated qubits {self.qubits}.",
+            )
+        if x.ndim == 1:
+            x = [x]
+        circuits = []
+        for i in range(len(x)):
+            circuit = self.circuit.copy()
+            for j, q in enumerate(self.qubits):
+                this_gate_params = {"trainable": False}
+                [
+                    this_gate_params.update({p: x[i][j]})
+                    for p in self.gate_encoding_params
+                ]
+                circuit.add(self.encoding_gate(q=q, **this_gate_params))
+            circuits.append(circuit)
+        return circuits
 
 
 class BinaryEncoding(QuantumEncoding):
@@ -131,12 +143,16 @@ class BinaryEncoding(QuantumEncoding):
         if x.shape[-1] != len(self.qubits):
             raise_error(
                 RuntimeError,
-                f"Invalid input dimension {x.shape[-1]}, but the allocated qubits are {self.qubits}.",
+                f"Invalid input dimension {x.shape[-1]} for the allocated qubits {self.qubits}.",
             )
-        circuit = self.circuit
-        x = x.ravel()
-        for i, q in enumerate(self.qubits):
-            circuit.add(gates.RX(q, theta=x[i] * np.pi, trainable=False))
+        if x.ndim == 1:
+            x = [x]
+        circuits = []
+        for i in range(len(x)):
+            circuit = self.circuit.copy()
+            for j, q in enumerate(self.qubits):
+                circuit.add(gates.RX(q, theta=x[i][j] * np.pi, trainable=False))
+            circuits.append(circuit)
         return circuit
 
     @property

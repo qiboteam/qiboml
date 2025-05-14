@@ -71,13 +71,13 @@ class QuantumModel(torch.nn.Module):
             (torch.tensor): the computed outputs.
         """
         if self.differentiation is None:
-            circuit = utils.circuit_from_structure(
+            circuits = utils.circuit_from_structure(
                 circuit_structure=self.circuit_structure,
                 x=x,
             )
 
-            circuit.set_parameters(list(self.parameters())[0])
-            x = self.decoding(circuit)
+            [circuit.set_parameters(list(self.parameters())[0]) for circuit in circuits]
+            x = self.decoding(circuits)
         else:
             x = QuantumModelAutoGrad.apply(
                 x,
