@@ -190,7 +190,6 @@ class PSR(Differentiation):
         forwards, backwards, eigenvals = self.dx_circuits(
             x=x,
             circuit=circuit,
-            backend=backend,
         )
 
         for xi in range(len(gradient)):
@@ -203,19 +202,21 @@ class PSR(Differentiation):
         self,
         x: ndarray,
         circuit: Circuit,
-        backend: Backend,
     ):
         """
         Collect all the forward and backward circuits required to compute the
         gradient w.r.t. the input data.
         """
         n_inputs = x.shape[-1]
-        forwards, backwards, eigenvals = [] * n_inputs, [] * n_inputs, [] * n_inputs
+        forwards, backwards, eigenvals = (
+            [None] * n_inputs,
+            [None] * n_inputs,
+            [None] * n_inputs,
+        )
         for xi in range(n_inputs):
             forwards[xi], backwards[xi], eigenvals[xi] = self.dxi_circuits(
                 xi=xi,
                 circuit=circuit,
-                backend=backend,
             )
         return forwards, backwards, eigenvals
 
@@ -237,14 +238,16 @@ class PSR(Differentiation):
                     NotImplementedError,
                     "For now, shift rules are supported for 1-parameter gates only.",
                 )
-            eigenval = circuit[ig].generator_eigenvalue()
-            shift = np.pi / (4 * gen_eigenval)
+            eigenval = circuit.queue[ig].generator_eigenvalue()
+            shift = np.pi / (4 * eigenval)
 
             forward = deepcopy(circuit)
             # TODO: we deal with tuple so we have to fix this
-            forward.queue[ig].parameters += shift
+            # TODO: this is only valid when the gate has 1 parameter for now
+            original_parameter = deepcopy(circuit.queue[ig].parameters[0])
+            forward.queue[ig].parameters = original_parameter + shift
             backward = deepcopy(circuit)
-            backward.queue[ig].parameters -= shift
+            backward.queue[ig].parameters = original_parameter - shift
 
             forwards.append(forward)
             backwards.append(backward)
