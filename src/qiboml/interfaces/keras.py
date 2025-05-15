@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import List, Optional, Union
 
 import keras
+import numpy as np
 import tensorflow as tf  # pylint: disable=import-error
 from qibo import Circuit
 from qibo.backends import Backend
