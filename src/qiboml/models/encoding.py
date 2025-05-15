@@ -11,7 +11,7 @@ from qibo.config import raise_error
 from qiboml import ndarray
 
 
-@dataclass
+@dataclass(eq=False)
 class QuantumEncoding(ABC):
     """
     Abstract Encoder class.
@@ -67,7 +67,7 @@ class QuantumEncoding(ABC):
         return hash(self.qubits)
 
 
-@dataclass
+@dataclass(eq=False)
 class PhaseEncoding(QuantumEncoding):
     encoding_gate: type = field(default_factory=lambda: gates.RY)
 

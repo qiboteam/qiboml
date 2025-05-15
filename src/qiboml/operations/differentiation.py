@@ -50,6 +50,11 @@ class PSR(Differentiation):
         self._data_map_cached = False
 
     def update_data_map(self, circuit_structure, backend, x):
+        """
+        Update the map object which is storing the encoding rules of the whole
+        quantum circuit. Namely, it can be used to retrieve which gates are
+        affected by the input data component `x[i]` accessing `psr.data_map['i']`.
+        """
         # Update the data map if the given shape has never been used
         if not self._data_map_cached:
             self.data_map = self._build_data_map(
@@ -58,6 +63,10 @@ class PSR(Differentiation):
             self._data_map_cached = True
 
     def _build_data_map(self, circuit_structure, backend, shape):
+        """
+        Helper method to build and cache the data map structure only the first
+        time the `psr.evaluate` method is called.
+        """
         # Construct the map with placeholders
         data_map = {str(i): [] for i in range(shape)}
 
@@ -183,9 +192,7 @@ class PSR(Differentiation):
     def gradient_wrt_inputs(self, x, circuit, decoding, backend):
         """Compute the gradient of the given model w.r.t inputs."""
 
-        gradient = backend.np.zeros(
-            (decoding.output_shape[-1], x.shape[-1]), dtype=x.dtype
-        )
+        gradient = backend.np.zeros(x.shape[-1], dtype=x.dtype)
 
         forwards, backwards, eigenvals = self.dx_circuits(
             x=x,
@@ -207,6 +214,8 @@ class PSR(Differentiation):
         Collect all the forward and backward circuits required to compute the
         gradient w.r.t. the input data.
         """
+        # TODO: consider to flatten the data at the beginning of the evaluate
+        # process
         n_inputs = x.shape[-1]
         forwards, backwards, eigenvals = (
             [None] * n_inputs,
@@ -268,21 +277,6 @@ class PSR(Differentiation):
         return parameters
 
 
-class _StaticArgWrapper:
-    """
-    A thin wrapper to make non-hashable objects hashable by using their id.
-    """
-
-    def __init__(self, obj):
-        self.obj = obj
-
-    def __hash__(self):
-        return id(self.obj)
-
-    def __eq__(self, other):
-        return id(self.obj) == id(other.obj)
-
-
 class Jax(Differentiation):
     """
     The Jax differentiator object. Particularly useful for enabling gradient calculation in
@@ -323,44 +317,50 @@ class Jax(Differentiation):
         x = backend.to_numpy(x)
         x = self._jax.cast(x, self._jax.precision)
 
-        circuit_structure_static = _StaticArgWrapper(circuit_structure)
-        decoding_static = _StaticArgWrapper(decoding)
+        circuit_structure = tuple(circuit_structure)
 
         if self._argnums is None:
-            self._argnums = (0, 3)
-            self._jacobian = partial(jax.jit, static_argnums=(1, 2))(
-                jax.jacfwd(self._run, (0, 3))
+            self._argnums = tuple(range(3, len(parameters) + 3))
+            setattr(
+                self,
+                "_jacobian",
+                partial(jax.jit, static_argnums=(1, 2))(
+                    jax.jacfwd(self._run, (0,) + self._argnums),
+                ),
+            )
+            setattr(
+                self,
+                "_jacobian_without_inputs",
+                partial(jax.jit, static_argnums=(1, 2))(
+                    jax.jacfwd(self._run, self._argnums),
+                ),
             )
 
-        params = np.array(list(parameters))  # shape: (n_params,)
-        params = self._jax.cast(params, params.dtype)
+        parameters = np.array(backend.to_numpy(list(parameters)))
+        parameters = self._jax.cast(parameters, parameters.dtype)
+
         decoding.set_backend(self._jax)
 
-        grad_inputs, grad_params = self._jacobian(
-            x, circuit_structure_static, decoding_static, params
-        )
-
-        if not wrt_inputs:
-            grad_inputs = self._jax.numpy.zeros(
-                (decoding.output_shape[-1], x.shape[-1])
+        if wrt_inputs:
+            gradients = self._jacobian(  # pylint: disable=no-member
+                x, circuit_structure, decoding, *parameters
             )
-
-        if grad_params.ndim == 3 and grad_params.shape[1] == 1:
-            grad_params = self._jax.numpy.squeeze(grad_params, axis=1)
-        num_params = int(grad_params.shape[1])
-        split_param_grads = list(self._jax.numpy.split(grad_params, num_params, axis=1))
-        decoding.set_backend(backend)
+        else:
+            gradients = (
+                self._jax.numpy.zeros((decoding.output_shape[-1], x.shape[-1])),
+                self._jacobian_without_inputs(  # pylint: disable=no-member
+                    x, circuit_structure, decoding, *parameters
+                ),
+            )
 
         return [
             backend.cast(self._jax.to_numpy(grad).tolist(), backend.precision)
-            for grad in ([grad_inputs] + split_param_grads)
+            for grad in gradients
         ]
 
     @staticmethod
     @partial(jax.jit, static_argnums=(1, 2))
-    def _run(x, circuit_structure_static, decoding_static, parameters):
-        circuit_structure = circuit_structure_static.obj
-        decoding = decoding_static.obj
+    def _run(x, circuit_structure, decoding, *parameters):
         circ = circuit_from_structure(
             circuit_structure=circuit_structure,
             x=x,

@@ -148,6 +148,11 @@ class Expectation(QuantumDecoding):
             (ndarray): the calculated expectation value.
         """
         if self.analytic:
+            # tmp_obs = Hamiltonian(
+            #     nqubits=self.nqubits,
+            #     matrix=self.backend.cast(self.observable.matrix),
+            #     backend=self.backend,
+            # )
             return self.observable.expectation(
                 super().__call__(x).state(),
             ).reshape(1, 1)
@@ -174,6 +179,12 @@ class Expectation(QuantumDecoding):
         """
         super().set_backend(backend)
         self.observable.backend = backend
+        if isinstance(self.observable, Hamiltonian):
+            self.observable = Hamiltonian(
+                nqubits=self.nqubits,
+                matrix=self.backend.cast(self.observable.matrix),
+                backend=self.backend,
+            )
 
     def __hash__(self) -> int:
         return hash((self.qubits, self.nshots, self.backend, self.observable))

@@ -207,7 +207,7 @@ class QuantumModelAutoGrad(torch.autograd.Function):
             ctx.backend.cast(par.clone().detach().cpu().numpy(), dtype=x_clone.dtype)
             for par in parameters
         ]
-        wrt_inputs = not x.is_leaf and ctx.differentiable_encodings
+        wrt_inputs = (not x.is_leaf or x.requires_grad) and ctx.differentiable_encodings
         grad_input, *gradients = (
             torch.as_tensor(
                 ctx.backend.to_numpy(grad).tolist(), dtype=x.dtype, device=x.device
