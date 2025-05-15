@@ -71,7 +71,7 @@ class PSR(Differentiation):
         data_map = {str(i): [] for i in range(shape)}
 
         # Construct a dummy data of the given shape
-        dummy_x = backend.zeros(shape)
+        dummy_x = backend.np.zeros(shape)
 
         gate_index = 0
         for circ in circuit_structure:
