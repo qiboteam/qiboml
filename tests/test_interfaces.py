@@ -403,7 +403,7 @@ def test_composition(backend, frontend):
 
     nqubits = 2
     encoding_layer = random.choice(ENCODING_LAYERS)(nqubits)
-    training_layer = ans.ReuploadingCircuit(nqubits)
+    training_layer = ans.HardwareEfficient(nqubits)
     decoding_layer = random.choice(DECODING_LAYERS)(
         nqubits, backend=backend
     )  # make sure it's not Samples
