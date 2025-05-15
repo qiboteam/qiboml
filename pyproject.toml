@@ -3,27 +3,35 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
-name = "qiboml"
-version = "0.0.1"
-description = "Quantum Machine Learning using Qibo"
-authors = ["Qiboteam"]
+name = "qibotn"
+version = "0.0.4"
+description = "A tensor-network translation module for Qibo"
+authors = ["The Qibo team"]
+license = "Apache License 2.0"
 readme = "README.md"
 homepage = "https://qibo.science/"
-repository = "https://github.com/qiboteam/qiboml/"
-documentation = "https://qibo.science/docs/qiboml/stable"
-packages = [{ include = "qiboml", from = "src" }]
+repository = "https://github.com/qiboteam/qibotn/"
+documentation = "https://qibo.science/docs/qibotn/stable"
+keywords = []
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Topic :: Scientific/Engineering :: Physics",
+]
+packages = [{ include = "qibotn", from = "src" }]
 
 [tool.poetry.dependencies]
-python = ">=3.10,<3.13"
-numpy = "^2.0.0"
-keras = { version = "^3.0.0", optional = true }
-tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux' or sys_platform == 'darwin'", optional = true }
-# TODO: the marker is a temporary solution due to the lack of the tensorflow-io 0.32.0's wheels for Windows, this package is one of
-# the tensorflow requirements
-torch = { version = "^2.3.1", optional = true}
-qibo = "^0.2.17"
-jax = "^0.4.25"
-jaxlib = "^0.4.25"
+python = "^3.9,<3.13"
+qibo = "^0.2.8"
+quimb = { version = "^1.6.0", extras = ["tensor"] }
+cupy-cuda11x = { version = "^11.6.0", optional = true }
+cuquantum-python-cu11 = { version = "^23.3.0", optional = true }
+qmatchatea = { version = "^1.1.4", optional = true }
+mpi4py = { version = "^3.1.5", optional = true }
+
+
+[tool.poetry.extras]
+cuda = ["cupy-cuda11x", "cuquantum-python-cu11", "mpi4py"]
+qmatchatea = ["qmatchatea"]
 
 [tool.poetry.group.docs]
 optional = true
@@ -34,60 +42,39 @@ furo = "^2023.3.27"
 sphinxcontrib-bibtex = "^2.5.0"
 sphinx-copybutton = "^0.5.2"
 sphinxcontrib-katex = "^0.9.9"
-recommonmark = "^0.7.1"
-nbsphinx = "^0.9.6"
-setuptools = "^75.8.2"
-ipykernel = "^6.29.5"
-torcheval = "^0.0.7"
-keras = { version = "^3.0.0" }
-tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux' or sys_platform == 'darwin'"}
-torch = { version = "^2.3.1"}
-
-[tool.poetry.group.dev]
-optional = true
 
 [tool.poetry.group.dev.dependencies]
-ipython = "^7.34"
-pdbpp = "^0.10.3"
+ipython = "^7.0.0"
 
 [tool.poetry.group.tests]
 optional = true
 
 [tool.poetry.group.tests.dependencies]
-pytest = "^7.2.1"
-pylint = "3.1.0"
-pytest-cov = "4.0.0"
-qibojit = "^0.1.7"
-keras = { version = "^3.0.0", optional = true }
-tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux' or sys_platform == 'darwin'"}
-torch = { version = "^2.3.1"}
+pytest = "^8.0.0"
+pytest-cov = "^4.1.0"
+pytest-env = "^1.1.3"
 
-[tool.poetry.group.cuda11]
+[tool.poetry.group.analysis]
 optional = true
 
-[tool.poetry.group.cuda11.dependencies]
-jax = {extras = ["cuda11"], version = "^0.4.25"}
-
-[tool.poetry.group.cuda12]
-optional = true
-
-[tool.poetry.group.cuda12.dependencies]
-jax = {extras = ["cuda12"], version = "^0.4.25"}
+[tool.poetry.group.analysis.dependencies]
+pylint = "^3.0.3"
 
 [tool.poe.tasks]
 test = "pytest"
-lint = "pylint src/**/*.py -E"
-lint-warnings = "pylint src/**/*.py --exit-zero"
+lint = "pylint src --errors-only"
+lint-warnings = "pylint src --exit-zero"
 docs = "make -C doc html"
 docs-clean = "make -C doc clean"
 test-docs = "make -C doc doctest"
 
+[tool.pylint.main]
+ignored-modules = ["cupy", "cuquantum", "mpi4py"]
+
+[tool.pylint.reports]
+output-format = "colorized"
+
 [tool.pytest.ini_options]
-testpaths = ['tests/']
-addopts = [
-  '--cov=qiboml',
-  '--cov-append',
-  '--cov-report=xml',
-  '--cov-report=html',
-  '--durations=60',
-]
+testpaths = ["tests/"]
+addopts = ["--cov=qibotn", "--cov-report=xml"]
+env = ["D:NUMBA_DISABLE_JIT=1"]

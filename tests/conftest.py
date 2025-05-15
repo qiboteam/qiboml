@@ -8,43 +8,19 @@ import sys
 import pytest
 
 # backends to be tested
-BACKENDS = [
-    "tensorflow",
-    "pytorch",
-    "jax",
-]
-
-FRONTENDS = [
-    "pytorch",
-    "keras",
-]
+# TODO: add cutensornet and quimb here as well
+BACKENDS = ["qmatchatea"]
 
 
 def get_backend(backend_name):
 
-    from qiboml.backends.jax import JaxBackend
-    from qiboml.backends.pytorch import PyTorchBackend
-    from qiboml.backends.tensorflow import TensorflowBackend
+    from qibotn.backends.qmatchatea import QMatchaTeaBackend
 
     NAME2BACKEND = {
-        "tensorflow": TensorflowBackend,
-        "pytorch": PyTorchBackend,
-        "jax": JaxBackend,
+        "qmatchatea": QMatchaTeaBackend,
     }
 
     return NAME2BACKEND[backend_name]()
-
-
-def get_frontend(frontend_name):
-    from qiboml.interfaces import keras, pytorch
-
-    if frontend_name == "keras":
-        frontend = keras
-    elif frontend_name == "pytorch":
-        frontend = pytorch
-    else:
-        raise RuntimeError(f"Unknown frontend {frontend_name}.")
-    return frontend
 
 
 AVAILABLE_BACKENDS = []
@@ -52,14 +28,6 @@ for backend_name in BACKENDS:
     try:
         _backend = get_backend(backend_name)
         AVAILABLE_BACKENDS.append(backend_name)
-    except (ModuleNotFoundError, ImportError):
-        pass
-
-AVAILABLE_FRONTENDS = []
-for frontend_name in FRONTENDS:
-    try:
-        _frontend = get_frontend(frontend_name)
-        AVAILABLE_FRONTENDS.append(frontend_name)
     except (ModuleNotFoundError, ImportError):
         pass
 
@@ -76,11 +44,6 @@ def pytest_runtest_setup(item):
 @pytest.fixture
 def backend(backend_name):
     yield get_backend(backend_name)
-
-
-@pytest.fixture
-def frontend(frontend_name):
-    yield get_frontend(frontend_name)
 
 
 def pytest_runtest_setup(item):
@@ -101,5 +64,3 @@ def pytest_generate_tests(metafunc):
 
     if "backend_name" in metafunc.fixturenames:
         metafunc.parametrize("backend_name", AVAILABLE_BACKENDS)
-    if "frontend_name" in metafunc.fixturenames:
-        metafunc.parametrize("frontend_name", AVAILABLE_FRONTENDS)

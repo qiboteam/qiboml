@@ -18,14 +18,14 @@
   } @ inputs: let
     forEachSystem = nixpkgs.lib.genAttrs (import systems);
   in {
-    packages = forEachSystem (system: {
-      default =
-        nixpkgs.legacyPackages.${system}.poetry2nix.mkPoetryApplication
-        {
-          projectDir = self;
-          preferWheels = true;
-        };
-    });
+    # packages = forEachSystem (system: {
+    #   default =
+    #     nixpkgs.legacyPackages.${system}.poetry2nix.mkPoetryApplication
+    #     {
+    #       projectDir = self;
+    #       preferWheels = true;
+    #     };
+    # });
 
     devShells =
       forEachSystem
@@ -37,15 +37,14 @@
 
           modules = [
             {
-              packages = with pkgs; [pre-commit poethepoet];
+              packages = with pkgs; [pre-commit poethepoet stdenv.cc.cc.lib];
 
               languages.python = {
                 enable = true;
                 poetry = {
                   enable = true;
                   install.enable = true;
-                  install.groups = ["dev"];
-                  install.allExtras = true;
+                  install.groups = ["dev" "analysis" "tests"];
                 };
                 version = "3.11";
               };
