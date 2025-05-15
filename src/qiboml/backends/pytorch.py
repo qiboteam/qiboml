@@ -3,9 +3,11 @@
 from typing import Union
 
 import numpy as np
-from qibo import __version__
+from qibo import Circuit, __version__
 from qibo.backends.npmatrices import NumpyMatrices
 from qibo.backends.numpy import NumpyBackend
+
+import qiboml.backends.einsum_utils as batched_einsum_utils
 
 
 class TorchMatrices(NumpyMatrices):
@@ -309,3 +311,67 @@ class PyTorchBackend(NumpyBackend):
                 {5: 17, 4: 5, 7: 4, 1: 2, 6: 2},
                 {4: 9, 2: 5, 5: 5, 3: 4, 6: 4, 0: 1, 1: 1, 7: 1},
             ]
+
+    def apply_gate_batched(self, gate, state, nqubits):
+        breakpoint()
+        state = self.np.reshape(state, (state.shape[0],) + nqubits * (2,))
+        matrix = gate.matrix(self)
+        if gate.is_controlled_by:
+            matrix = self.np.reshape(matrix, 2 * len(gate.target_qubits) * (2,))
+            ncontrol = len(gate.control_qubits)
+            nactive = nqubits - ncontrol
+            order, targets = batched_einsum_utils.control_order(
+                gate.control_qubits, nqubits
+            )
+            state = self.np.transpose(state, order)
+            # Apply `einsum` only to the part of the state where all controls
+            # are active. This should be `state[-1]`
+            state = self.np.reshape(
+                state, (state.shape[0],) + (2**ncontrol,) + nactive * (2,)
+            )
+            opstring = batched_einsum_utils.apply_gate_string(targets, nactive)
+            updates = self.np.einsum(opstring, state[:, -1], matrix)
+            # Concatenate the updated part of the state `updates` with the
+            # part of of the state that remained unaffected `state[:-1]`.
+            state = self.np.concatenate([state[:, :-1], updates[None]], axis=1)
+            state = self.np.reshape(state, (state.shape[0],) + nqubits * (2,))
+            # Put qubit indices back to their proper places
+            state = self.np.transpose(state, batched_einsum_utils.reverse_order(order))
+        else:
+            matrix = self.np.reshape(
+                matrix, (state.shape[0],) + 2 * len(gate.qubits) * (2,)
+            )
+            opstring = batched_einsum_utils.apply_gate_string(gate.qubits, nqubits)
+            state = self.np.einsum(opstring, state, matrix)
+        return self.np.reshape(state, (state.shape[0], -1) + (2**nqubits,))
+
+    def execute_batch_of_circuits(
+        self, circuits: list[Circuit], initial_state=None, nshots: int = 1000
+    ):
+
+        try:
+            nqubits = circuits[0].nqubits
+
+            if circuits[0].density_matrix:
+                if initial_state is None:
+                    state = self.zero_density_matrix(nqubits)
+                else:
+                    state = self.cast(initial_state)
+
+                for gate in circuit.queue:
+                    state = gate.apply_density_matrix_batched(self, state, nqubits)
+
+            else:
+                if initial_state is None:
+                    state = self.zero_state(nqubits)
+                    state = self.np.vstack(
+                        len(circuits) * (state.reshape(1, -1, 2**nqubits),)
+                    )
+                else:
+                    state = self.cast(initial_state)
+
+                for gate in circuits[0].queue:
+                    state = self.apply_gate_batched(gate, state, nqubits)
+
+        except:
+            pass

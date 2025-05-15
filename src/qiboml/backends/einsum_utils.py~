@@ -1,0 +1,18 @@
+
+def prepare_strings(qubits, nqubits):
+    if nqubits + len(qubits) + 1 > len(EINSUM_CHARS):  # pragma: no cover
+        raise_error(NotImplementedError, "Not enough einsum characters.")
+
+    inp = list(EINSUM_CHARS[: nqubits + 1])
+    out = inp[:]
+    trans = list(EINSUM_CHARS[nqubits + 1 : nqubits + len(qubits) + 1])
+    for i, q in enumerate(qubits):
+        q += 1
+        trans.append(inp[q])
+        out[q] = trans[i]
+
+    inp = "".join(inp)
+    out = "".join(out)
+    trans = "".join(trans)
+    rest = EINSUM_CHARS[nqubits + len(qubits) + 1 :]
+    return inp, out, trans, rest
