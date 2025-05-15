@@ -415,8 +415,7 @@ def test_composition(backend, frontend):
             build_linear_layer(frontend, 1, nqubits),
             activation,
             frontend.QuantumModel(
-                encoding=encoding_layer,
-                circuit=training_layer,
+                circuit_structure=[encoding_layer, training_layer],
                 decoding=decoding_layer,
             ),
             build_linear_layer(frontend, decoding_layer.output_shape[-1], 1),

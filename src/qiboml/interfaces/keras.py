@@ -19,9 +19,9 @@ from qiboml.models.encoding import QuantumEncoding
 from qiboml.operations.differentiation import Differentiation, Jax
 
 DEFAULT_DIFFERENTIATION = {
-    "qiboml-pytorch": Jax,  # None,
+    "qiboml-pytorch": Jax,
     "qiboml-tensorflow": None,
-    "qiboml-jax": Jax,  # None,
+    "qiboml-jax": Jax,
     "numpy": Jax,
 }
 

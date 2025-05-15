@@ -352,7 +352,7 @@ class Jax(Differentiation):
                     x, circuit_structure, decoding, *parameters
                 ),
             )
-
+        decoding.set_backend(backend)
         return [
             backend.cast(self._jax.to_numpy(grad).tolist(), backend.precision)
             for grad in gradients
