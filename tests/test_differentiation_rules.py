@@ -9,10 +9,11 @@ from qiboml.backends import PyTorchBackend
 from qiboml.models.ansatze import HardwareEfficient
 from qiboml.models.decoding import Expectation
 from qiboml.models.encoding import PhaseEncoding
-from qiboml.operations.differentiation import PSR
+from qiboml.operations.differentiation import PSR, Jax
 
 # TODO: use the classical conftest mechanism or customize mechanism for this test
 EXECUTION_BACKENDS = [NumbaBackend(), NumpyBackend(), PyTorchBackend()]
+DIFF_RULES = [Jax, PSR]
 
 TARGET_GRAD = np.array([0.130832955241203, 0.0, -1.806316614151001, 0.0])
 TARGET_GRAD = {
@@ -52,7 +53,8 @@ def compute_gradient(frontend, model, x):
 @pytest.mark.parametrize("nshots", [None, 12000000])
 @pytest.mark.parametrize("backend", EXECUTION_BACKENDS)
 @pytest.mark.parametrize("wrt_inputs", [True, False])
-def test_expval_grad_PSR(frontend, backend, nshots, wrt_inputs):
+@pytest.mark.parametrize("diff_rule", DIFF_RULES)
+def test_expval_custom_grad(frontend, backend, nshots, wrt_inputs, diff_rule):
     """
     Compute test gradient of < 0 | model^dag observable model | 0 > w.r.t model's
     parameters. In this test the system size is fixed to two qubits and all the
@@ -61,6 +63,8 @@ def test_expval_grad_PSR(frontend, backend, nshots, wrt_inputs):
 
     if frontend.__name__ == "qiboml.interfaces.keras":
         pytest.skip("keras interface not ready.")
+    if diff_rule.__name__ == "Jax" and nshots is not None:
+        pytest.skip("Jax differentiation does not work with shots.")
 
     frontend.np.random.seed(42)
     backend.set_seed(42)
@@ -88,7 +92,7 @@ def test_expval_grad_PSR(frontend, backend, nshots, wrt_inputs):
     q_model = frontend.QuantumModel(
         circuit_structure=[encoding_layer, training_layer],
         decoding=decoding_layer,
-        differentiation=PSR(),
+        differentiation=diff_rule(),
     )
 
     target_grad = TARGET_GRAD["wrt_inputs"] if wrt_inputs else TARGET_GRAD["no_inputs"]
