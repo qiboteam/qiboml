@@ -177,7 +177,7 @@ class Expectation(QuantumDecoding):
         if isinstance(self.observable, Hamiltonian):
             self.observable = Hamiltonian(
                 nqubits=self.nqubits,
-                matrix=self.backend.cast(self.observable.matrix),
+                matrix=self.backend.cast(self.backend.to_numpy(self.observable.matrix)),
                 backend=self.backend,
             )
 
