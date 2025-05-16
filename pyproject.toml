@@ -59,7 +59,7 @@ pylint = "3.1.0"
 pytest-cov = "4.0.0"
 qibojit = "^0.1.7"
 matplotlib = "^3.7.0"
-keras = { version = "^3.0.0" }
+keras = "^3.0.0"
 tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux' or sys_platform == 'darwin'"}
 torch = { version = "^2.3.1"}
 
@@ -76,7 +76,7 @@ optional = true
 jax = {extras = ["cuda12"], version = "^0.4.25"}
 
 [tool.poe.tasks]
-test = "pytest -rs"
+test = "pytest"
 lint = "pylint src/**/*.py -E"
 lint-warnings = "pylint src/**/*.py --exit-zero"
 docs = "make -C doc html"

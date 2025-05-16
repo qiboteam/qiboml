@@ -7,12 +7,11 @@ import numpy as np
 import torch
 from qibo import Circuit
 from qibo.backends import Backend
-from qibo.ui import plot_circuit
 
 from qiboml.interfaces import utils
 from qiboml.models.decoding import QuantumDecoding
 from qiboml.models.encoding import QuantumEncoding, TrainableEncoding
-from qiboml.operations.differentiation import PSR, Differentiation, Jax
+from qiboml.operations.differentiation import Differentiation, Jax
 
 DEFAULT_DIFFERENTIATION = {
     "qiboml-pytorch": None,
@@ -31,7 +30,7 @@ class QuantumModel(torch.nn.Module):
         circuit_structure (Union[List[QuantumEncoding, Circuit], Circuit]):
             a list of Qibo circuits and Qiboml encoding layers, which defines
             the complete structure of the model. The whole circuit will be mounted
-            by sequentially add the elements of the given list. It is also possible
+            by sequentially stacking the elements of the given list. It is also possible
             to pass a single circuit, in the case a sequential structure is not needed.
         decoding (QuantumDecoding): the decoding layer.
         differentiation (Differentiation, optional): the differentiation engine,
@@ -47,7 +46,6 @@ class QuantumModel(torch.nn.Module):
     ):
         super().__init__()
 
-        # The following code works with list of objects
         if isinstance(self.circuit_structure, Circuit):
             self.circuit_structure = [self.circuit_structure]
 
@@ -142,26 +140,14 @@ class QuantumModel(torch.nn.Module):
                 `qibo.ui.plot_circuit` function.
         """
 
-        encoding_layer = next(
-            (
-                circ
-                for circ in self.circuit_structure
-                if isinstance(circ, QuantumEncoding)
-            ),
-            None,
+        fig = utils.draw_circuit(
+            circuit_structure=self.circuit_structure,
+            backend=self.decoding.backend,
+            plt_drawing=plt_drawing,
+            **plt_kwargs,
         )
-        dummy_data = (
-            self.decoding.backend.cast(np.zeros(len(encoding_layer.qubits)))
-            if encoding_layer is not None
-            else None
-        )
-        circuit = utils.circuit_from_structure(self.circuit_structure, dummy_data)
-        if plt_drawing:
-            _, fig = plot_circuit(circuit, **plt_kwargs)
-            return fig
-        else:
-            circuit.draw()
-            return str(circuit)
+
+        return fig
 
 
 class QuantumModelAutoGrad(torch.autograd.Function):
@@ -180,17 +166,14 @@ class QuantumModelAutoGrad(torch.autograd.Function):
         differentiation,
         *parameters: List[torch.nn.Parameter],
     ):
-        # Save the flag and other context
+        # Save the context
         ctx.save_for_backward(x, *parameters)
         ctx.circuit_structure = circuit_structure
         ctx.decoding = decoding
         ctx.backend = backend
         ctx.differentiation = differentiation
 
-        # Checking whether input data require grad
-        x_requires_grad = x.requires_grad
-
-        # Process the input
+        # Cloning, detaching and converting to backend arrays
         x_clone = x.clone().detach().cpu().numpy()
         x_clone = backend.cast(x_clone, dtype=x_clone.dtype)
         params = [
@@ -199,12 +182,14 @@ class QuantumModelAutoGrad(torch.autograd.Function):
         ]
 
         # Build the temporary circuit from the circuit structure.
-        ctx.differentiable_encodings = x_requires_grad
+        ctx.differentiable_encodings = True
         circuit = Circuit(decoding.nqubits)
         for circ in circuit_structure:
             if isinstance(circ, QuantumEncoding):
                 circuit += circ(x_clone)
                 # Record if any encoding is differentiable.
+                # TODO: discuss if we want to solve it like this, namely all non
+                # differentiable if at least one it is not
                 if not circ.differentiable:
                     ctx.differentiable_encodings = False
             else:
@@ -212,7 +197,9 @@ class QuantumModelAutoGrad(torch.autograd.Function):
 
         circuit.set_parameters(params)
         x_clone = decoding(circuit)
-        x_clone = torch.as_tensor(backend.to_numpy(x_clone).tolist())
+        x_clone = torch.as_tensor(
+            backend.to_numpy(x_clone).tolist(), dtype=x.dtype, device=x.device
+        )
         return x_clone
 
     @staticmethod
@@ -224,7 +211,7 @@ class QuantumModelAutoGrad(torch.autograd.Function):
             ctx.backend.cast(par.clone().detach().cpu().numpy(), dtype=x_clone.dtype)
             for par in parameters
         ]
-        wrt_inputs = ctx.differentiable_encodings
+        wrt_inputs = (not x.is_leaf or x.requires_grad) and ctx.differentiable_encodings
         grad_input, *gradients = (
             torch.as_tensor(
                 ctx.backend.to_numpy(grad).tolist(), dtype=x.dtype, device=x.device

@@ -244,26 +244,6 @@ class TensorflowBackend(NumpyBackend):
 
         return tape.jacobian(real, parameters)
 
-    def calculate_hamiltonian_matrix_product(self, matrix1, matrix2):
-        if self.is_sparse(matrix1) or self.is_sparse(matrix2):
-            raise_error(
-                NotImplementedError,
-                "Multiplication of sparse matrices is not supported with Tensorflow.",
-            )
-        return super().calculate_hamiltonian_matrix_product(matrix1, matrix2)
-
-    def calculate_hamiltonian_state_product(self, matrix, state):
-        rank = len(tuple(state.shape))
-        if rank == 1:  # vector
-            return self.np.matmul(matrix, state[:, self.np.newaxis])[:, 0]
-        elif rank == 2:  # matrix
-            return self.np.matmul(matrix, state)
-        else:
-            raise_error(
-                ValueError,
-                f"Cannot multiply Hamiltonian with rank-{rank} tensor.",
-            )
-
     def _test_regressions(self, name):
         if name == "test_measurementresult_apply_bitflips":
             return [

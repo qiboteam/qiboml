@@ -11,7 +11,7 @@ from qibo.config import raise_error
 from qiboml import ndarray
 
 
-@dataclass
+@dataclass(eq=False)
 class QuantumEncoding(ABC):
     """
     Abstract Encoder class.
@@ -67,7 +67,7 @@ class QuantumEncoding(ABC):
         return hash(self.qubits)
 
 
-@dataclass
+@dataclass(eq=False)
 class PhaseEncoding(QuantumEncoding):
     encoding_gate: type = field(default_factory=lambda: gates.RY)
 
@@ -88,8 +88,6 @@ class PhaseEncoding(QuantumEncoding):
             raise NotImplementedError(
                 f"{self} currently support only gates with one parameter."
             )
-
-        # TODO: mount the circuit here and check whether it works with Keras
 
     @cached_property
     def _data_to_gate(self):
@@ -153,9 +151,10 @@ class TrainableEncoding(QuantumEncoding):
 
     Args:
         nqubits (int): total number of qubits.
-        encoding_gate (type): The gate type to use for encoding (e.g., gates.RY).
-        encoding_rule: A machine learning layer that processes input data.
         qubits (tuple[int], optional): set of qubits it acts on, by default range(nqubits).
+        encoding_gate (type): The gate type to use for encoding (e.g., gates.RY).
+        encoding_rule: A machine learning layer that processes input data. It can
+            be a Pytorch module or a Keras layer.
     """
 
     encoding_gate: type = field(default_factory=lambda: gates.RY)
