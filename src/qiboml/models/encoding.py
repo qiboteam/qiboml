@@ -1,5 +1,7 @@
+import inspect
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from functools import cached_property
 from typing import Optional
 
 import numpy as np
@@ -9,7 +11,7 @@ from qibo.config import raise_error
 from qiboml import ndarray
 
 
-@dataclass
+@dataclass(eq=False)
 class QuantumEncoding(ABC):
     """
     Abstract Encoder class.
@@ -31,8 +33,15 @@ class QuantumEncoding(ABC):
         self.qubits = (
             tuple(range(self.nqubits)) if self.qubits is None else tuple(self.qubits)
         )
-
         self._circuit = Circuit(self.nqubits, density_matrix=self.density_matrix)
+
+    @cached_property
+    def _data_to_gate(self):
+        """Dictionary which helps to map each data component into a gate in the circuit"""
+        raise_error(
+            NotImplementedError,
+            f"_data_to_gate method is not implemented for encoding {self}.",
+        )
 
     @abstractmethod
     def __call__(self, x: ndarray) -> Circuit:
@@ -57,17 +66,39 @@ class QuantumEncoding(ABC):
         return hash(self.qubits)
 
 
+@dataclass(eq=False)
 class PhaseEncoding(QuantumEncoding):
+    encoding_gate: type = field(default_factory=lambda: gates.RY)
 
-    def ___post_init__(
+    def __post_init__(
         self,
     ):
         """Ancillary post initialization: builds the internal circuit with the rotation gates."""
         super().__post_init__()
 
+        # Retrieving information about the given encoding gate
+        signature = inspect.signature(self.encoding_gate)
+        allowed_params = {"theta", "phi", "lam"}
+        self.gate_encoding_params = {
+            p for p in signature.parameters.keys()
+        } & allowed_params
+
+        if len(self.gate_encoding_params) != 1:
+            raise NotImplementedError(
+                f"{self} currently support only gates with one parameter."
+            )
+
+    @cached_property
+    def _data_to_gate(self):
+        """
+        Associate each data component with its index in the gates queue.
+        In this case, the correspondence it's simply that the i-th component
+        of the data is uploaded in the i-th gate of the queue.
+        """
+        return {f"{i}": [i] for i in range(len(self.qubits))}
+
     def __call__(self, x: ndarray) -> Circuit:
-        """Construct the circuit encoding the ``x`` data in the rotation angles of some
-        ``RY`` gates.
+        """Construct the circuit encoding the ``x`` data in the chosen encoding gate.
 
         Args:
             x (ndarray): the input real data to encode in rotation angles.
@@ -78,7 +109,9 @@ class PhaseEncoding(QuantumEncoding):
         circuit = self.circuit
         x = x.ravel()
         for i, q in enumerate(self.qubits):
-            circuit.add(gates.RY(q, theta=x[i], trainable=False))
+            this_gate_params = {"trainable": False}
+            [this_gate_params.update({p: x[i]}) for p in self.gate_encoding_params]
+            circuit.add(self.encoding_gate(q=q, **this_gate_params))
         return circuit
 
 

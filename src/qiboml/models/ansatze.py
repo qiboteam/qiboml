@@ -5,7 +5,7 @@ import numpy as np
 from qibo import Circuit, gates
 
 
-def ReuploadingCircuit(
+def HardwareEfficient(
     nqubits: int,
     qubits: list[int] = None,
     nlayers: int = 1,

@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+from qibo import gates
 
 import qiboml.models.encoding as ed
 
@@ -20,6 +21,11 @@ def test_binary_encoding_layer(backend):
 def test_phase_encoding_layer(backend):
     nqubits = 10
     qubits = np.random.choice(range(nqubits), size=(6,), replace=False)
+
+    # Testing error when encoding gate is affected by more than one parameter
+    with pytest.raises(NotImplementedError):
+        layer = ed.PhaseEncoding(nqubits=nqubits, qubits=qubits, encoding_gate=gates.U3)
+
     layer = ed.PhaseEncoding(nqubits, qubits=qubits)
     data = backend.cast(np.random.randn(1, len(qubits)))
     c = layer(data)
