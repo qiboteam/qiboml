@@ -2,16 +2,17 @@ import numpy as np
 import pytest
 from qibo import hamiltonians
 from qibo.backends import NumpyBackend
+from qibojit.backends import NumbaBackend
 
-from qiboml.backends import JaxBackend, PyTorchBackend, TensorflowBackend
-from qiboml.models.ansatze import ReuploadingCircuit
+from qiboml.backends import PyTorchBackend
+from qiboml.models.ansatze import HardwareEfficient
 from qiboml.models.decoding import Expectation
 from qiboml.models.encoding import PhaseEncoding
-from qiboml.operations.differentiation import PSR
+from qiboml.operations.differentiation import PSR, Jax
 
-# jax and tensorflow don't work with the PSR
-# EXECUTION_BACKENDS = [JaxBackend(), PyTorchBackend(), TensorflowBackend()]
-EXECUTION_BACKENDS = [NumpyBackend(), PyTorchBackend()]
+# TODO: use the classical conftest mechanism or customize mechanism for this test
+EXECUTION_BACKENDS = [NumbaBackend(), NumpyBackend(), PyTorchBackend()]
+DIFF_RULES = [Jax, PSR]
 
 TARGET_GRAD = np.array([0.130832955241203, 0.0, -1.806316614151001, 0.0])
 TARGET_GRAD = {
@@ -76,18 +77,16 @@ def compute_gradient(frontend, model, x):
 @pytest.mark.parametrize("nshots", [None, 12000000])
 @pytest.mark.parametrize("backend", EXECUTION_BACKENDS)
 @pytest.mark.parametrize("wrt_inputs", [True, False])
-def test_expval_grad_PSR(frontend, backend, nshots, wrt_inputs):
+@pytest.mark.parametrize("diff_rule", DIFF_RULES)
+def test_expval_custom_grad(frontend, backend, nshots, wrt_inputs, diff_rule):
     """
     Compute test gradient of < 0 | model^dag observable model | 0 > w.r.t model's
     parameters. In this test the system size is fixed to two qubits and all the
     parameters/data values are fixed.
     """
 
-    if frontend.__name__ == "qiboml.interfaces.keras":
-        from qiboml.interfaces.keras import QuantumModel
-
-    elif frontend.__name__ == "qiboml.interfaces.pytorch":
-        from qiboml.interfaces.pytorch import QuantumModel
+    if diff_rule.__name__ == "Jax" and nshots is not None:
+        pytest.skip("Jax differentiation does not work with shots.")
 
     set_seed(frontend, 42)
     backend.set_seed(42)
@@ -99,7 +98,8 @@ def test_expval_grad_PSR(frontend, backend, nshots, wrt_inputs):
     obs = hamiltonians.Z(nqubits=nqubits, backend=backend)
 
     encoding_layer = PhaseEncoding(nqubits=nqubits)
-    training_layer = ReuploadingCircuit(nqubits=nqubits, nlayers=1)
+    training_layer = HardwareEfficient(nqubits=nqubits, nlayers=1)
+
     decoding_layer = Expectation(
         nqubits=nqubits,
         backend=backend,
@@ -113,11 +113,10 @@ def test_expval_grad_PSR(frontend, backend, nshots, wrt_inputs):
         backend.cast(initial_params, dtype=backend.np.float64)
     )
 
-    q_model = QuantumModel(
-        encoding=encoding_layer,
-        circuit=training_layer,
+    q_model = frontend.QuantumModel(
+        circuit_structure=[encoding_layer, training_layer],
         decoding=decoding_layer,
-        differentiation=PSR(),
+        differentiation=diff_rule(),
     )
 
     target_grad = TARGET_GRAD["wrt_inputs"] if wrt_inputs else TARGET_GRAD["no_inputs"]

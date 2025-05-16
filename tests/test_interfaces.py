@@ -290,7 +290,7 @@ def test_encoding(backend, frontend, layer, seed):
     nqubits = 2
     dim = 2
 
-    training_layer = ans.ReuploadingCircuit(
+    training_layer = ans.HardwareEfficient(
         nqubits,
         random_subset(nqubits, dim),
     )
@@ -309,6 +309,9 @@ def test_encoding(backend, frontend, layer, seed):
     )
 
     encoding_layer = layer(nqubits, random_subset(nqubits, dim))
+
+    circuit_structure = [encoding_layer, training_layer]
+
     binary = True if encoding_layer.__class__.__name__ == "BinaryEncoding" else False
     activation = build_activation(frontend, binary)
     q_model = build_sequential_model(
@@ -316,8 +319,7 @@ def test_encoding(backend, frontend, layer, seed):
         [
             activation,
             frontend.QuantumModel(
-                encoding=encoding_layer,
-                circuit=training_layer,
+                circuit_structure=circuit_structure,
                 decoding=decoding_layer,
             ),
         ],
@@ -342,7 +344,7 @@ def test_decoding(backend, frontend, layer, seed):
 
     nqubits = 2
     dim = 2
-    training_layer = ans.ReuploadingCircuit(
+    training_layer = ans.HardwareEfficient(
         nqubits,
         random_subset(nqubits, dim),
     )
@@ -372,8 +374,7 @@ def test_decoding(backend, frontend, layer, seed):
         [
             activation,
             frontend.QuantumModel(
-                encoding=encoding_layer,
-                circuit=training_layer,
+                circuit_structure=[encoding_layer, training_layer],
                 decoding=decoding_layer,
             ),
         ],
@@ -381,7 +382,6 @@ def test_decoding(backend, frontend, layer, seed):
     setattr(q_model, "decoding", decoding_layer)
 
     data = random_tensor(frontend, (100, dim))
-
     target = prepare_targets(frontend, q_model, data)
 
     if layer is dec.Samples:
@@ -403,7 +403,7 @@ def test_composition(backend, frontend):
 
     nqubits = 2
     encoding_layer = random.choice(ENCODING_LAYERS)(nqubits)
-    training_layer = ans.ReuploadingCircuit(nqubits)
+    training_layer = ans.HardwareEfficient(nqubits)
     decoding_layer = random.choice(DECODING_LAYERS)(
         nqubits, backend=backend
     )  # make sure it's not Samples
@@ -415,8 +415,7 @@ def test_composition(backend, frontend):
             build_linear_layer(frontend, 1, nqubits),
             activation,
             frontend.QuantumModel(
-                encoding=encoding_layer,
-                circuit=training_layer,
+                circuit_structure=[encoding_layer, training_layer],
                 decoding=decoding_layer,
             ),
             build_linear_layer(frontend, decoding_layer.output_shape[-1], 1),
