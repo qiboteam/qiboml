@@ -6,7 +6,7 @@ from qibo.ui.mpldrawer import plot_circuit
 
 from qiboml import ndarray
 from qiboml.models.decoding import QuantumDecoding
-from qiboml.models.encoding import QuantumEncoding, TrainableEncoding
+from qiboml.models.encoding import QuantumEncoding
 
 
 def get_params_from_circuit_structure(
@@ -21,7 +21,7 @@ def get_params_from_circuit_structure(
         if not isinstance(circ, QuantumEncoding):
             params.extend([p for param in circ.get_parameters() for p in param])
         else:
-            if isinstance(circ, TrainableEncoding):
+            if circ.encoding_rule is not None:
                 params.extend(
                     [p for param in circ.circuit.get_parameters() for p in param]
                 )

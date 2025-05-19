@@ -10,7 +10,7 @@ from qibo.backends import Backend
 
 from qiboml.interfaces import utils
 from qiboml.models.decoding import QuantumDecoding
-from qiboml.models.encoding import QuantumEncoding, TrainableEncoding
+from qiboml.models.encoding import QuantumEncoding
 from qiboml.operations.differentiation import Differentiation, Jax
 
 DEFAULT_DIFFERENTIATION = {
@@ -51,8 +51,9 @@ class QuantumModel(torch.nn.Module):
 
         params = utils.get_params_from_circuit_structure(self.circuit_structure)
 
+        # Inform the Pytorch model that we are adding sub-modules here
         for i, circ in enumerate(self.circuit_structure):
-            if isinstance(circ, TrainableEncoding):
+            if isinstance(circ, QuantumEncoding) and circ.encoding_rule is not None:
                 self.add_module(f"enc{i}", circ.encoding_rule)
 
         params = torch.as_tensor(self.backend.to_numpy(x=params)).ravel()

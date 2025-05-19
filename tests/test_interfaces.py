@@ -3,6 +3,9 @@ import random
 
 import numpy as np
 import pytest
+import tensorflow as tf
+import torch
+import torch.nn as nn
 from qibo import hamiltonians
 from qibo.config import raise_error
 from qibo.symbols import Z
@@ -11,6 +14,25 @@ import qiboml.models.ansatze as ans
 import qiboml.models.decoding as dec
 import qiboml.models.encoding as enc
 from qiboml.operations.differentiation import PSR
+
+
+class TorchLinearEncoding(nn.Module):
+    """Activation function which helps in giving more sensitivity around zero."""
+
+    def __init__(self):
+        super().__init__()
+        self.param1 = nn.Parameter(torch.tensor(np.random.randn()))
+        self.param2 = nn.Parameter(torch.tensor(np.random.randn()))
+
+    def forward(self, x):
+        return self.param1 * torch.tensor(x) + self.param2
+
+
+def construct_linear_encoding(frontend):
+    if frontend.__name__ == "qiboml.interfaces.pytorch":
+        return TorchLinearEncoding()
+    elif frontend.__name__ == "qiboml.interfaces.keras":
+        pytest.skip("Trainable encoding are supported by Pytorch interface only.")
 
 
 def get_layers(module, layer_type=None):
@@ -282,8 +304,9 @@ def backprop_test(frontend, model, data, target):
     # specific (rare) cases
 
 
+@pytest.mark.parametrize("encoding_rule", [False, True])
 @pytest.mark.parametrize("layer,seed", zip(ENCODING_LAYERS, [6, 4]))
-def test_encoding(backend, frontend, layer, seed):
+def test_encoding(backend, frontend, encoding_rule, layer, seed):
     set_device(frontend)
     set_seed(frontend, seed)
 
@@ -308,7 +331,14 @@ def test_encoding(backend, frontend, layer, seed):
         backend=backend,
     )
 
-    encoding_layer = layer(nqubits, random_subset(nqubits, dim))
+    enc_rule = None
+    if encoding_rule:
+        enc_rule = construct_linear_encoding(frontend)
+    encoding_layer = layer(
+        nqubits=nqubits,
+        qubits=random_subset(nqubits, dim),
+        encoding_rule=enc_rule,
+    )
 
     circuit_structure = [encoding_layer, training_layer]
 
