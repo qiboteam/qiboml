@@ -7,7 +7,7 @@ In order to build a Quantum Model you need to define three fundamental ingredien
 * (`optionally`) A parametrized quantum ``Circuit`` defining the actual computation the model will perform;
 * a ``Decoder`` in charge of decoding the quantum information contained in the final state.
 
-.. image:: qiboml_triad.svg
+.. image:: qiboml.png
    :width: 600
    :align: center
 
