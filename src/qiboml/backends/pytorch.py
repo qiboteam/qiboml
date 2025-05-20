@@ -361,18 +361,6 @@ class PyTorchBackend(NumpyBackend):
             state = self.np.einsum(opstring, state, matrix)
         return self.np.reshape(state, (state.shape[0], -1) + (2**nqubits,))
 
-    def apply_gates_batched(self, gate_list, state, nqubits):
-
-        matrices, qubits = zip(
-            *(
-                (
-                    self.np.reshape(gate.matrix(self), 2 * len(gate.qubits) * (2,)),
-                    gate.qubits,
-                )
-                for gate in gate_list
-            )
-        )
-
     def execute_batch_of_circuits(
         self, circuits: list[Circuit], initial_state=None, nshots: int = 1000
     ):
