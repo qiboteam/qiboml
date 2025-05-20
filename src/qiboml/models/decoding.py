@@ -21,6 +21,8 @@ class QuantumDecoding:
         qubits (tuple[int], optional): set of qubits it acts on, by default ``range(nqubits)``.
         nshots (int, optional): number of shots used for circuit execution and sampling.
         backend (Backend, optional): backend used for computation, by default the globally-set backend is used.
+        transpiler (Passes, optional): transpiler to run before circuit execution, by default no transpilation
+                                       is performed on the circuit (``transpiler=None``).
     """
 
     nqubits: int
