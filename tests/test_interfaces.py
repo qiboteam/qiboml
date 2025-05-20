@@ -405,11 +405,15 @@ def test_composition(backend, frontend):
     nqubits = 2
     encoding_layer = random.choice(ENCODING_LAYERS)(nqubits)
     training_layer = ans.HardwareEfficient(nqubits)
-    decoding_layer = random.choice(DECODING_LAYERS)(
+    decoding_layer = random.choice(
+        list(set(DECODING_LAYERS) - {dec.Samples, dec.State})
+    )(
         nqubits, backend=backend
     )  # make sure it's not Samples
 
-    activation = build_activation(frontend, binary=False)
+    activation = build_activation(
+        frontend, binary=encoding_layer.__class__.__name__ == "BinaryEncoding"
+    )
     model = build_sequential_model(
         frontend,
         [
@@ -455,7 +459,9 @@ def test_qibolab(frontend):
         nqubits, backend=backend, transpiler=transpiler, nshots=1000
     )
 
-    activation = build_activation(frontend, binary=False)
+    activation = build_activation(
+        frontend, binary=encoding_layer.__class__.__name__ == "BinaryEncoding"
+    )
     model = build_sequential_model(
         frontend,
         [
