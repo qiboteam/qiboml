@@ -42,7 +42,7 @@ class QuantumEncoding(ABC):
         """
         Mapping between the index of the input and the indices of the gates in the
         produced encoding circuit queue, where the input is encoded to.
-        For instance, {0: [0,2], 1: [2,]}, represents an encoding where the element
+        For instance, {0: [0,2], 1: [2]}, represents an encoding where the element
         0 of the inputs enters the gates with indices 0 and 2 of the queue, whereas
         the element 1 of the input affects only the the gate in position 2 of the
         queue.
