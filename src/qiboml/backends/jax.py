@@ -136,6 +136,12 @@ class JaxBackend(NumpyBackend):
         frequencies = frequencies.at[res].add(counts)
         return frequencies
 
+    def matrix(self, gate):
+        matrix = super().matrix(gate)
+        if isinstance(matrix, self.jax.core.Tracer):
+            delattr(self.matrices, gate.__class__.__name__)
+        return matrix
+
     def apply_gate(self, gate, state, nqubits):
         if gate.is_controlled_by:
             order, targets = einsum_utils.control_order(gate, nqubits)
