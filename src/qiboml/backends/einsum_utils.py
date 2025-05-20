@@ -1,6 +1,6 @@
 from functools import cache
 
-from qibo.backends.einsum_utils import *
+from qibo.backends.einsum_utils import EINSUM_CHARS
 
 
 @cache
@@ -24,6 +24,13 @@ def prepare_strings(qubits, nqubits):
 
 
 @cache
+def prepare_strings_same_qubits(qubits, nqubits):
+    inp, out, trans, rest = prepare_strings(qubits, nqubits)
+    trans = rest[0] + trans
+    return inp, out, trans, rest[1:]
+
+
+@cache
 def control_order(control_qubits, target_qubits, nqubits):
     loop_start = 0
     order = list(control_qubits)
@@ -41,3 +48,15 @@ def control_order(control_qubits, target_qubits, nqubits):
         order[i] += 1
         targets[i] += 1
     return order, targets
+
+
+@cache
+def apply_gate_string(qubits, nqubits):
+    inp, out, trans, _ = prepare_strings(qubits, nqubits)
+    return f"{inp},{trans}->{out}"
+
+
+@cache
+def apply_gates_same_qubits_string(qubits, nqubits):
+    inp, out, trans, _ = prepare_strings_same_qubits(qubits, nqubits)
+    return f"{inp},{trans}->{out}"
