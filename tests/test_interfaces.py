@@ -8,7 +8,6 @@ from qibo import construct_backend, hamiltonians
 from qibo.config import raise_error
 from qibo.symbols import Z
 from qibo.transpiler import NativeGates, Passes, Unroller
-from qibolab import create_platform
 
 import qiboml.models.ansatze as ans
 import qiboml.models.decoding as dec
@@ -434,6 +433,11 @@ def test_composition(backend, frontend):
 
 
 def test_qibolab(frontend):
+    try:
+        from qibolab import create_platform
+    except ImportError:
+        pytest.skip("qibolab not installed.")
+
     os.environ["QIBOLAB_PLATFORMS"] = "tests/"
     platform = create_platform("emulator")
     backend = construct_backend("qibolab", platform=platform)
