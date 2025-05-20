@@ -53,7 +53,7 @@ class QuantumDecoding:
             (CircuitResult | QuantumState | MeasurementOutcomes): the execution ``qibo.result`` object.
         """
         if self.transpiler is not None:
-            x, qubit_map = self.transpiler(x)
+            x, _ = self.transpiler(x)
         return self.backend.execute_circuit(x + self._circuit, nshots=self.nshots)
 
     @property
