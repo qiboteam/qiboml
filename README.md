@@ -71,7 +71,7 @@ Now that all the pieces are prepared, we can build the quantum model.
 from qiboml.interfaces.pytorch import QuantumModel
 
 qmodel = QuantumModel(
-    circuit_structure=training,
+    circuit_structure=circuit,
     decoding=decoding,
 )
 ```
