@@ -13,7 +13,7 @@ def HardwareEfficient(
     circuit = Circuit(nqubits)
 
     for _ in range(nlayers):
-        for q in qubits:
+        for q in range(qubits):
             circuit.add(gates.RY(q, theta=random.random() * np.pi, trainable=True))
             circuit.add(gates.RZ(q, theta=random.random() * np.pi, trainable=True))
         for i, q in enumerate(qubits[:-2]):
