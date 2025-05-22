@@ -453,34 +453,30 @@ def test_noise(backend, frontend):
     model = build_sequential_model(
         frontend,
         [
-            build_linear_layer(frontend, 1, nqubits),
             activation,
             frontend.QuantumModel(
                 circuit_structure=circuit,
                 decoding=decoding_layer,
             ),
-            build_linear_layer(frontend, decoding_layer.output_shape[-1], 1),
         ],
     )
     setattr(model, "decoding", decoding_layer)
     noisy_model = build_sequential_model(
         frontend,
         [
-            build_linear_layer(frontend, 1, nqubits),
             activation,
             frontend.QuantumModel(
                 circuit_structure=noisy_circuit,
                 decoding=decoding_layer,
             ),
-            build_linear_layer(frontend, decoding_layer.output_shape[-1], 1),
         ],
     )
     setattr(noisy_model, "decoding", decoding_layer)
 
-    data = random_tensor(frontend, (100, 1))
+    data = random_tensor(frontend, (100, nqubits))
     target = prepare_targets(frontend, model, data)
-    train_model(frontend, model, data, target, max_epochs=10)
+    train_model(frontend, model, data, target, max_epochs=1)
     _, loss = eval_model(frontend, model, data, target)
-    train_model(frontend, noisy_model, data, target, max_epochs=10)
+    train_model(frontend, noisy_model, data, target, max_epochs=1)
     _, noisy_loss = eval_model(frontend, noisy_model, data, target)
     assert noisy_loss > loss
