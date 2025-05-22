@@ -10,7 +10,6 @@ keeping the same high-level language proposed by the most used libraries (Pytorc
 
 ![qiboml](https://github.com/user-attachments/assets/c88fd9a7-2511-4672-a911-5d8937dc5d08)
 
----
 
 ### Documentation
 
@@ -18,7 +17,6 @@ keeping the same high-level language proposed by the most used libraries (Pytorc
 
 📖 The Qiboml documentation can be found in our [organization webpage](https://qibo.science/qibo/stable/).
 
----
 
 ### Minimum working example
 
@@ -94,3 +92,15 @@ for iteration in range(300):
     cost.backward()
     optimizer.step()
 ```
+
+### Citation policy
+
+If you use the package please refer to [the documentation](https://qibo.science/qibo/stable/appendix/citing-qibo.html#publications) for citation instructions.
+
+### Contacts
+
+To get in touch with the community and the developers, consider joining the Qibo workspace on Matrix:
+
+[![Matrix](https://img.shields.io/matrix/qibo%3Amatrix.org?logo=matrix)](https://matrix.to/#/#qiboml:matrix.org)
+
+If you have a question about the project, please contact us with [📫](mailto:qiboteam@qibo.science).
