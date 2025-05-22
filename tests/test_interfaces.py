@@ -437,7 +437,7 @@ def test_noise(backend, frontend):
     backend.set_seed(42)
     set_seed(frontend, 42)
 
-    nqubits = 2
+    nqubits = 6
     noise = NoiseModel()
     noise.add(PauliError([("X", 0.5)]), gates.CNOT)
     noise.add(PauliError([("Y", 0.2)]), gates.RY)

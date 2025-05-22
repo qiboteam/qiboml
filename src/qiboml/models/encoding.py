@@ -19,6 +19,7 @@ class QuantumEncoding(ABC):
     Args:
         nqubits (int): total number of qubits.
         qubits (tuple[int], optional): set of qubits it acts on, by default ``range(nqubits)``.
+        density_matrix (bool, optional): whether to build the circuit with ``density_matrix=True``, mostly useful for noisy simulations. ``density_matrix=False`` by default.
     """
 
     nqubits: int
