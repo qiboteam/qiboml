@@ -157,12 +157,11 @@ class TensorflowBackend(NumpyBackend):
         # tf only supports coo sparse arrays
         # however they are probably not as efficient as csr ones
         # at this point it is maybe better to just use dense arrays
+        # from the tests no major performance difference emerged
+        # with dense tensors, thus keeping sparse representation for now
         matrix = self.np.eye(2**rank, dtype=self.dtype)
 
         for gate in fgate.gates:
-            # transfer gate matrix to numpy as it is more efficient for
-            # small tensor calculations
-            # explicit to_numpy see https://github.com/qiboteam/qibo/issues/928
             gmatrix = gate.matrix(self)
             # add controls if controls were instantiated using
             # the ``Gate.controlled_by`` method

@@ -434,6 +434,7 @@ def test_composition(backend, frontend):
 
 def test_noise(backend, frontend):
     set_device(frontend)
+    backend.set_seed(42)
     set_seed(frontend, 42)
 
     nqubits = 2

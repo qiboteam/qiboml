@@ -116,13 +116,10 @@ class JaxBackend(NumpyBackend):
         rank = len(fgate.target_qubits)
         # jax only supports coo sparse arrays
         # however they are probably not as efficient as csr ones
-        # at this point it is maybe better to just use dense arrays
-        matrix = sparse.BCOO.fromdense(self.np.eye(2**rank), nse=2**rank)
+        # indeed using dense arrays instead of coo ones proved to be significantly faster
+        matrix = self.np.eye(2**rank)
 
         for gate in fgate.gates:
-            # transfer gate matrix to numpy as it is more efficient for
-            # small tensor calculations
-            # explicit to_numpy see https://github.com/qiboteam/qibo/issues/928
             gmatrix = gate.matrix(self)
             # add controls if controls were instantiated using
             # the ``Gate.controlled_by`` method
@@ -146,11 +143,9 @@ class JaxBackend(NumpyBackend):
             transpose_indices.extend(indices + rank)
             gmatrix = self.np.transpose(gmatrix, transpose_indices)
             gmatrix = self.np.reshape(gmatrix, original_shape)
-            # fuse the individual gate matrix to the total ``FusedGate`` matrix
-            # we are using sparse matrices to improve perfomances
-            matrix = sparse.BCOO.fromdense(gmatrix, nse=2**rank) @ matrix
+            matrix = gmatrix @ matrix
 
-        return matrix.todense()
+        return matrix
 
     def zero_state(self, nqubits):
         state = self.np.zeros(2**nqubits, dtype=self.dtype)

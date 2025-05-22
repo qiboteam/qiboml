@@ -144,16 +144,10 @@ class PyTorchBackend(NumpyBackend):
     def matrix_fused(self, fgate):
         rank = len(fgate.target_qubits)
         matrix = self.np.eye(2**rank, dtype=self.dtype)
-        matrix = (
-            matrix.to_sparse_csr()
-            if self.np.backends.mkl.is_available()
-            else matrix.to_sparse_coo()
-        )
+        if self.np.backends.mkl.is_available():
+            matrix = matrix.to_sparse_csr()
 
         for gate in fgate.gates:
-            # transfer gate matrix to numpy as it is more efficient for
-            # small tensor calculations
-            # explicit to_numpy see https://github.com/qiboteam/qibo/issues/928
             gmatrix = gate.matrix(self)
             # add controls if controls were instantiated using
             # the ``Gate.controlled_by`` method
@@ -179,11 +173,9 @@ class PyTorchBackend(NumpyBackend):
             gmatrix = self.np.reshape(gmatrix, original_shape)
             # fuse the individual gate matrix to the total ``FusedGate`` matrix
             # we are using sparse matrices to improve perfomances
-            gmatrix = (
-                gmatrix.to_sparse_csr()
-                if self.np.backends.mkl.is_available()
-                else gmatrix.to_sparse_coo()
-            )
+            if self.np.backends.mkl.is_available():
+                gmatrix = gmatrix.to_sparse_csr()
+
             matrix = gmatrix @ matrix
 
         return matrix.to_dense()
