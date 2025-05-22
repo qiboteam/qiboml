@@ -36,6 +36,8 @@ Contents
    :caption: Tutorials
 
    tutorials/binary_mnist
+   tutorials/data_reuploading
+   tutorials/vqe
 
 .. toctree::
     :maxdepth: 1
