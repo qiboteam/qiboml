@@ -3,10 +3,10 @@ Building your first Quantum Model
 
 In order to build a Quantum Model you need to define two fundamental ingredients:
 
-* the ``circuit_structure``: a general quantum circuit can be composed of encoding Unitaries and trainable Unitaries. In practice, in Qiboml, we use the ``Encoder`` class to build the encoding layers of our quantum circuits (namely, the operations where we encode external input data), while we leave you the freedom of constructing any trainable layer using the Qibo interface. Once a set of candidates for our circuit structure are selected, we can collect them into a list and provide it to the Qiboml quantum models.
+* the ``circuit_structure``: a general quantum circuit can be composed of encoding Unitaries and trainable Unitaries. In practice, in Qiboml, we use the ``Encoder`` class to build the encoding layers of our quantum circuits (namely, the operations where we encode external input data), while we leave the user the freedom of constructing any trainable layer using Qibo's ``Circuit`` interface. The set of elements composing the circuit structure can then be provided as a list to the Qiboml quantum models.
 * a ``Decoder`` in charge of decoding the quantum information contained in the final state we get once executing the whole circuit structure.
 
-In the following picture, we represent a full quantum machine learning pipeline:
+In the following picture, we showcase a full quantum machine learning pipeline:
 after defining a custom quantum circuit structure, this is executed on the chosen Qibo backend
 both for computing predictions and gradients during the optimization.
 
@@ -15,7 +15,7 @@ both for computing predictions and gradients during the optimization.
    :width: 600
    :align: center
 
-Following this structure, every single evaluation of the model, divided in the steps `circuit_structure` -> `Decoding`, takes as input classical data and outputs classical data once again.
+Following this structure, every single evaluation of the model, divided in the steps `Encoding` -> `Circuit Composition` -> `Execution` -> `Decoding`, takes as input classical data and outputs classical data once again.
 
 In ``qiboml`` we provide some standard pre-defined encoding and decoding layers, whereas the trainable part can be delegated to any ``qibo`` circuit (some standard quantum circuit ansaetze are available as well). The different pieces can be joined together through a ``qiboml`` interface, which exposes a ``QuantumModel`` object in one of the popular ML frameworks (such as ``torch`` and ``keras``).
 
