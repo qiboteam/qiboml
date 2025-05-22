@@ -175,10 +175,11 @@ class PyTorchBackend(NumpyBackend):
             # we are using sparse matrices to improve perfomances
             if self.np.backends.mkl.is_available():
                 gmatrix = gmatrix.to_sparse_csr()
-
             matrix = gmatrix @ matrix
 
-        return matrix.to_dense()
+        if self.np.backends.mkl.is_available():
+            return matrix.to_dense()
+        return matrix
 
     def matrix_parametrized(self, gate):
         """Convert a parametrized gate to its matrix representation in the computational basis."""
