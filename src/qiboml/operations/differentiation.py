@@ -118,14 +118,6 @@ class PSR(Differentiation):
                 "Parameter Shift Rule only supports expectation value decoding.",
             )
 
-        # Compute once the data map to know how input x affects the
-        # circuit gates
-        self.update_data_map(
-            circuit_structure=circuit_structure,
-            backend=backend,
-            x=x,
-        )
-
         # Construct circuit using the full circuit helper
         circuit = circuit_from_structure(
             circuit_structure=circuit_structure,
@@ -137,6 +129,13 @@ class PSR(Differentiation):
 
         gradient = []
         if wrt_inputs:
+            # Compute once the data map to know how input x affects the
+            # circuit gates
+            self.update_data_map(
+                circuit_structure=circuit_structure,
+                backend=backend,
+                x=x,
+            )
             # Compute first gradient part, wrt input data
             gradient.append(
                 backend.np.reshape(
@@ -149,12 +148,14 @@ class PSR(Differentiation):
                     (decoding.output_shape[-1], x.shape[-1]),
                 )
             )
-        else:
+        elif x is not None:
             gradient.append(
                 backend.np.zeros(
                     (decoding.output_shape[-1], x.shape[-1]), dtype=x.dtype
                 )
             )
+        else:
+            gradient.append(backend.cast([]))
 
         # compute second gradient part, wrt parameters
         for i in range(len(parameters)):

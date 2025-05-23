@@ -194,7 +194,8 @@ def eval_model(frontend, model, data, target=None):
             reduction="sum_over_batch_size",
         )
         for x in data:
-            x = frontend.tf.expand_dims(x, axis=0)
+            if x is not None:
+                x = frontend.tf.expand_dims(x, axis=0)
             outputs.append(model(x))
         outputs = frontend.tf.stack(outputs, axis=0)
     if target is not None:
@@ -429,3 +430,43 @@ def test_composition(backend, frontend):
     train_model(frontend, model, data, target, max_epochs=3)
     _, loss_trained = eval_model(frontend, model, data, target)
     assert loss_untrained > loss_trained
+
+
+def test_vqe(backend, frontend):
+    seed = 42
+    set_device(frontend)
+    set_seed(frontend, seed)
+    backend.set_seed(42)
+
+    nqubits = 2
+    dim = 2
+
+    training_layer = ans.HardwareEfficient(
+        nqubits,
+        random_subset(nqubits, dim),
+    )
+
+    decoding_qubits = random_subset(nqubits, dim)
+    decoding_layer = dec.Expectation(
+        nqubits=nqubits,
+        qubits=decoding_qubits,
+        backend=backend,
+    )
+
+    circuit_structure = [
+        training_layer,
+    ]
+    q_model = frontend.QuantumModel(
+        circuit_structure=circuit_structure,
+        decoding=decoding_layer,
+    )
+
+    data = np.array(
+        100
+        * [
+            None,
+        ]
+    )
+    target = prepare_targets(frontend, q_model, data)
+
+    backprop_test(frontend, q_model, data, target)

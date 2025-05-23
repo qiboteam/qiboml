@@ -168,12 +168,15 @@ class QuantumModelAutoGrad(torch.autograd.Function):
         ctx.decoding = decoding
         ctx.backend = backend
         ctx.differentiation = differentiation
+        dtype = getattr(backend.np, str(parameters[0].dtype).split(".")[-1])
+        ctx.dtype = dtype
 
-        # Cloning, detaching and converting to backend arrays
-        x_clone = x.clone().detach().cpu().numpy()
-        x_clone = backend.cast(x_clone, dtype=x_clone.dtype)
+        if x is not None:
+            # Cloning, detaching and converting to backend arrays
+            x_clone = x.clone().detach().cpu().numpy()
+            x_clone = backend.cast(x_clone, dtype=x_clone.dtype)
         params = [
-            backend.cast(par.clone().detach().cpu().numpy(), dtype=x_clone.dtype)
+            backend.cast(par.clone().detach().cpu().numpy(), dtype=dtype)
             for par in parameters
         ]
 
@@ -194,23 +197,33 @@ class QuantumModelAutoGrad(torch.autograd.Function):
         circuit.set_parameters(params)
         x_clone = decoding(circuit)
         x_clone = torch.as_tensor(
-            backend.to_numpy(x_clone).tolist(), dtype=x.dtype, device=x.device
+            backend.to_numpy(x_clone).tolist(),
+            dtype=parameters[0].dtype,
+            device=parameters[0].device,
         )
         return x_clone
 
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor):
         x, *parameters = ctx.saved_tensors
-        x_clone = x.clone().detach().cpu().numpy()
-        x_clone = ctx.backend.cast(x_clone, dtype=x_clone.dtype)
+        if x is not None:
+            x_clone = x.clone().detach().cpu().numpy()
+            x_clone = ctx.backend.cast(x_clone, dtype=x_clone.dtype)
+            wrt_inputs = (
+                not x.is_leaf or x.requires_grad
+            ) and ctx.differentiable_encodings
+        else:
+            x_clone = None
+            wrt_inputs = False
         params = [
-            ctx.backend.cast(par.clone().detach().cpu().numpy(), dtype=x_clone.dtype)
+            ctx.backend.cast(par.clone().detach().cpu().numpy(), dtype=ctx.dtype)
             for par in parameters
         ]
-        wrt_inputs = (not x.is_leaf or x.requires_grad) and ctx.differentiable_encodings
         grad_input, *gradients = (
             torch.as_tensor(
-                ctx.backend.to_numpy(grad).tolist(), dtype=x.dtype, device=x.device
+                ctx.backend.to_numpy(grad).tolist(),
+                dtype=parameters[0].dtype,
+                device=parameters[0].device,
             )
             for grad in ctx.differentiation.evaluate(
                 x_clone,
@@ -228,8 +241,9 @@ class QuantumModelAutoGrad(torch.autograd.Function):
         )
         # TODO: grad_output.mT when we move to batching
         gradients = torch.einsum(gradients, left_indices, grad_output.T, right_indices)
+        grad_input = grad_output @ grad_input if x is not None else None
         return (
-            grad_output @ grad_input,
+            grad_input,
             None,
             None,
             None,
