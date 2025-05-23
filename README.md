@@ -29,6 +29,7 @@ from qiboml.models.decoding import Expectation
 
 nqubits = 2
 circuit = HardwareEfficient(nqubits)
+# By default is the expectation value of a sum of Z observables, but can be set any Hamiltonian
 decoding = Expectation(nqubits)
 
 # using pytorch
