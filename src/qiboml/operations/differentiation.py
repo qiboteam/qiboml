@@ -315,8 +315,9 @@ class Jax(Differentiation):
         Returns:
             (list[ndarray]): the calculated gradients.
         """
-        x = backend.to_numpy(x)
-        x = self._jax.cast(x, self._jax.precision)
+        if x is not None:
+            x = backend.to_numpy(x)
+            x = self._jax.cast(x, self._jax.precision)
 
         circuit_structure = tuple(circuit_structure)
 
@@ -347,8 +348,9 @@ class Jax(Differentiation):
                 x, circuit_structure, decoding, *parameters
             )
         else:
+            shape = 0 if x is None else (decoding.output_shape[-1], x.shape[-1])
             gradients = (
-                self._jax.numpy.zeros((decoding.output_shape[-1], x.shape[-1])),
+                self._jax.numpy.zeros(shape),
                 self._jacobian_without_inputs(  # pylint: disable=no-member
                     x, circuit_structure, decoding, *parameters
                 ),

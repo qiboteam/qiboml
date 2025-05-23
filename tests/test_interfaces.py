@@ -123,7 +123,12 @@ def train_model(frontend, model, data, target, max_epochs=10):
             avg_grad = 0.0
             avg_loss = 0.0
             permutation = frontend.torch.randperm(len(data))
-            for x, y in zip(data[permutation], target[permutation]):
+            x_data, y_data = (
+                (data[permutation], target[permutation])
+                if all(data != None)
+                else (data, target)
+            )
+            for x, y in zip(x_data, y_data):
                 optimizer.zero_grad()
                 if x is not None:
                     loss = loss_f(model(x), y)
@@ -481,4 +486,4 @@ def test_vqe(backend, frontend):
     )
     grad = train_model(frontend, q_model, none, none)
     cost = q_model()
-    backend.assert_allclose(cost, -2.0, atol=2e-2)
+    backend.assert_allclose(float(cost), -2.0, atol=2e-2)
