@@ -125,7 +125,10 @@ def train_model(frontend, model, data, target, max_epochs=10):
             permutation = frontend.torch.randperm(len(data))
             for x, y in zip(data[permutation], target[permutation]):
                 optimizer.zero_grad()
-                loss = loss_f(model(x), y)
+                if x is not None:
+                    loss = loss_f(model(x), y)
+                else:
+                    loss = model()
                 loss.backward()
                 avg_grad += list(model.parameters())[-1].grad.norm()
                 avg_loss += loss
@@ -143,8 +146,11 @@ def train_model(frontend, model, data, target, max_epochs=10):
 
         def train_step(x, y):
             with frontend.tf.GradientTape() as tape:
-                predictions = model(x)
-                loss = loss_f(y, predictions)
+                if x is not None:
+                    predictions = model(x)
+                    loss = loss_f(y, predictions)
+                else:
+                    loss = model()
 
             gradients = tape.gradient(
                 loss, model.trainable_variables
@@ -166,15 +172,26 @@ def train_model(frontend, model, data, target, max_epochs=10):
                     self.stopped_epoch = epoch
                     self.model.stop_training = True
 
-        model.compile(loss=loss_f, optimizer=optimizer)
-        history = model.fit(
-            data,
-            target,
-            batch_size=1,
-            epochs=max_epochs,
-            callbacks=[GradientStopCallback()],
-        )
-        return history.history["grad"][-1]
+        if all(data != None):
+            model.compile(loss=loss_f, optimizer=optimizer)
+            history = model.fit(
+                data,
+                target,
+                batch_size=1,
+                epochs=max_epochs,
+                callbacks=[GradientStopCallback()],
+            )
+            return history.history["grad"][-1]
+        else:
+            for e in range(max_epochs):
+                for _ in range(len(data)):
+                    grads = train_step(None, None)
+                    optimizer.apply_gradients(zip(grads, model.trainable_variables))
+                avg_grad = frontend.tf.norm(grads)
+                print(f"-> Loss: {float(model())}, Grad: {avg_grad}")
+                if avg_grad < 1e-2:
+                    break
+            return avg_grad
 
 
 def eval_model(frontend, model, data, target=None):
@@ -440,19 +457,14 @@ def test_vqe(backend, frontend):
 
     nqubits = 2
     dim = 2
-
     training_layer = ans.HardwareEfficient(
         nqubits,
-        random_subset(nqubits, dim),
+        nlayers=4,
     )
-
-    decoding_qubits = random_subset(nqubits, dim)
     decoding_layer = dec.Expectation(
         nqubits=nqubits,
-        qubits=decoding_qubits,
         backend=backend,
     )
-
     circuit_structure = [
         training_layer,
     ]
@@ -461,12 +473,12 @@ def test_vqe(backend, frontend):
         decoding=decoding_layer,
     )
 
-    data = np.array(
+    none = np.array(
         100
         * [
             None,
         ]
     )
-    target = prepare_targets(frontend, q_model, data)
-
-    backprop_test(frontend, q_model, data, target)
+    grad = train_model(frontend, q_model, none, none)
+    cost = q_model()
+    backend.assert_allclose(cost, -2.0, atol=2e-2)
