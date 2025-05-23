@@ -177,7 +177,7 @@ def train_model(frontend, model, data, target, max_epochs=10):
                     self.stopped_epoch = epoch
                     self.model.stop_training = True
 
-        if all(data != None):
+        if data[0] != None:
             model.compile(loss=loss_f, optimizer=optimizer)
             history = model.fit(
                 data,
