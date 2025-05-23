@@ -125,7 +125,7 @@ def train_model(frontend, model, data, target, max_epochs=10):
             permutation = frontend.torch.randperm(len(data))
             x_data, y_data = (
                 (data[permutation], target[permutation])
-                if all(data != None)
+                if data[0] != None
                 else (data, target)
             )
             for x, y in zip(x_data, y_data):
