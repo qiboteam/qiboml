@@ -143,7 +143,7 @@ class QuantumModelCustomGradient:
 
     @tf.custom_gradient
     def evaluate(self, x, params):
-        x_is_not_None = len(x) != 0
+        x_is_not_None = x.shape[0] != 0
         # check whether we have to derive wrt inputs
         if x_is_not_None and tf.is_symbolic_tensor(
             x
