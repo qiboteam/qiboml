@@ -19,11 +19,12 @@ class QuantumEncoding(ABC):
     Args:
         nqubits (int): total number of qubits.
         qubits (tuple[int], optional): set of qubits it acts on, by default ``range(nqubits)``.
+        density_matrix (bool, optional): whether to build the circuit with ``density_matrix=True``, mostly useful for noisy simulations. ``density_matrix=False`` by default.
     """
 
     nqubits: int
     qubits: Optional[tuple[int]] = None
-
+    density_matrix: Optional[bool] = False
     _circuit: Circuit = None
 
     def __post_init__(
@@ -33,16 +34,21 @@ class QuantumEncoding(ABC):
         self.qubits = (
             tuple(range(self.nqubits)) if self.qubits is None else tuple(self.qubits)
         )
-
-        self._circuit = Circuit(self.nqubits)
-        # Dictionary which helps to map each data component into a gate in the circuit
+        self._circuit = Circuit(self.nqubits, density_matrix=self.density_matrix)
 
     @cached_property
     def _data_to_gate(self):
-        raise_error(
-            NotImplementedError,
-            f"_data_to_gate method is not implemented for encoding {self}.",
-        )
+        """
+        Mapping between the index of the input and the indices of the gates in the
+        produced encoding circuit queue, where the input is encoded to.
+        For instance, {0: [0,2], 1: [2]}, represents an encoding where the element
+        0 of the inputs enters the gates with indices 0 and 2 of the queue, whereas
+        the element 1 of the input affects only the the gate in position 2 of the
+        queue.
+        By deafult, the map reproduces a simple encoding where the
+        i-th component of the data is uploaded in the i-th gate of the queue.
+        """
+        return {f"{i}": [i] for i in range(len(self.qubits))}
 
     @abstractmethod
     def __call__(self, x: ndarray) -> Circuit:
@@ -88,15 +94,6 @@ class PhaseEncoding(QuantumEncoding):
             raise NotImplementedError(
                 f"{self} currently support only gates with one parameter."
             )
-
-    @cached_property
-    def _data_to_gate(self):
-        """
-        Associate each data component with its index in the gates queue.
-        In this case, the correspondence it's simply that the i-th component
-        of the data is uploaded in the i-th gate of the queue.
-        """
-        return {f"{i}": [i] for i in range(len(self.qubits))}
 
     def __call__(self, x: ndarray) -> Circuit:
         """Construct the circuit encoding the ``x`` data in the chosen encoding gate.

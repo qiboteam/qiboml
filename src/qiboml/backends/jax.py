@@ -2,6 +2,8 @@ from functools import partial
 
 import jax
 import jax.numpy as jnp  # pylint: disable=import-error
+import numpy as np
+from jax.experimental import sparse
 from qibo import __version__
 from qibo.backends import einsum_utils
 from qibo.backends.npmatrices import NumpyMatrices
@@ -110,6 +112,41 @@ class JaxBackend(NumpyBackend):
             range(len(probabilities)), size=nshots, p=probabilities
         )
 
+    def matrix_fused(self, fgate):
+        rank = len(fgate.target_qubits)
+        # jax only supports coo sparse arrays
+        # however they are probably not as efficient as csr ones
+        # indeed using dense arrays instead of coo ones proved to be significantly faster
+        matrix = self.np.eye(2**rank)
+
+        for gate in fgate.gates:
+            gmatrix = gate.matrix(self)
+            # add controls if controls were instantiated using
+            # the ``Gate.controlled_by`` method
+            num_controls = len(gate.control_qubits)
+            if num_controls > 0:
+                gmatrix = self.jax.scipy.linalg.block_diag(
+                    self.np.eye(2 ** len(gate.qubits) - len(gmatrix)), gmatrix
+                )
+            # Kronecker product with identity is needed to make the
+            # original matrix have shape (2**rank x 2**rank)
+            eye = self.np.eye(2 ** (rank - len(gate.qubits)))
+            gmatrix = self.np.kron(gmatrix, eye)
+            # Transpose the new matrix indices so that it targets the
+            # target qubits of the original gate
+            original_shape = gmatrix.shape
+            gmatrix = self.np.reshape(gmatrix, 2 * rank * (2,))
+            qubits = list(gate.qubits)
+            indices = qubits + [q for q in fgate.target_qubits if q not in qubits]
+            indices = np.argsort(indices)
+            transpose_indices = list(indices)
+            transpose_indices.extend(indices + rank)
+            gmatrix = self.np.transpose(gmatrix, transpose_indices)
+            gmatrix = self.np.reshape(gmatrix, original_shape)
+            matrix = gmatrix @ matrix
+
+        return matrix
+
     def zero_state(self, nqubits):
         state = self.np.zeros(2**nqubits, dtype=self.dtype)
         state = state.at[0].set(1)
@@ -135,6 +172,12 @@ class JaxBackend(NumpyBackend):
         res, counts = self.np.unique(samples, return_counts=True)
         frequencies = frequencies.at[res].add(counts)
         return frequencies
+
+    def matrix(self, gate):
+        matrix = super().matrix(gate)
+        if isinstance(matrix, self.jax.core.Tracer):
+            delattr(self.matrices, gate.__class__.__name__)
+        return matrix
 
     def apply_gate(self, gate, state, nqubits):
         if gate.is_controlled_by:

@@ -34,7 +34,7 @@ To define a custom encoder, ``qiboml`` handily provides an abstract :py:class:`q
         super().__init__(nqubits)
 
         self.x1_qubits = self.qubits[:n1]
-        self.x2_qubits = self.qubits[(nqubits - n2):]
+        self.x2_qubits = self.qubits[n1:]
 
     def __call__(self, x: "ndarray") -> "Circuit":
 
@@ -73,7 +73,9 @@ The abstract :py:meth:`qiboml.models.encoding.QuantumEncoding` provides a proper
 
 Keep in mind that, when ``differentiable`` is set to ``False``, all the gradients of the ``QuantumModel`` with respect to the inputs :math:`x` are going to automatically set to zero in the differentiation step.
 
-Finally, there is an important property we have to set to allow the computation of gradients with respect to inputs in case hardware-compatible methods are chosen (parameter shift rule). We refer to the ``._data_to_gate`` method, where an ``encoding_map`` has to be defined in the form of a dictionary, where the keys are the indices corresponding to the components of the data and the value for each key is a list of integer numbers, corresponding to the list of gates where the target component of the data is encoded.
+Finally, there is an important property we have to set to allow for the computation of gradients with respect to inputs in case a hardware-compatible method is used (namely, the Parameter Shift Rule :py:class:`qiboml.operations.differentiation.PSR`). This is the ``._data_to_gate`` method, which defines an ``encoding_map`` in the form of a dictionary, where the keys are the indices of the components of the input data and the value for each key is a list of integers, that specifies the indices of the gates in the generated circuit where that input entered. Therefore, for instance, a ``{0: [0,1], 1: [1,2]}`` dictionary indicates that the first component of the input data is loaded in the first two gates of the circuit (gate ``0`` and gate ``1``), whereas the second component of ``x`` affects the second and third gates (gate ``1`` and gate ``2``).
+
+Hence, in our case the ``_data_to_gate`` method reads:
 
 .. code::
 
@@ -89,7 +91,7 @@ Finally, there is an important property we have to set to allow the computation 
             "1": self.x2_qubits,
         }
 
-On this way, we allow the custom differentiation rules to reconstruct the derivatives of any expectation value w.r.t. input data.
+This way, we allow the :py:class:`qiboml.operations.differentiation.PSR` to properly recombine all the derivatives that are associated to the same input spread across different gates.
 
 Trainable encoding layers
 =========================
