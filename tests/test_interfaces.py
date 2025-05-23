@@ -1,17 +1,18 @@
 import inspect
+import os
 import random
 
 import numpy as np
 import pytest
-from qibo import gates, hamiltonians
+from qibo import construct_backend, gates, hamiltonians
 from qibo.config import raise_error
 from qibo.noise import NoiseModel, PauliError
 from qibo.symbols import Z
+from qibo.transpiler import NativeGates, Passes, Unroller
 
 import qiboml.models.ansatze as ans
 import qiboml.models.decoding as dec
 import qiboml.models.encoding as enc
-from qiboml.operations.differentiation import PSR
 
 
 def get_layers(module, layer_type=None):
@@ -405,11 +406,15 @@ def test_composition(backend, frontend):
     nqubits = 2
     encoding_layer = random.choice(ENCODING_LAYERS)(nqubits)
     training_layer = ans.HardwareEfficient(nqubits)
-    decoding_layer = random.choice(DECODING_LAYERS)(
+    decoding_layer = random.choice(
+        list(set(DECODING_LAYERS) - {dec.Samples, dec.State})
+    )(
         nqubits, backend=backend
     )  # make sure it's not Samples
 
-    activation = build_activation(frontend, binary=False)
+    activation = build_activation(
+        frontend, binary=encoding_layer.__class__.__name__ == "BinaryEncoding"
+    )
     model = build_sequential_model(
         frontend,
         [
@@ -480,3 +485,51 @@ def test_noise(backend, frontend):
     train_model(frontend, noisy_model, data, target, max_epochs=1)
     _, noisy_loss = eval_model(frontend, noisy_model, data, target)
     assert noisy_loss > loss
+
+
+def test_qibolab(frontend):
+    try:
+        from qibolab import create_platform
+    except ImportError:
+        pytest.skip("qibolab not installed.")
+
+    os.environ["QIBOLAB_PLATFORMS"] = "tests/"
+    platform = create_platform("emulator")
+    backend = construct_backend("qibolab", platform=platform)
+    transpiler = Passes(
+        connectivity=backend.platform.pairs, passes=[Unroller(NativeGates.default())]
+    )
+
+    set_device(frontend)
+    set_seed(frontend, 42)
+
+    nqubits = 1
+    encoding_layer = enc.PhaseEncoding(nqubits)
+    training_layer = ans.HardwareEfficient(nqubits)
+    decoding_layer = dec.Expectation(
+        nqubits, backend=backend, transpiler=transpiler, nshots=1000
+    )
+
+    activation = build_activation(
+        frontend, binary=encoding_layer.__class__.__name__ == "BinaryEncoding"
+    )
+    model = build_sequential_model(
+        frontend,
+        [
+            build_linear_layer(frontend, 1, nqubits),
+            activation,
+            frontend.QuantumModel(
+                circuit_structure=[encoding_layer, training_layer],
+                decoding=decoding_layer,
+            ),
+            build_linear_layer(frontend, decoding_layer.output_shape[-1], 1),
+        ],
+    )
+    setattr(model, "decoding", decoding_layer)
+
+    data = random_tensor(frontend, (10, 1))
+    target = prepare_targets(frontend, model, data)
+    _, loss_untrained = eval_model(frontend, model, data, target)
+    train_model(frontend, model, data, target, max_epochs=1)
+    _, loss_trained = eval_model(frontend, model, data, target)
+    assert loss_untrained > loss_trained
