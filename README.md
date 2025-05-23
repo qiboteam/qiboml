@@ -51,11 +51,11 @@ import qiboml.interfaces.keras as ks
 ks_model = ks.QuantumModel(circuit_structure=[circuit,], decoding=decoding)
 optimizer = keras.optimizers.Adam(lr=0.05)
 for iteration in range(100):
-    with tf.GradientTape() as tape:
-        cost = ks_model(x)
+	with tf.GradientTape() as tape:
+		cost = ks_model(x)
 	gradients = tape.gradient(
-        cost, ks_model.trainable_variables
-    )
+		cost, ks_model.trainable_variables
+	)
 	optimizer.apply_gradients(zip(gradients, ks_model.trainable_variables))
 ```
 
