@@ -7,58 +7,57 @@ For instance, basic examples of this can be found in the :py:class:`qiboml.model
 
 Hence, broadly speaking, the quantum `Encoder` is a function :math:`f_e: \mathbf{x}\in\mathbb{R}^n \rightarrow C` that maps an input array of :math:`n` floats :math:`\mathbf{x}`, be it a ``torch.Tensor`` for the :py:class:`qiboml.interfaces.pytorch.QuantumModel` or a ``tensorflow.Tensor`` for the :py:class:`qiboml.interfaces.keras.QuantumModel`, to an instance of a ``qibo.Circuit`` :math:`C`.
 
-To define a custom encoder, ``qiboml`` handily provides an abstract :py:class:`qiboml.models.encoding.QuantumEncoding` class to inherit from. Let's say for example, that we had some heterogeneous data consisting of both real :math:`x_{\rm real}` and binary :math:`x_{\rm bin}` data stacked on top of each other in a single array
-
-.. math::
-
-   \mathbf{x} = x_{\rm real} \lvert x_{\rm bin}\;.
-
-To encode at the same time these two type of data we could define a mixture of the :py:class:`qiboml.models.encoding.BinaryEncoding` and  :py:class:`qiboml.models.encoding.PhaseEncoding` encoders:
+To define a custom encoder, ``qiboml`` handily provides an abstract :py:class:`qiboml.models.encoding.QuantumEncoding` class to inherit from. Let's say, for example, that we want to encode two-dimensional data ``x`` in our model and, for some reasons, we want our model to be more sensitive to the first variable (``x[0]``). To do so, we may be interested in constructing an encoder where ``x[0]`` is uploaded $n_1$ times, while ``x[1]`` is uploaded $n_2<n_1$ times.
 
 .. testcode::
 
-   import numpy as np
-   from qibo import gates
-   from qiboml.models.encoding import QuantumEncoding
+    from functools import cached_property
+    import numpy as np
+    from qibo import gates
+    from qiboml.models.encoding import QuantumEncoding
 
-   class HeterogeneousEncoder(QuantumEncoding):
+    class CustomEncoder(QuantumEncoding):
 
-       def __init__(self, nqubits: int, real_part_len: int, bin_part_len: int):
-           if real_part_len + bin_part_len != nqubits:
-	       raise RuntimeError(
-	       "``real_part_len`` and ``bin_part_len`` don't sum to ``nqubits``."
-	       )
+    def __init__(self, nqubits: int, n1: int, n2: int):
+        """
+        Custom encoder where the first component of a two-dimensional data
+        is uploaded ``n1`` times and the second component is uploaded ``n2`` times.
+        """
+        if n1 + n2 != nqubits:
+            raise RuntimeError(
+            "``n1`` and ``n2`` don't sum to ``nqubits``."
+            )
 
-	   # use the general setup for a QuantumEncoding layer
-	   # which mainly initialize an empty n-qubits circuit (self.circuit)
-	   # and the set of qubits it insists on (by default self.qubits=range(nqubits))
-	   super().__init__(nqubits)
+        # use the general setup for a QuantumEncoding layer
+        # which mainly initialize an empty n-qubits circuit (self.circuit)
+        # and the set of qubits it insists on (by default self.qubits=range(nqubits))
+        super().__init__(nqubits)
 
-	   self.real_qubits = self.qubits[:real_part_len]
-	   self.bin_qubits = self.qubits[real_part_len:]
+        self.x1_qubits = self.qubits[:n1]
+        self.x2_qubits = self.qubits[n1:]
 
-       def __call__(self, x: "ndarray") -> "Circuit":
-           # check that the data is binary
-           if not all((x[1] == 0) | (x[1] == 1)):
-	       raise RuntimeError("Received non binary data")
+    def __call__(self, x: "ndarray") -> "Circuit":
 
-	   # copy the internal circuit as we don't want to modify that
-	   # every time a new input is processed
-           circuit = self.circuit.copy()
+        if len(x) != 2:
+            raise ValueError(
+            f"Data dimension is expected to be 2 in this custom encoder, while the received one is {len(x)}."
+            )
 
-	   # encode the real data
-	   # the first row of x contains the real data
-           for qubit, value in zip(self.real_qubits, x[0]):
-               circuit.add(gates.RY(qubit, theta=value, trainable=False))
+        # copy the internal circuit as we don't want to modify that
+        # every time a new input is processed
+        circuit = self.circuit.copy()
 
-	   # encode the binary data
-	   # the second row contains the binary data
-	   for qubit, bit in zip(self.bin_qubits, x[1]):
-               circuit.add(gates.RX(qubit, theta=bit * np.pi, trainable=False))
+        # encode the first component n1 times
+        for qubit in self.x1_qubits:
+            circuit.add(gates.RY(qubit, theta=x[0], trainable=False))
 
-           return circuit
+        # encode the second component n2 times
+        for qubit in self.x2_qubits:
+            circuit.add(gates.RY(qubit, theta=x[1], trainable=False))
 
-This way we have defined our custom layer that encodes the real data in the first ``real_part_len`` qubits of a quantum circuit, and the binary data in the second ``bin_part_len`` qubits.
+        return circuit
+
+This way we have defined our custom layer that encodes the first and the second component of a given two-dimensional data into respectively $n_1$ and $n_2$ gates.
 
 In addition to this, we can optionally specify whether our custom encoder is differentiable or not. Namely, whether to calculate the derivatives with respect to its inputs upon differentiation. This is useful mostly for the sake of backpropagating the gradients to other layers that are found before the ``QuantumModel``, if any, which thus will compose their own gradients with the one coming from the ``QuantumModel``. As it will be discussed in more detail in the next section, this is crucial, for instance, to build trainable encoding layers.
 
@@ -73,6 +72,26 @@ The abstract :py:meth:`qiboml.models.encoding.QuantumEncoding` provides a proper
        return False
 
 Keep in mind that, when ``differentiable`` is set to ``False``, all the gradients of the ``QuantumModel`` with respect to the inputs :math:`x` are going to automatically set to zero in the differentiation step.
+
+Finally, there is an important property we have to set to allow for the computation of gradients with respect to inputs in case a hardware-compatible method is used (namely, the Parameter Shift Rule :py:class:`qiboml.operations.differentiation.PSR`). This is the ``._data_to_gate`` method, which defines an ``encoding_map`` in the form of a dictionary, where the keys are the indices of the components of the input data and the value for each key is a list of integers, that specifies the indices of the gates in the generated circuit where that input entered. Therefore, for instance, a ``{0: [0,1], 1: [1,2]}`` dictionary indicates that the first component of the input data is loaded in the first two gates of the circuit (gate ``0`` and gate ``1``), whereas the second component of ``x`` affects the second and third gates (gate ``1`` and gate ``2``).
+
+Hence, in our case the ``_data_to_gate`` method reads:
+
+.. code::
+
+    @cached_property
+    def _data_to_gate(self):
+        """
+        Associate each data component with its index in the gates queue.
+        In this case, we will follow the presented strategy, namely encoding ``x[0]``
+        into the first ``n1`` qubits and ``x[1]`` in the second ``n2`` qubits.
+        """
+        return {
+            "0": self.x1_qubits,
+            "1": self.x2_qubits,
+        }
+
+This way, we allow the :py:class:`qiboml.operations.differentiation.PSR` to properly recombine all the derivatives that are associated to the same input spread across different gates.
 
 Trainable encoding layers
 =========================
