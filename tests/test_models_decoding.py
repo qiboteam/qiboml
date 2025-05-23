@@ -3,6 +3,7 @@ import pytest
 from qibo import gates, hamiltonians
 from qibo.quantum_info import random_clifford
 from qibo.symbols import Z
+from qibo.transpiler import NativeGates, Passes, Sabre, Unroller
 
 import qiboml.models.decoding as dec
 
@@ -62,3 +63,14 @@ def test_expectation_layer(backend, nshots, observable):
         )
     )
     backend.assert_allclose(layer_expv, expv)
+
+
+def test_decoding_with_transpiler(backend):
+    rng = np.random.default_rng(42)
+    backend.set_seed(42)
+    c = random_clifford(3, seed=rng, backend=backend)
+    transpiler = Passes(
+        connectivity=[[0, 1], [0, 2]], passes=[Unroller(NativeGates.default(), Sabre())]
+    )
+    layer = dec.Probabilities(3, transpiler=transpiler, backend=backend)
+    backend.assert_allclose(backend.execute_circuit(c).probabilities(), layer(c))

@@ -1,11 +1,12 @@
 from dataclasses import dataclass
-from typing import Union
+from typing import Optional, Union
 
-from qibo import Circuit, gates
+from qibo import Circuit, gates, transpiler
 from qibo.backends import Backend, _check_backend
 from qibo.config import raise_error
 from qibo.hamiltonians import Hamiltonian, Z
 from qibo.result import CircuitResult, MeasurementOutcomes, QuantumState
+from qibo.transpiler import Passes
 
 from qiboml import ndarray
 
@@ -20,12 +21,15 @@ class QuantumDecoding:
         qubits (tuple[int], optional): set of qubits it acts on, by default ``range(nqubits)``.
         nshots (int, optional): number of shots used for circuit execution and sampling.
         backend (Backend, optional): backend used for computation, by default the globally-set backend is used.
+        transpiler (Passes, optional): transpiler to run before circuit execution, by default no transpilation
+                                       is performed on the circuit (``transpiler=None``).
     """
 
     nqubits: int
-    qubits: tuple[int] = None
-    nshots: int = None
-    backend: Backend = None
+    qubits: Optional[tuple[int]] = None
+    nshots: Optional[int] = None
+    backend: Optional[Backend] = None
+    transpiler: Optional[Passes] = None
     _circuit: Circuit = None
 
     def __post_init__(self):
@@ -48,6 +52,8 @@ class QuantumDecoding:
         Returns:
             (CircuitResult | QuantumState | MeasurementOutcomes): the execution ``qibo.result`` object.
         """
+        if self.transpiler is not None:
+            x, _ = self.transpiler(x)
         return self.backend.execute_circuit(x + self._circuit, nshots=self.nshots)
 
     @property
@@ -134,7 +140,7 @@ class Expectation(QuantumDecoding):
     def __post_init__(self):
         """Ancillary post initialization operations."""
         if self.observable is None:
-            self.observable = Z(self.nqubits, dense=False, backend=self.backend)
+            self.observable = Z(self.nqubits, dense=True, backend=self.backend)
         super().__post_init__()
 
     def __call__(self, x: Circuit) -> ndarray:

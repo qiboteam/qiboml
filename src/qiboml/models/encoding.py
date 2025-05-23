@@ -39,10 +39,17 @@ class QuantumEncoding(ABC):
 
     @cached_property
     def _data_to_gate(self):
-        raise_error(
-            NotImplementedError,
-            f"_data_to_gate method is not implemented for encoding {self}.",
-        )
+        """
+        Mapping between the index of the input and the indices of the gates in the
+        produced encoding circuit queue, where the input is encoded to.
+        For instance, {0: [0,2], 1: [2]}, represents an encoding where the element
+        0 of the inputs enters the gates with indices 0 and 2 of the queue, whereas
+        the element 1 of the input affects only the the gate in position 2 of the
+        queue.
+        By deafult, the map reproduces a simple encoding where the
+        i-th component of the data is uploaded in the i-th gate of the queue.
+        """
+        return {f"{i}": [i] for i in range(len(self.qubits))}
 
     @abstractmethod
     def __call__(self, x: ndarray) -> Circuit:
@@ -88,15 +95,6 @@ class PhaseEncoding(QuantumEncoding):
             raise NotImplementedError(
                 f"{self} currently support only gates with one parameter."
             )
-
-    @cached_property
-    def _data_to_gate(self):
-        """
-        Associate each data component with its index in the gates queue.
-        In this case, the correspondence it's simply that the i-th component
-        of the data is uploaded in the i-th gate of the queue.
-        """
-        return {f"{i}": [i] for i in range(len(self.qubits))}
 
     def __call__(self, x: ndarray) -> Circuit:
         """Construct the circuit encoding the ``x`` data in the chosen encoding gate.

@@ -122,7 +122,6 @@ class TensorflowBackend(NumpyBackend):
         if self.tf.is_symbolic_tensor(npmatrix):
             delattr(self.matrices, gate.__class__.__name__)
         return npmatrix
-        # return self.tf.cast(npmatrix, dtype=self.dtype)
 
     def matrix_parametrized(self, gate):
         npmatrix = super().matrix_parametrized(gate)
