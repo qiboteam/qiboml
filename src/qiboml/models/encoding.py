@@ -19,11 +19,12 @@ class QuantumEncoding(ABC):
     Args:
         nqubits (int): total number of qubits.
         qubits (tuple[int], optional): set of qubits it acts on, by default ``range(nqubits)``.
+        density_matrix (bool, optional): whether to build the circuit with ``density_matrix=True``, mostly useful for noisy simulations. ``density_matrix=False`` by default.
     """
 
     nqubits: int
     qubits: Optional[tuple[int]] = None
-
+    density_matrix: Optional[bool] = False
     _circuit: Circuit = None
 
     def __post_init__(
@@ -33,9 +34,7 @@ class QuantumEncoding(ABC):
         self.qubits = (
             tuple(range(self.nqubits)) if self.qubits is None else tuple(self.qubits)
         )
-
-        self._circuit = Circuit(self.nqubits)
-        # Dictionary which helps to map each data component into a gate in the circuit
+        self._circuit = Circuit(self.nqubits, density_matrix=self.density_matrix)
 
     @cached_property
     def _data_to_gate(self):

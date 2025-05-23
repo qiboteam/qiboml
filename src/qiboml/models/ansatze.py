@@ -1,16 +1,20 @@
 import random
+from typing import Optional
 
 import numpy as np
 from qibo import Circuit, gates
 
 
 def HardwareEfficient(
-    nqubits: int, qubits: list[int] = None, nlayers: int = 1
+    nqubits: int,
+    qubits: list[int] = None,
+    nlayers: int = 1,
+    density_matrix: Optional[bool] = False,
 ) -> Circuit:
     if qubits is None:
         qubits = list(range(nqubits))
 
-    circuit = Circuit(nqubits)
+    circuit = Circuit(nqubits, density_matrix=density_matrix)
 
     for _ in range(nlayers):
         for q in qubits:

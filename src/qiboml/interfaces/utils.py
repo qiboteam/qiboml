@@ -41,12 +41,13 @@ def circuit_from_structure(
             "x cannot be None when encoding layers are present in the circuit structure."
         )
 
-    circuit = Circuit(circuit_structure[0].nqubits)
+    circuit = Circuit(
+        circuit_structure[0].nqubits, density_matrix=circuit_structure[0].density_matrix
+    )
     for circ in circuit_structure:
         if isinstance(circ, QuantumEncoding):
-            circuit += circ(x)
-        else:
-            circuit += circ
+            circ = circ(x)
+        circuit += circ
     return circuit
 
 
@@ -99,3 +100,13 @@ def draw_circuit(circuit_structure, backend, plt_drawing=True, **plt_kwargs):
     else:
         circuit.draw()
         return str(circuit)
+
+
+def _uniform_circuit_structure_density_matrix(circuit_structure):
+    """
+    Align the ``density_matrix`` attribute of all circuits composing the circuit structure.
+    Namely, setting them to ``True`` if at least one component of the circuit has ``density_matrix==True``.
+    """
+    density_matrix = any(circ.density_matrix for circ in circuit_structure)
+    for circ in circuit_structure:
+        circ.density_matrix = density_matrix

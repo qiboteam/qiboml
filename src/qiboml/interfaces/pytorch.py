@@ -48,9 +48,9 @@ class QuantumModel(torch.nn.Module):
 
         if isinstance(self.circuit_structure, Circuit):
             self.circuit_structure = [self.circuit_structure]
+        utils._uniform_circuit_structure_density_matrix(self.circuit_structure)
 
         params = utils.get_params_from_circuit_structure(self.circuit_structure)
-
         params = torch.as_tensor(self.backend.to_numpy(x=params)).ravel()
         params.requires_grad = True
         self.circuit_parameters = torch.nn.Parameter(params)
@@ -179,7 +179,9 @@ class QuantumModelAutoGrad(torch.autograd.Function):
 
         # Build the temporary circuit from the circuit structure.
         ctx.differentiable_encodings = True
-        circuit = Circuit(decoding.nqubits)
+        circuit = Circuit(
+            decoding.nqubits, density_matrix=circuit_structure[0].density_matrix
+        )
         for circ in circuit_structure:
             if isinstance(circ, QuantumEncoding):
                 circuit += circ(x_clone)
