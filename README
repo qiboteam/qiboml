@@ -13,9 +13,9 @@ keeping the same high-level language proposed by the most used libraries (Pytorc
 
 ### Documentation
 
-[![docs](https://github.com/qiboteam/qibo/actions/workflows/publish.yml/badge.svg)](https://qibo.science/qibo/stable/)
+[![docs](https://github.com/qiboteam/qiboml/actions/workflows/publish.yml/badge.svg)](https://qibo.science/qiboml/stable/)
 
-📖 The Qiboml documentation can be found in our [organization webpage](https://qibo.science/qibo/stable/).
+📖 The Qiboml documentation can be found in our [organization webpage](https://qibo.science/qiboml/stable/).
 
 
 ### Minimum working example
