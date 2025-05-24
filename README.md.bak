@@ -29,7 +29,6 @@ from qiboml.models.decoding import Expectation
 
 nqubits = 2
 circuit = HardwareEfficient(nqubits)
-# By default is the expectation value of a sum of Z observables, but can be set any Hamiltonian
 decoding = Expectation(nqubits)
 
 # using pytorch
@@ -52,14 +51,83 @@ import qiboml.interfaces.keras as ks
 ks_model = ks.QuantumModel(circuit_structure=[circuit,], decoding=decoding)
 optimizer = keras.optimizers.Adam(lr=0.05)
 for iteration in range(100):
-	with tf.GradientTape() as tape:
-		cost = ks_model(x)
-	gradients = tape.gradient(
-		cost, ks_model.trainable_variables
-	)
-	optimizer.apply_gradients(zip(gradients, ks_model.trainable_variables))
+    with tf.GradientTape() as tape:
+        cost = ks_model(x)
+	 gradients = tape.gradient(
+         cost, ks_model.trainable_variables
+     )
+	 optimizer.apply_gradients(zip(gradients, ks_model.trainable_variables))
 ```
 
+
+```python
+from qibo import set_backend
+from qibo.hamiltonians import XXZ
+
+# We select the pytorch backend provided by Qiboml
+set_backend(backend="qiboml", platform="pytorch")
+
+# Fix the size of the problem
+nqubits = 5
+
+hamiltonian = XXZ(nqubits=nqubits, delta=0.5)
+```
+
+Then, we can construct our model building a parametrized quantum circuit. Any Qibo
+circuit is supported, but we use here a pre-computed ansatz from Qiboml directly.
+
+```python
+from qiboml.models.ansatze import HardwareEfficient
+
+# It is a layered ansatz, namely a circuit where we repeat some sequences of gates
+circuit = HardwareEfficient(nqubits=nqubits, nlayers=3)
+```
+
+Now we need a decoding strategy, to process the state prepared by `circuit`.
+Since our goal is to train a VQE, our decoding strategy will be computing the
+expectation value of the target Hamiltonian over the state prepared by `circuit`, and
+we will train the parameters of the model to minimize it.
+
+```python
+from qiboml.models.decoding import Expectation
+
+decoding = Expectation(
+    nqubits=nqubits,
+    observable=hamiltonian,
+)
+```
+
+Now that all the pieces are prepared, we can build the quantum model.
+
+```python
+# We take the one implemented to be integrated within a Pytorch interface
+# but in an equivalent way, a similar model can be imported for Tensorflow
+from qiboml.interfaces.pytorch import QuantumModel
+
+qmodel = QuantumModel(
+    circuit_structure=circuit,
+    decoding=decoding,
+)
+```
+
+The circuit structure for our VQE is very simple, but more in general it can be
+any sequence of Qibo circuits and Qiboml encoders.
+
+We are finally ready to train it! From now on, everything is pure Pytorch 🤙
+
+```python
+import pytorch.optim as optim
+
+# Select the optimizer
+optimizer = optim.Adam(qmodel.parameters(), lr=0.05)
+
+# And train!
+for iteration in range(300):
+    optimizer.zero_grad()
+    cost = qmodel()
+    cost.backward()
+    optimizer.step()
+```
 
 ### Citation policy
 
