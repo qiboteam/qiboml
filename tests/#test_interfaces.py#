@@ -113,10 +113,10 @@ def random_tensor(frontend, shape, binary=False):
     return tensor
 
 
-def train_model(frontend, model, data, target, max_epochs=5):
+def train_model(frontend, model, data, target, max_epochs=10):
     if frontend.__name__ == "qiboml.interfaces.pytorch":
 
-        optimizer = frontend.torch.optim.Adam(model.parameters(), lr=0.1)
+        optimizer = frontend.torch.optim.Adam(model.parameters())
         loss_f = frontend.torch.nn.MSELoss()
 
         avg_grad, ep = 1.0, 0
@@ -141,14 +141,14 @@ def train_model(frontend, model, data, target, max_epochs=5):
                 avg_loss += loss
                 optimizer.step()
             avg_grad /= len(data)
-            print(f"avg grad: {avg_grad}, avg loss: {avg_loss/len(data)}")
+            print(f"avg grad: {avg_grad}, avg loss: {float(avg_loss/len(data))}")
             if avg_grad < 1e-2:
                 break
 
         return avg_grad / len(data)
 
     elif frontend.__name__ == "qiboml.interfaces.keras":
-        optimizer = frontend.keras.optimizers.Adam(learning_rate=0.1)
+        optimizer = frontend.keras.optimizers.Adam()
         loss_f = frontend.keras.losses.MeanSquaredError()
 
         def train_step(x, y):
@@ -452,10 +452,10 @@ def test_composition(backend, frontend):
     )
     setattr(model, "decoding", decoding_layer)
 
-    data = random_tensor(frontend, (50, 1))
+    data = random_tensor(frontend, (100, 1))
     target = prepare_targets(frontend, model, data)
     _, loss_untrained = eval_model(frontend, model, data, target)
-    train_model(frontend, model, data, target, max_epochs=5)
+    train_model(frontend, model, data, target, max_epochs=3)
     _, loss_trained = eval_model(frontend, model, data, target)
     assert loss_untrained > loss_trained
 
@@ -466,18 +466,15 @@ def test_vqe(backend, frontend):
     set_seed(frontend, seed)
     backend.set_seed(42)
 
-    tfim = hamiltonians.TFIM(nqubits=2, backend=backend)
-
     nqubits = 2
     dim = 2
     training_layer = ans.HardwareEfficient(
         nqubits,
-        nlayers=2,
+        nlayers=4,
     )
     decoding_layer = dec.Expectation(
         nqubits=nqubits,
         backend=backend,
-        observable=tfim,
     )
     circuit_structure = [
         training_layer,
@@ -488,14 +485,14 @@ def test_vqe(backend, frontend):
     )
 
     none = np.array(
-        5
+        100
         * [
             None,
         ]
     )
-    grad = train_model(frontend, q_model, none, none, max_epochs=10)
+    grad = train_model(frontend, q_model, none, none)
     cost = q_model()
-    backend.assert_allclose(float(cost), -2.0, atol=5e-2)
+    backend.assert_allclose(float(cost), -2.0, atol=2e-2)
 
 
 def test_noise(backend, frontend):
