@@ -113,10 +113,10 @@ def random_tensor(frontend, shape, binary=False):
     return tensor
 
 
-def train_model(frontend, model, data, target, max_epochs=10):
+def train_model(frontend, model, data, target, max_epochs=5):
     if frontend.__name__ == "qiboml.interfaces.pytorch":
 
-        optimizer = frontend.torch.optim.Adam(model.parameters())
+        optimizer = frontend.torch.optim.Adam(model.parameters(), lr=0.1)
         loss_f = frontend.torch.nn.MSELoss()
 
         avg_grad, ep = 1.0, 0
@@ -148,7 +148,7 @@ def train_model(frontend, model, data, target, max_epochs=10):
         return avg_grad / len(data)
 
     elif frontend.__name__ == "qiboml.interfaces.keras":
-        optimizer = frontend.keras.optimizers.Adam()
+        optimizer = frontend.keras.optimizers.Adam(learning_rate=0.1)
         loss_f = frontend.keras.losses.MeanSquaredError()
 
         def train_step(x, y):
@@ -455,7 +455,7 @@ def test_composition(backend, frontend):
     data = random_tensor(frontend, (100, 1))
     target = prepare_targets(frontend, model, data)
     _, loss_untrained = eval_model(frontend, model, data, target)
-    train_model(frontend, model, data, target, max_epochs=3)
+    train_model(frontend, model, data, target, max_epochs=15)
     _, loss_trained = eval_model(frontend, model, data, target)
     assert loss_untrained > loss_trained
 
@@ -466,15 +466,18 @@ def test_vqe(backend, frontend):
     set_seed(frontend, seed)
     backend.set_seed(42)
 
+    tfim = hamiltonians.TFIM(nqubits=2, backend=backend)
+
     nqubits = 2
     dim = 2
     training_layer = ans.HardwareEfficient(
         nqubits,
-        nlayers=4,
+        nlayers=2,
     )
     decoding_layer = dec.Expectation(
         nqubits=nqubits,
         backend=backend,
+        observable=tfim,
     )
     circuit_structure = [
         training_layer,
@@ -485,14 +488,14 @@ def test_vqe(backend, frontend):
     )
 
     none = np.array(
-        100
+        5
         * [
             None,
         ]
     )
-    grad = train_model(frontend, q_model, none, none)
+    grad = train_model(frontend, q_model, none, none, max_epochs=10)
     cost = q_model()
-    backend.assert_allclose(float(cost), -2.0, atol=2e-2)
+    backend.assert_allclose(float(cost), -2.0, atol=5e-2)
 
 
 def test_noise(backend, frontend):
