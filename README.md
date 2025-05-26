@@ -8,7 +8,7 @@
 allowing the definition and usage of quantum or hybrid classical-quantum models
 keeping the same high-level language proposed by the most used libraries (Pytorch, Tensorflow).
 
-![qiboml](https://github.com/user-attachments/assets/c88fd9a7-2511-4672-a911-5d8937dc5d08)
+![qiboml](https://github.com/user-attachments/assets/5baba39f-fffc-43db-8080-f8acad340c63)
 
 
 ### Documentation
