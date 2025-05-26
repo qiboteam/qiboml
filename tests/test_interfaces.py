@@ -113,10 +113,10 @@ def random_tensor(frontend, shape, binary=False):
     return tensor
 
 
-def train_model(frontend, model, data, target, max_epochs=10):
+def train_model(frontend, model, data, target, max_epochs=5):
     if frontend.__name__ == "qiboml.interfaces.pytorch":
 
-        optimizer = frontend.torch.optim.Adam(model.parameters())
+        optimizer = frontend.torch.optim.Adam(model.parameters(), lr=0.1)
         loss_f = frontend.torch.nn.MSELoss()
 
         avg_grad, ep = 1.0, 0
@@ -125,9 +125,17 @@ def train_model(frontend, model, data, target, max_epochs=10):
             avg_grad = 0.0
             avg_loss = 0.0
             permutation = frontend.torch.randperm(len(data))
-            for x, y in zip(data[permutation], target[permutation]):
+            x_data, y_data = (
+                (data[permutation], target[permutation])
+                if data[0] != None
+                else (data, target)
+            )
+            for x, y in zip(x_data, y_data):
                 optimizer.zero_grad()
-                loss = loss_f(model(x), y)
+                if x is not None:
+                    loss = loss_f(model(x), y)
+                else:
+                    loss = model()
                 loss.backward()
                 avg_grad += list(model.parameters())[-1].grad.norm()
                 avg_loss += loss
@@ -140,13 +148,16 @@ def train_model(frontend, model, data, target, max_epochs=10):
         return avg_grad / len(data)
 
     elif frontend.__name__ == "qiboml.interfaces.keras":
-        optimizer = frontend.keras.optimizers.Adam()
+        optimizer = frontend.keras.optimizers.Adam(learning_rate=0.1)
         loss_f = frontend.keras.losses.MeanSquaredError()
 
         def train_step(x, y):
             with frontend.tf.GradientTape() as tape:
-                predictions = model(x)
-                loss = loss_f(y, predictions)
+                if x is not None:
+                    predictions = model(x)
+                    loss = loss_f(y, predictions)
+                else:
+                    loss = model()
 
             gradients = tape.gradient(
                 loss, model.trainable_variables
@@ -168,15 +179,26 @@ def train_model(frontend, model, data, target, max_epochs=10):
                     self.stopped_epoch = epoch
                     self.model.stop_training = True
 
-        model.compile(loss=loss_f, optimizer=optimizer)
-        history = model.fit(
-            data,
-            target,
-            batch_size=1,
-            epochs=max_epochs,
-            callbacks=[GradientStopCallback()],
-        )
-        return history.history["grad"][-1]
+        if data[0] != None:
+            model.compile(loss=loss_f, optimizer=optimizer)
+            history = model.fit(
+                data,
+                target,
+                batch_size=1,
+                epochs=max_epochs,
+                callbacks=[GradientStopCallback()],
+            )
+            return history.history["grad"][-1]
+        else:
+            for e in range(max_epochs):
+                for _ in range(len(data)):
+                    grads = train_step(None, None)
+                    optimizer.apply_gradients(zip(grads, model.trainable_variables))
+                avg_grad = frontend.tf.norm(grads)
+                print(f"-> Loss: {float(model())}, Grad: {avg_grad}")
+                if avg_grad < 1e-2:
+                    break
+            return avg_grad
 
 
 def eval_model(frontend, model, data, target=None):
@@ -196,7 +218,8 @@ def eval_model(frontend, model, data, target=None):
             reduction="sum_over_batch_size",
         )
         for x in data:
-            x = frontend.tf.expand_dims(x, axis=0)
+            if x is not None:
+                x = frontend.tf.expand_dims(x, axis=0)
             outputs.append(model(x))
         outputs = frontend.tf.stack(outputs, axis=0)
     if target is not None:
@@ -429,12 +452,50 @@ def test_composition(backend, frontend):
     )
     setattr(model, "decoding", decoding_layer)
 
-    data = random_tensor(frontend, (100, 1))
+    data = random_tensor(frontend, (50, 1))
     target = prepare_targets(frontend, model, data)
     _, loss_untrained = eval_model(frontend, model, data, target)
-    train_model(frontend, model, data, target, max_epochs=3)
+    train_model(frontend, model, data, target, max_epochs=5)
     _, loss_trained = eval_model(frontend, model, data, target)
     assert loss_untrained > loss_trained
+
+
+def test_vqe(backend, frontend):
+    seed = 42
+    set_device(frontend)
+    set_seed(frontend, seed)
+    backend.set_seed(42)
+
+    tfim = hamiltonians.TFIM(nqubits=2, backend=backend)
+
+    nqubits = 2
+    dim = 2
+    training_layer = ans.HardwareEfficient(
+        nqubits,
+        nlayers=2,
+    )
+    decoding_layer = dec.Expectation(
+        nqubits=nqubits,
+        backend=backend,
+        observable=tfim,
+    )
+    circuit_structure = [
+        training_layer,
+    ]
+    q_model = frontend.QuantumModel(
+        circuit_structure=circuit_structure,
+        decoding=decoding_layer,
+    )
+
+    none = np.array(
+        5
+        * [
+            None,
+        ]
+    )
+    grad = train_model(frontend, q_model, none, none, max_epochs=10)
+    cost = q_model()
+    backend.assert_allclose(float(cost), -2.0, atol=5e-2)
 
 
 def test_noise(backend, frontend):

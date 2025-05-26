@@ -80,7 +80,7 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
     def compute_output_shape(self, input_shape):
         return self.decoding.output_shape
 
-    def call(self, x: tf.Tensor) -> tf.Tensor:
+    def call(self, x: Optional[tf.Tensor] = None) -> tf.Tensor:
         circuit = utils.circuit_from_structure(
             x=x, circuit_structure=self.circuit_structure
         )
@@ -90,6 +90,8 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
             circuit.set_parameters(1 * self.circuit_parameters)
             output = self.decoding(circuit)
             return output[None, :]
+        if x is None:
+            x = tf.constant([])
         return self.custom_gradient.evaluate(x, 1 * self.circuit_parameters)
 
     def draw(self, plt_drawing=True, **plt_kwargs):
@@ -142,8 +144,11 @@ class QuantumModelCustomGradient:
 
     @tf.custom_gradient
     def evaluate(self, x, params):
+        x_is_not_None = x.shape[0] != 0
         # check whether we have to derive wrt inputs
-        if tf.is_symbolic_tensor(x):  # how to check if tf.tensor is leaf?
+        if x_is_not_None and tf.is_symbolic_tensor(
+            x
+        ):  # how to check if tf.tensor is leaf?
 
             differentiable_encodings = True
             for circ in self.circuit_structure:
@@ -156,9 +161,10 @@ class QuantumModelCustomGradient:
             )
 
         def forward(x, params):
-            x = self.backend.cast(
-                keras.ops.convert_to_numpy(x), dtype=self.backend.np.float64
-            )
+            if x_is_not_None:
+                x = self.backend.cast(
+                    keras.ops.convert_to_numpy(x), dtype=self.backend.np.float64
+                )
             circuit = utils.circuit_from_structure(
                 circuit_structure=self.circuit_structure,
                 x=x,
@@ -175,7 +181,8 @@ class QuantumModelCustomGradient:
         y = keras.ops.reshape(y, self.decoding.output_shape)
 
         def get_gradients(x, params):
-            x = self.backend.cast(x, dtype=self.backend.np.float64)
+            if x_is_not_None:
+                x = self.backend.cast(x, dtype=self.backend.np.float64)
             d_x, *d_params = self.differentiation.evaluate(
                 x,
                 self.circuit_structure,
@@ -197,9 +204,10 @@ class QuantumModelCustomGradient:
             d_x, d_params = tf.numpy_function(
                 func=get_gradients, inp=[x, params], Tout=[tf.float64, tf.float64]
             )
-            # double check this
-            # the reshape here should be needed for symbolic execution only
-            d_x = keras.ops.reshape(d_x, dy.shape + x.shape)
+            if x_is_not_None:
+                # double check this
+                # the reshape here should be needed for symbolic execution only
+                d_x = keras.ops.reshape(d_x, dy.shape + x.shape)
             d_params = keras.ops.reshape(d_params, tuple(params.shape) + dy.shape)
             indices = tuple(range(len(dy.shape)))
             lhs = "".join(string.ascii_letters[i] for i in indices)
@@ -208,7 +216,7 @@ class QuantumModelCustomGradient:
             rhs = lhs + "".join(
                 string.ascii_letters[i] for i in range(len(indices), len(d_x.shape))
             )
-            d_x = keras.ops.einsum(f"{lhs},{rhs}", dy, d_x)
+            d_x = keras.ops.einsum(f"{lhs},{rhs}", dy, d_x) if x_is_not_None else None
             return d_x, d_params
 
         return y, grad
