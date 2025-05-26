@@ -54,12 +54,12 @@ tf.keras.backend.set_floatx('float64') # set the dtype to float64, which is qibo
 ks_model = ks.QuantumModel(circuit_structure=[circuit,], decoding=decoding)
 optimizer = keras.optimizers.Adam(lr=0.05)
 for iteration in range(100):
-	with tf.GradientTape() as tape:
-		cost = ks_model(x)
-	gradients = tape.gradient(
-		cost, ks_model.trainable_variables
-	)
-	optimizer.apply_gradients(zip(gradients, ks_model.trainable_variables))
+    with tf.GradientTape() as tape:
+        cost = ks_model(x)
+    gradients = tape.gradient(
+        cost, ks_model.trainable_variables
+    )
+    optimizer.apply_gradients(zip(gradients, ks_model.trainable_variables))
 ```
 
 
