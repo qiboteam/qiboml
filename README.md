@@ -21,7 +21,7 @@ keeping the same high-level language proposed by the most used libraries (Pytorc
 ### Minimum working example
 
 You can quickly build a QML model using one of the currently supported interfaces. For instance,
-to train a VQE:
+to train a VQE to find the ground state of an Hamiltonian $H=\sum_i Z_i$:
 
 ```python
 from qiboml.models.ansatze import HardwareEfficient
@@ -29,7 +29,8 @@ from qiboml.models.decoding import Expectation
 
 nqubits = 2
 circuit = HardwareEfficient(nqubits)
-# By default is the expectation value of a sum of Z observables, but can be set any Hamiltonian
+# By default Expectation sets Z_0 + Z_1 + ... + Z_n as observable,
+# any Hamiltonian can be used though
 decoding = Expectation(nqubits)
 
 # using pytorch
@@ -48,6 +49,7 @@ for iteration in range(100):
 import keras
 import tensorflow as tf
 import qiboml.interfaces.keras as ks
+tf.keras.backend.set_floatx('float64') # set the dtype to float64, which is qibo's default
 
 ks_model = ks.QuantumModel(circuit_structure=[circuit,], decoding=decoding)
 optimizer = keras.optimizers.Adam(lr=0.05)
