@@ -180,14 +180,17 @@ class Expectation(QuantumDecoding):
         Args:
             backend (Backend): backend to be set.
         """
-        super().set_backend(backend)
-        self.observable.backend = backend
         if isinstance(self.observable, Hamiltonian):
+            matrix = self.backend.to_numpy(self.observable.matrix)
+            super().set_backend(backend)
             self.observable = Hamiltonian(
                 nqubits=self.nqubits,
-                matrix=self.backend.cast(self.backend.to_numpy(self.observable.matrix)),
+                matrix=self.backend.cast(matrix),
                 backend=self.backend,
             )
+        else:
+            super().set_backend(backend)
+            self.observable.backend = backend
 
     def __hash__(self) -> int:
         return hash((self.qubits, self.nshots, self.backend, self.observable))
