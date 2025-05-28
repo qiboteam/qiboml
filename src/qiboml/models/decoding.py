@@ -180,12 +180,13 @@ class Expectation(QuantumDecoding):
         Args:
             backend (Backend): backend to be set.
         """
+        matrix = self.backend.to_numpy(self.observable.matrix)
         super().set_backend(backend)
         self.observable.backend = backend
         if isinstance(self.observable, Hamiltonian):
             self.observable = Hamiltonian(
                 nqubits=self.nqubits,
-                matrix=self.backend.cast(self.backend.to_numpy(self.observable.matrix)),
+                matrix=self.backend.cast(matrix),
                 backend=self.backend,
             )
 
