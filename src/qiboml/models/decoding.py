@@ -55,7 +55,7 @@ class QuantumDecoding:
         self._circuit.density_matrix = x.density_matrix
         self._circuit.init_kwargs["density_matrix"] = x.density_matrix
         self._circuit.wire_names = x.wire_names
-        self._circuit.init_kwargs["wire_names"] = x.wire_names
+        self._circuit.init_kwargs["wire_names"] = x.init_kwargs["wire_names"]
 
         if self.transpiler is not None:
             x, _ = self.transpiler(x)
