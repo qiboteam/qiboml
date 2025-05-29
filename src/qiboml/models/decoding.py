@@ -1,10 +1,11 @@
 from dataclasses import dataclass
-from typing import Optional, Union
+from typing import Callable, Optional, Union
 
 from qibo import Circuit, gates, transpiler
 from qibo.backends import Backend, _check_backend
 from qibo.config import raise_error
 from qibo.hamiltonians import Hamiltonian, Z
+from qibo.noise import NoiseModel
 from qibo.result import CircuitResult, MeasurementOutcomes, QuantumState
 from qibo.transpiler import Passes
 
@@ -30,6 +31,7 @@ class QuantumDecoding:
     nshots: Optional[int] = None
     backend: Optional[Backend] = None
     transpiler: Optional[Passes] = None
+    noise_model: Optional[NoiseModel] = None
     _circuit: Circuit = None
 
     def __post_init__(self):
@@ -53,7 +55,12 @@ class QuantumDecoding:
             (CircuitResult | QuantumState | MeasurementOutcomes): the execution ``qibo.result`` object.
         """
         self._circuit.density_matrix = x.density_matrix
-        self._circuit.init_kwargs["density_matrix"] = x.density_matrix
+        # Forcing the density matrix simulation if a noise model is given
+        if self.noise_model is not None:
+            self._circuit.init_kwargs["density_matrix"] = True
+        else:
+            self._circuit.init_kwargs["density_matrix"] = x.density_matrix
+
         if self.transpiler is not None:
             x, _ = self.transpiler(x)
         return self.backend.execute_circuit(x + self._circuit, nshots=self.nshots)
@@ -133,53 +140,40 @@ class Expectation(QuantumDecoding):
     r"""The expectation value decoder.
 
     Args:
-        observable (Hamiltonian | ndarray): the observable to calculate the expectation value of,
-    by default :math:`Z_0\otimes Z_1\otimes ... \otimes Z_n` is used.
+        observable (Hamiltonian | ndarray): the observable to calculate the expectation value of.
+            By default :math:`Z_0\otimes Z_1\otimes ... \otimes Z_n` is used.
+        mitigation_map (callable, optional): a function taking the raw expectation (as a 0-d ndarray
+            or scalar) and returning a corrected one. E.g. `lambda x: x / calibration_factor`.
     """
 
     observable: Union[ndarray, Hamiltonian] = None
+    mitigation_map: Optional[Callable[[ndarray], ndarray]] = None
 
     def __post_init__(self):
-        """Ancillary post initialization operations."""
         if self.observable is None:
             self.observable = Z(self.nqubits, dense=True, backend=self.backend)
         super().__post_init__()
 
     def __call__(self, x: Circuit) -> ndarray:
-        """Execute the input circuit and calculate the expectation value of the internal observable on
-        the final state
-
-        Args:
-            x (Circuit): input Circuit.
-
-        Returns:
-            (ndarray): the calculated expectation value.
-        """
+        """Execute the input circuit, compute the expectation, then (optionally) apply mitigation_map."""
+        # 1) run and get raw expectation
         if self.analytic:
-            return self.observable.expectation(
-                super().__call__(x).state(),
-            ).reshape(1, 1)
+            raw = self.observable.expectation(super().__call__(x).state())
         else:
-            return self.observable.expectation_from_samples(
-                super().__call__(x).frequencies(),
-                qubit_map=self.qubits,
-            ).reshape(1, 1)
+            freqs = super().__call__(x).frequencies()
+            raw = self.observable.expectation_from_samples(freqs, qubit_map=self.qubits)
+        # 2) apply mitigation_map (if any)
+        if self.mitigation_map is not None:
+            raw = self.mitigation_map(raw)
+
+        # 3) format as (1,1) array
+        return self.backend.np.array(raw).reshape(1, 1)
 
     @property
     def output_shape(self) -> tuple[int, int]:
-        """Shape of the output expectation value.
-
-        Returns:
-            (tuple[int, int]): a ``(1, 1)`` shape.
-        """
         return (1, 1)
 
     def set_backend(self, backend: Backend):
-        """Set the internal and observable's backends.
-
-        Args:
-            backend (Backend): backend to be set.
-        """
         if isinstance(self.observable, Hamiltonian):
             matrix = self.backend.to_numpy(self.observable.matrix)
             super().set_backend(backend)
@@ -193,6 +187,7 @@ class Expectation(QuantumDecoding):
             self.observable.backend = backend
 
     def __hash__(self) -> int:
+        # We don’t include non-hashable callables in the hash
         return hash((self.qubits, self.nshots, self.backend, self.observable))
 
 
