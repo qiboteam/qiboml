@@ -2,6 +2,7 @@ from typing import Dict, List, Optional, Union
 
 import numpy as np
 from qibo import Circuit
+from qibo.gates import raise_error
 from qibo.ui.mpldrawer import plot_circuit
 
 from qiboml import ndarray
@@ -42,7 +43,9 @@ def circuit_from_structure(
         )
 
     circuit = Circuit(
-        circuit_structure[0].nqubits, density_matrix=circuit_structure[0].density_matrix
+        circuit_structure[0].nqubits,
+        density_matrix=circuit_structure[0].density_matrix,
+        wire_names=circuit_structure[0].wire_names,
     )
     for circ in circuit_structure:
         if isinstance(circ, QuantumEncoding):
@@ -102,11 +105,32 @@ def draw_circuit(circuit_structure, backend, plt_drawing=True, **plt_kwargs):
         return str(circuit)
 
 
-def _uniform_circuit_structure_density_matrix(circuit_structure):
+def _uniform_circuit_structure(circuit_structure):
     """
-    Align the ``density_matrix`` attribute of all circuits composing the circuit structure.
-    Namely, setting them to ``True`` if at least one component of the circuit has ``density_matrix==True``.
+    Align the ``density_matrix`` and ``wire_names`` attributes of all circuits composing the circuit structure.
+    Namely, setting their ``density_matrix=True`` if at least one component of the circuit has ``density_matrix==True``
+    and setting their ``wire_names`` attribute equal to the first non-``None`` found.
     """
     density_matrix = any(circ.density_matrix for circ in circuit_structure)
+    wire_names = [
+        tuple(circ.wire_names)
+        for circ in circuit_structure
+        if circ.wire_names is not None
+    ]
+    if len(set(wire_names)) > 1:
+        raise_error(
+            RuntimeError,
+            f"Multiple ``wire_names`` defined in the circuit structure: {wire_names}",
+        )
+    elif len(wire_names) == 0:
+        wire_names = None
+    else:
+        wire_names = list(wire_names[0])
     for circ in circuit_structure:
         circ.density_matrix = density_matrix
+        circ.wire_names = wire_names
+        if isinstance(circ, Circuit):
+            circ.init_kwargs["wire_names"] = wire_names
+        else:
+            circ._circuit.wire_names = wire_names
+            circ._circuit.init_kwargs["wire_names"] = wire_names

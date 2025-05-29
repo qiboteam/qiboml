@@ -2,13 +2,14 @@ import inspect
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Optional
+from typing import Optional, Union
 
 import numpy as np
 from qibo import Circuit, gates
 from qibo.config import raise_error
 
 from qiboml import ndarray
+from qiboml.models.utils import _get_wire_names_and_qubits
 
 
 @dataclass(eq=False)
@@ -23,7 +24,7 @@ class QuantumEncoding(ABC):
     """
 
     nqubits: int
-    qubits: Optional[tuple[int]] = None
+    qubits: Optional[Union[tuple[int], tuple["str"]]] = None
     density_matrix: Optional[bool] = False
     _circuit: Circuit = None
 
@@ -31,10 +32,12 @@ class QuantumEncoding(ABC):
         self,
     ):
         """Ancillary post initialization for the dataclass object."""
-        self.qubits = (
-            tuple(range(self.nqubits)) if self.qubits is None else tuple(self.qubits)
+        self.qubits, self.wire_names = _get_wire_names_and_qubits(
+            self.nqubits, self.qubits
         )
-        self._circuit = Circuit(self.nqubits, density_matrix=self.density_matrix)
+        self._circuit = Circuit(
+            self.nqubits, density_matrix=self.density_matrix, wire_names=self.wire_names
+        )
 
     @cached_property
     def _data_to_gate(self):
