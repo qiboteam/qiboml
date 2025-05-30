@@ -19,9 +19,7 @@ class QuantumEncoding(ABC):
 
     Args:
         nqubits (int): total number of qubits.
-        qubits (tuple[int] | tuple[str], optional): set of qubits it acts on, by default ``range(nqubits)``. 
-            Optionally, the name of the wires to run on can be passed through this argument. 
-            This is mainly useful when executing on hardware to select which qubits to make use of.
+        qubits (tuple[int] | tuple[str], optional): set of qubits it acts on, by default ``range(nqubits)``.
         density_matrix (bool, optional): whether to build the circuit with ``density_matrix=True``, mostly useful for noisy simulations. ``density_matrix=False`` by default.
     """
 
@@ -34,12 +32,10 @@ class QuantumEncoding(ABC):
         self,
     ):
         """Ancillary post initialization for the dataclass object."""
-        self.qubits, self.wire_names = _get_wire_names_and_qubits(
-            self.nqubits, self.qubits
+        self.qubits = (
+            tuple(range(self.nqubits)) if self.qubits is None else tuple(self.qubits)
         )
-        self._circuit = Circuit(
-            self.nqubits, density_matrix=self.density_matrix, wire_names=self.wire_names
-        )
+        self._circuit = Circuit(self.nqubits, density_matrix=self.density_matrix)
 
     @cached_property
     def _data_to_gate(self):

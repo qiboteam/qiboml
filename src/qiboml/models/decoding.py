@@ -9,6 +9,7 @@ from qibo.result import CircuitResult, MeasurementOutcomes, QuantumState
 from qibo.transpiler import Passes
 
 from qiboml import ndarray
+from qiboml.models.utils import _get_wire_names_and_qubits
 
 
 @dataclass
@@ -19,6 +20,8 @@ class QuantumDecoding:
     Args:
         nqubits (int): total number of qubits.
         qubits (tuple[int], optional): set of qubits it acts on, by default ``range(nqubits)``.
+            Optionally, the name of the wires to run on can be passed through this argument.
+            This is mainly useful when executing on hardware to select which qubits to make use of.
         nshots (int, optional): number of shots used for circuit execution and sampling.
         backend (Backend, optional): backend used for computation, by default the globally-set backend is used.
         transpiler (Passes, optional): transpiler to run before circuit execution, by default no transpilation
@@ -31,13 +34,14 @@ class QuantumDecoding:
     backend: Optional[Backend] = None
     transpiler: Optional[Passes] = None
     _circuit: Circuit = None
+    _wire_names: tuple[str] = None
 
     def __post_init__(self):
         """Ancillary post initialization operations."""
-        self.qubits = (
-            tuple(range(self.nqubits)) if self.qubits is None else tuple(self.qubits)
+        self.qubits, self._wire_names = _get_wire_names_and_qubits(
+            self.nqubits, self.qubits
         )
-        self._circuit = Circuit(self.nqubits)
+        self._circuit = Circuit(self.nqubits, wire_names=self._wire_names)
         self.backend = _check_backend(self.backend)
         self._circuit.add(gates.M(*self.qubits))
 
@@ -54,8 +58,8 @@ class QuantumDecoding:
         """
         self._circuit.density_matrix = x.density_matrix
         self._circuit.init_kwargs["density_matrix"] = x.density_matrix
-        self._circuit.wire_names = x.wire_names
-        self._circuit.init_kwargs["wire_names"] = x.init_kwargs["wire_names"]
+        x.wire_names = self.wire_names
+        x.init_kwargs["wire_names"] = self.wire_names
 
         if self.transpiler is not None:
             x, _ = self.transpiler(x)
@@ -99,6 +103,10 @@ class QuantumDecoding:
 
     def __hash__(self) -> int:
         return hash((self.qubits, self.nshots, self.backend))
+
+    @property
+    def wire_names(self):
+        return self._wire_names
 
 
 class Probabilities(QuantumDecoding):

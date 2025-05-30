@@ -1,21 +1,19 @@
 import random
-from typing import Optional, Union
+from typing import Optional
 
 import numpy as np
 from qibo import Circuit, gates
 
-from qiboml.models.utils import _get_wire_names_and_qubits
-
 
 def HardwareEfficient(
     nqubits: int,
-    qubits: Optional[Union[tuple[int], tuple["str"]]] = None,
+    qubits: Optional[tuple[int]] = None,
     nlayers: int = 1,
     density_matrix: Optional[bool] = False,
 ) -> Circuit:
-
-    qubits, wire_names = _get_wire_names_and_qubits(nqubits, qubits)
-    circuit = Circuit(nqubits, density_matrix=density_matrix, wire_names=wire_names)
+    if qubits is None:
+        qubits = list(range(nqubits))
+    circuit = Circuit(nqubits, density_matrix=density_matrix)
 
     for _ in range(nlayers):
         for q in qubits:
