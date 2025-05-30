@@ -2,7 +2,6 @@ from typing import Dict, List, Optional, Union
 
 import numpy as np
 from qibo import Circuit
-from qibo.gates import raise_error
 from qibo.ui.mpldrawer import plot_circuit
 
 from qiboml import ndarray

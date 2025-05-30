@@ -2,7 +2,7 @@ import inspect
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Optional, Union
+from typing import Optional
 
 import numpy as np
 from qibo import Circuit, gates
@@ -24,7 +24,7 @@ class QuantumEncoding(ABC):
     """
 
     nqubits: int
-    qubits: Optional[Union[tuple[int], tuple["str"]]] = None
+    qubits: Optional[tuple[int]] = None
     density_matrix: Optional[bool] = False
     _circuit: Circuit = None
 
