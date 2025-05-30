@@ -19,7 +19,9 @@ class QuantumEncoding(ABC):
 
     Args:
         nqubits (int): total number of qubits.
-        qubits (tuple[int] | tuple[str], optional): set of qubits it acts on, by default ``range(nqubits)``. Optionally, the name of the wires to run on can be passed through this argument. This is mainly useful when executing on hardware to select which qubits to make use of.
+        qubits (tuple[int] | tuple[str], optional): set of qubits it acts on, by default ``range(nqubits)``. 
+            Optionally, the name of the wires to run on can be passed through this argument. 
+            This is mainly useful when executing on hardware to select which qubits to make use of.
         density_matrix (bool, optional): whether to build the circuit with ``density_matrix=True``, mostly useful for noisy simulations. ``density_matrix=False`` by default.
     """
 
