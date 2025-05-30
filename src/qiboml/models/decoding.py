@@ -1,10 +1,11 @@
-from dataclasses import dataclass
-from typing import Callable, Optional, Union
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, Optional, Union
 
 from qibo import Circuit, gates, transpiler
 from qibo.backends import Backend, _check_backend
-from qibo.config import raise_error
+from qibo.config import log, raise_error
 from qibo.hamiltonians import Hamiltonian, Z
+from qibo.models import error_mitigation
 from qibo.noise import NoiseModel
 from qibo.result import CircuitResult, MeasurementOutcomes, QuantumState
 from qibo.transpiler import Passes
@@ -32,6 +33,7 @@ class QuantumDecoding:
     backend: Optional[Backend] = None
     transpiler: Optional[Passes] = None
     noise_model: Optional[NoiseModel] = None
+    density_matrix: Optional[bool] = False
     _circuit: Circuit = None
 
     def __post_init__(self):
@@ -39,7 +41,7 @@ class QuantumDecoding:
         self.qubits = (
             tuple(range(self.nqubits)) if self.qubits is None else tuple(self.qubits)
         )
-        self._circuit = Circuit(self.nqubits)
+        self._circuit = Circuit(self.nqubits, density_matrix=self.density_matrix)
         self.backend = _check_backend(self.backend)
         self._circuit.add(gates.M(*self.qubits))
 
@@ -63,7 +65,13 @@ class QuantumDecoding:
 
         if self.transpiler is not None:
             x, _ = self.transpiler(x)
-        return self.backend.execute_circuit(x + self._circuit, nshots=self.nshots)
+
+        if self.noise_model is not None:
+            executable_circuit = self.noise_model.apply(x + self._circuit)
+        else:
+            executable_circuit = x + self._circuit
+
+        return self.backend.execute_circuit(executable_circuit, nshots=self.nshots)
 
     @property
     def circuit(
@@ -137,37 +145,70 @@ class Probabilities(QuantumDecoding):
 
 @dataclass
 class Expectation(QuantumDecoding):
-    r"""The expectation value decoder.
-
-    Args:
-        observable (Hamiltonian | ndarray): the observable to calculate the expectation value of.
-            By default :math:`Z_0\otimes Z_1\otimes ... \otimes Z_n` is used.
-        mitigation_map (callable, optional): a function taking the raw expectation (as a 0-d ndarray
-            or scalar) and returning a corrected one. E.g. `lambda x: x / calibration_factor`.
-    """
+    """The expectation value decoder."""
 
     observable: Union[ndarray, Hamiltonian] = None
-    mitigation_map: Optional[Callable[[ndarray], ndarray]] = None
+    mitigation_config: Optional[Dict[str, Any]] = None
+
+    # Internal attributes
+    _mitigation_map: Callable[..., Union[ndarray, float]] = field(
+        init=False, repr=False
+    )
+    _mitigation_map_popt: Optional[ndarray] = field(
+        init=False, default=None, repr=False
+    )
+    _real_time_mitigation: bool = field(init=False, repr=False)
+    _mitigation_method: str = field(init=False, repr=False)
+    _mitigation_method_kwargs: Dict[str, Any] = field(init=False, repr=False)
 
     def __post_init__(self):
         if self.observable is None:
             self.observable = Z(self.nqubits, dense=True, backend=self.backend)
+        # ensure config dict
+        if self.mitigation_config is None:
+            self.mitigation_config = {}
+
+        # default: simple linear map lambda x, a=1, b=0
+        self._mitigation_map = lambda x, a=1, b=0: a * x + b
+        self._mitigation_map_popt = self.backend.np.array([1.0, 0.0])
+
+        # unpack config
+        self._real_time_mitigation = self.mitigation_config.get("real_time", False)
+        self._mitigation_method = self.mitigation_config.get("method", "cdr")
+        self._mitigation_method_kwargs = self.mitigation_config.get("method_kwargs", {})
+
+        # if user provided custom map, overwrite default
+        custom_map = self.mitigation_config.get("mitigation_kwargs", {}).get("model")
+        if custom_map is not None:
+            if not callable(custom_map):
+                raise ValueError("Noise map model must be a callable")
+            self._mitigation_map = custom_map
+            # init popt from user function defaults if exist
+            defaults = custom_map.__defaults__ or ()
+            self._mitigation_map_popt = self.backend.np.array(defaults)
+
         super().__post_init__()
 
     def __call__(self, x: Circuit) -> ndarray:
-        """Execute the input circuit, compute the expectation, then (optionally) apply mitigation_map."""
-        # 1) run and get raw expectation
+        # recompute map if real-time enabled and not yet run
+        if self._real_time_mitigation and self.backend.np.allclose(
+            self._mitigation_map_popt, [1.0, 0.0]
+        ):
+            self.retrieve_mitigation_map(x)
+
+        # run circuit
         if self.analytic:
-            raw = self.observable.expectation(super().__call__(x).state())
+            expval = self.observable.expectation(super().__call__(x).state())
         else:
             freqs = super().__call__(x).frequencies()
-            raw = self.observable.expectation_from_samples(freqs, qubit_map=self.qubits)
-        # 2) apply mitigation_map (if any)
-        if self.mitigation_map is not None:
-            raw = self.mitigation_map(raw)
+            expval = self.observable.expectation_from_samples(
+                freqs, qubit_map=self.qubits
+            )
 
-        # 3) format as (1,1) array
-        return self.backend.np.array(raw).reshape(1, 1)
+        # apply mitigation
+        return self.backend.np.array(
+            self._mitigation_map(expval, *self._mitigation_map_popt)
+        ).reshape(1, 1)
 
     @property
     def output_shape(self) -> tuple[int, int]:
@@ -187,8 +228,27 @@ class Expectation(QuantumDecoding):
             self.observable.backend = backend
 
     def __hash__(self) -> int:
-        # We don’t include non-hashable callables in the hash
         return hash((self.qubits, self.nshots, self.backend, self.observable))
+
+    def retrieve_mitigation_map(self, x: Circuit):
+        """
+        Compute and cache the mitigation map parameters (popt).
+        """
+        log.info(f"Recomputing noise map via {self._mitigation_method!r} mitigation.")
+
+        # retrieve popt only
+        _, _, popt, _ = getattr(error_mitigation, self._mitigation_method.upper())(
+            circuit=x + self._circuit,
+            observable=self.observable,
+            noise_model=self.noise_model,
+            nshots=self.nshots,
+            full_output=True,
+            **self._mitigation_method_kwargs,
+        )
+        # update defaults of mitigation_map
+        self._mitigation_map.__defaults__ = tuple(popt)
+        self._mitigation_map_popt = self.backend.np.array(popt)
+        log.info(f"Obtained noise map params: {self._mitigation_map_popt}.")
 
 
 class State(QuantumDecoding):
