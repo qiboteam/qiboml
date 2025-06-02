@@ -1,16 +1,16 @@
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Optional, Union
+from dataclasses import dataclass
+from typing import Any, Dict, Optional, Union
 
 from qibo import Circuit, gates, transpiler
 from qibo.backends import Backend, _check_backend
 from qibo.config import log, raise_error
 from qibo.hamiltonians import Hamiltonian, Z
-from qibo.models import error_mitigation
 from qibo.noise import NoiseModel
 from qibo.result import CircuitResult, MeasurementOutcomes, QuantumState
 from qibo.transpiler import Passes
 
 from qiboml import ndarray
+from qiboml.models.utils import Mitigator
 
 
 @dataclass
@@ -150,51 +150,35 @@ class Expectation(QuantumDecoding):
     observable: Union[ndarray, Hamiltonian] = None
     mitigation_config: Optional[Dict[str, Any]] = None
 
-    # Internal attributes
-    _mitigation_map: Callable[..., Union[ndarray, float]] = field(
-        init=False, repr=False
-    )
-    _mitigation_map_popt: Optional[ndarray] = field(
-        init=False, default=None, repr=False
-    )
-    _real_time_mitigation: bool = field(init=False, repr=False)
-    _mitigation_method: str = field(init=False, repr=False)
-    _mitigation_method_kwargs: Dict[str, Any] = field(init=False, repr=False)
-
     def __post_init__(self):
         if self.observable is None:
             self.observable = Z(self.nqubits, dense=True, backend=self.backend)
+
         # ensure config dict
         if self.mitigation_config is None:
             self.mitigation_config = {}
 
-        # default: simple linear map lambda x, a=1, b=0
-        self._mitigation_map = lambda x, a=1, b=0: a * x + b
-        self._mitigation_map_popt = self.backend.np.array([1.0, 0.0])
-
-        # unpack config
-        self._real_time_mitigation = self.mitigation_config.get("real_time", False)
-        self._mitigation_method = self.mitigation_config.get("method", "cdr")
-        self._mitigation_method_kwargs = self.mitigation_config.get("method_kwargs", {})
-
-        # if user provided custom map, overwrite default
-        custom_map = self.mitigation_config.get("mitigation_kwargs", {}).get("model")
-        if custom_map is not None:
-            if not callable(custom_map):
-                raise ValueError("Noise map model must be a callable")
-            self._mitigation_map = custom_map
-            # init popt from user function defaults if exist
-            defaults = custom_map.__defaults__ or ()
-            self._mitigation_map_popt = self.backend.np.array(defaults)
+        # Construct the Mitigator object
+        self.mitigator = Mitigator(
+            mitigation_config=self.mitigation_config,
+            backend=self.backend,
+        )
 
         super().__post_init__()
 
     def __call__(self, x: Circuit) -> ndarray:
         # recompute map if real-time enabled and not yet run
-        if self._real_time_mitigation and self.backend.np.allclose(
-            self._mitigation_map_popt, [1.0, 0.0]
+        if self.mitigator._real_time_mitigation and self.backend.np.allclose(
+            self.mitigator._mitigation_map_popt,
+            self.mitigator._mitigation_map_initial_popt,
+            atol=1e-6,
         ):
-            self.retrieve_mitigation_map(x)
+            self.mitigator.data_regression(
+                circuit=x + self._circuit,
+                observable=self.observable,
+                noise_model=self.noise_model,
+                nshots=self.nshots,
+            )
 
         # run circuit
         if self.analytic:
@@ -206,8 +190,12 @@ class Expectation(QuantumDecoding):
             )
 
         # apply mitigation
-        return self.backend.np.array(
-            self._mitigation_map(expval, *self._mitigation_map_popt)
+        return self.backend.cast(
+            self.backend.to_numpy(
+                self.mitigator._mitigation_map(
+                    expval, *self.mitigator._mitigation_map_popt
+                )
+            )
         ).reshape(1, 1)
 
     @property
@@ -229,26 +217,6 @@ class Expectation(QuantumDecoding):
 
     def __hash__(self) -> int:
         return hash((self.qubits, self.nshots, self.backend, self.observable))
-
-    def retrieve_mitigation_map(self, x: Circuit):
-        """
-        Compute and cache the mitigation map parameters (popt).
-        """
-        log.info(f"Recomputing noise map via {self._mitigation_method!r} mitigation.")
-
-        # retrieve popt only
-        _, _, popt, _ = getattr(error_mitigation, self._mitigation_method.upper())(
-            circuit=x + self._circuit,
-            observable=self.observable,
-            noise_model=self.noise_model,
-            nshots=self.nshots,
-            full_output=True,
-            **self._mitigation_method_kwargs,
-        )
-        # update defaults of mitigation_map
-        self._mitigation_map.__defaults__ = tuple(popt)
-        self._mitigation_map_popt = self.backend.np.array(popt)
-        log.info(f"Obtained noise map params: {self._mitigation_map_popt}.")
 
 
 class State(QuantumDecoding):
