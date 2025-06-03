@@ -70,7 +70,7 @@ def test_rtqem(frontend, nqubits, nshots, backend):
         nqubits=nqubits,
         nshots=nshots,
         backend=backend,
-        noise_model=build_noise_model(nqubits=nqubits, local_pauli_noise_prob=0.02),
+        noise_model=build_noise_model(nqubits=nqubits, local_pauli_noise_prob=0.03),
         density_matrix=True,
     )
 
@@ -84,13 +84,13 @@ def test_rtqem(frontend, nqubits, nshots, backend):
         frontend=frontend,
         backend=backend,
         model=noisy_model,
-        epochs=30,
+        epochs=40,
     )
 
     mitigation_config = {
         "real_time": True,
         "method": "CDR",
-        "method_kwargs": {"n_training_samples": 100},
+        "method_kwargs": {"n_training_samples": 70},
     }
 
     # Then we build a decoding with error mitigation
@@ -98,7 +98,7 @@ def test_rtqem(frontend, nqubits, nshots, backend):
         nqubits=nqubits,
         nshots=nshots,
         backend=backend,
-        noise_model=build_noise_model(nqubits=nqubits, local_pauli_noise_prob=0.02),
+        noise_model=build_noise_model(nqubits=nqubits, local_pauli_noise_prob=0.03),
         density_matrix=True,
         mitigation_config=mitigation_config,
     )
@@ -113,7 +113,7 @@ def test_rtqem(frontend, nqubits, nshots, backend):
         frontend=frontend,
         backend=backend,
         model=mit_model,
-        epochs=30,
+        epochs=40,
     )
 
     assert mit_result < noisy_result

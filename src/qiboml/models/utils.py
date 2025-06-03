@@ -67,9 +67,3 @@ class Mitigator:
         self._mitigation_map.__defaults__ = tuple(popt)
         self._mitigation_map_popt = self.backend.np.array(popt)
         log.info(f"Obtained noise map params: {self._mitigation_map_popt}.")
-
-        # (example plotting)
-        import matplotlib.pyplot as plt
-
-        plt.scatter(training_data["noisy"], training_data["noise-free"])
-        plt.savefig("cdr.pdf")
