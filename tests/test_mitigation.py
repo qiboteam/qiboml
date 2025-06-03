@@ -1,0 +1,122 @@
+from copy import deepcopy
+
+import keras
+import pytest
+import tensorflow as tf
+import torch
+from qibo.backends import NumpyBackend
+from qibo.noise import NoiseModel, PauliError
+
+from qiboml.models.ansatze import HardwareEfficient
+from qiboml.models.decoding import Expectation
+from qiboml.operations.differentiation import PSR
+
+from .utils import set_seed
+
+BACKENDS = [NumpyBackend()]
+
+
+def build_noise_model(
+    nqubits: int,
+    local_pauli_noise_prob: float,
+):
+    """Costruct noise model as a local Pauli noise channel + readout noise."""
+    noise_model = NoiseModel()
+    for q in range(nqubits):
+        noise_model.add(
+            PauliError(
+                [
+                    ("X", local_pauli_noise_prob),
+                    ("Y", local_pauli_noise_prob),
+                    ("Z", local_pauli_noise_prob),
+                ]
+            ),
+            qubits=q,
+        )
+    return noise_model
+
+
+def train_vqe(frontend, backend, model, epochs):
+    """Implement training procedure given interface."""
+
+    if frontend.__name__ == "qiboml.interfaces.pytorch":
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.5)
+        for _ in range(epochs):
+            optimizer.zero_grad()
+            cost = model()
+            cost.backward()
+            optimizer.step()
+        return backend.cast(cost.item(), dtype="double")
+
+    elif frontend.__name__ == "qiboml.interfaces.keras":
+        tf.keras.backend.set_floatx("float64")
+        optimizer = keras.optimizers.Adam(learning_rate=0.5)
+        for _ in range(epochs):
+            with tf.GradientTape() as tape:
+                cost = model()
+            gradients = tape.gradient(cost, model.trainable_variables)
+            optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+        return backend.cast(cost, dtype="double")
+
+
+@pytest.mark.parametrize("nqubits", [1])  # Maybe include 2 qubits as well, let's see
+@pytest.mark.parametrize("nshots", [1000, 5000])
+@pytest.mark.parametrize("backend", BACKENDS)
+def test_rtqem(frontend, nqubits, nshots, backend):
+    set_seed(frontend=frontend, seed=42)
+
+    # We build a trainable circuit
+    vqe = HardwareEfficient(nqubits=nqubits, nlayers=4, density_matrix=True)
+
+    # First we build a model with noise and without mitigation
+    noisy_decoding = Expectation(
+        nqubits=nqubits,
+        nshots=nshots,
+        backend=backend,
+        noise_model=build_noise_model(nqubits=nqubits, local_pauli_noise_prob=0.02),
+        density_matrix=True,
+    )
+
+    noisy_model = frontend.QuantumModel(
+        circuit_structure=deepcopy(vqe),
+        decoding=noisy_decoding,
+        differentiation=PSR(),
+    )
+
+    noisy_result = train_vqe(
+        frontend=frontend,
+        backend=backend,
+        model=noisy_model,
+        epochs=30,
+    )
+
+    mitigation_config = {
+        "real_time": True,
+        "method": "CDR",
+        "method_kwargs": {"n_training_samples": 100},
+    }
+
+    # Then we build a decoding with error mitigation
+    mit_decoding = Expectation(
+        nqubits=nqubits,
+        nshots=nshots,
+        backend=backend,
+        noise_model=build_noise_model(nqubits=nqubits, local_pauli_noise_prob=0.02),
+        density_matrix=True,
+        mitigation_config=mitigation_config,
+    )
+
+    mit_model = frontend.QuantumModel(
+        circuit_structure=deepcopy(vqe),
+        decoding=mit_decoding,
+        differentiation=PSR(),
+    )
+
+    mit_result = train_vqe(
+        frontend=frontend,
+        backend=backend,
+        model=mit_model,
+        epochs=30,
+    )
+
+    assert mit_result < noisy_result

@@ -14,6 +14,8 @@ import qiboml.models.ansatze as ans
 import qiboml.models.decoding as dec
 import qiboml.models.encoding as enc
 
+from .utils import set_seed
+
 
 def get_layers(module, layer_type=None):
     layers = []
@@ -225,19 +227,6 @@ def eval_model(frontend, model, data, target=None):
     if target is not None:
         loss = loss_f(target, outputs)
     return outputs, loss
-
-
-def set_seed(frontend, seed):
-    random.seed(seed)
-    np.random.seed(seed)
-    if frontend.__name__ == "qiboml.interfaces.pytorch":
-        frontend.torch.set_default_dtype(frontend.torch.float64)
-        frontend.torch.manual_seed(seed)
-    elif frontend.__name__ == "qiboml.interfaces.keras":
-        frontend.keras.backend.set_floatx("float64")
-        frontend.tf.keras.backend.set_floatx("float64")
-        frontend.keras.utils.set_random_seed(seed)
-        frontend.tf.config.experimental.enable_op_determinism()
 
 
 def random_parameters(frontend, model):
