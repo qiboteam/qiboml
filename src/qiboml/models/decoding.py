@@ -154,24 +154,26 @@ class Expectation(QuantumDecoding):
         if self.observable is None:
             self.observable = Z(self.nqubits, dense=True, backend=self.backend)
 
-        # ensure config dict
-        if self.mitigation_config is None:
-            self.mitigation_config = {}
-
-        # Construct the Mitigator object
-        self.mitigator = Mitigator(
-            mitigation_config=self.mitigation_config,
-            backend=self.backend,
-        )
+        # If mitigation is requested
+        if self.mitigation_config is not None:
+            # Construct the Mitigator object
+            self.mitigator = Mitigator(
+                mitigation_config=self.mitigation_config,
+                backend=self.backend,
+            )
 
         super().__post_init__()
 
     def __call__(self, x: Circuit) -> ndarray:
         # recompute map if real-time enabled and not yet run
-        if self.mitigator._real_time_mitigation and self.backend.np.allclose(
-            self.mitigator._mitigation_map_popt,
-            self.mitigator._mitigation_map_initial_popt,
-            atol=1e-6,
+        if (
+            self.mitigation_config is not None
+            and self.mitigator._real_time_mitigation
+            and self.backend.np.allclose(
+                self.mitigator._mitigation_map_popt,
+                self.mitigator._mitigation_map_initial_popt,
+                atol=1e-6,
+            )
         ):
             self.mitigator.data_regression(
                 circuit=x + self._circuit,
@@ -189,15 +191,18 @@ class Expectation(QuantumDecoding):
                 freqs, qubit_map=self.qubits
             )
 
-        # apply mitigation
-        return self.backend.cast(
-            self.backend.to_numpy(
-                self.mitigator._mitigation_map(
-                    expval, *self.mitigator._mitigation_map_popt
-                )
-            ),
-            dtype="double",
-        ).reshape(1, 1)
+        # apply mitigation if requested
+        if self.mitigation_config is not None:
+            expval = self.backend.cast(
+                self.backend.to_numpy(
+                    self.mitigator._mitigation_map(
+                        expval, *self.mitigator._mitigation_map_popt
+                    )
+                ),
+                dtype="double",
+            )
+
+        return expval.reshape(1, 1)
 
     @property
     def output_shape(self) -> tuple[int, int]:
