@@ -1,9 +1,6 @@
 from copy import deepcopy
 
-import keras
 import pytest
-import tensorflow as tf
-import torch
 from qibo.backends import NumpyBackend
 from qibo.noise import NoiseModel, PauliError
 
@@ -40,7 +37,7 @@ def train_vqe(frontend, backend, model, epochs):
     """Implement training procedure given interface."""
 
     if frontend.__name__ == "qiboml.interfaces.pytorch":
-        optimizer = torch.optim.Adam(model.parameters(), lr=0.5)
+        optimizer = frontend.torch.optim.Adam(model.parameters(), lr=0.5)
         for _ in range(epochs):
             optimizer.zero_grad()
             cost = model()
@@ -49,10 +46,10 @@ def train_vqe(frontend, backend, model, epochs):
         return backend.cast(cost.item(), dtype="double")
 
     elif frontend.__name__ == "qiboml.interfaces.keras":
-        tf.keras.backend.set_floatx("float64")
-        optimizer = keras.optimizers.Adam(learning_rate=0.5)
+        frontend.tf.keras.backend.set_floatx("float64")
+        optimizer = frontend.keras.optimizers.Adam(learning_rate=0.5)
         for _ in range(epochs):
-            with tf.GradientTape() as tape:
+            with frontend.tf.GradientTape() as tape:
                 cost = model()
             gradients = tape.gradient(cost, model.trainable_variables)
             optimizer.apply_gradients(zip(gradients, model.trainable_variables))
