@@ -195,7 +195,8 @@ class Expectation(QuantumDecoding):
                 self.mitigator._mitigation_map(
                     expval, *self.mitigator._mitigation_map_popt
                 )
-            )
+            ),
+            dtype="double",
         ).reshape(1, 1)
 
     @property
