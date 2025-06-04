@@ -45,7 +45,7 @@ class Mitigator:
                 raise ValueError("Noise map model must be a callable")
             self._mitigation_map = custom_map
             defaults = custom_map.__defaults__ or ()
-            self._mitigation_map_popt = self.backend.np.array(defaults)
+            self._mitigation_map_popt = self.backend.cast(defaults, dtype="double")
 
     def data_regression(
         self,
@@ -55,7 +55,7 @@ class Mitigator:
         nshots: Optional[int],
     ):
         """Perform data regression on noisy and exact data."""
-        _, _, popt, training_data = getattr(error_mitigation, self._mitigation_method)(
+        _, _, popt, _ = getattr(error_mitigation, self._mitigation_method)(
             circuit=circuit,
             observable=observable,
             noise_model=noise_model,
@@ -65,5 +65,5 @@ class Mitigator:
         )
 
         self._mitigation_map.__defaults__ = tuple(popt)
-        self._mitigation_map_popt = self.backend.np.array(popt)
+        self._mitigation_map_popt = self.backend.cast(popt, dtype="double")
         log.info(f"Obtained noise map params: {self._mitigation_map_popt}.")

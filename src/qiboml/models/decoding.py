@@ -194,10 +194,8 @@ class Expectation(QuantumDecoding):
         # apply mitigation if requested
         if self.mitigation_config is not None:
             expval = self.backend.cast(
-                self.backend.to_numpy(
-                    self.mitigator._mitigation_map(
-                        expval, *self.mitigator._mitigation_map_popt
-                    )
+                self.mitigator._mitigation_map(
+                    expval, *self.mitigator._mitigation_map_popt
                 ),
                 dtype="double",
             )
