@@ -30,18 +30,17 @@ class QuantumDecoding:
 
     nqubits: int
     qubits: Optional[tuple[int]] = None
+    wire_names: Optional[Union[tuple[int], Union[tuple[str]]]] = None
     nshots: Optional[int] = None
     backend: Optional[Backend] = None
     transpiler: Optional[Passes] = None
     _circuit: Circuit = None
-    _wire_names: tuple[str] = None
 
     def __post_init__(self):
         """Ancillary post initialization operations."""
-        self.qubits, self._wire_names = _get_wire_names_and_qubits(
-            self.nqubits, self.qubits
-        )
-        self._circuit = Circuit(self.nqubits, wire_names=self._wire_names)
+        if self.qubits is None:
+            self.qubits = tuple(range(self.nqubits))
+        self._circuit = Circuit(self.nqubits, wire_names=self.wire_names)
         self.backend = _check_backend(self.backend)
         self._circuit.add(gates.M(*self.qubits))
 
@@ -103,10 +102,6 @@ class QuantumDecoding:
 
     def __hash__(self) -> int:
         return hash((self.qubits, self.nshots, self.backend))
-
-    @property
-    def wire_names(self):
-        return self._wire_names
 
 
 class Probabilities(QuantumDecoding):

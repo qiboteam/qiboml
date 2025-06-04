@@ -79,7 +79,7 @@ def test_decoding_with_transpiler(backend):
 def test_decoding_wire_names(backend):
     c = Circuit(3)
     wire_names = ["a", "b", "c"]
-    layer = dec.Probabilities(3, qubits=wire_names, backend=backend)
+    layer = dec.Probabilities(3, wire_names=wire_names, backend=backend)
     layer(c)
     assert c.wire_names == wire_names
     assert layer.wire_names == wire_names
