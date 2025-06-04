@@ -36,7 +36,7 @@ sphinx-copybutton = "^0.5.2"
 sphinxcontrib-katex = "^0.9.9"
 recommonmark = "^0.7.1"
 nbsphinx = "^0.9.6"
-setuptools = "^75.8.2"
+setuptools = "^78.1.1"
 ipykernel = "^6.29.5"
 torchmetrics = "^1.7.0"
 keras = { version = "^3.0.0" }
@@ -47,7 +47,7 @@ torch = { version = "^2.3.1"}
 optional = true
 
 [tool.poetry.group.dev.dependencies]
-ipython = "^7.34"
+ipython = "^8.10.0"
 pdbpp = "^0.10.3"
 
 [tool.poetry.group.tests]
