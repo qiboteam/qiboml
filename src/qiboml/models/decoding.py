@@ -5,6 +5,7 @@ from qibo import Circuit, gates, transpiler
 from qibo.backends import Backend, _check_backend
 from qibo.config import raise_error
 from qibo.hamiltonians import Hamiltonian, Z
+from qibo.hamiltonians.hamiltonians import SymbolicHamiltonian
 from qibo.result import CircuitResult, MeasurementOutcomes, QuantumState
 from qibo.transpiler import Passes
 
@@ -142,7 +143,7 @@ class Expectation(QuantumDecoding):
     def __post_init__(self):
         """Ancillary post initialization operations."""
         if self.observable is None:
-            self.observable = Z(self.nqubits, dense=True, backend=self.backend)
+            self.observable = Z(len(self.qubits), dense=True, backend=self.backend)
         super().__post_init__()
 
     def __call__(self, x: Circuit) -> ndarray:
@@ -160,10 +161,22 @@ class Expectation(QuantumDecoding):
                 super().__call__(x).state(),
             ).reshape(1, 1)
         else:
-            return self.observable.expectation_from_samples(
-                super().__call__(x).frequencies(),
-                qubit_map=self.qubits,
-            ).reshape(1, 1)
+            if isinstance(self.observable, SymbolicHamiltonian):
+                self._circuit.density_matrix = x.density_matrix
+                self._circuit.init_kwargs["density_matrix"] = x.density_matrix
+                x = x + self._circuit
+                if self.transpiler is not None:
+                    x, _ = self.transpiler(x)
+                return self.observable.expectation_from_circuit(
+                    x,
+                    nshots=self.nshots,
+                ).reshape(1, 1)
+            else:
+                breakpoint()
+                return self.observable.expectation_from_samples(
+                    super().__call__(x).frequencies(),
+                    qubit_map=self.qubits,
+                ).reshape(1, 1)
 
     @property
     def output_shape(self) -> tuple[int, int]:

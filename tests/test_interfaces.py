@@ -460,24 +460,26 @@ def test_composition(backend, frontend):
     assert loss_untrained > loss_trained
 
 
-def test_vqe(backend, frontend):
+@pytest.mark.parametrize("dense,nshots", ((True, None), (False, 100)))
+def test_vqe(backend, frontend, dense, nshots):
+    if nshots is not None and backend.platform == "tensorflow":
+        pytest.skip(
+            "Tensorflow is too slow for the current implementation of execute_circuits."
+        )
     seed = 42
     set_device(frontend)
     set_seed(frontend, seed)
     backend.set_seed(42)
 
-    tfim = hamiltonians.TFIM(nqubits=2, backend=backend)
+    tfim = hamiltonians.TFIM(nqubits=2, h=0.1, backend=backend, dense=dense)
 
     nqubits = 2
-    dim = 2
     training_layer = ans.HardwareEfficient(
         nqubits,
         nlayers=2,
     )
     decoding_layer = dec.Expectation(
-        nqubits=nqubits,
-        backend=backend,
-        observable=tfim,
+        nqubits=nqubits, backend=backend, observable=tfim, nshots=nshots
     )
     circuit_structure = [
         training_layer,
