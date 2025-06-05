@@ -82,5 +82,5 @@ def test_decoding_wire_names(backend):
     layer = dec.Probabilities(3, wire_names=wire_names, backend=backend)
     layer(c)
     assert c.wire_names == wire_names
-    assert layer.wire_names == wire_names
+    assert list(layer.wire_names) == wire_names
     assert layer.circuit.wire_names == wire_names

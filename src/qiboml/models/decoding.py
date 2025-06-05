@@ -50,8 +50,12 @@ class QuantumDecoding:
         else:
             self.qubits = tuple(self.qubits)
         if self.wire_names is not None:
+            # self.wire_names has to be a tuple to make the decoder hashable
+            # and thus usable in Jax differentiation
             self.wire_names = tuple(self.wire_names)
-        self._circuit = Circuit(self.nqubits, wire_names=self.wire_names)
+        # I have to convert to list because qibo does not accept a tuple
+        wire_names = list(self.wire_names) if self.wire_names is not None else None
+        self._circuit = Circuit(self.nqubits, wire_names=wire_names)
         self.backend = _check_backend(self.backend)
         self._circuit.add(gates.M(*self.qubits))
 
@@ -68,8 +72,10 @@ class QuantumDecoding:
         """
         self._circuit.density_matrix = x.density_matrix
         self._circuit.init_kwargs["density_matrix"] = x.density_matrix
-        x.wire_names = self.wire_names
-        x.init_kwargs["wire_names"] = self.wire_names
+        # same problem as above
+        wire_names = list(self.wire_names) if self.wire_names is not None else None
+        x.wire_names = wire_names
+        x.init_kwargs["wire_names"] = wire_names
 
         if self.transpiler is not None:
             x, _ = self.transpiler(x)
