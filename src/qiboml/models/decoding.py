@@ -9,7 +9,6 @@ from qibo.result import CircuitResult, MeasurementOutcomes, QuantumState
 from qibo.transpiler import Passes
 
 from qiboml import ndarray
-from qiboml.models.utils import _get_wire_names_and_qubits
 
 
 @dataclass
@@ -20,8 +19,16 @@ class QuantumDecoding:
     Args:
         nqubits (int): total number of qubits.
         qubits (tuple[int], optional): set of qubits it acts on, by default ``range(nqubits)``.
-            Optionally, the name of the wires to run on can be passed through this argument.
-            This is mainly useful when executing on hardware to select which qubits to make use of.
+        wire_names (tuple[int] | tuple[str], optional): names to be given to the wires, this has to
+            have ``len`` equal to ``nqubits``. Additionally, this is mostly useful when executing
+            on hardware to select which qubits to make use of. Namely, if the chip has qubits named:
+            ```
+            ("a", "b", "c", "d")
+            ```
+            and we wish to deploy a two qubits circuit on the first and last qubits you have to build it as:
+            ```
+            decoding = QuantumDecoding(nqubits=2, wire_names=("a", "d"))
+            ```
         nshots (int, optional): number of shots used for circuit execution and sampling.
         backend (Backend, optional): backend used for computation, by default the globally-set backend is used.
         transpiler (Passes, optional): transpiler to run before circuit execution, by default no transpilation
@@ -40,6 +47,10 @@ class QuantumDecoding:
         """Ancillary post initialization operations."""
         if self.qubits is None:
             self.qubits = tuple(range(self.nqubits))
+        else:
+            self.qubits = tuple(self.qubits)
+        if self.wire_names is not None:
+            self.wire_names = tuple(self.wire_names)
         self._circuit = Circuit(self.nqubits, wire_names=self.wire_names)
         self.backend = _check_backend(self.backend)
         self._circuit.add(gates.M(*self.qubits))
@@ -101,7 +112,7 @@ class QuantumDecoding:
         return False
 
     def __hash__(self) -> int:
-        return hash((self.qubits, self.nshots, self.backend))
+        return hash((self.qubits, self.wire_names, self.nshots, self.backend))
 
 
 class Probabilities(QuantumDecoding):

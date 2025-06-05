@@ -9,7 +9,6 @@ from qibo import Circuit, gates
 from qibo.config import raise_error
 
 from qiboml import ndarray
-from qiboml.models.utils import _get_wire_names_and_qubits
 
 
 @dataclass(eq=False)
@@ -19,7 +18,7 @@ class QuantumEncoding(ABC):
 
     Args:
         nqubits (int): total number of qubits.
-        qubits (tuple[int] | tuple[str], optional): set of qubits it acts on, by default ``range(nqubits)``.
+        qubits (tuple[int], optional): set of qubits it acts on, by default ``range(nqubits)``.
         density_matrix (bool, optional): whether to build the circuit with ``density_matrix=True``, mostly useful for noisy simulations. ``density_matrix=False`` by default.
     """
 

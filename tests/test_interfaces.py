@@ -568,7 +568,7 @@ def test_qibolab(frontend):
     encoding_layer = enc.PhaseEncoding(nqubits)
     training_layer = ans.HardwareEfficient(nqubits)
     decoding_layer = dec.Expectation(
-        nqubits, qubits=["0"], backend=backend, transpiler=transpiler, nshots=1000
+        nqubits, wire_names=["0"], backend=backend, transpiler=transpiler, nshots=1000
     )
 
     activation = build_activation(
