@@ -2,9 +2,24 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from dataclasses import dataclass
-from mpl_toolkits.mplot3d import Axes3D
+from mpl_toolkits.mplot3d import Axes3D, proj3d
+from matplotlib.patches import FancyArrowPatch
+
 from qibo import hamiltonians
 from qibo.symbols import X, Y, Z
+
+
+class Arrow3D(FancyArrowPatch):
+    def __init__(self, xs, ys, zs, *args, **kwargs):
+        super().__init__((0, 0), (0, 0), *args, **kwargs)
+        self._verts3d = xs, ys, zs
+
+    def do_3d_projection(self, renderer=None):
+        xs3d, ys3d, zs3d = self._verts3d
+        xs, ys, zs = proj3d.proj_transform(xs3d, ys3d, zs3d, self.axes.M)
+        self.set_positions((xs[0], ys[0]), (xs[1], ys[1]))
+
+        return np.min(zs)
 
 
 class Bloch:
@@ -12,6 +27,9 @@ class Bloch:
         # Sizes
         self.figsize = [5, 5]
         self.fontsize = 18
+        self.arrow_style = "-|>"
+        self.arrow_width = 2.0
+        self.mutation_scale = 20
 
         # Figure and axis
         self.fig = plt.figure(figsize=self.figsize)
@@ -189,10 +207,34 @@ class Bloch:
         self.create_sphere()
 
         for color, vector in zip(self.color_vectors, self.vectors):
-            self.ax.quiver(0, 0, 0, *vector, color=color, arrow_length_ratio=0.1)
+            xs3d = vector[0] * np.array([0, 1])
+            ys3d = vector[1] * np.array([0, 1])
+            zs3d = vector[2] * np.array([0, 1])
+            a = Arrow3D(
+                xs3d,
+                ys3d,
+                zs3d,
+                lw=self.arrow_width,
+                arrowstyle=self.arrow_style,
+                mutation_scale=self.mutation_scale,
+                color=color,
+            )
+            self.ax.add_artist(a)
 
         for color, state in zip(self.color_states, self.states):
-            self.ax.quiver(0, 0, 0, *state, color=color, arrow_length_ratio=0.1)
+            xs3d = state[0] * np.array([0, 1])
+            ys3d = state[1] * np.array([0, 1])
+            zs3d = state[2] * np.array([0, 1])
+            a = Arrow3D(
+                xs3d,
+                ys3d,
+                zs3d,
+                lw=self.arrow_width,
+                arrowstyle=self.arrow_style,
+                mutation_scale=self.mutation_scale,
+                color=color,
+            )
+            self.ax.add_artist(a)
 
         for color, point in zip(self.color_points, self.points):
             self.ax.scatter(point[0], point[1], point[2], color=color, s=10)
