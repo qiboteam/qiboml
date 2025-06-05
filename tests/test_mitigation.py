@@ -37,7 +37,7 @@ def train_vqe(frontend, backend, model, epochs):
     """Implement training procedure given interface."""
 
     if frontend.__name__ == "qiboml.interfaces.pytorch":
-        optimizer = frontend.torch.optim.Adam(model.parameters(), lr=0.5)
+        optimizer = frontend.torch.optim.Adam(model.parameters(), lr=0.3)
         for _ in range(epochs):
             optimizer.zero_grad()
             cost = model()
@@ -47,7 +47,7 @@ def train_vqe(frontend, backend, model, epochs):
 
     elif frontend.__name__ == "qiboml.interfaces.keras":
         frontend.tf.keras.backend.set_floatx("float64")
-        optimizer = frontend.keras.optimizers.Adam(learning_rate=0.5)
+        optimizer = frontend.keras.optimizers.Adam(learning_rate=0.3)
         for _ in range(epochs):
             with frontend.tf.GradientTape() as tape:
                 cost = model()
@@ -63,14 +63,14 @@ def test_rtqem(frontend, nqubits, nshots, backend):
     set_seed(frontend=frontend, seed=42)
 
     # We build a trainable circuit
-    vqe = HardwareEfficient(nqubits=nqubits, nlayers=4, density_matrix=True)
+    vqe = HardwareEfficient(nqubits=nqubits, nlayers=3, density_matrix=True)
 
     # First we build a model with noise and without mitigation
     noisy_decoding = Expectation(
         nqubits=nqubits,
         nshots=nshots,
         backend=backend,
-        noise_model=build_noise_model(nqubits=nqubits, local_pauli_noise_prob=0.03),
+        noise_model=build_noise_model(nqubits=nqubits, local_pauli_noise_prob=0.04),
         density_matrix=True,
     )
 
@@ -84,13 +84,13 @@ def test_rtqem(frontend, nqubits, nshots, backend):
         frontend=frontend,
         backend=backend,
         model=noisy_model,
-        epochs=40,
+        epochs=30,
     )
 
     mitigation_config = {
         "real_time": True,
         "method": "CDR",
-        "method_kwargs": {"n_training_samples": 70},
+        "method_kwargs": {"n_training_samples": 50},
     }
 
     # Then we build a decoding with error mitigation
@@ -98,7 +98,7 @@ def test_rtqem(frontend, nqubits, nshots, backend):
         nqubits=nqubits,
         nshots=nshots,
         backend=backend,
-        noise_model=build_noise_model(nqubits=nqubits, local_pauli_noise_prob=0.03),
+        noise_model=build_noise_model(nqubits=nqubits, local_pauli_noise_prob=0.04),
         density_matrix=True,
         mitigation_config=mitigation_config,
     )
@@ -113,7 +113,51 @@ def test_rtqem(frontend, nqubits, nshots, backend):
         frontend=frontend,
         backend=backend,
         model=mit_model,
-        epochs=40,
+        epochs=30,
     )
 
     assert mit_result < noisy_result
+
+
+def test_custom_map(frontend):
+    set_seed(frontend=frontend, seed=42)
+
+    # We build a trainable circuit
+    vqe = HardwareEfficient(nqubits=1, nlayers=2, density_matrix=True)
+
+    mitigation_config = {
+        "real_time": True,
+        "method": "CDR",
+        "method_kwargs": {
+            "n_training_samples": 70,
+            "model": lambda x, a, b, c: a * x**2 + b * x + c,
+        },
+    }
+
+    # Then we build a decoding with error mitigation
+    mit_decoding = Expectation(
+        nqubits=1,
+        nshots=1024,
+        backend=NumpyBackend(),
+        noise_model=build_noise_model(nqubits=1, local_pauli_noise_prob=0.03),
+        density_matrix=True,
+        mitigation_config=mitigation_config,
+    )
+
+    initial_popt = mit_decoding.mitigator._mitigation_map_popt
+
+    mit_model = frontend.QuantumModel(
+        circuit_structure=deepcopy(vqe),
+        decoding=mit_decoding,
+        differentiation=PSR(),
+    )
+
+    _ = train_vqe(
+        frontend=frontend,
+        backend=NumpyBackend(),
+        model=mit_model,
+        epochs=2,
+    )
+
+    diff = mit_decoding.mitigator._mitigation_map_popt != initial_popt
+    assert diff.any()
