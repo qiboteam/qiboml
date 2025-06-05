@@ -1,14 +1,16 @@
 from dataclasses import dataclass
-from typing import Optional, Union
+from typing import Any, Dict, Optional, Union
 
 from qibo import Circuit, gates, transpiler
 from qibo.backends import Backend, _check_backend
-from qibo.config import raise_error
+from qibo.config import log, raise_error
 from qibo.hamiltonians import Hamiltonian, Z
+from qibo.noise import NoiseModel
 from qibo.result import CircuitResult, MeasurementOutcomes, QuantumState
 from qibo.transpiler import Passes
 
 from qiboml import ndarray
+from qiboml.models.utils import Mitigator
 
 
 @dataclass
@@ -30,6 +32,8 @@ class QuantumDecoding:
     nshots: Optional[int] = None
     backend: Optional[Backend] = None
     transpiler: Optional[Passes] = None
+    noise_model: Optional[NoiseModel] = None
+    density_matrix: Optional[bool] = False
     _circuit: Circuit = None
 
     def __post_init__(self):
@@ -37,7 +41,7 @@ class QuantumDecoding:
         self.qubits = (
             tuple(range(self.nqubits)) if self.qubits is None else tuple(self.qubits)
         )
-        self._circuit = Circuit(self.nqubits)
+        self._circuit = Circuit(self.nqubits, density_matrix=self.density_matrix)
         self.backend = _check_backend(self.backend)
         self._circuit.add(gates.M(*self.qubits))
 
@@ -53,10 +57,21 @@ class QuantumDecoding:
             (CircuitResult | QuantumState | MeasurementOutcomes): the execution ``qibo.result`` object.
         """
         self._circuit.density_matrix = x.density_matrix
-        self._circuit.init_kwargs["density_matrix"] = x.density_matrix
+        # Forcing the density matrix simulation if a noise model is given
+        if self.noise_model is not None:
+            self._circuit.init_kwargs["density_matrix"] = True
+        else:
+            self._circuit.init_kwargs["density_matrix"] = x.density_matrix
+
         if self.transpiler is not None:
             x, _ = self.transpiler(x)
-        return self.backend.execute_circuit(x + self._circuit, nshots=self.nshots)
+
+        if self.noise_model is not None:
+            executable_circuit = self.noise_model.apply(x + self._circuit)
+        else:
+            executable_circuit = x + self._circuit
+
+        return self.backend.execute_circuit(executable_circuit, nshots=self.nshots)
 
     @property
     def circuit(
@@ -130,56 +145,70 @@ class Probabilities(QuantumDecoding):
 
 @dataclass
 class Expectation(QuantumDecoding):
-    r"""The expectation value decoder.
-
-    Args:
-        observable (Hamiltonian | ndarray): the observable to calculate the expectation value of,
-    by default :math:`Z_0\otimes Z_1\otimes ... \otimes Z_n` is used.
-    """
+    """The expectation value decoder."""
 
     observable: Union[ndarray, Hamiltonian] = None
+    mitigation_config: Optional[Dict[str, Any]] = None
 
     def __post_init__(self):
-        """Ancillary post initialization operations."""
         if self.observable is None:
             self.observable = Z(self.nqubits, dense=True, backend=self.backend)
+
+        # If mitigation is requested
+        if self.mitigation_config is not None:
+            # Construct the Mitigator object
+            self.mitigator = Mitigator(
+                mitigation_config=self.mitigation_config,
+                backend=self.backend,
+            )
+
         super().__post_init__()
 
     def __call__(self, x: Circuit) -> ndarray:
-        """Execute the input circuit and calculate the expectation value of the internal observable on
-        the final state
+        # recompute map if real-time enabled and not yet run
+        if (
+            self.mitigation_config is not None
+            and self.mitigator._real_time_mitigation
+            and self.backend.np.allclose(
+                self.mitigator._mitigation_map_popt,
+                self.mitigator._mitigation_map_initial_popt,
+                atol=1e-6,
+            )
+        ):
+            self.mitigator.data_regression(
+                circuit=x + self._circuit,
+                observable=self.observable,
+                noise_model=self.noise_model,
+                nshots=self.nshots,
+            )
 
-        Args:
-            x (Circuit): input Circuit.
-
-        Returns:
-            (ndarray): the calculated expectation value.
-        """
+        # run circuit
         if self.analytic:
-            return self.observable.expectation(
-                super().__call__(x).state(),
-            ).reshape(1, 1)
+            expval = self.observable.expectation(super().__call__(x).state())
         else:
-            return self.observable.expectation_from_samples(
-                super().__call__(x).frequencies(),
-                qubit_map=self.qubits,
-            ).reshape(1, 1)
+            freqs = super().__call__(x).frequencies()
+            expval = self.observable.expectation_from_samples(
+                freqs, qubit_map=self.qubits
+            )
+
+        # apply mitigation if requested
+        if self.mitigation_config is not None:
+            expval = self.backend.cast(
+                self.backend.to_numpy(
+                    self.mitigator._mitigation_map(
+                        expval, *self.mitigator._mitigation_map_popt
+                    )
+                ),
+                dtype="double",
+            )
+
+        return expval.reshape(1, 1)
 
     @property
     def output_shape(self) -> tuple[int, int]:
-        """Shape of the output expectation value.
-
-        Returns:
-            (tuple[int, int]): a ``(1, 1)`` shape.
-        """
         return (1, 1)
 
     def set_backend(self, backend: Backend):
-        """Set the internal and observable's backends.
-
-        Args:
-            backend (Backend): backend to be set.
-        """
         if isinstance(self.observable, Hamiltonian):
             matrix = self.backend.to_numpy(self.observable.matrix)
             super().set_backend(backend)
