@@ -30,6 +30,10 @@ class Bloch:
         self.arrow_style = "-|>"
         self.arrow_width = 2.0
         self.mutation_scale = 20
+        self.linewidth = 0.9
+        self.linecolor = "#383838"
+        self.main_alpha = 0.6
+        self.secondary_alpha = 0.2
 
         # Figure and axis
         self.fig = plt.figure(figsize=self.figsize)
@@ -76,28 +80,70 @@ class Bloch:
         z = np.zeros(100)
         x = np.sin(theta)
         y = np.cos(theta)
-        self.ax.plot(x, y, z, color="black", alpha=0.25)
-        self.ax.plot(z, x, y, color="black", alpha=0.25)
-        self.ax.plot(y, z, x, color="black", alpha=0.1)
+        self.ax.plot(
+            x,
+            y,
+            z,
+            color=self.linecolor,
+            alpha=self.main_alpha,
+            linewidth=self.linewidth,
+        )
+        self.ax.plot(
+            z,
+            x,
+            y,
+            color=self.linecolor,
+            alpha=self.main_alpha,
+            linewidth=self.linewidth,
+        )
+        self.ax.plot(
+            y,
+            z,
+            x,
+            color=self.linecolor,
+            alpha=self.main_alpha,
+            linewidth=self.linewidth,
+        )
 
         # Latitude
         z1 = np.full(100, 0.4)
         r1 = np.sqrt(1 - z1[0] ** 2)
         x1 = r1 * np.cos(theta)
         y1 = r1 * np.sin(theta)
-        self.ax.plot(x1, y1, z1, color="black", alpha=0.1)
+        self.ax.plot(
+            x1,
+            y1,
+            z1,
+            color=self.linecolor,
+            alpha=self.secondary_alpha,
+            linewidth=self.linewidth,
+        )
 
         z1 = np.full(100, 0.9)
         r1 = np.sqrt(1 - z1[0] ** 2)
         x1 = r1 * np.cos(theta)
         y1 = r1 * np.sin(theta)
-        self.ax.plot(x1, y1, z1, color="black", alpha=0.1)
+        self.ax.plot(
+            x1,
+            y1,
+            z1,
+            color=self.linecolor,
+            alpha=self.secondary_alpha,
+            linewidth=self.linewidth,
+        )
 
         z2 = np.full(100, -0.9)
         r2 = np.sqrt(1 - z2[0] ** 2)
         x2 = r2 * np.cos(theta)
         y2 = r2 * np.sin(theta)
-        self.ax.plot(x2, y2, z2, color="black", alpha=0.1)
+        self.ax.plot(
+            x2,
+            y2,
+            z2,
+            color=self.linecolor,
+            alpha=self.secondary_alpha,
+            linewidth=self.linewidth,
+        )
 
         # Longitude
         phi_list = np.linspace(0, 2 * np.pi, 6)
@@ -107,15 +153,43 @@ class Bloch:
             x = np.sin(theta) * np.cos(phi)
             y = np.sin(theta) * np.sin(phi)
             z = np.cos(theta)
-            self.ax.plot(x, y, z, color="black", alpha=0.1)
+            self.ax.plot(
+                x,
+                y,
+                z,
+                color=self.linecolor,
+                alpha=self.secondary_alpha,
+                linewidth=self.linewidth,
+            )
 
         # ----Axis lines----
         line = np.linspace(-1, 1, 100)
         zeros = np.zeros_like(line)
 
-        self.ax.plot(line, zeros, zeros, color="black", alpha=0.3)
-        self.ax.plot(zeros, line, zeros, color="black", alpha=0.3)
-        self.ax.plot(zeros, zeros, line, color="black", alpha=0.3)
+        self.ax.plot(
+            line,
+            zeros,
+            zeros,
+            color=self.linecolor,
+            alpha=self.main_alpha,
+            linewidth=self.linewidth,
+        )
+        self.ax.plot(
+            zeros,
+            line,
+            zeros,
+            color=self.linecolor,
+            alpha=self.main_alpha,
+            linewidth=self.linewidth,
+        )
+        self.ax.plot(
+            zeros,
+            zeros,
+            line,
+            color=self.linecolor,
+            alpha=self.main_alpha,
+            linewidth=self.linewidth,
+        )
 
         self.ax.text(1.2, 0, 0, "x", color="black", fontsize=self.fontsize, ha="center")
         self.ax.text(0, 1.2, 0, "y", color="black", fontsize=self.fontsize, ha="center")
