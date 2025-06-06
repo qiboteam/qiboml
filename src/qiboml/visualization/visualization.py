@@ -52,6 +52,20 @@ class Bloch:
         self.color_points = []
         self.color_vectors = []
 
+    def check(self, element):
+        if len(element) == 2:
+            total_prob = sum(np.abs(amplitude) ** 2 for amplitude in element)
+            if not np.isclose(total_prob, 1):
+                raise ValueError("Unnormalized state detected")
+        elif len(element) == 3:
+            norm = np.linalg.norm(element)
+            if not np.isclose(norm, 1.0):
+                raise ValueError("The vector does not lie on the Bloch sphere")
+        else:
+            raise ValueError(
+                "Only two (states) or three (vectors) dimensional objects can be plotted."
+            )
+
     def clear(self):
         # Data
         self.states = []
@@ -246,12 +260,28 @@ class Bloch:
 
         if mode == "vector":
             for c, element in zip(color, elements):
-                self.color_vectors.append(c)
-                self.vectors.append(element)
+                self.check(element)
+                # If the element has length two it means
+                # that it is a state
+                if len(element) == 2:
+                    x, y, z = self.coordinates(element)
+                    element = np.array([x, y, z])
+                    self.color_vectors.append(c)
+                    self.vectors.append(element)
+                else:
+                    self.color_vectors.append(c)
+                    self.vectors.append(element)
         elif mode == "point":
             for c, element in zip(color, elements):
-                self.color_points.append(c)
-                self.points.append(element)
+                self.check(element)
+                if len(element) == 2:
+                    x, y, z = self.coordinates(element)
+                    element = np.array([x, y, z])
+                    self.color_points.append(c)
+                    self.points.append(element)
+                else:
+                    self.color_points.append(c)
+                    self.points.append(element)
         else:
             RaiseError("Unknown mode. Only 'vector' and 'point' are available.")
 
@@ -266,6 +296,7 @@ class Bloch:
             color = [color] * len(states)
 
         for c, state in zip(color, states):
+            self.check(state)
             x, y, z = self.coordinates(state)
             self.color_states.append(c)
             self.states.append(np.array([x, y, z]))
