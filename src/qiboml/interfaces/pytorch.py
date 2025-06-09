@@ -67,13 +67,11 @@ class QuantumModel(torch.nn.Module):
                     raise ValueError(
                         f"Shape not valid for angles_initialisation. The shape should be {params.shape}."
                     )
-                params = torch.as_tensor(
+                parameters = torch.as_tensor(
                     self.backend.to_numpy(x=self.angles_initialisation)
                 ).ravel()
-                print(params)
-                self.circuit_parameters = torch.nn.Parameter(
-                    self.angles_initialisation, requires_grad=True
-                )
+                parameters.requires_grad = True
+                self.circuit_parameters = torch.nn.Parameter(parameters)
 
         if self.differentiation is None:
             self.differentiation = utils.get_default_differentiation(
