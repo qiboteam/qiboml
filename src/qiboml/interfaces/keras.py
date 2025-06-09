@@ -44,6 +44,9 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
 
     circuit_structure: Union[Circuit, List[Union[Circuit, QuantumEncoding]]]
     decoding: QuantumDecoding
+    angles_initialisation: Optional[
+        Union[keras.initializers.Initializer, np.ndarray]
+    ] = None
     differentiation: Optional[Differentiation] = None
 
     def __post_init__(self):
@@ -58,10 +61,32 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
             self.backend.to_numpy(params), "float64"
         )  # pylint: disable=no-member
 
-        self.circuit_parameters = self.add_weight(
-            shape=params.shape, initializer="zeros", trainable=True
-        )
-        self.set_weights([params])
+        if self.angles_initialisation is None:
+            self.circuit_parameters = self.add_weight(
+                shape=params.shape,
+                initializer=keras.initializers.RandomNormal(stddev=0.01),
+                trainable=True,
+            )
+
+        else:
+            if isinstance(self.angles_initialisation, keras.initializers.Initializer):
+                self.circuit_parameters = self.add_weight(
+                    shape=params.shape,
+                    initializer=self.angles_initialisation,
+                    trainable=True,
+                )
+
+            elif isinstance(self.angles_initialisation, np.ndarray):
+                if self.angles_initialisation.shape != params.shape:
+                    raise ValueError(
+                        f"Shape not valid for angles_initialisation. The shape should be {params.shape}."
+                    )
+                self.circuit_parameters = self.add_weight(
+                    shape=params.shape,
+                    initializer="zeros",
+                    trainable=True,
+                )
+                self.circuit_parameters.assign(self.angles_initialisation)
 
         if self.differentiation is None:
             self.differentiation = utils.get_default_differentiation(
