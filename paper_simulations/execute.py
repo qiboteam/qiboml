@@ -119,7 +119,7 @@ def main(
         return 1 * torch.sin(x) ** 2 - 0.3 * torch.cos(x)
 
     num_samples = 20
-    x_all = torch.linspace(0, 2 * np.pi, num_samples, dtype=torch.float64).unsqueeze(1)
+    x_all = torch.linspace(0, 2 * np.pi, num_samples, dtype=torch.float32).unsqueeze(1)
     perm = torch.randperm(x_all.size(0))
     x_train = x_all[perm]
     y_train = f(x_train)
