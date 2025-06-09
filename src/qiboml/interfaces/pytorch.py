@@ -39,6 +39,7 @@ class QuantumModel(torch.nn.Module):
 
     circuit_structure: Union[Circuit, List[Union[Circuit, QuantumEncoding]]]
     decoding: QuantumDecoding
+    angles_initialisation: Optional[Union[np.ndarray, callable]] = None
     differentiation: Optional[Differentiation] = None
 
     def __post_init__(
@@ -52,8 +53,27 @@ class QuantumModel(torch.nn.Module):
 
         params = utils.get_params_from_circuit_structure(self.circuit_structure)
         params = torch.as_tensor(self.backend.to_numpy(x=params)).ravel()
-        params.requires_grad = True
-        self.circuit_parameters = torch.nn.Parameter(params)
+
+        if self.angles_initialisation is None:
+            self.circuit_parameters = torch.nn.Parameter(torch.empty(params.shape))
+            torch.nn.init.normal_(self.circuit_parameters, mean=0.0, std=0.01)
+        else:
+            if callable(self.angles_initialisation):
+                self.circuit_parameters = torch.empty(params.shape)
+                self.angles_initialisation(self.circuit_parameters)
+            elif isinstance(self.angles_initialisation, np.ndarray):
+                print("3")
+                if self.angles_initialisation.shape != params.shape:
+                    raise ValueError(
+                        f"Shape not valid for angles_initialisation. The shape should be {params.shape}."
+                    )
+                params = torch.as_tensor(
+                    self.backend.to_numpy(x=self.angles_initialisation)
+                ).ravel()
+                print(params)
+                self.circuit_parameters = torch.nn.Parameter(
+                    self.angles_initialisation, requires_grad=True
+                )
 
         if self.differentiation is None:
             self.differentiation = utils.get_default_differentiation(
