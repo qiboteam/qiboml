@@ -51,7 +51,12 @@ class QuantumModel(torch.nn.Module):
         utils._uniform_circuit_structure(self.circuit_structure)
 
         params = utils.get_params_from_circuit_structure(self.circuit_structure)
-        params = torch.as_tensor(self.backend.to_numpy(x=params)).ravel()
+        self._independent_params_map = utils._independent_params_map(params)
+        params = torch.as_tensor(
+            self.backend.to_numpy(
+                x=[params[i] for i in self._independent_params_map.keys()]
+            )
+        ).ravel()
         params.requires_grad = True
         self.circuit_parameters = torch.nn.Parameter(params)
 
@@ -77,7 +82,10 @@ class QuantumModel(torch.nn.Module):
                 x=x,
             )
 
-            circuit.set_parameters(list(self.parameters())[0])
+            # circuit.set_parameters(list(self.parameters())[0])
+            utils.set_parameters(
+                circuit, list(self.parameters())[0], self._independent_params_map
+            )
             x = self.decoding(circuit)
         else:
             x = QuantumModelAutoGrad.apply(

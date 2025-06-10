@@ -111,3 +111,47 @@ def _uniform_circuit_structure(circuit_structure):
     density_matrix = any(circ.density_matrix for circ in circuit_structure)
     for circ in circuit_structure:
         circ.density_matrix = density_matrix
+
+
+def _independent_params_map(params):
+    """
+    Extract the independent parameters among ``params`` by looking for all the
+    elements of ``params`` that share the same memory (numpy.shares_memory).
+    After that, a mapping is built that associates the index of an independent
+    element with all the indices where it is repeated, for instance if ``params``
+    is:
+
+    array([0.1, 0.2, 0.1, 0.1, 0.2])
+
+    the constructed map will be:
+
+    {0: {0,2,3}, 1: {1,4}}
+
+    (modulo the set ordering)
+    """
+    # the first element is surely independent, start from there
+    imap = {0: {0}}
+    # check all the other parameters
+    for i, p1 in enumerate(params[1:], start=1):
+        # check if any of the independent elements in imap share the
+        # memory with the current element
+        keys = [j for j in imap if np.shares_memory(p1, params[j])]
+        # none found -> i (p1) is independent
+        if len(keys) == 0:
+            imap[i] = {i}
+        # not independent, add i to the j (it should be only one) that
+        # shares the memory with it
+        else:
+            for j in keys:
+                imap[j].add(i)
+    return imap
+
+
+def set_parameters(circuit, params, imap):
+    new_params = len(circuit.get_parameters()) * [
+        None,
+    ]
+    for p, indices in zip(params, imap.values()):
+        for i in indices:
+            new_params[i] = p
+    circuit.set_parameters(new_params)
