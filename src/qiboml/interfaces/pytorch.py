@@ -62,8 +62,8 @@ class QuantumModel(torch.nn.Module):
                 self.circuit_parameters = torch.empty(params.shape)
                 self.angles_initialisation(self.circuit_parameters)
             elif isinstance(self.angles_initialisation, np.ndarray):
-                print("3")
                 if self.angles_initialisation.shape != params.shape:
+                    params = params.numpy()
                     raise ValueError(
                         f"Shape not valid for angles_initialisation. The shape should be {params.shape}."
                     )
