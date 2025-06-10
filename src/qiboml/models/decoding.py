@@ -35,6 +35,12 @@ class QuantumDecoding:
         backend (Backend, optional): backend used for computation, by default the globally-set backend is used.
         transpiler (Passes, optional): transpiler to run before circuit execution, by default no transpilation
                                        is performed on the circuit (``transpiler=None``).
+        noise_model (NoiseModel): a ``NoiseModel`` of Qibo, which is applied to the
+            given circuit to perform noisy simulations. Default is ``None`` and,
+            in case Qibolab is used to execute on real quantum hardware, the noise
+            will be the one of the real device.
+        density_matrix (bool): if ``True``, density matrix simulation is performed
+            instead of state-vector simulation.
     """
 
     nqubits: int
@@ -171,12 +177,25 @@ class Probabilities(QuantumDecoding):
 
 @dataclass
 class Expectation(QuantumDecoding):
-    """The expectation value decoder."""
+    r"""The expectation value decoder.
+
+    Args:
+        observable (Hamiltonian | ndarray): the observable to calculate the expectation value of,
+            by default :math:`Z_0\otimes Z_1\otimes ... \otimes Z_n` is used.
+        mitigation_config (dict): configuration of the quantum error mitigation
+            method in case it is desired. For example, one can set:
+            ```
+            mitigation_config = {
+                "real_time": True,
+                "method": "CDR",
+            }
+    """
 
     observable: Union[ndarray, Hamiltonian] = None
     mitigation_config: Optional[Dict[str, Any]] = None
 
     def __post_init__(self):
+        """Ancillary post initialization operations."""
         if self.observable is None:
             self.observable = Z(self.nqubits, dense=True, backend=self.backend)
 
@@ -191,6 +210,16 @@ class Expectation(QuantumDecoding):
         super().__post_init__()
 
     def __call__(self, x: Circuit) -> ndarray:
+        """
+        Execute the input circuit and calculate the expectation value of
+        the internal observable on the final state.
+
+        Args:
+            x (Circuit): input Circuit.
+
+        Returns:
+            (ndarray): the calculated expectation value.
+        """
         # recompute map if real-time enabled and not yet run
         if (
             self.mitigation_config is not None
@@ -232,9 +261,19 @@ class Expectation(QuantumDecoding):
 
     @property
     def output_shape(self) -> tuple[int, int]:
+        """Shape of the output expectation value.
+
+        Returns:
+            (tuple[int, int]): a ``(1, 1)`` shape.
+        """
         return (1, 1)
 
     def set_backend(self, backend: Backend):
+        """Set the internal and observable's backends.
+
+        Args:
+            backend (Backend): backend to be set.
+        """
         if isinstance(self.observable, Hamiltonian):
             matrix = self.backend.to_numpy(self.observable.matrix)
             super().set_backend(backend)
