@@ -20,7 +20,7 @@ keras = { version = "^3.0.0", optional = true }
 tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux' or sys_platform == 'darwin'", optional = true }
 # TODO: the marker is a temporary solution due to the lack of the tensorflow-io 0.32.0's wheels for Windows, this package is one of
 # the tensorflow requirements
-torch = { version = "^2.3.1", optional = true}
+torch = { version = "^2.7.0", optional = true}
 qibo = "^0.2.17"
 jax = "^0.4.25"
 jaxlib = "^0.4.25"
@@ -36,18 +36,18 @@ sphinx-copybutton = "^0.5.2"
 sphinxcontrib-katex = "^0.9.9"
 recommonmark = "^0.7.1"
 nbsphinx = "^0.9.6"
-setuptools = "^75.8.2"
+setuptools = "^78.1.1"
 ipykernel = "^6.29.5"
 torchmetrics = "^1.7.0"
 keras = { version = "^3.0.0" }
 tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux' or sys_platform == 'darwin'"}
-torch = { version = "^2.3.1"}
+torch = { version = "^2.7.0"}
 
 [tool.poetry.group.dev]
 optional = true
 
 [tool.poetry.group.dev.dependencies]
-ipython = "^7.34"
+ipython = "^8.34.0"
 pdbpp = "^0.10.3"
 
 [tool.poetry.group.tests]
@@ -61,7 +61,7 @@ qibojit = "^0.1.7"
 matplotlib = "^3.7.0"
 keras = "^3.0.0"
 tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux' or sys_platform == 'darwin'"}
-torch = { version = "^2.3.1"}
+torch = { version = "^2.7.0"}
 qibolab = { git="https://github.com/qiboteam/qibolab", extras=["emulator"] }
 
 [tool.poetry.group.cuda11]

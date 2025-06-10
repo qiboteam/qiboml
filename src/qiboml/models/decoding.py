@@ -21,6 +21,16 @@ class QuantumDecoding:
     Args:
         nqubits (int): total number of qubits.
         qubits (tuple[int], optional): set of qubits it acts on, by default ``range(nqubits)``.
+        wire_names (tuple[int] | tuple[str], optional): names to be given to the wires, this has to
+            have ``len`` equal to ``nqubits``. Additionally, this is mostly useful when executing
+            on hardware to select which qubits to make use of. Namely, if the chip has qubits named:
+            ```
+            ("a", "b", "c", "d")
+            ```
+            and we wish to deploy a two qubits circuit on the first and last qubits you have to build it as:
+            ```
+            decoding = QuantumDecoding(nqubits=2, wire_names=("a", "d"))
+            ```
         nshots (int, optional): number of shots used for circuit execution and sampling.
         backend (Backend, optional): backend used for computation, by default the globally-set backend is used.
         transpiler (Passes, optional): transpiler to run before circuit execution, by default no transpilation
@@ -29,6 +39,7 @@ class QuantumDecoding:
 
     nqubits: int
     qubits: Optional[tuple[int]] = None
+    wire_names: Optional[Union[tuple[int], Union[tuple[str]]]] = None
     nshots: Optional[int] = None
     backend: Optional[Backend] = None
     transpiler: Optional[Passes] = None
@@ -38,10 +49,19 @@ class QuantumDecoding:
 
     def __post_init__(self):
         """Ancillary post initialization operations."""
-        self.qubits = (
-            tuple(range(self.nqubits)) if self.qubits is None else tuple(self.qubits)
+        if self.qubits is None:
+            self.qubits = tuple(range(self.nqubits))
+        else:
+            self.qubits = tuple(self.qubits)
+        if self.wire_names is not None:
+            # self.wire_names has to be a tuple to make the decoder hashable
+            # and thus usable in Jax differentiation
+            self.wire_names = tuple(self.wire_names)
+        # I have to convert to list because qibo does not accept a tuple
+        wire_names = list(self.wire_names) if self.wire_names is not None else None
+        self._circuit = Circuit(
+            self.nqubits, wire_names=wire_names, density_matrix=self.density_matrix
         )
-        self._circuit = Circuit(self.nqubits, density_matrix=self.density_matrix)
         self.backend = _check_backend(self.backend)
         self._circuit.add(gates.M(*self.qubits))
 
@@ -56,12 +76,18 @@ class QuantumDecoding:
         Returns:
             (CircuitResult | QuantumState | MeasurementOutcomes): the execution ``qibo.result`` object.
         """
-        self._circuit.density_matrix = x.density_matrix
         # Forcing the density matrix simulation if a noise model is given
         if self.noise_model is not None:
-            self._circuit.init_kwargs["density_matrix"] = True
+            density_matrix = True
         else:
-            self._circuit.init_kwargs["density_matrix"] = x.density_matrix
+            density_matrix = self.density_matrix
+        # Aligning the density_matrix attribute of all the circuits
+        self._circuit.init_kwargs["density_matrix"] = density_matrix
+        x.init_kwargs["density_matrix"] = density_matrix
+
+        wire_names = list(self.wire_names) if self.wire_names is not None else None
+        x.wire_names = wire_names
+        x.init_kwargs["wire_names"] = wire_names
 
         if self.transpiler is not None:
             x, _ = self.transpiler(x)
@@ -110,7 +136,7 @@ class QuantumDecoding:
         return False
 
     def __hash__(self) -> int:
-        return hash((self.qubits, self.nshots, self.backend))
+        return hash((self.qubits, self.wire_names, self.nshots, self.backend))
 
 
 class Probabilities(QuantumDecoding):

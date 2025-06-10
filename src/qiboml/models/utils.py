@@ -68,3 +68,17 @@ class Mitigator:
         self._mitigation_map.__defaults__ = tuple(popt)
         self._mitigation_map_popt = self.backend.np.array(popt)
         log.info(f"Obtained noise map params: {self._mitigation_map_popt}.")
+
+
+def _get_wire_names_and_qubits(nqubits, qubits):
+    if qubits is not None:
+        if isinstance(qubits[0], str):
+            wire_names = qubits
+            qubits = tuple(range(len(qubits)))
+        else:
+            qubits = tuple(qubits)
+            wire_names = None
+    else:
+        qubits = tuple(range(nqubits))
+        wire_names = None
+    return qubits, wire_names

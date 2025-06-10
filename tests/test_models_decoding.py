@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from qibo import gates, hamiltonians
+from qibo import Circuit, gates, hamiltonians
 from qibo.quantum_info import random_clifford
 from qibo.symbols import Z
 from qibo.transpiler import NativeGates, Passes, Sabre, Unroller
@@ -74,3 +74,13 @@ def test_decoding_with_transpiler(backend):
     )
     layer = dec.Probabilities(3, transpiler=transpiler, backend=backend)
     backend.assert_allclose(backend.execute_circuit(c).probabilities(), layer(c))
+
+
+def test_decoding_wire_names(backend):
+    c = Circuit(3)
+    wire_names = ["a", "b", "c"]
+    layer = dec.Probabilities(3, wire_names=wire_names, backend=backend)
+    layer(c)
+    assert c.wire_names == wire_names
+    assert list(layer.wire_names) == wire_names
+    assert layer.circuit.wire_names == wire_names
