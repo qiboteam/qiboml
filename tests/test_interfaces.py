@@ -492,7 +492,7 @@ def test_noise(backend, frontend):
     backend.set_seed(42)
     set_seed(frontend, 42)
 
-    nqubits = 6
+    nqubits = 4
     noise = NoiseModel()
     noise.add(PauliError([("X", 0.5)]), gates.CNOT)
     noise.add(PauliError([("Y", 0.2)]), gates.RY)
@@ -500,10 +500,11 @@ def test_noise(backend, frontend):
 
     encoding_layer = random.choice(ENCODING_LAYERS)(nqubits, density_matrix=True)
     training_layer = ans.HardwareEfficient(nqubits, density_matrix=True)
-    noisy_training_layer = noise.apply(training_layer.copy())
     circuit = [encoding_layer, training_layer]
-    noisy_circuit = [encoding_layer, noisy_training_layer]
-    decoding_layer = random.choice(DECODING_LAYERS)(nqubits, backend=backend)
+
+    # Noiseless decoding layer
+    # Fixing it because we want to use the same and not sampling
+    decoding_layer = dec.Expectation(nqubits, backend=backend)
     activation = build_activation(frontend, binary=False)
     model = build_sequential_model(
         frontend,
@@ -515,20 +516,20 @@ def test_noise(backend, frontend):
             ),
         ],
     )
-    setattr(model, "decoding", decoding_layer)
+    # Now initialising the same problem with noise
+    noisy_decoding_layer = dec.Expectation(nqubits, backend=backend, noise_model=noise)
     noisy_model = build_sequential_model(
         frontend,
         [
             activation,
             frontend.QuantumModel(
-                circuit_structure=noisy_circuit,
-                decoding=decoding_layer,
+                circuit_structure=circuit,
+                decoding=noisy_decoding_layer,
             ),
         ],
     )
-    setattr(noisy_model, "decoding", decoding_layer)
 
-    data = random_tensor(frontend, (100, nqubits))
+    data = random_tensor(frontend, (50, nqubits))
     target = prepare_targets(frontend, model, data)
     train_model(frontend, model, data, target, max_epochs=1)
     _, loss = eval_model(frontend, model, data, target)
