@@ -35,7 +35,7 @@ class Mitigator:
         self._mitigation_method = cfg.get("method", "cdr")
         self._mitigation_method_kwargs = cfg.get("method_kwargs", {})
 
-        custom_map = cfg.get("method_kwargs", {}).get("model")
+        custom_map = self._mitigation_method_kwargs.get("model")
         if custom_map is not None:
             if not callable(custom_map):
                 raise ValueError("Noise map model must be a callable")
@@ -66,7 +66,7 @@ class Mitigator:
         )
 
         self._mitigation_map.__defaults__ = tuple(popt)
-        self._mitigation_map_popt = self.backend.np.array(popt)
+        self._mitigation_map_popt = self.backend.cast(popt, dtype="double")
         log.info(f"Obtained noise map params: {self._mitigation_map_popt}.")
 
 
