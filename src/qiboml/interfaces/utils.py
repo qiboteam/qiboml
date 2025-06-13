@@ -151,7 +151,7 @@ def set_parameters(circuit, params, imap):
     new_params = len(circuit.get_parameters()) * [
         None,
     ]
-    for p, indices in zip(params, imap.values()):
-        for i in indices:
-            new_params[i] = p
+    for i in range(len(imap)):
+        for j in imap[i]:
+            new_params[j] = params[i]
     circuit.set_parameters(new_params)
