@@ -159,9 +159,7 @@ class JaxBackend(NumpyBackend):
         return matrix
 
     def zero_state(self, nqubits):
-        state = self.np.zeros(2**nqubits, dtype=self.dtype)
-        state = state.at[0].set(1)
-        return state
+        return zero_state(nqubits, self.dtype)
 
     def zero_density_matrix(self, nqubits):
         state = self.np.zeros(2 * (2**nqubits,), dtype=self.dtype)
@@ -250,6 +248,3 @@ class JaxBackend(NumpyBackend):
             state = self.np.einsum(right, state, matrixc)
             state = self.np.einsum(left, state, matrix)
         return self.np.reshape(state, 2 * (2**nqubits,))
-
-    def zero_state(self, nqubits):
-        return zero_state(nqubits, self.dtype)
