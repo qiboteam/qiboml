@@ -4,6 +4,7 @@ import random
 
 import numpy as np
 import pytest
+import torch
 from qibo import construct_backend, gates, hamiltonians
 from qibo.config import raise_error
 from qibo.noise import NoiseModel, PauliError
@@ -261,11 +262,17 @@ def random_parameters(frontend, model):
     return new_params
 
 
-def get_parameters(frontend, model):
+def get_parameters(frontend, model, return_array=False):
     if frontend.__name__ == "qiboml.interfaces.pytorch":
-        return {k: v.clone() for k, v in model.state_dict().items()}
+        par = {k: v.clone() for k, v in model.state_dict().items()}
+        if return_array:
+            par = par.get("circuit_parameters")
+        return par
     elif frontend.__name__ == "qiboml.interfaces.keras":
-        return model.get_weights()
+        par = model.get_weights()
+        if return_array:
+            par = par[0]
+        return par
 
 
 def set_device(frontend):
@@ -594,3 +601,26 @@ def test_qibolab(frontend):
     train_model(frontend, model, data, target, max_epochs=1)
     _, loss_trained = eval_model(frontend, model, data, target)
     assert loss_untrained > loss_trained
+
+
+def test_equivariant(backend, frontend):
+    # 4 total parameters
+    circuit = ans.HardwareEfficient(2)
+    # only 2 independent
+    ind_params = torch.randn(2)
+    # in numpy you need to use slicing to get references
+    # otherwise you will get copies, in torch instead you could
+    # just use ind_params[0] and ind_params[1]
+    dep_params = [ind_params[0], ind_params[1], ind_params[0], ind_params[1]]
+    circuit.set_parameters(dep_params)
+    decoding = dec.Expectation(2, backend=backend)
+    model = frontend.QuantumModel(
+        [
+            circuit,
+        ],
+        decoding,
+    )
+    m_params = np.array(get_parameters(frontend, model, return_array=True))
+    ind_params = ind_params.numpy()
+    assert len(m_params) == 2
+    np.testing.assert_allclose(m_params, ind_params)
