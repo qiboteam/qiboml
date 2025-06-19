@@ -36,9 +36,8 @@ class QuantumDecoding:
         transpiler (Passes, optional): transpiler to run before circuit execution, by default no transpilation
                                        is performed on the circuit (``transpiler=None``).
         noise_model (NoiseModel): a ``NoiseModel`` of Qibo, which is applied to the
-            given circuit to perform noisy simulations. Default is ``None`` and,
-            in case Qibolab is used to execute on real quantum hardware, the noise
-            will be the one of the real device.
+            given circuit to perform noisy simulations. Default is ``None`` and 
+            no noise is added.
         density_matrix (bool): if ``True``, density matrix simulation is performed
             instead of state-vector simulation.
     """
@@ -181,7 +180,7 @@ class Expectation(QuantumDecoding):
 
     Args:
         observable (Hamiltonian | ndarray): the observable to calculate the expectation value of,
-            by default :math:`Z_0\otimes Z_1\otimes ... \otimes Z_n` is used.
+            by default :math:`Z_0 + Z_1 + ... + Z_n` is used.
         mitigation_config (dict): configuration of the quantum error mitigation
             method in case it is desired. For example, one can set:
             ```
