@@ -2,13 +2,15 @@ from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional, Union
 
 from qibo import Circuit
-from qibo.backends import Backend, _check_backend
+from qibo.backends import Backend, CliffordBackend, _check_backend
 from qibo.config import log
 from qibo.hamiltonians import Hamiltonian
 from qibo.models import error_mitigation
 from qibo.noise import NoiseModel
 
 from qiboml import ndarray
+
+REF_CIRCUIT_SEED = 42
 
 
 @dataclass
@@ -32,6 +34,7 @@ class Mitigator:
 
         cfg = self.mitigation_config or {}
         self._real_time_mitigation = cfg.get("real_time", False)
+        self._threshold = cfg.get("threshold", 1e-1)
         self._mitigation_method = cfg.get("method", "cdr")
         self._mitigation_method_kwargs = cfg.get("method_kwargs", {})
 
@@ -55,7 +58,10 @@ class Mitigator:
         noise_model: NoiseModel,
         nshots: Optional[int],
     ):
-        """Perform data regression on noisy and exact data."""
+        """
+        Perform data regression on noisy and exact data.
+        """
+
         _, _, popt, _ = getattr(error_mitigation, self._mitigation_method)(
             circuit=circuit,
             observable=observable,
