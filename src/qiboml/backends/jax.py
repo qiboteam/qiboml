@@ -8,7 +8,6 @@ from qibo import __version__
 from qibo.backends import einsum_utils
 from qibo.backends.npmatrices import NumpyMatrices
 from qibo.backends.numpy import NumpyBackend
-from qibo.config import raise_error
 
 
 class JaxMatrices(NumpyMatrices):
@@ -74,26 +73,16 @@ class JaxBackend(NumpyBackend):
         self.tensor_types = (jnp.ndarray, numpy.ndarray)
         self.matrices = JaxMatrices(self.dtype)
 
-    def set_precision(self, precision):
-        if precision != self.precision:
-            if precision == "single":
-                self.precision = precision
-                self.dtype = self.np.complex64
-            elif precision == "double":
-                self.precision = precision
-                self.dtype = self.np.complex128
-            else:
-                raise_error(ValueError, f"Unknown precision {precision}.")
-            if self.matrices:
-                self.matrices = self.matrices.__class__(self.dtype)
-
     def cast(self, x, dtype=None, copy=False):
         if dtype is None:
             dtype = self.dtype
+
         if isinstance(x, self.tensor_types):
             return x.astype(dtype)
-        elif self.is_sparse(x):
+
+        if self.is_sparse(x):
             return x.astype(dtype)
+
         return self.np.array(x, dtype=dtype, copy=copy)
 
     def to_numpy(self, x):
