@@ -35,10 +35,11 @@ class QuantumDecoding:
         nshots (int, optional): number of shots used for circuit execution and sampling.
         backend (Backend, optional): backend used for computation, by default the globally-set backend is used.
         transpiler (Passes, optional): transpiler to run before circuit execution, by default no transpilation
-                                       is performed on the circuit (``transpiler=None``).
+            is performed on the circuit (``transpiler=None``).
         noise_model (NoiseModel): a ``NoiseModel`` of Qibo, which is applied to the
-            given circuit to perform noisy simulations. Default is ``None`` and
-            no noise is added.
+            given circuit to perform noisy simulations. In case a `transpiler` is
+            passed, the noise model is applied to the transpiled circuit.
+            Default is ``None`` and no noise is added.
         density_matrix (bool): if ``True``, density matrix simulation is performed
             instead of state-vector simulation.
     """
