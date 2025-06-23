@@ -17,6 +17,12 @@ def zero_state(nqubits, dtype):
     return state
 
 
+@partial(jax.jit, static_argnums=(0, 1))
+def zero_density_matrix(nqubits, dtype):
+    matrix = jnp.zeros(2 * (2**nqubits,), dtype=dtype).at[0, 0].set(1)
+    return matrix
+
+
 @partial(jax.jit, static_argnames={"dtype"})
 def cast_matrix(x, dtype):
     return jnp.asarray(x, dtype=dtype)
@@ -162,9 +168,7 @@ class JaxBackend(NumpyBackend):
         return zero_state(nqubits, self.dtype)
 
     def zero_density_matrix(self, nqubits):
-        state = self.np.zeros(2 * (2**nqubits,), dtype=self.dtype)
-        state = state.at[0, 0].set(1)
-        return state
+        return zero_density_matrix(nqubits, self.dtype)
 
     def plus_state(self, nqubits):
         state = self.np.ones(2**nqubits, dtype=self.dtype)
