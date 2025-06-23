@@ -182,14 +182,31 @@ class Expectation(QuantumDecoding):
     Args:
         observable (Hamiltonian | ndarray): the observable to calculate the expectation value of,
             by default :math:`Z_0 + Z_1 + ... + Z_n` is used.
-        mitigation_config (dict): configuration of the quantum error mitigation
-            method in case it is desired. For example, one can set:
-            ```
-            mitigation_config = {
-                "real_time": True,
-                "threshold": 1e-1,
-                "method": "CDR",
-            }
+        mitigation_config (dict): configuration of the real-time quantum error mitigation
+            method in case it is desired.
+            The real-time quantum error mitigation algorithm is proposed in https://arxiv.org/abs/2311.05680
+            and consists in performing a real-time check of the reliability of a learned mitigation map.
+            This is done by constructing a reference error-sensitive Clifford circuit,
+            which preserves the size of the original, target one. At each call of the
+            decoder, the reliability of the mitigation map is checked by computing
+            a simple metric :math:`D = |E_{\rm noisy} - E_{\rm mitigated}|`. If
+            the metric is found exceeding an arbitrary threshold value :math:`\delta`,
+            then a chosen data-driven error mitigation technique is executed to
+            retrieve the mitigation map.
+            An example of real-time error mitigation configuration is:
+
+            .. code-block:: python
+
+                mitigation_config = {
+                    "threshold": 2e-1,
+                    "method": "CDR",
+                    "method_kwargs": {"n_training_samples": 100},
+                }
+
+            The given example is performing real-time error mitigation with the
+            request of computing the mitigation map via Clifford Data Regression
+            whenever the reference expectation value differs from the mitigated
+            one of :math:`\delta > 0.2`.
     """
 
     observable: Union[ndarray, Hamiltonian] = None
@@ -271,12 +288,12 @@ class Expectation(QuantumDecoding):
             # TODO: replace Numpy with Clifford after fixing Unitary problem
             simulation_backend = NumpyBackend()
             # Compute the reference expectation value once
-            reference_frequencies = simulation_backend.execute_circuit(
+            reference_state = simulation_backend.execute_circuit(
                 self._mitigation_reference_circuit,
                 nshots=self.nshots,
-            )
-            self._mitigation_reference_value = self.observable.expectation_from_samples(
-                reference_frequencies
+            ).state()
+            self._mitigation_reference_value = self.observable.expectation(
+                reference_state
             )
 
         # Compute the mitigated value of the reference circuit
@@ -290,9 +307,10 @@ class Expectation(QuantumDecoding):
                 freqs, qubit_map=self.qubits
             )
         mit_expval = self._mitigated_expectation_value(expval)
+
         if (
             abs(mit_expval - self._mitigation_reference_value)
-            > self.mitigator.threshold
+            > self.mitigator._threshold
         ):
             self.mitigator.data_regression(
                 circuit=x + self._circuit,

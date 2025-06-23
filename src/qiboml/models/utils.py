@@ -33,7 +33,6 @@ class Mitigator:
         self._mitigation_map: Callable[..., ndarray] = lambda x, a=1, b=0: a * x + b
 
         cfg = self.mitigation_config or {}
-        self._real_time_mitigation = cfg.get("real_time", False)
         self._threshold = cfg.get("threshold", 1e-1)
         self._mitigation_method = cfg.get("method", "cdr")
         self._mitigation_method_kwargs = cfg.get("method_kwargs", {})
@@ -77,6 +76,7 @@ class Mitigator:
 
 
 def _get_wire_names_and_qubits(nqubits, qubits):
+
     if qubits is not None:
         if isinstance(qubits[0], str):
             wire_names = qubits

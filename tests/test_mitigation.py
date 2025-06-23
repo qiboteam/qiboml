@@ -88,7 +88,7 @@ def test_rtqem(frontend, nqubits, nshots, backend):
     )
 
     mitigation_config = {
-        "real_time": True,
+        "threshold": 3e-1,
         "method": "CDR",
         "method_kwargs": {"n_training_samples": 50},
     }
