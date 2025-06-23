@@ -10,15 +10,21 @@ from qibo.backends.npmatrices import NumpyMatrices
 from qibo.backends.numpy import NumpyBackend
 
 
-class JaxMatrices(NumpyMatrices):
+@partial(jax.jit, static_argnums=(0, 1))
+def zero_state(nqubits, dtype):
+    state = jnp.zeros(2**nqubits, dtype=dtype).at[0].set(1)
+    return state
 
-    def __init__(self, dtype):
-        super().__init__(dtype)
-        self.np = jnp
-        self.dtype = dtype
 
-    def _cast(self, x, dtype):
-        return jnp.asarray(x, dtype=dtype)
+@partial(jax.jit, static_argnums=(0, 1))
+def zero_density_matrix(nqubits, dtype):
+    matrix = jnp.zeros(2 * (2**nqubits,), dtype=dtype).at[0, 0].set(1)
+    return matrix
+
+
+@partial(jax.jit, static_argnames={"dtype"})
+def cast_matrix(x, dtype):
+    return jnp.asarray(x, dtype=dtype)
 
 
 @partial(jax.jit, static_argnums=(2, 3))
@@ -51,6 +57,17 @@ def _apply_gate_controlled(
     # Put qubit indices back to their proper places
     state = jnp.transpose(state, einsum_utils.reverse_order(order))
     return jnp.reshape(state, (2**nqubits,))
+
+
+class JaxMatrices(NumpyMatrices):
+
+    def __init__(self, dtype):
+        super().__init__(dtype)
+        self.np = jnp
+        self.dtype = dtype
+
+    def _cast(self, x, dtype):
+        return cast_matrix(x, dtype)
 
 
 class JaxBackend(NumpyBackend):
@@ -137,14 +154,10 @@ class JaxBackend(NumpyBackend):
         return matrix
 
     def zero_state(self, nqubits):
-        state = self.np.zeros(2**nqubits, dtype=self.dtype)
-        state = state.at[0].set(1)
-        return state
+        return zero_state(nqubits, self.dtype)
 
     def zero_density_matrix(self, nqubits):
-        state = self.np.zeros(2 * (2**nqubits,), dtype=self.dtype)
-        state = state.at[0, 0].set(1)
-        return state
+        return zero_density_matrix(nqubits, self.dtype)
 
     def plus_state(self, nqubits):
         state = self.np.ones(2**nqubits, dtype=self.dtype)
