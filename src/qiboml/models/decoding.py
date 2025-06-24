@@ -246,14 +246,9 @@ class Expectation(QuantumDecoding):
         if self.mitigation_config is not None:
             self._check_or_update_mitigation_map(x)
 
-        # run circuit
-        if self.analytic:
-            expval = self.observable.expectation(super().__call__(x).state())
-        else:
-            freqs = super().__call__(x).frequencies()
-            expval = self.observable.expectation_from_samples(
-                freqs, qubit_map=self.qubits
-            )
+        # TODO: error mitigation techniques in Qibo now work with expectation_from_samples only
+        freqs = super().__call__(x).frequencies()
+        expval = self.observable.expectation_from_samples(freqs, qubit_map=self.qubits)
 
         # apply mitigation if requested
         if self.mitigation_config is not None:

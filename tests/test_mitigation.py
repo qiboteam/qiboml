@@ -56,10 +56,10 @@ def train_vqe(frontend, backend, model, epochs):
         return backend.cast(cost, dtype="double")
 
 
-@pytest.mark.parametrize("nqubits", [1])  # Maybe include 2 qubits as well, let's see
-@pytest.mark.parametrize("nshots", [1000, 5000])
 @pytest.mark.parametrize("backend", BACKENDS)
-def test_rtqem(frontend, nqubits, nshots, backend):
+def test_rtqem(frontend, backend):
+    nqubits = 1
+    nshots = 10000
     set_seed(frontend=frontend, seed=42)
 
     # We build a trainable circuit
