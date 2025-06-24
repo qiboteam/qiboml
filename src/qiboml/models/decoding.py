@@ -1,14 +1,17 @@
 from dataclasses import dataclass
-from typing import Optional, Union
+from typing import Any, Dict, Optional, Union
 
 from qibo import Circuit, gates, transpiler
-from qibo.backends import Backend, _check_backend
-from qibo.config import raise_error
+from qibo.backends import Backend, NumpyBackend, _check_backend
+from qibo.config import log, raise_error
 from qibo.hamiltonians import Hamiltonian, Z
+from qibo.models.error_mitigation import error_sensitive_circuit
+from qibo.noise import NoiseModel
 from qibo.result import CircuitResult, MeasurementOutcomes, QuantumState
 from qibo.transpiler import Passes
 
 from qiboml import ndarray
+from qiboml.models.utils import Mitigator
 
 
 @dataclass
@@ -32,7 +35,13 @@ class QuantumDecoding:
         nshots (int, optional): number of shots used for circuit execution and sampling.
         backend (Backend, optional): backend used for computation, by default the globally-set backend is used.
         transpiler (Passes, optional): transpiler to run before circuit execution, by default no transpilation
-                                       is performed on the circuit (``transpiler=None``).
+            is performed on the circuit (``transpiler=None``).
+        noise_model (NoiseModel): a ``NoiseModel`` of Qibo, which is applied to the
+            given circuit to perform noisy simulations. In case a `transpiler` is
+            passed, the noise model is applied to the transpiled circuit.
+            Default is ``None`` and no noise is added.
+        density_matrix (bool): if ``True``, density matrix simulation is performed
+            instead of state-vector simulation.
     """
 
     nqubits: int
@@ -41,6 +50,8 @@ class QuantumDecoding:
     nshots: Optional[int] = None
     backend: Optional[Backend] = None
     transpiler: Optional[Passes] = None
+    noise_model: Optional[NoiseModel] = None
+    density_matrix: Optional[bool] = False
     _circuit: Circuit = None
 
     def __post_init__(self):
@@ -55,7 +66,9 @@ class QuantumDecoding:
             self.wire_names = tuple(self.wire_names)
         # I have to convert to list because qibo does not accept a tuple
         wire_names = list(self.wire_names) if self.wire_names is not None else None
-        self._circuit = Circuit(self.nqubits, wire_names=wire_names)
+        self._circuit = Circuit(
+            self.nqubits, wire_names=wire_names, density_matrix=self.density_matrix
+        )
         self.backend = _check_backend(self.backend)
         self._circuit.add(gates.M(*self.qubits))
 
@@ -70,16 +83,28 @@ class QuantumDecoding:
         Returns:
             (CircuitResult | QuantumState | MeasurementOutcomes): the execution ``qibo.result`` object.
         """
-        self._circuit.density_matrix = x.density_matrix
-        self._circuit.init_kwargs["density_matrix"] = x.density_matrix
-        # same problem as above
+        # Forcing the density matrix simulation if a noise model is given
+        if self.noise_model is not None:
+            density_matrix = True
+        else:
+            density_matrix = self.density_matrix
+        # Aligning the density_matrix attribute of all the circuits
+        self._circuit.init_kwargs["density_matrix"] = density_matrix
+        x.init_kwargs["density_matrix"] = density_matrix
+
         wire_names = list(self.wire_names) if self.wire_names is not None else None
         x.wire_names = wire_names
         x.init_kwargs["wire_names"] = wire_names
 
         if self.transpiler is not None:
             x, _ = self.transpiler(x)
-        return self.backend.execute_circuit(x + self._circuit, nshots=self.nshots)
+
+        if self.noise_model is not None:
+            executable_circuit = self.noise_model.apply(x + self._circuit)
+        else:
+            executable_circuit = x + self._circuit
+
+        return self.backend.execute_circuit(executable_circuit, nshots=self.nshots)
 
     @property
     def circuit(
@@ -157,20 +182,59 @@ class Expectation(QuantumDecoding):
 
     Args:
         observable (Hamiltonian | ndarray): the observable to calculate the expectation value of,
-    by default :math:`Z_0\otimes Z_1\otimes ... \otimes Z_n` is used.
+            by default :math:`Z_0 + Z_1 + ... + Z_n` is used.
+        mitigation_config (dict): configuration of the real-time quantum error mitigation
+            method in case it is desired.
+            The real-time quantum error mitigation algorithm is proposed in https://arxiv.org/abs/2311.05680
+            and consists in performing a real-time check of the reliability of a learned mitigation map.
+            This is done by constructing a reference error-sensitive Clifford circuit,
+            which preserves the size of the original, target one. At each call of the
+            decoder, the reliability of the mitigation map is checked by computing
+            a simple metric :math:`D = |E_{\rm noisy} - E_{\rm mitigated}|`. If
+            the metric is found exceeding an arbitrary threshold value :math:`\delta`,
+            then a chosen data-driven error mitigation technique is executed to
+            retrieve the mitigation map.
+            An example of real-time error mitigation configuration is:
+
+            .. code-block:: python
+
+                mitigation_config = {
+                    "threshold": 2e-1,
+                    "method": "CDR",
+                    "method_kwargs": {"n_training_samples": 100},
+                }
+
+            The given example is performing real-time error mitigation with the
+            request of computing the mitigation map via Clifford Data Regression
+            whenever the reference expectation value differs from the mitigated
+            one of :math:`\delta > 0.2`.
     """
 
     observable: Union[ndarray, Hamiltonian] = None
+    mitigation_config: Optional[Dict[str, Any]] = None
 
     def __post_init__(self):
         """Ancillary post initialization operations."""
         if self.observable is None:
             self.observable = Z(self.nqubits, dense=True, backend=self.backend)
+
+        # If mitigation is requested
+        if self.mitigation_config is not None:
+            # Construct the Mitigator object
+            self.mitigator = Mitigator(
+                mitigation_config=self.mitigation_config,
+                backend=self.backend,
+            )
+            # This attribute will contain the reference circuit (Clifford and
+            # error sensitive, that will be used in the real time error mitigation).
+            self._mitigation_reference_circuit = None
+
         super().__post_init__()
 
     def __call__(self, x: Circuit) -> ndarray:
-        """Execute the input circuit and calculate the expectation value of the internal observable on
-        the final state
+        """
+        Execute the input circuit and calculate the expectation value of
+        the internal observable on the final state.
 
         Args:
             x (Circuit): input Circuit.
@@ -178,15 +242,77 @@ class Expectation(QuantumDecoding):
         Returns:
             (ndarray): the calculated expectation value.
         """
+
+        if self.mitigation_config is not None:
+            self._check_or_update_mitigation_map(x)
+
+        # run circuit
         if self.analytic:
-            return self.observable.expectation(
-                super().__call__(x).state(),
-            ).reshape(1, 1)
+            expval = self.observable.expectation(super().__call__(x).state())
         else:
-            return self.observable.expectation_from_samples(
-                super().__call__(x).frequencies(),
-                qubit_map=self.qubits,
-            ).reshape(1, 1)
+            freqs = super().__call__(x).frequencies()
+            expval = self.observable.expectation_from_samples(
+                freqs, qubit_map=self.qubits
+            )
+
+        # apply mitigation if requested
+        if self.mitigation_config is not None:
+            expval = self._mitigated_expectation_value(expval)
+
+        return expval.reshape(1, 1)
+
+    def _mitigated_expectation_value(self, expval: float):
+        """
+        Compute the mitigated expectation value using the saved map and a given
+        noisy expectation value.
+        """
+        mit_expval = self.backend.cast(
+            self.mitigator._mitigation_map(
+                expval, *self.mitigator._mitigation_map_popt
+            ),
+            dtype=self.backend.np.float64,
+        )
+        return mit_expval
+
+    def _check_or_update_mitigation_map(self, x: Circuit):
+        """
+        If called for the first time, construct reference circuit and expectation
+        value. If not, check whether a recomputation of the noise map is needed.
+        The check is performed according to https://arxiv.org/abs/2311.05680.
+        """
+        if self._mitigation_reference_circuit is None:
+            # Sample the reference error sensitive circuit (it will be pure Clifford)
+            self._mitigation_reference_circuit = error_sensitive_circuit(
+                circuit=x,
+                observable=self.observable,
+            )[0]
+            # TODO: replace Numpy with Clifford after fixing Unitary problem
+            simulation_backend = NumpyBackend()
+            # Compute the reference expectation value once
+            reference_state = simulation_backend.execute_circuit(
+                self._mitigation_reference_circuit,
+                nshots=self.nshots,
+            ).state()
+            self._mitigation_reference_value = self.observable.expectation(
+                reference_state
+            )
+
+        # Compute the mitigated value of the reference circuit
+        # TODO: error mitigation techniques in Qibo now work with expectation_from_samples only
+        freqs = super().__call__(self._mitigation_reference_circuit).frequencies()
+        expval = self.observable.expectation_from_samples(freqs, qubit_map=self.qubits)
+        mit_expval = self._mitigated_expectation_value(expval)
+
+        if (
+            abs(mit_expval - self._mitigation_reference_value)
+            > self.mitigator._threshold
+        ):
+            self.mitigator.data_regression(
+                circuit=x + self._circuit,
+                observable=self.observable,
+                noise_model=self.noise_model,
+                nshots=self.nshots,
+            )
 
     @property
     def output_shape(self) -> tuple[int, int]:
