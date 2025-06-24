@@ -12,7 +12,9 @@ from qibo.result import CircuitResult, MeasurementOutcomes, QuantumState
 from qibo.transpiler import Passes
 
 from qiboml import ndarray
-from qiboml.models.utils import Mitigator
+import numpy as np
+import torch
+
 
 
 @dataclass
@@ -377,6 +379,7 @@ class Samples(QuantumDecoding):
     @property
     def analytic(self) -> bool:  # pragma: no cover
         return False
+<<<<<<< HEAD
 
 
 def _real_time_mitigation_check(decoder: Expectation, x: Circuit):
@@ -421,3 +424,40 @@ def _check_or_recompute_map(decoder: Expectation, x: Circuit):
         noise_model=decoder.noise_model,
         nshots=decoder.nshots,
     )
+=======
+    
+@dataclass
+class VQLS(QuantumDecoding):
+    """Decoder for the Variational Quantum Linear Solver (VQLS).
+
+    Args:
+        target_state (ndarray): Target solution vector |b⟩.
+        A (ndarray): The matrix A in the linear system A|x⟩ = |b⟩.
+    """
+    target_state: ndarray = None
+    A: ndarray = None
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.target_state = torch.tensor(self.target_state, dtype=torch.complex128)
+        self.A = torch.tensor(self.A, dtype=torch.complex128)
+
+    def __call__(self, circuit: Circuit) -> torch.Tensor:
+        result = super().__call__(circuit)
+        state = result.state()  
+        final_state = self.A @ state
+        normalized = final_state / torch.linalg.norm(final_state)
+        overlap = torch.vdot(self.target_state, normalized)
+        return 1 - overlap.abs() ** 2
+
+    @property
+    def output_shape(self) -> tuple[int, int]:
+        return (1, 1)
+
+    @property
+    def analytic(self) -> bool:
+        return True
+
+
+
+>>>>>>> 2438de9 (Add VQLS Decoder and Modify Tutorial)
