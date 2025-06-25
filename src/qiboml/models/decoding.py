@@ -447,7 +447,11 @@ class VariationalQuantumLinearSolver(QuantumDecoding):
         
     def __call__(self, circuit: Circuit):
         result = super().__call__(circuit)
-        state = result.state()  
+        state = result.state()
+
+        if self.A is None or self.target_state is None:
+            raise ValueError("Both A and target_state must be provided.")  
+        
         final_state = self.A @ state
         normalized = final_state / self.backend.calculate_vector_norm(final_state)
         overlap = self.backend.np.vdot(self.target_state, normalized)
