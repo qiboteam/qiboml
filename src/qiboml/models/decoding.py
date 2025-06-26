@@ -450,7 +450,7 @@ class VariationalQuantumLinearSolver(QuantumDecoding):
         state = result.state()
 
         if self.A is None or self.target_state is None:
-            raise ValueError("Both A and target_state must be provided.")  
+            raise_error(ValueError, "Both ``A`` and ``target_state`` must be provided.")  
         
         final_state = self.A @ state
         normalized = final_state / self.backend.calculate_vector_norm(final_state)
