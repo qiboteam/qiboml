@@ -292,8 +292,8 @@ class VariationalQuantumLinearSolver(QuantumDecoding):
     Adapted from the following paper arXiv:1909.05820v4 by Carlos Bravo-Prieto et al. 
 
     Args:
-        target_state (ndarray): Target solution vector |b⟩.
-        A (ndarray): The matrix A in the linear system A|x⟩ = |b⟩.
+        target_state (ndarray): Target solution vector :math:`\\ket{b}`.
+        A (ndarray): The matrix ``A`` in the linear system :math:`A \\, \\ket{x} = \\ket{b}`.
     
     Ensure QiboML backend set to Pytorch. 
     """
