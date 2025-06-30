@@ -10,6 +10,7 @@ from qibo.models.error_mitigation import error_sensitive_circuit
 from qibo.noise import NoiseModel
 from qibo.result import CircuitResult, MeasurementOutcomes, QuantumState
 from qibo.transpiler import Passes
+from qibo.quantum_info.metrics import infidelity
 
 from qiboml import ndarray
 
@@ -454,10 +455,9 @@ class VariationalQuantumLinearSolver(QuantumDecoding):
         
         final_state = self.A @ state
         normalized = final_state / self.backend.calculate_vector_norm(final_state)
-        overlap = self.backend.np.vdot(self.target_state, normalized)
-        cost = 1 - overlap.abs() ** 2
+        cost = infidelity(normalized, self.target_state, backend=self.backend)
         return self.backend.cast(self.backend.np.real(cost), dtype=self.backend.np.float64)
-
+    
     @property
     def output_shape(self) -> tuple[int, int]:
         return (1, 1)
