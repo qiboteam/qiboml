@@ -12,7 +12,7 @@ from qibo.config import raise_error
 
 from qiboml import ndarray
 from qiboml.backends.jax import JaxBackend
-from qiboml.interfaces.utils import circuit_from_structure
+from qiboml.interfaces.utils import circuit_from_structure, set_parameters
 from qiboml.models.decoding import QuantumDecoding
 from qiboml.models.encoding import QuantumEncoding
 
@@ -30,6 +30,7 @@ class Differentiation(ABC):
         circuit_structure: List[Union[Circuit, QuantumEncoding]],
         decoding: QuantumDecoding,
         backend: Backend,
+        independent_params_map: dict[int, set[int]],
         *parameters: list[ndarray],
         wrt_inputs: bool = False,
     ):  # pragma: no cover
@@ -94,6 +95,7 @@ class PSR(Differentiation):
         circuit_structure: List[Union[Circuit, QuantumEncoding]],
         decoding: QuantumDecoding,
         backend: Backend,
+        independent_params_map: dict[int, set[int]],
         *parameters: List[ndarray],
         wrt_inputs: bool = False,
     ):
@@ -125,7 +127,8 @@ class PSR(Differentiation):
         )
 
         # Inject parameters into the circuit
-        circuit.set_parameters(parameters)
+        # circuit.set_parameters(parameters)
+        set_parameters(circuit, parameters, independent_params_map)
 
         gradient = []
         if wrt_inputs:
@@ -166,12 +169,19 @@ class PSR(Differentiation):
                     parameters=parameters,
                     parameter_index=i,
                     backend=backend,
+                    independent_params_map=independent_params_map,
                 )
             )
         return gradient
 
     def one_parameter_shift(
-        self, circuit, decoding, parameters, parameter_index, backend
+        self,
+        circuit,
+        decoding,
+        parameters,
+        parameter_index,
+        backend,
+        independent_params_map,
     ):
         """Compute one derivative of the decoding strategy w.r.t. a target parameter."""
         gate = circuit.associate_gates_with_parameters()[parameter_index]
@@ -181,12 +191,14 @@ class PSR(Differentiation):
         tmp_params = backend.cast(parameters, copy=True, dtype=parameters[0].dtype)
         tmp_params = self.shift_parameter(tmp_params, parameter_index, s, backend)
 
-        circuit.set_parameters(tmp_params)
+        # circuit.set_parameters(tmp_params)
+        set_parameters(circuit, tmp_params, independent_params_map)
         forward = decoding(circuit)
 
         tmp_params = self.shift_parameter(tmp_params, parameter_index, -2 * s, backend)
 
-        circuit.set_parameters(tmp_params)
+        # circuit.set_parameters(tmp_params)
+        set_parameters(circuit, tmp_params, independent_params_map)
         backward = decoding(circuit)
         return generator_eigenval * (forward - backward)
 
@@ -297,6 +309,7 @@ class Jax(Differentiation):
         circuit_structure: List[Union[Circuit, QuantumEncoding]],
         decoding: QuantumDecoding,
         backend: Backend,
+        independent_params_map: dict[int, set[int]],
         *parameters: list[ndarray],
         wrt_inputs: bool = False,
     ):
@@ -315,6 +328,12 @@ class Jax(Differentiation):
         Returns:
             (list[ndarray]): the calculated gradients.
         """
+        # have to convert to tuple because dicts are not
+        # hashable, I also discard the keys that are not strictly
+        # necessary
+        independent_params_map = tuple(
+            tuple(v) for v in independent_params_map.values()
+        )
         if x is not None:
             x = backend.to_numpy(x)
             x = self._jax.cast(x, self._jax.precision)
@@ -322,18 +341,18 @@ class Jax(Differentiation):
         circuit_structure = tuple(circuit_structure)
 
         if self._argnums is None:
-            self._argnums = tuple(range(3, len(parameters) + 3))
+            self._argnums = tuple(range(4, len(parameters) + 4))
             setattr(
                 self,
                 "_jacobian",
-                partial(jax.jit, static_argnums=(1, 2))(
+                partial(jax.jit, static_argnums=(1, 2, 3))(
                     jax.jacfwd(self._run, (0,) + self._argnums),
                 ),
             )
             setattr(
                 self,
                 "_jacobian_without_inputs",
-                partial(jax.jit, static_argnums=(1, 2))(
+                partial(jax.jit, static_argnums=(1, 2, 3))(
                     jax.jacfwd(self._run, self._argnums),
                 ),
             )
@@ -345,14 +364,14 @@ class Jax(Differentiation):
 
         if wrt_inputs:
             gradients = self._jacobian(  # pylint: disable=no-member
-                x, circuit_structure, decoding, *parameters
+                x, circuit_structure, decoding, independent_params_map, *parameters
             )
         else:
             shape = 0 if x is None else (decoding.output_shape[-1], x.shape[-1])
             gradients = (
                 self._jax.numpy.zeros(shape),
                 self._jacobian_without_inputs(  # pylint: disable=no-member
-                    x, circuit_structure, decoding, *parameters
+                    x, circuit_structure, decoding, independent_params_map, *parameters
                 ),
             )
         decoding.set_backend(backend)
@@ -362,11 +381,22 @@ class Jax(Differentiation):
         ]
 
     @staticmethod
-    @partial(jax.jit, static_argnums=(1, 2))
-    def _run(x, circuit_structure, decoding, *parameters):
+    @partial(jax.jit, static_argnums=(1, 2, 3))
+    def _run(x, circuit_structure, decoding, independent_params_map, *parameters):
         circ = circuit_from_structure(
             circuit_structure=circuit_structure,
             x=x,
         )
-        circ.set_parameters(parameters)
+        # circ.set_parameters(parameters)
+        _jax_set_parameters(circ, parameters, independent_params_map)
         return decoding(circ)
+
+
+def _jax_set_parameters(circuit, parameters, imap):
+    new_params = len(circuit.get_parameters()) * [
+        None,
+    ]
+    for p, indices in zip(parameters, imap):
+        for i in indices:
+            new_params[i] = p
+    circuit.set_parameters(new_params)
