@@ -225,9 +225,6 @@ class Expectation(QuantumDecoding):
                 mitigation_config=self.mitigation_config,
                 backend=self.backend,
             )
-            # This attribute will contain the reference circuit (Clifford and
-            # error sensitive, that will be used in the real time error mitigation).
-            self._mitigation_reference_circuit = None
 
         super().__post_init__()
 
@@ -244,7 +241,24 @@ class Expectation(QuantumDecoding):
         """
 
         if self.mitigation_config is not None:
-            self._check_or_update_mitigation_map(x)
+            if self.mitigator._reference_value is None:
+                self.mitigator.calculate_reference_expval(
+                    observable=self.observable,
+                    circuit=x,
+                )
+            # Compute the expectation value of the reference circuit
+            freqs = super().__call__(self.mitigator._reference_circuit).frequencies()
+            reference_expval = self.observable.expectation_from_samples(
+                freqs, qubit_map=self.qubits
+            )
+            # Check or update noise map
+            self.mitigator.check_or_update_map(
+                noisy_reference_value=reference_expval,
+                circuit=x + self._circuit,
+                observable=self.observable,
+                noise_model=self.noise_model,
+                nshots=self.nshots,
+            )
 
         # run circuit
         if self.analytic:
@@ -257,62 +271,12 @@ class Expectation(QuantumDecoding):
 
         # apply mitigation if requested
         if self.mitigation_config is not None:
-            expval = self._mitigated_expectation_value(expval)
+            expval = self.backend.cast(
+                self.mitigator(expval),
+                dtype=self.backend.np.float64,
+            )
 
         return expval.reshape(1, 1)
-
-    def _mitigated_expectation_value(self, expval: float):
-        """
-        Compute the mitigated expectation value using the saved map and a given
-        noisy expectation value.
-        """
-        mit_expval = self.backend.cast(
-            self.mitigator._mitigation_map(
-                expval, *self.mitigator._mitigation_map_popt
-            ),
-            dtype=self.backend.np.float64,
-        )
-        return mit_expval
-
-    def _check_or_update_mitigation_map(self, x: Circuit):
-        """
-        If called for the first time, construct reference circuit and expectation
-        value. If not, check whether a recomputation of the noise map is needed.
-        The check is performed according to https://arxiv.org/abs/2311.05680.
-        """
-        if self._mitigation_reference_circuit is None:
-            # Sample the reference error sensitive circuit (it will be pure Clifford)
-            self._mitigation_reference_circuit = error_sensitive_circuit(
-                circuit=x,
-                observable=self.observable,
-            )[0]
-            # TODO: replace Numpy with Clifford after fixing Unitary problem
-            simulation_backend = NumpyBackend()
-            # Compute the reference expectation value once
-            reference_state = simulation_backend.execute_circuit(
-                self._mitigation_reference_circuit,
-                nshots=self.nshots,
-            ).state()
-            self._mitigation_reference_value = self.observable.expectation(
-                reference_state
-            )
-
-        # Compute the mitigated value of the reference circuit
-        # TODO: error mitigation techniques in Qibo now work with expectation_from_samples only
-        freqs = super().__call__(self._mitigation_reference_circuit).frequencies()
-        expval = self.observable.expectation_from_samples(freqs, qubit_map=self.qubits)
-        mit_expval = self._mitigated_expectation_value(expval)
-
-        if (
-            abs(mit_expval - self._mitigation_reference_value)
-            > self.mitigator._threshold
-        ):
-            self.mitigator.data_regression(
-                circuit=x + self._circuit,
-                observable=self.observable,
-                noise_model=self.noise_model,
-                nshots=self.nshots,
-            )
 
     @property
     def output_shape(self) -> tuple[int, int]:
