@@ -89,10 +89,9 @@ class Mitigator:
             bool: ``True`` if the map is reliable, ``False`` if not.
         """
         mitigated_ref_value = self.__call__(noisy_reference_value)
-        reliability = True
         if abs(mitigated_ref_value - self._reference_value) > self._threshold:
-            reliability = False
-        return reliability
+            return False
+        return True
 
     def check_or_update_map(
         self,
