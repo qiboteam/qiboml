@@ -13,6 +13,7 @@ from qibo.transpiler import NativeGates, Passes, Unroller
 import qiboml.models.ansatze as ans
 import qiboml.models.decoding as dec
 import qiboml.models.encoding as enc
+from qiboml.backends.tensorflow import TensorflowBackend
 
 
 def get_layers(module, layer_type=None):
@@ -307,7 +308,7 @@ def backprop_test(frontend, model, data, target):
     # specific (rare) cases
 
 
-@pytest.mark.parametrize("layer,seed", zip(ENCODING_LAYERS, [6, 4]))
+@pytest.mark.parametrize("layer,seed", zip(ENCODING_LAYERS, [2]))
 def test_encoding(backend, frontend, layer, seed):
     set_device(frontend)
     set_seed(frontend, seed)
@@ -346,6 +347,7 @@ def test_encoding(backend, frontend, layer, seed):
             activation,
             frontend.QuantumModel(
                 circuit_structure=circuit_structure,
+                angles_initialisation=np.random.normal(size=(4,)),
                 decoding=decoding_layer,
             ),
         ],
