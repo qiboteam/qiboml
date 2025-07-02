@@ -7,6 +7,7 @@ import numpy as np
 import torch
 from qibo import Circuit
 from qibo.backends import Backend
+from qibo.config import raise_error
 
 from qiboml.interfaces import utils
 from qiboml.models.decoding import QuantumDecoding
