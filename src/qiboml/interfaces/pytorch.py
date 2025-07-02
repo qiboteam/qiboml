@@ -33,6 +33,8 @@ class QuantumModel(torch.nn.Module):
             by sequentially stacking the elements of the given list. It is also possible
             to pass a single circuit, in the case a sequential structure is not needed.
         decoding (QuantumDecoding): the decoding layer.
+        angles_initialisation (Union[keras.initializers.Initializer, np.ndarray]]): the initial parameters of the
+        circuit.
         differentiation (Differentiation, optional): the differentiation engine,
             if not provided a default one will be picked following what described in the :ref:`docs <_differentiation_engine>`.
     """
@@ -64,8 +66,9 @@ class QuantumModel(torch.nn.Module):
             elif isinstance(self.angles_initialisation, np.ndarray):
                 if self.angles_initialisation.shape != params.shape:
                     params = params.numpy()
-                    raise ValueError(
-                        f"Shape not valid for angles_initialisation. The shape should be {params.shape}."
+                    raise_error(
+                        ValueError,
+                        f"Shape not valid for angles_initialisation. The shape should be {params.shape}.",
                     )
                 parameters = torch.as_tensor(
                     self.backend.to_numpy(x=self.angles_initialisation)

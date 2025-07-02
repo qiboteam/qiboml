@@ -12,6 +12,7 @@ import numpy as np
 import tensorflow as tf  # pylint: disable=import-error
 from qibo import Circuit
 from qibo.backends import Backend
+from qibo.config import raise_error
 
 from qiboml.interfaces import utils
 from qiboml.models.decoding import QuantumDecoding
@@ -38,6 +39,8 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
             by sequentially stacking the elements of the given list. It is also possible
             to pass a single circuit, in the case a sequential structure is not needed.
         decoding (QuantumDecoding): the decoding layer.
+        angles_initialisation (Union[keras.initializers.Initializer, np.ndarray]]): the initial parameters of the
+        circuit.
         differentiation (Differentiation, optional): the differentiation engine,
             if not provided a default one will be picked following what described in the :ref:`docs <_differentiation_engine>`.
     """
@@ -78,8 +81,9 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
 
             elif isinstance(self.angles_initialisation, np.ndarray):
                 if self.angles_initialisation.shape != params.shape:
-                    raise ValueError(
-                        f"Shape not valid for angles_initialisation. The shape should be {params.shape}."
+                    raise_error(
+                        ValueError,
+                        f"Shape not valid for angles_initialisation. The shape should be {params.shape}.",
                     )
                 self.circuit_parameters = self.add_weight(
                     shape=params.shape,
