@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Union
 
@@ -142,6 +143,16 @@ class QuantumDecoding:
             return True
         return False
 
+    @contextmanager
+    def _temporary_nshots(self, nshots):
+        """Context manager to execute the decoder with a custom number of shots."""
+        original = self.nshots
+        self.nshots = nshots
+        try:
+            yield
+        finally:
+            self.nshots = original
+
     def __hash__(self) -> int:
         return hash((self.qubits, self.wire_names, self.nshots, self.backend))
 
@@ -241,24 +252,7 @@ class Expectation(QuantumDecoding):
         """
 
         if self.mitigation_config is not None:
-            if self.mitigator._reference_value is None:
-                self.mitigator.calculate_reference_expval(
-                    observable=self.observable,
-                    circuit=x,
-                )
-            # Compute the expectation value of the reference circuit
-            freqs = super().__call__(self.mitigator._reference_circuit).frequencies()
-            reference_expval = self.observable.expectation_from_samples(
-                freqs, qubit_map=self.qubits
-            )
-            # Check or update noise map
-            self.mitigator.check_or_update_map(
-                noisy_reference_value=reference_expval,
-                circuit=x + self._circuit,
-                observable=self.observable,
-                noise_model=self.noise_model,
-                nshots=self.nshots,
-            )
+            _real_time_mitigation_check(self, x)
 
         # run circuit
         if self.analytic:
@@ -373,3 +367,49 @@ class Samples(QuantumDecoding):
     @property
     def analytic(self) -> bool:  # pragma: no cover
         return False
+
+
+def _real_time_mitigation_check(decoder: Expectation, x: Circuit):
+    """
+    Helper function to execute the real time mitigation check
+    and, if necessary, to compute the reference circuit expectation value.
+    """
+    # At first iteration, compute the reference value (exact)
+    if decoder.mitigator._reference_value is None:
+        decoder.mitigator.calculate_reference_expval(
+            observable=decoder.observable,
+            circuit=x,
+        )
+        # Trigger the mechanism at first iteration
+        _check_or_recompute_map(decoder, x)
+
+    if decoder.mitigator._iteration_counter == decoder.mitigator._min_iterations:
+        log.info("Checking map since max iterations reached.")
+        _check_or_recompute_map(decoder, x)
+        decoder.mitigator._iteration_counter = 0
+    else:
+        decoder.mitigator._iteration_counter += 1
+
+
+def _check_or_recompute_map(decoder: Expectation, x: Circuit):
+    """Helper function to recompute the mitigation map."""
+    # Compute the expectation value of the reference circuit
+    with decoder._temporary_nshots(
+        decoder.mitigator._mitigation_method_kwargs["nshots"]
+    ):
+        freqs = (
+            super(Expectation, decoder)
+            .__call__(decoder.mitigator._reference_circuit)
+            .frequencies()
+        )
+        reference_expval = decoder.observable.expectation_from_samples(
+            freqs, qubit_map=decoder.qubits
+        )
+    # Check or update noise map
+    decoder.mitigator.check_or_update_map(
+        noisy_reference_value=reference_expval,
+        circuit=x + decoder._circuit,
+        observable=decoder.observable,
+        noise_model=decoder.noise_model,
+        nshots=decoder.nshots,
+    )
