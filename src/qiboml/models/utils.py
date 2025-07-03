@@ -38,6 +38,7 @@ class Mitigator:
         self._iteration_counter = 0
         self._mitigation_method = cfg.get("method", "cdr")
         self._mitigation_method_kwargs = cfg.get("method_kwargs", {})
+        self._nshots = self._mitigation_method_kwargs.get("nshots", 10000)
 
         custom_map = self._mitigation_method_kwargs.get("model")
         if custom_map is not None:

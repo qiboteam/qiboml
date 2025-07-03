@@ -199,26 +199,36 @@ class Expectation(QuantumDecoding):
             The real-time quantum error mitigation algorithm is proposed in https://arxiv.org/abs/2311.05680
             and consists in performing a real-time check of the reliability of a learned mitigation map.
             This is done by constructing a reference error-sensitive Clifford circuit,
-            which preserves the size of the original, target one. At each call of the
-            decoder, the reliability of the mitigation map is checked by computing
+            which preserves the size of the original, target one. When the decoder is called,
+            the reliability of the mitigation map is checked by computing
             a simple metric :math:`D = |E_{\rm noisy} - E_{\rm mitigated}|`. If
             the metric is found exceeding an arbitrary threshold value :math:`\delta`,
             then a chosen data-driven error mitigation technique is executed to
             retrieve the mitigation map.
+            To successfully check the reliability of the mitigation map or computing
+            the map itself, it is recommended to use a number of shots which leads
+            to a statistical noise (due to measurements) :math:`\varepsilon << \delta`.
+            For this reason, the real-time error mitigation algorithm can be customized
+            by passing also a `min_iterations` argument, which will define the minimum
+            number of decoding calls which have to happen before the mitigation map
+            check is performed.
             An example of real-time error mitigation configuration is:
 
             .. code-block:: python
 
                 mitigation_config = {
                     "threshold": 2e-1,
+                    "min_iterations": 500,
                     "method": "CDR",
-                    "method_kwargs": {"n_training_samples": 100},
+                    "method_kwargs": {"n_training_samples": 100, "nshots": 10000},
                 }
 
             The given example is performing real-time error mitigation with the
             request of computing the mitigation map via Clifford Data Regression
             whenever the reference expectation value differs from the mitigated
-            one of :math:`\delta > 0.2`.
+            one of :math:`\delta > 0.2`. This check is performed every 500 iterations and,
+            in case it is required, the mitigation map is computed executing circuits
+            with `nshots=10000`.
     """
 
     observable: Union[ndarray, Hamiltonian] = None
@@ -394,9 +404,7 @@ def _real_time_mitigation_check(decoder: Expectation, x: Circuit):
 def _check_or_recompute_map(decoder: Expectation, x: Circuit):
     """Helper function to recompute the mitigation map."""
     # Compute the expectation value of the reference circuit
-    with decoder._temporary_nshots(
-        decoder.mitigator._mitigation_method_kwargs["nshots"]
-    ):
+    with decoder._temporary_nshots(decoder.mitigator._nshots):
         freqs = (
             super(Expectation, decoder)
             .__call__(decoder.mitigator._reference_circuit)
