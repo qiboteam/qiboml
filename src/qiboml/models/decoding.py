@@ -287,7 +287,7 @@ class Samples(QuantumDecoding):
     def analytic(self) -> bool:  # pragma: no cover
         return False
     
-@dataclass
+@dataclass(kw_only=True)
 class VariationalQuantumLinearSolver(QuantumDecoding):
     """Decoder for the Variational Quantum Linear Solver (VQLS).
     Adapted from the following paper arXiv:1909.05820v4 by Carlos Bravo-Prieto et al. 
