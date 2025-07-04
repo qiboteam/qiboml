@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Union
 
@@ -142,6 +143,16 @@ class QuantumDecoding:
             return True
         return False
 
+    @contextmanager
+    def _temporary_nshots(self, nshots):
+        """Context manager to execute the decoder with a custom number of shots."""
+        original = self.nshots
+        self.nshots = nshots
+        try:
+            yield
+        finally:
+            self.nshots = original
+
     def __hash__(self) -> int:
         return hash((self.qubits, self.wire_names, self.nshots, self.backend))
 
@@ -188,26 +199,36 @@ class Expectation(QuantumDecoding):
             The real-time quantum error mitigation algorithm is proposed in https://arxiv.org/abs/2311.05680
             and consists in performing a real-time check of the reliability of a learned mitigation map.
             This is done by constructing a reference error-sensitive Clifford circuit,
-            which preserves the size of the original, target one. At each call of the
-            decoder, the reliability of the mitigation map is checked by computing
+            which preserves the size of the original, target one. When the decoder is called,
+            the reliability of the mitigation map is checked by computing
             a simple metric :math:`D = |E_{\rm noisy} - E_{\rm mitigated}|`. If
             the metric is found exceeding an arbitrary threshold value :math:`\delta`,
             then a chosen data-driven error mitigation technique is executed to
             retrieve the mitigation map.
+            To successfully check the reliability of the mitigation map or computing
+            the map itself, it is recommended to use a number of shots which leads
+            to a statistical noise (due to measurements) :math:`\varepsilon << \delta`.
+            For this reason, the real-time error mitigation algorithm can be customized
+            by passing also a `min_iterations` argument, which will define the minimum
+            number of decoding calls which have to happen before the mitigation map
+            check is performed.
             An example of real-time error mitigation configuration is:
 
             .. code-block:: python
 
                 mitigation_config = {
                     "threshold": 2e-1,
+                    "min_iterations": 500,
                     "method": "CDR",
-                    "method_kwargs": {"n_training_samples": 100},
+                    "method_kwargs": {"n_training_samples": 100, "nshots": 10000},
                 }
 
             The given example is performing real-time error mitigation with the
             request of computing the mitigation map via Clifford Data Regression
             whenever the reference expectation value differs from the mitigated
-            one of :math:`\delta > 0.2`.
+            one of :math:`\delta > 0.2`. This check is performed every 500 iterations and,
+            in case it is required, the mitigation map is computed executing circuits
+            with `nshots=10000`.
     """
 
     observable: Union[ndarray, Hamiltonian] = None
@@ -241,24 +262,7 @@ class Expectation(QuantumDecoding):
         """
 
         if self.mitigation_config is not None:
-            if self.mitigator._reference_value is None:
-                self.mitigator.calculate_reference_expval(
-                    observable=self.observable,
-                    circuit=x,
-                )
-            # Compute the expectation value of the reference circuit
-            freqs = super().__call__(self.mitigator._reference_circuit).frequencies()
-            reference_expval = self.observable.expectation_from_samples(
-                freqs, qubit_map=self.qubits
-            )
-            # Check or update noise map
-            self.mitigator.check_or_update_map(
-                noisy_reference_value=reference_expval,
-                circuit=x + self._circuit,
-                observable=self.observable,
-                noise_model=self.noise_model,
-                nshots=self.nshots,
-            )
+            _real_time_mitigation_check(self, x)
 
         # run circuit
         if self.analytic:
@@ -373,3 +377,47 @@ class Samples(QuantumDecoding):
     @property
     def analytic(self) -> bool:  # pragma: no cover
         return False
+
+
+def _real_time_mitigation_check(decoder: Expectation, x: Circuit):
+    """
+    Helper function to execute the real time mitigation check
+    and, if necessary, to compute the reference circuit expectation value.
+    """
+    # At first iteration, compute the reference value (exact)
+    if decoder.mitigator._reference_value is None:
+        decoder.mitigator.calculate_reference_expval(
+            observable=decoder.observable,
+            circuit=x,
+        )
+        # Trigger the mechanism at first iteration
+        _check_or_recompute_map(decoder, x)
+
+    if decoder.mitigator._iteration_counter == decoder.mitigator._min_iterations:
+        log.info("Checking map since max iterations reached.")
+        _check_or_recompute_map(decoder, x)
+        decoder.mitigator._iteration_counter = 0
+    else:
+        decoder.mitigator._iteration_counter += 1
+
+
+def _check_or_recompute_map(decoder: Expectation, x: Circuit):
+    """Helper function to recompute the mitigation map."""
+    # Compute the expectation value of the reference circuit
+    with decoder._temporary_nshots(decoder.mitigator._nshots):
+        freqs = (
+            super(Expectation, decoder)
+            .__call__(decoder.mitigator._reference_circuit)
+            .frequencies()
+        )
+        reference_expval = decoder.observable.expectation_from_samples(
+            freqs, qubit_map=decoder.qubits
+        )
+    # Check or update noise map
+    decoder.mitigator.check_or_update_map(
+        noisy_reference_value=reference_expval,
+        circuit=x + decoder._circuit,
+        observable=decoder.observable,
+        noise_model=decoder.noise_model,
+        nshots=decoder.nshots,
+    )

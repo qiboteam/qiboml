@@ -34,8 +34,11 @@ class Mitigator:
 
         cfg = self.mitigation_config or {}
         self._threshold = cfg.get("threshold", 1e-1)
+        self._min_iterations = cfg.get("min_iterations", 100)
+        self._iteration_counter = 0
         self._mitigation_method = cfg.get("method", "cdr")
         self._mitigation_method_kwargs = cfg.get("method_kwargs", {})
+        self._nshots = self._mitigation_method_kwargs.get("nshots", 10000)
 
         custom_map = self._mitigation_method_kwargs.get("model")
         if custom_map is not None:
@@ -128,7 +131,6 @@ class Mitigator:
             circuit=circuit,
             observable=observable,
             noise_model=noise_model,
-            nshots=nshots,
             full_output=True,
             **self._mitigation_method_kwargs,
         )
