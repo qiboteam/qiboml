@@ -393,8 +393,8 @@ class VariationalQuantumLinearSolver(QuantumDecoding):
     
     Ensure QiboML backend set to Pytorch. 
     """
-    target_state: ndarray
-    A: ndarray
+    target_state: ndarray = None
+    A: ndarray = None
 
     def __post_init__(self):
         super().__post_init__()

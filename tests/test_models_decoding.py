@@ -84,3 +84,23 @@ def test_decoding_wire_names(backend):
     assert c.wire_names == wire_names
     assert list(layer.wire_names) == wire_names
     assert layer.circuit.wire_names == wire_names
+
+
+def test_vqls_solver_basic(backend):
+    """Test the VariationalQuantumLinearSolver on a 1-qubit system."""
+    nqubits = 1
+
+    A = backend.cast([[1.0, 0.2], [0.2, 1.0]], dtype=backend.np.complex128)
+    target_state = backend.cast([1.0, 0.0], dtype=backend.np.complex128)
+    circuit = Circuit(nqubits)
+
+    solver = dec.VariationalQuantumLinearSolver(
+        nqubits=nqubits,
+        target_state=target_state,
+        A=A,
+        backend=backend,
+    )
+    
+    cost = solver(circuit)
+    assert 0.0 <= cost <= 1.0
+
