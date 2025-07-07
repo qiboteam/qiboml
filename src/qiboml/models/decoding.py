@@ -1,15 +1,19 @@
+from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Optional, Union
+from typing import Any, Dict, Optional, Union
 
 from qibo import Circuit, gates, transpiler
-from qibo.backends import Backend, _check_backend
-from qibo.config import raise_error
+from qibo.backends import Backend, NumpyBackend, _check_backend
+from qibo.config import log, raise_error
 from qibo.hamiltonians import Hamiltonian, Z
+from qibo.models.error_mitigation import error_sensitive_circuit
+from qibo.noise import NoiseModel
 from qibo.result import CircuitResult, MeasurementOutcomes, QuantumState
 from qibo.transpiler import Passes
 from qibo.quantum_info.metrics import infidelity
 
 from qiboml import ndarray
+from qiboml.models.utils import Mitigator
 
 
 
@@ -35,7 +39,13 @@ class QuantumDecoding:
         nshots (int, optional): number of shots used for circuit execution and sampling.
         backend (Backend, optional): backend used for computation, by default the globally-set backend is used.
         transpiler (Passes, optional): transpiler to run before circuit execution, by default no transpilation
-                                       is performed on the circuit (``transpiler=None``).
+            is performed on the circuit (``transpiler=None``).
+        noise_model (NoiseModel): a ``NoiseModel`` of Qibo, which is applied to the
+            given circuit to perform noisy simulations. In case a `transpiler` is
+            passed, the noise model is applied to the transpiled circuit.
+            Default is ``None`` and no noise is added.
+        density_matrix (bool): if ``True``, density matrix simulation is performed
+            instead of state-vector simulation.
     """
 
     nqubits: int
@@ -44,6 +54,8 @@ class QuantumDecoding:
     nshots: Optional[int] = None
     backend: Optional[Backend] = None
     transpiler: Optional[Passes] = None
+    noise_model: Optional[NoiseModel] = None
+    density_matrix: Optional[bool] = False
     _circuit: Circuit = None
 
     def __post_init__(self):
@@ -58,7 +70,9 @@ class QuantumDecoding:
             self.wire_names = tuple(self.wire_names)
         # I have to convert to list because qibo does not accept a tuple
         wire_names = list(self.wire_names) if self.wire_names is not None else None
-        self._circuit = Circuit(self.nqubits, wire_names=wire_names)
+        self._circuit = Circuit(
+            self.nqubits, wire_names=wire_names, density_matrix=self.density_matrix
+        )
         self.backend = _check_backend(self.backend)
         self._circuit.add(gates.M(*self.qubits))
 
@@ -73,16 +87,28 @@ class QuantumDecoding:
         Returns:
             (CircuitResult | QuantumState | MeasurementOutcomes): the execution ``qibo.result`` object.
         """
-        self._circuit.density_matrix = x.density_matrix
-        self._circuit.init_kwargs["density_matrix"] = x.density_matrix
-        # same problem as above
+        # Forcing the density matrix simulation if a noise model is given
+        if self.noise_model is not None:
+            density_matrix = True
+        else:
+            density_matrix = self.density_matrix
+        # Aligning the density_matrix attribute of all the circuits
+        self._circuit.init_kwargs["density_matrix"] = density_matrix
+        x.init_kwargs["density_matrix"] = density_matrix
+
         wire_names = list(self.wire_names) if self.wire_names is not None else None
         x.wire_names = wire_names
         x.init_kwargs["wire_names"] = wire_names
 
         if self.transpiler is not None:
             x, _ = self.transpiler(x)
-        return self.backend.execute_circuit(x + self._circuit, nshots=self.nshots)
+
+        if self.noise_model is not None:
+            executable_circuit = self.noise_model.apply(x + self._circuit)
+        else:
+            executable_circuit = x + self._circuit
+
+        return self.backend.execute_circuit(executable_circuit, nshots=self.nshots)
 
     @property
     def circuit(
@@ -119,6 +145,16 @@ class QuantumDecoding:
         if self.nshots is None:
             return True
         return False
+
+    @contextmanager
+    def _temporary_nshots(self, nshots):
+        """Context manager to execute the decoder with a custom number of shots."""
+        original = self.nshots
+        self.nshots = nshots
+        try:
+            yield
+        finally:
+            self.nshots = original
 
     def __hash__(self) -> int:
         return hash((self.qubits, self.wire_names, self.nshots, self.backend))
@@ -160,20 +196,66 @@ class Expectation(QuantumDecoding):
 
     Args:
         observable (Hamiltonian | ndarray): the observable to calculate the expectation value of,
-    by default :math:`Z_0\otimes Z_1\otimes ... \otimes Z_n` is used.
+            by default :math:`Z_0 + Z_1 + ... + Z_n` is used.
+        mitigation_config (dict): configuration of the real-time quantum error mitigation
+            method in case it is desired.
+            The real-time quantum error mitigation algorithm is proposed in https://arxiv.org/abs/2311.05680
+            and consists in performing a real-time check of the reliability of a learned mitigation map.
+            This is done by constructing a reference error-sensitive Clifford circuit,
+            which preserves the size of the original, target one. When the decoder is called,
+            the reliability of the mitigation map is checked by computing
+            a simple metric :math:`D = |E_{\rm noisy} - E_{\rm mitigated}|`. If
+            the metric is found exceeding an arbitrary threshold value :math:`\delta`,
+            then a chosen data-driven error mitigation technique is executed to
+            retrieve the mitigation map.
+            To successfully check the reliability of the mitigation map or computing
+            the map itself, it is recommended to use a number of shots which leads
+            to a statistical noise (due to measurements) :math:`\varepsilon << \delta`.
+            For this reason, the real-time error mitigation algorithm can be customized
+            by passing also a `min_iterations` argument, which will define the minimum
+            number of decoding calls which have to happen before the mitigation map
+            check is performed.
+            An example of real-time error mitigation configuration is:
+
+            .. code-block:: python
+
+                mitigation_config = {
+                    "threshold": 2e-1,
+                    "min_iterations": 500,
+                    "method": "CDR",
+                    "method_kwargs": {"n_training_samples": 100, "nshots": 10000},
+                }
+
+            The given example is performing real-time error mitigation with the
+            request of computing the mitigation map via Clifford Data Regression
+            whenever the reference expectation value differs from the mitigated
+            one of :math:`\delta > 0.2`. This check is performed every 500 iterations and,
+            in case it is required, the mitigation map is computed executing circuits
+            with `nshots=10000`.
     """
 
     observable: Union[ndarray, Hamiltonian] = None
+    mitigation_config: Optional[Dict[str, Any]] = None
 
     def __post_init__(self):
         """Ancillary post initialization operations."""
         if self.observable is None:
             self.observable = Z(self.nqubits, dense=True, backend=self.backend)
+
+        # If mitigation is requested
+        if self.mitigation_config is not None:
+            # Construct the Mitigator object
+            self.mitigator = Mitigator(
+                mitigation_config=self.mitigation_config,
+                backend=self.backend,
+            )
+
         super().__post_init__()
 
     def __call__(self, x: Circuit) -> ndarray:
-        """Execute the input circuit and calculate the expectation value of the internal observable on
-        the final state
+        """
+        Execute the input circuit and calculate the expectation value of
+        the internal observable on the final state.
 
         Args:
             x (Circuit): input Circuit.
@@ -181,15 +263,27 @@ class Expectation(QuantumDecoding):
         Returns:
             (ndarray): the calculated expectation value.
         """
+
+        if self.mitigation_config is not None:
+            _real_time_mitigation_check(self, x)
+
+        # run circuit
         if self.analytic:
-            return self.observable.expectation(
-                super().__call__(x).state(),
-            ).reshape(1, 1)
+            expval = self.observable.expectation(super().__call__(x).state())
         else:
-            return self.observable.expectation_from_samples(
-                super().__call__(x).frequencies(),
-                qubit_map=self.qubits,
-            ).reshape(1, 1)
+            freqs = super().__call__(x).frequencies()
+            expval = self.observable.expectation_from_samples(
+                freqs, qubit_map=self.qubits
+            )
+
+        # apply mitigation if requested
+        if self.mitigation_config is not None:
+            expval = self.backend.cast(
+                self.mitigator(expval),
+                dtype=self.backend.np.float64,
+            )
+
+        return expval.reshape(1, 1)
 
     @property
     def output_shape(self) -> tuple[int, int]:
@@ -286,6 +380,7 @@ class Samples(QuantumDecoding):
     @property
     def analytic(self) -> bool:  # pragma: no cover
         return False
+
     
 @dataclass(kw_only=True)
 class VariationalQuantumLinearSolver(QuantumDecoding):
@@ -328,4 +423,50 @@ class VariationalQuantumLinearSolver(QuantumDecoding):
         return True
 
 
+
+
+
+
+def _real_time_mitigation_check(decoder: Expectation, x: Circuit):
+    """
+    Helper function to execute the real time mitigation check
+    and, if necessary, to compute the reference circuit expectation value.
+    """
+    # At first iteration, compute the reference value (exact)
+    if decoder.mitigator._reference_value is None:
+        decoder.mitigator.calculate_reference_expval(
+            observable=decoder.observable,
+            circuit=x,
+        )
+        # Trigger the mechanism at first iteration
+        _check_or_recompute_map(decoder, x)
+
+    if decoder.mitigator._iteration_counter == decoder.mitigator._min_iterations:
+        log.info("Checking map since max iterations reached.")
+        _check_or_recompute_map(decoder, x)
+        decoder.mitigator._iteration_counter = 0
+    else:
+        decoder.mitigator._iteration_counter += 1
+
+
+def _check_or_recompute_map(decoder: Expectation, x: Circuit):
+    """Helper function to recompute the mitigation map."""
+    # Compute the expectation value of the reference circuit
+    with decoder._temporary_nshots(decoder.mitigator._nshots):
+        freqs = (
+            super(Expectation, decoder)
+            .__call__(decoder.mitigator._reference_circuit)
+            .frequencies()
+        )
+        reference_expval = decoder.observable.expectation_from_samples(
+            freqs, qubit_map=decoder.qubits
+        )
+    # Check or update noise map
+    decoder.mitigator.check_or_update_map(
+        noisy_reference_value=reference_expval,
+        circuit=x + decoder._circuit,
+        observable=decoder.observable,
+        noise_model=decoder.noise_model,
+        nshots=decoder.nshots,
+    )
 
