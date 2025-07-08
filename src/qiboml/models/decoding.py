@@ -84,14 +84,8 @@ class QuantumDecoding:
         Returns:
             (CircuitResult | QuantumState | MeasurementOutcomes): the execution ``qibo.result`` object.
         """
-        # Forcing the density matrix simulation if a noise model is given
-        if self.noise_model is not None:
-            density_matrix = True
-        else:
-            density_matrix = self.density_matrix
-        # Aligning the density_matrix attribute of all the circuits
-        self._circuit.init_kwargs["density_matrix"] = density_matrix
-        x.init_kwargs["density_matrix"] = density_matrix
+        # Standardize the density matrix attribute
+        self._align_density_matrix(x)
 
         wire_names = list(self.wire_names) if self.wire_names is not None else None
         x.wire_names = wire_names
@@ -142,6 +136,17 @@ class QuantumDecoding:
         if self.nshots is None:
             return True
         return False
+
+    def _align_density_matrix(self, x: Circuit):
+        """Share the density matrix attribute with the input circuit."""
+        # Forcing the density matrix simulation if a noise model is given
+        if self.noise_model is not None:
+            density_matrix = True
+        else:
+            density_matrix = self.density_matrix
+        # Aligning the density_matrix attribute of all the circuits
+        self._circuit.init_kwargs["density_matrix"] = density_matrix
+        x.init_kwargs["density_matrix"] = density_matrix
 
     @contextmanager
     def _temporary_nshots(self, nshots):
@@ -262,6 +267,8 @@ class Expectation(QuantumDecoding):
         """
 
         if self.mitigation_config is not None:
+            # In this case it is required before the super.call
+            self._align_density_matrix(x)
             _real_time_mitigation_check(self, x)
 
         # run circuit
