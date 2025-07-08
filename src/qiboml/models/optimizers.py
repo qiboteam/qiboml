@@ -5,10 +5,12 @@ from qibo.backends import _check_backend
 class ExactGeodesicTransportCG:
     """Exact Geodesic Transport with Conjugate Gradients Optimizer.
 
-    Implements the Exact Geodesic Transport with Conjugate Gradients (EGT-CG) optimizer, a curvature-aware Riemannian optimizer designed
-    specifically for variational circuits based on the Hamming-weight encoder (HWE) ansätze. It updates parameters along exact geodesic paths
-    on the hyperspherical manifold defined by the HWE, combining analytic metric computation, conjugate-gradient memory, and dynamic
-    learning rates for fast, globally convergent optimization.
+    Implements the Exact Geodesic Transport with Conjugate Gradients (EGT-CG) optimizer, 
+    a curvature-aware Riemannian optimizer designed specifically for variational circuits based 
+    on the Hamming-weight encoder (HWE) ansatze. It updates parameters along exact geodesic
+    paths on the hyperspherical manifold defined by the HWE, combining analytic metric 
+    computation, conjugate-gradient memory, and dynamic learning rates for fast, globally
+    convergent optimization.
 
     Args:
       nqubits (int): Number of qubits in the quantum circuit.
