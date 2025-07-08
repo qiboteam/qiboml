@@ -85,7 +85,7 @@ class ExactGeodesicTransportCG:
            angles (ndarray): Angles in hyperspherical coordinates. 
 
         Returns:
-            amplitudes (ndarray): Amplitudes calculated from the hyperspherical coordinates.
+            ndarray: Amplitudes calculated from the hyperspherical coordinates.
         """
         d = len(angles) + 1
         amps = self.backend.np.zeros(d)
