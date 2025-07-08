@@ -393,8 +393,8 @@ class VariationalQuantumLinearSolver(QuantumDecoding):
     
     Ensure QiboML backend set to Pytorch. 
     """
-    target_state: ndarray = None
-    A: ndarray = None
+    target_state: ndarray 
+    A: ndarray 
 
     def __post_init__(self):
         super().__post_init__()
@@ -404,11 +404,7 @@ class VariationalQuantumLinearSolver(QuantumDecoding):
         
     def __call__(self, circuit: Circuit):
         result = super().__call__(circuit)
-        state = result.state()
-
-        if self.A is None or self.target_state is None:
-            raise_error(ValueError, "Both ``A`` and ``target_state`` must be provided.")  
-        
+        state = result.state() 
         final_state = self.A @ state
         normalized = final_state / self.backend.calculate_vector_norm(final_state)
         cost = infidelity(normalized, self.target_state, backend=self.backend)
