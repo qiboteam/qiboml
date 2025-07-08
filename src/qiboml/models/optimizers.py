@@ -86,11 +86,7 @@ class ExactGeodesicTransportCG:
 
         Args:
            angles (ndarray): Angles in hyperspherical coordinates. 
-<<<<<<< HEAD
 
-=======
-           
->>>>>>> 96232ad (Minor adjustments)
         Returns:
             ndarray: Amplitudes calculated from the hyperspherical coordinates.
         """
