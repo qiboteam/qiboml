@@ -16,8 +16,6 @@ from qiboml import ndarray
 from qiboml.models.utils import Mitigator
 
 
-
-
 @dataclass
 class QuantumDecoding:
     """
