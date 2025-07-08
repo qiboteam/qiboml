@@ -10,11 +10,9 @@ from qibo.models.error_mitigation import error_sensitive_circuit
 from qibo.noise import NoiseModel
 from qibo.result import CircuitResult, MeasurementOutcomes, QuantumState
 from qibo.transpiler import Passes
-from qibo.quantum_info.metrics import infidelity
 
 from qiboml import ndarray
-
-
+from qiboml.models.utils import Mitigator
 
 
 @dataclass
@@ -379,7 +377,6 @@ class Samples(QuantumDecoding):
     @property
     def analytic(self) -> bool:  # pragma: no cover
         return False
-<<<<<<< HEAD
 
 
 def _real_time_mitigation_check(decoder: Expectation, x: Circuit):
@@ -424,48 +421,3 @@ def _check_or_recompute_map(decoder: Expectation, x: Circuit):
         noise_model=decoder.noise_model,
         nshots=decoder.nshots,
     )
-=======
-    
-@dataclass
-class VariationalQuantumLinearSolver(QuantumDecoding):
-    """Decoder for the Variational Quantum Linear Solver (VQLS).
-    Adapted from the following paper arXiv:1909.05820v4 by Carlos Bravo-Prieto et al. 
-
-    Args:
-        target_state (ndarray): Target solution vector :math:`\\ket{b}`.
-        A (ndarray): The matrix ``A`` in the linear system :math:`A \\, \\ket{x} = \\ket{b}`.
-    
-    Ensure QiboML backend set to Pytorch. 
-    """
-    target_state: ndarray = None
-    A: ndarray = None
-
-    def __post_init__(self):
-        super().__post_init__()
-        self.target_state = self.backend.cast(self.target_state, dtype=self.backend.np.complex128)
-        self.A = self.backend.cast(self.A, dtype=self.backend.np.complex128)
-
-        
-    def __call__(self, circuit: Circuit):
-        result = super().__call__(circuit)
-        state = result.state()
-
-        if self.A is None or self.target_state is None:
-            raise_error(ValueError, "Both ``A`` and ``target_state`` must be provided.")  
-        
-        final_state = self.A @ state
-        normalized = final_state / self.backend.calculate_vector_norm(final_state)
-        cost = infidelity(normalized, self.target_state, backend=self.backend)
-        return self.backend.cast(self.backend.np.real(cost), dtype=self.backend.np.float64)
-    
-    @property
-    def output_shape(self) -> tuple[int, int]:
-        return (1, 1)
-
-    @property
-    def analytic(self) -> bool:
-        return True
-
-
-
->>>>>>> 2438de9 (Add VQLS Decoder and Modify Tutorial)
