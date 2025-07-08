@@ -1,3 +1,4 @@
+from typing import Optional
 from qibo.models.encodings import hamming_weight_encoder
 from qibo.backends import _check_backend
 
@@ -15,19 +16,19 @@ class ExactGeodesicTransportCG:
     Args:
       nqubits (int): Number of qubits in the quantum circuit.
       weight (int): Hamming weight to encode.
-      hamiltonian (qibo.hamiltonians.Hamiltonian): Hamiltonian whose expectation
+      hamiltonian (:class:'qibo.hamiltonians.Hamiltonian'): Hamiltonian whose expectation
         value defines the loss to minimize.
       angles (ndarray): Initial hyperspherical angles parameterizing the amplitudes.
       backtrack_rate (float, optional): Backtracking rate for Wolfe condition
-        line search. Defaults to 0.5 if not provided.
-      geometric_gradient (bool, optional): If True, uses the geometric gradient
-        estimator instead of numerical finite differences. Defaults to False.
-      multiplicative_factor (float, optional): Scaling factor applied to the intial learning
-        rate during optimization. Defaults to 1.
+        line search. If ``None``, defaults to :math:`0.5`. Defaults to ``None``.
+      geometric_gradient (bool, optional): If ``True``, uses the geometric gradient
+          estimator instead of numerical finite differences. Defaults to ``False``.
+      multiplicative_factor (float, optional): Scaling factor applied to the initial learning
+          rate during optimization. Defaults to :math:`1`.
       c1 (float, optional): Constant for Armijo condition (sufficient decrease) in
-        Wolfe line search. Defaults to 1e-3.
+          Wolfe line search. Defaults to :math:`10^{-3}`.
       c2 (float, optional): Constant for curvature condition in Wolfe line search.
-        hould satisfy c1 < c2 < 1. Defaults to 0.9.
+          It should satisfy ``c1 < c2 < 1``. Defaults to :math:`0.9`.
       backend (:class:`qibo.backends.abstract.Backend`, optional): backend
           to be used in the execution. If ``None``, it uses the current backend. 
           Defaults to ``None``.
@@ -35,22 +36,23 @@ class ExactGeodesicTransportCG:
     Returns:
       ExactGeodesicTransportCG: Instantiated optimizer object.
 
-    A. J. Ferreira‑Martins, R. M. S. Farias, G. Camilo, T. O. Maciel, A. Tosta, R. Lin, A. Alhajri, T. Haug, and L. Aolita,  
-    *Variational quantum algorithms with exact geodesic transport*,  
-    `arXiv:2506.17395 (2025) <https://arxiv.org/abs/2506.17395>`_.
+    References:
+        A. J. Ferreira‑Martins, R. M. S. Farias, G. Camilo, T. O. Maciel, A. Tosta, R. Lin, A. Alhajri, T. Haug, and L. Aolita,  
+        *Variational quantum algorithms with exact geodesic transport*,  
+        `arXiv:2506.17395 (2025) <https://arxiv.org/abs/2506.17395>`_.
     """
 
     def __init__(
         self,
-        nqubits,
-        weight,
+        nqubits: int,
+        weight: int,
         hamiltonian,
         angles,
-        backtrack_rate=None,
-        geometric_gradient=False,
-        multiplicative_factor = 1,
-        c1 = 0.0001,
-        c2 = 0.9,
+        backtrack_rate: Optional[float] = None,
+        geometric_gradient: bool = False,
+        multiplicative_factor: float = 1.0,
+        c1: float = 0.0001,
+        c2: float = 0.9,
         backend = None,
     ):
         self.nqubits = nqubits
@@ -76,25 +78,26 @@ class ExactGeodesicTransportCG:
         # Power method learning rate
         norm_u = self.backend.np.sqrt(self.sphere_inner_product(self.u, self.u, self.x))
         loss_prev = self.loss()
-        self.eta = ((1 / norm_u) * self.backend.np.arccos(
-            (1 + (norm_u / (2 * loss_prev)) ** 2) ** -0.5
-        )) * self.multiplicative_factor
+        self.eta = ((1 / norm_u) * self.backend.np.arccos((1 + (norm_u / (2 * loss_prev)) ** 2) ** -0.5
+                    )) * self.multiplicative_factor
 
     def angles_to_amplitudes(self, angles):
         """Convert angles to amplitudes.
 
         Args:
            angles (ndarray): Angles in hyperspherical coordinates. 
+<<<<<<< HEAD
 
+=======
+           
+>>>>>>> 96232ad (Minor adjustments)
         Returns:
             ndarray: Amplitudes calculated from the hyperspherical coordinates.
         """
         d = len(angles) + 1
         amps = self.backend.np.zeros(d)
         for k in range(d):
-            prod = 1.0
-            for j in range(k):
-                prod *= self.backend.np.sin(angles[j])
+            prod = self.backend.np.prod(self.backend.np.sin(angles[:k]))
             if k < d - 1:
                 prod *= self.backend.np.cos(angles[k])
             amps[k] = prod
@@ -107,7 +110,7 @@ class ExactGeodesicTransportCG:
             circuit (qibo.models.hamming_weight_encoder): Circuit prepared with current amplitudes.
         """
         amps = self.angles_to_amplitudes(self.angles)
-        return hamming_weight_encoder(amps, self.nqubits, self.weight)
+        self.circuit = hamming_weight_encoder(amps, self.nqubits, self.weight)
 
     def state(self, initial_state=None, nshots=1000):
         """Return the statevector after encoding.
@@ -119,8 +122,8 @@ class ExactGeodesicTransportCG:
         Returns:
             statevector (ndarray): Statevector of the encoded quantum state.
         """
-        circuit = self.encoder()
-        result = self.backend.execute_circuit(circuit, initial_state=initial_state, nshots=nshots)
+        self.encoder()
+        result = self.backend.execute_circuit(self.circuit, initial_state=initial_state, nshots=nshots)
         return result.state()
 
     def loss(self):
@@ -150,14 +153,9 @@ class ExactGeodesicTransportCG:
             angles_backward = self.angles.copy()
             angles_forward[idx] += epsilon
             angles_backward[idx] -= epsilon
-            grad[idx] = (
-                self.__class__(
-                    self.nqubits, self.weight, self.hamiltonian, angles_forward
-                ).loss()
-                - self.__class__(
-                    self.nqubits, self.weight, self.hamiltonian, angles_backward
-                ).loss()
-            ) / (2 * epsilon)
+            loss_forward = self.__class__(self.nqubits, self.weight, self.hamiltonian, angles_forward).loss()
+            loss_backward = self.__class__(self.nqubits, self.weight, self.hamiltonian, angles_backward).loss()
+            grad[idx] = (loss_forward - loss_backward) / (2 * epsilon)
         return grad
 
     def amplitudes_to_full_state(self, amps):
