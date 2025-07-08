@@ -6,12 +6,9 @@ from qibo import Circuit, gates, transpiler
 from qibo.backends import Backend, NumpyBackend, _check_backend
 from qibo.config import log, raise_error
 from qibo.hamiltonians import Hamiltonian, Z
-<<<<<<< HEAD
 from qibo.hamiltonians.hamiltonians import SymbolicHamiltonian
-=======
 from qibo.models.error_mitigation import error_sensitive_circuit
 from qibo.noise import NoiseModel
->>>>>>> main
 from qibo.result import CircuitResult, MeasurementOutcomes, QuantumState
 from qibo.transpiler import Passes
 
