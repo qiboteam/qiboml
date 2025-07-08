@@ -104,5 +104,5 @@ def test_vqls_solver_basic(backend):
     cost = solver(circuit)
     assert 0.0 <= cost <= 1.0
     assert solver.output_shape == (1, 1)
-    assert solver.analytic is True
+    assert solver.analytic
 
