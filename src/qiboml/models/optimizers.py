@@ -1,5 +1,5 @@
 from qibo.models.encodings import hamming_weight_encoder
-from qibo import get_backend
+from qibo.backends import _check_backend
 
 
 class ExactGeodesicTransportCG:
@@ -11,61 +11,64 @@ class ExactGeodesicTransportCG:
     learning rates for fast, globally convergent optimization.
 
     Args:
-      n_qubits (int): Number of qubits in the quantum circuit.
+      nqubits (int): Number of qubits in the quantum circuit.
       weight (int): Hamming weight to encode.
       hamiltonian (qibo.hamiltonians.Hamiltonian): Hamiltonian whose expectation
         value defines the loss to minimize.
-      theta (array): Initial spherical angles parameterizing the amplitudes.
+      angles (ndarray): Initial hyperspherical angles parameterizing the amplitudes.
       backtrack_rate (float, optional): Backtracking rate for Wolfe condition
         line search. Defaults to 0.5 if not provided.
       geometric_gradient (bool, optional): If True, uses the geometric gradient
         estimator instead of numerical finite differences. Defaults to False.
-      backend (qibo.backends.AbstractBackend, optional): Qibo backend to use for numerical
-        operations. If None, the default backend is used.
       multiplicative_factor (float, optional): Scaling factor applied to the intial learning
         rate during optimization. Defaults to 1.
       c1 (float, optional): Constant for Armijo condition (sufficient decrease) in
         Wolfe line search. Defaults to 1e-3.
       c2 (float, optional): Constant for curvature condition in Wolfe line search.
         hould satisfy c1 < c2 < 1. Defaults to 0.9.
+      backend (:class:`qibo.backends.abstract.Backend`, optional): backend
+          to be used in the execution. If ``None``, it uses the current backend. 
+          Defaults to ``None``.
 
     Returns:
       ExactGeodesicTransportCG: Instantiated optimizer object.
 
-    Adapted from: Ferreira‑Martins, A. J., Farias, R. M. S., Camilo, G., Maciel, T. O., Tosta, A., Lin, R., Alhajri, A., Haug, T., & Aolita, L. (2025, June 20).
-    Variational quantum algorithms with exact geodesic transport. arXiv:2506.17395
+    A. J. Ferreira‑Martins, R. M. S. Farias, G. Camilo, T. O. Maciel, A. Tosta, R. Lin, A. Alhajri, T. Haug, and L. Aolita,  
+    *Variational quantum algorithms with exact geodesic transport*,  
+    `arXiv:2506.17395 (2025) <https://arxiv.org/abs/2506.17395>`_.
     """
 
     def __init__(
         self,
-        n_qubits,
+        nqubits,
         weight,
         hamiltonian,
-        theta,
+        angles,
         backtrack_rate=None,
         geometric_gradient=False,
-        backend = None,
         multiplicative_factor = 1,
         c1 = 0.0001,
         c2 = 0.9,
+        backend = None,
     ):
-        self.n_qubits = n_qubits
+        self.nqubits = nqubits
         self.weight = weight
         self.hamiltonian = hamiltonian
-        self.theta = theta
+        self.angles = angles
         self.backtrack_rate = backtrack_rate
         self.geometric_gradient = geometric_gradient
         self.multiplicative_factor = multiplicative_factor
         self.c1 = c1
         self.c2 = c2
-        if backend is None:
-            self.backend = get_backend()
-        else:
-            self.backend = backend
+        self.backend = _check_backend(backend)
 
     def initialize_cg_state(self):
-        """Initialize CG state."""
-        self.x = self.angles_to_amplitudes(self.theta)
+        """Initialize CG state.
+
+        Sets up the internal variables `x`, `u`, `v`, and initial step size `eta`
+        based on the current angles.
+        """
+        self.x = self.angles_to_amplitudes(self.angles)
         self.v = self.tangent_vector()
         self.u = self.v.copy()
         # Power method learning rate
@@ -75,66 +78,109 @@ class ExactGeodesicTransportCG:
             (1 + (norm_u / (2 * loss_prev)) ** 2) ** -0.5
         )) * self.multiplicative_factor
 
-    def angles_to_amplitudes(self, theta):
-        """Convert angles to amplitudes."""
-        d = len(theta) + 1
+    def angles_to_amplitudes(self, angles):
+        """Convert angles to amplitudes.
+
+        Args:
+           angles (ndarray): Angles in hyperspherical coordinates. 
+        Returns:
+            amplitudes (ndarray): Amplitudes calculated from the hyperspherical coordinates.
+        """
+        d = len(angles) + 1
         amps = self.backend.np.zeros(d)
         for k in range(d):
             prod = 1.0
             for j in range(k):
-                prod *= self.backend.np.sin(theta[j])
+                prod *= self.backend.np.sin(angles[j])
             if k < d - 1:
-                prod *= self.backend.np.cos(theta[k])
+                prod *= self.backend.np.cos(angles[k])
             amps[k] = prod
         return amps
 
     def encoder(self):
-        """Build the Hamming-weight encoder circuit for the given amplitudes."""
-        amps = self.angles_to_amplitudes(self.theta)
-        return hamming_weight_encoder(amps, self.n_qubits, self.weight)
+        """Build and return the Hamming-weight encoder circuit for the given amplitudes.
+        
+        Returns:
+            circuit (qibo.models.hamming_weight_encoder): Circuit prepared with current amplitudes.
+        """
+        amps = self.angles_to_amplitudes(self.angles)
+        return hamming_weight_encoder(amps, self.nqubits, self.weight)
 
-    def state(self):
-        """Return the statevector after encoding."""
+    def state(self, initial_state=None, nshots=1000):
+        """Return the statevector after encoding.
+       
+        Args:
+            initial_state (ndarray, optional): Initial statevector. Defaults to None.
+            nshots (int, optional): Number of measurement shots. Defaults to 1000.
+
+        Returns:
+            statevector (ndarray): Statevector of the encoded quantum state.
+        """
         circuit = self.encoder()
-        return circuit().state()
+        result = self.backend.execute_circuit(circuit, initial_state=initial_state, nshots=nshots)
+        return result.state()
 
     def loss(self):
-        """Calculte expectation of hamiltonian as loss"""
-        psi = self.state()
-        return self.hamiltonian.expectation(psi)
+        """Loss function to be minimized.
+        
+        Given a quantum state :math:`\\ket{\\psi}` and a Hamiltonian :math:`H`, the loss
+        function is defined as
+        
+        .. math::
+            \\mathcal{L} = \\bra{\\psi} \\, H \\, \\ket{\\psi} \\, .  
 
-    def gradient(self):
-        """Numerically compute gradient of loss wrt theta."""
-        epsilon = 1e-8
-        grad = self.backend.np.zeros_like(self.theta)
-        for idx in range(len(self.theta)):
-            theta_forward = self.theta.copy()
-            theta_backward = self.theta.copy()
-            theta_forward[idx] += epsilon
-            theta_backward[idx] -= epsilon
+        Returns:
+            loss (float): Expectation value of Hamiltonain    
+        """
+        state = self.state()
+        return self.hamiltonian.expectation(state)
+
+    def gradient(self, epsilon = 1e-8):
+        """Numerically compute gradient of loss wrt angles.
+        
+        Returns:
+            gradients (array): Gradient of loss wrt angles 
+        """
+        grad = self.backend.np.zeros_like(self.angles)
+        for idx in range(len(self.angles)):
+            angles_forward = self.angles.copy()
+            angles_backward = self.angles.copy()
+            angles_forward[idx] += epsilon
+            angles_backward[idx] -= epsilon
             grad[idx] = (
                 self.__class__(
-                    self.n_qubits, self.weight, self.hamiltonian, theta_forward
+                    self.nqubits, self.weight, self.hamiltonian, angles_forward
                 ).loss()
                 - self.__class__(
-                    self.n_qubits, self.weight, self.hamiltonian, theta_backward
+                    self.nqubits, self.weight, self.hamiltonian, angles_backward
                 ).loss()
             ) / (2 * epsilon)
         return grad
 
     def amplitudes_to_full_state(self, amps):
-        """Convert amplitudes to full state."""
-        circuit = hamming_weight_encoder(amps, self.n_qubits, self.weight)
+        """Convert amplitudes to the full quantum statevector.
+
+        Args:
+            amps (ndarray): Amplitude vector.
+
+        Returns:
+            ndarray: Statevector corresponding to the given amplitudes.
+        """
+        circuit = hamming_weight_encoder(amps, self.nqubits, self.weight)
         return circuit().state()
 
     def geom_gradient(self):
-        """Compute gradient for hamiltonian"""
-        d = len(self.theta)
+        """Compute geometric gradient using the diagonal metric tensor and Jacobian.
+
+        Returns:
+            ndarray: Geometric gradient vector.
+        """
+        d = len(self.angles)
         grad = self.backend.np.zeros(d)
         l_psi = self.loss()
         jacobian = self.jacobian()
         g_diag = self.metric_tensor()
-        psi = self.angles_to_amplitudes(self.theta)
+        psi = self.angles_to_amplitudes(self.angles)
         for j in range(d):
             varphi = g_diag[j] ** (-1 / 2) * jacobian[:, j]
             full_varphi = self.amplitudes_to_full_state(varphi)
@@ -146,42 +192,43 @@ class ExactGeodesicTransportCG:
         return grad
 
     def jacobian(self):
-        """Compute Jacobian of x wrt theta."""
-        d = len(self.theta) + 1
-        J = self.backend.np.zeros((d, d - 1))
-        for i in range(d):
-            for k in range(d - 1):
-                if k > i:
-                    J[i, k] = 0.0
-                else:
-                    prod = 1.0
-                    for j in range(k):
-                        prod *= self.backend.np.sin(self.theta[j])
-                    if k == i:
-                        if i < d - 1:
-                            prod *= -self.backend.np.sin(self.theta[k])
-                    else:
-                        prod *= self.backend.np.cos(self.theta[k])
-                        for j2 in range(k + 1, i):
-                            prod *= self.backend.np.sin(self.theta[j2])
-                        if i < d - 1:
-                            prod *= self.backend.np.cos(self.theta[i])
-                    J[i, k] = prod
-        return J
+        """Compute Jacobian of amplitudes wrt angles.
+
+        Returns:
+            jacobian (ndarray): Jacobian matrix
+        """
+        dim = len(self.angles) 
+        jacob = self.backend.np.zeros((dim + 1, dim), dtype=self.backend.np.float64)
+
+        for j in range(dim):
+            reduced_params = self.backend.np.array(self.angles[j:], dtype=self.backend.np.float64, copy=True)
+            reduced_params[0] += self.backend.np.pi / 2
+
+            sins = self.backend.np.prod(self.backend.np.sin(self.angles[:j])) 
+            amps = self.angles_to_amplitudes(reduced_params)
+
+            jacob[j:, j] = sins * amps
+
+        return jacob
 
     def metric_tensor(self):
-        """Compute metric tensor."""
-        theta = self.theta
-        g_diag = self.backend.np.ones(len(theta))
-        for j in range(1, len(theta)):
-            prod = 1.0
-            for l in range(j):
-                prod *= self.backend.np.sin(theta[l]) ** 2
-            g_diag[j] = max(prod, 1e-12)
-        return g_diag
+        """Compute the diagonal metric tensor in hyperspherical coordinates.
+
+        Returns:
+            ndarray: Diagonal elements of the metric tensor.
+        """
+        angles = self.angles
+        g_diag = [
+            self.backend.np.prod(self.backend.np.sin(self.angles[:k]) ** 2) for k in range(len(self.angles))
+        ]
+        return self.backend.cast(g_diag, dtype="float64")
 
     def tangent_vector(self):
-        """Compute tangent vector"""
+        """Compute the Riemannian gradient (tangent vector) at the current point on the hypersphere.
+
+        Returns:
+            ndarray: Tangent vector in the tangent space of the hypersphere.
+        """
         # Compute gradient(either finite difference or geometric)
         if self.geometric_gradient:
             grad = self.geom_gradient()
@@ -196,7 +243,17 @@ class ExactGeodesicTransportCG:
         return jacobian @ nat_grad
 
     def optimize_step_size(self, x_prev, u_prev, v_prev, loss_prev):
-        """Adaptively determine eta using Wolfe conditions."""
+        """Perform Wolfe line search to determine optimal step size eta.
+
+        Args:
+            x_prev (ndarray): Previous position on the sphere.
+            u_prev (ndarray): Previous search direction.
+            v_prev (ndarray): Previous gradient vector.
+            loss_prev (float): Loss at previous position.
+
+        Returns:
+            tuple: (x_new, angles_trial, v_new, eta) updated position, angles, gradient, and step size.
+        """
         backtrack_rate = self.backtrack_rate
         if backtrack_rate is None:
             backtrack_rate = 0.5
@@ -207,13 +264,13 @@ class ExactGeodesicTransportCG:
         while 1e-6 < eta:
             transported_u = self.parallel_transport(u_prev, u_prev, x_prev, eta)
             x_new = self.exponential_map_with_direction(u_prev, eta)
-            theta_trial = self.amplitudes_to_angles(x_new)
+            angles_trial = self.amplitudes_to_angles(x_new)
 
-            theta_orig = self.theta
-            self.theta = theta_trial
+            angles_orig = self.angles
+            self.angles = angles_trial
             v_new = self.tangent_vector()
             loss_new = self.loss()
-            self.theta = theta_orig
+            self.angles = angles_orig
 
             condition_a_lhs = loss_new - loss_prev
             condition_a_rhs = (
@@ -233,21 +290,29 @@ class ExactGeodesicTransportCG:
 
             if condition_a and condition_b:
                 # Accept step
-                return x_new, theta_trial, v_new, eta
+                return x_new, angles_trial, v_new, eta
 
             eta *= backtrack_rate
             count += 1
 
         # Fallback to last tried point
         x_new = self.exponential_map_with_direction(u_prev, eta)
-        theta_trial = self.amplitudes_to_angles(x_new)
-        self.theta = theta_trial
+        angles_trial = self.amplitudes_to_angles(x_new)
+        self.angles = angles_trial
         v_new = self.tangent_vector()
 
-        return x_new, theta_trial, v_new, eta
+        return x_new, angles_trial, v_new, eta
 
     def exponential_map_with_direction(self, direction, eta=None):
-        """Define exponential map."""
+        """Exponential map from current point along specified direction.
+
+        Args:
+            direction (ndarray): Tangent vector direction.
+            eta (float, optional): Step size. Defaults to current eta.
+
+        Returns:
+            ndarray: New point on the hypersphere.
+        """
         if eta == None:
             eta = self.eta
         norm_dir = self.backend.np.sqrt(
@@ -258,19 +323,36 @@ class ExactGeodesicTransportCG:
         ) * (direction / norm_dir)
 
     def amplitudes_to_angles(self, x):
-        """Convert amplitudes to angles"""
+        """Convert amplitude vector back to hyperspherical angles.
+
+        Args:
+            x (ndarray): Amplitude vector.
+
+        Returns:
+            ndarray: Corresponding angles.
+        """
         d = len(x)
-        theta = self.backend.np.zeros(d - 1)
+        angles = self.backend.np.zeros(d - 1)
         for i in range(d - 2):
             norm_tail = self.backend.np.linalg.norm(x[i:])
-            theta[i] = (
+            angles[i] = (
                 0.0 if norm_tail == 0 else self.backend.np.arccos(x[i] / norm_tail)
             )
-        theta[-1] = self.backend.np.arctan2(x[-1], x[-2])
-        return theta
+        angles[-1] = self.backend.np.arctan2(x[-1], x[-2])
+        return angles
 
     def parallel_transport(self, u, v, a, eta=None):
-        """Parallel transport vector u along geodesic defined by v, starting at point a."""
+        """Parallel transport a tangent vector u along geodesic defined by v.
+
+        Args:
+            u (ndarray): Vector to transport.
+            v (ndarray): Direction of geodesic.
+            a (ndarray): Starting point on sphere.
+            eta (float, optional): Step size. Defaults to current eta.
+
+        Returns:
+            ndarray: Transported vector.
+        """
         if eta == None:
             eta = self.eta
         norm_v = self.backend.np.linalg.norm(v)
@@ -283,11 +365,30 @@ class ExactGeodesicTransportCG:
         return transported
 
     def sphere_inner_product(self, u, v, x):
-        """Inner product on the tangent space at x on the sphere."""
+        """Compute inner product on tangent space at x on the sphere.
+
+        Args:
+            u (ndarray): First tangent vector.
+            v (ndarray): Second tangent vector.
+            x (ndarray): Base point on the sphere.
+
+        Returns:
+            float: Inner product value.
+        """
         return self.backend.np.dot(u, v) - self.backend.np.dot(x, u) * self.backend.np.dot(x, v)
 
     def beta_dy(self, v_next, x_next, transported_u, st):
-        """Compute Dai and Yuan Beta."""
+        """Compute Dai and Yuan Beta.
+        
+        Args:
+            v_next (ndarray): Next gradient.
+            x_next (ndarray): Next point.
+            transported_u (ndarray): Parallel-transported u.
+            st (float): Scaling factor.
+
+        Returns:
+            float: Dai-Yuan beta value.
+        """
         st_scaled_u = st * transported_u
         numerator = self.sphere_inner_product(-v_next, -v_next, x_next)
         denominator = self.sphere_inner_product(
@@ -296,7 +397,19 @@ class ExactGeodesicTransportCG:
         return numerator / denominator
 
     def beta_hs(self, v_next, x_next, transported_u, transported_v, lt, st):
-        """Compute Hestenes and Stiefel Beta."""
+        """Compute Hestenes-Stiefel conjugate gradient beta.
+
+        Args:
+            v_next (ndarray): Next gradient.
+            x_next (ndarray): Next point.
+            transported_u (ndarray): Parallel-transported u.
+            transported_v (ndarray): Parallel-transported v.
+            lt (float): Scaling factor.
+            st (float): Scaling factor.
+
+        Returns:
+            float: Hestenes-Stiefel beta value.
+        """
         numerator = self.sphere_inner_product(
             -v_next, -v_next, x_next
         ) - self.sphere_inner_product(-self.v, lt * transported_v, x_next)
@@ -306,7 +419,17 @@ class ExactGeodesicTransportCG:
         return numerator / denominator
 
     def run_egt_cg(self, steps=10):
-        """Run EGT Conjugate Gradient Optimizer."""
+        """Run the EGT-CG optimizer for a specified number of steps.
+
+        Args:
+            steps (int, optional): Number of optimization iterations. Defaults to 10.
+
+        Returns:
+            tuple: (final_loss, losses, final_parameters)
+            final_loss (float): Final loss value.
+            losses (list): Loss at each iteration.
+            final_parameters (ndarray): Final angles.
+        """
         self.initialize_cg_state()
         losses = []
 
@@ -333,7 +456,7 @@ class ExactGeodesicTransportCG:
             ) * self.multiplicative_factor
 
             # Line search via Wolfe conditions
-            x_new, theta_trial, v_new, new_eta = self.optimize_step_size(
+            x_new, angles_trial, v_new, new_eta = self.optimize_step_size(
                 x_prev=x_prev, u_prev=u_prev, v_prev=self.v, loss_prev=loss_prev
             )
 
@@ -369,14 +492,14 @@ class ExactGeodesicTransportCG:
 
             # Accept step
             self.x = x_new
-            self.theta = theta_trial
+            self.angles = angles_trial
             self.v = v_new
             self.eta = new_eta
 
             # Update u
             self.u = v_new + beta_val * st * transported_u
         final_loss = self.loss()
-        final_parameters = self.theta
+        final_parameters = self.angles
         return final_loss, losses, final_parameters
 
     def __call__(self, steps=10):

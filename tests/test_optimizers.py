@@ -7,18 +7,18 @@ from scipy.special import comb
 @pytest.fixture
 def optimizer_fixture():
     np.random.seed(42)
-    n_qubits = 4
+    nqubits = 4
     weight = 2
-    dim = int(comb(n_qubits, weight))
+    dim = int(comb(nqubits, weight))
     theta_init = np.random.uniform(low=0, high=np.pi, size=dim - 1)
 
-    hamiltonian = hamiltonians.XXZ(nqubits=n_qubits)
+    hamiltonian = hamiltonians.XXZ(nqubits=nqubits)
 
     optimizer = ExactGeodesicTransportCG(
-        n_qubits=n_qubits,
+        nqubits=nqubits,
         weight=weight,
         hamiltonian=hamiltonian,
-        theta=theta_init,
+        angles=theta_init,
     )
     return optimizer
 
@@ -29,30 +29,30 @@ def test_loss_decreases(optimizer_fixture):
 
 def test_geometric_vs_numerical():
     np.random.seed(42)
-    n_qubits = 4
+    nqubits = 4
     weight = 2
 
-    dim = int(comb(n_qubits, weight))
+    dim = int(comb(nqubits, weight))
     theta_init = np.random.uniform(low=0, high=np.pi, size=dim - 1)
 
-    hamiltonian = hamiltonians.XXZ(nqubits=n_qubits)
+    hamiltonian = hamiltonians.XXZ(nqubits=nqubits)
 
     # Optimizer with numerical gradient
     optimizer_num = ExactGeodesicTransportCG(
-        n_qubits=n_qubits,
+        nqubits=nqubits,
         weight=weight,
         hamiltonian=hamiltonian,
-        theta=theta_init.copy(),
+        angles=theta_init.copy(),
         geometric_gradient=False,
     )
     final_loss_num, _ ,_ = optimizer_num.run_egt_cg(steps=10)
 
     # Optimizer with geometric gradient
     optimizer_geo = ExactGeodesicTransportCG(
-        n_qubits=n_qubits,
+        nqubits=nqubits,
         weight=weight,
         hamiltonian=hamiltonian,
-        theta=theta_init.copy(),
+        angles=theta_init.copy(),
         geometric_gradient=True,
     )
     final_loss_geo, _, _ = optimizer_geo.run_egt_cg(steps=10)
