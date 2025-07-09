@@ -301,7 +301,7 @@ class Expectation(QuantumDecoding):
             )
         
         if self.calibrator_config is not None:
-            self.calibrator.calibration()
+            self.calibrator()
         return expval.reshape(1, 1)
 
     @property

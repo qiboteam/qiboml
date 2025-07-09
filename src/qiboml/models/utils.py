@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Optional, Union
 
 from qibo import Circuit
@@ -7,6 +7,7 @@ from qibo.config import log
 from qibo.hamiltonians import Hamiltonian
 from qibo.models import error_mitigation
 from qibo.noise import NoiseModel
+from qibocal.auto.task import Data, Results
 from qibocal.protocols import single_shot_classification
 from qibocal.update import QubitId
 
@@ -148,29 +149,40 @@ class Calibrator:
     calibrator_config: Optional[Dict[str, Any]] = None
     backend: Optional[Backend] = None
     targets: Optional[list[QubitId]] = None
-    
+    trigger_shots: int = 100
+    _data: list[Data] = field(default_factory=list)
+    _results: list[Results] = field(default_factory=list)
+    _counter: int = 0 
+
     def __post_init__(self):
         self.backend = _check_backend(self.backend)
         cfg = self.calibrator_config or {}
         self.nshots = cfg["nshots"]
 
+    def __call__(self):
+        self._counter += 1
+        if self._counter == self.trigger_shots:
+            self.calibration()
+
     def calibration(self):
         # breakpoint()
         platform = self.backend.platform
-        assert platform is None, "Invalid None platform"
+        assert platform is not None, "Invalid None platform"
         params = single_shot_classification.parameters_type.load(
             {"nshots":self.nshots},
         ) 
         platform.connect()
-        self.data, _ = single_shot_classification.acquisition(
+        data, _ = single_shot_classification.acquisition(
             params = params,
             platform = platform,
             targets = self.targets,
         )
         platform.disconnect()
-
+        self._data.append(data)
         # post-processing
-        self.results, _ = single_shot_classification.fit(data=data)
+        results, _ = single_shot_classification.fit(data=self.data)
+        self._results.append(results)
+        print(self.results)
 
 
 def _get_wire_names_and_qubits(nqubits, qubits):
