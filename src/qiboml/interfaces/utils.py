@@ -24,8 +24,7 @@ def get_params_from_circuit_structure(
 
 
 def circuit_from_structure(
-    circuit_structure,
-    x: Optional[ndarray],
+    circuit_structure, x: Optional[ndarray], params: Optional[ndarray]
 ):
     """
     Helper function to reconstruct the whole circuit from a circuit structure.
@@ -45,9 +44,14 @@ def circuit_from_structure(
         circuit_structure[0].nqubits,
         density_matrix=circuit_structure[0].density_matrix,
     )
+    index = 0
     for circ in circuit_structure:
         if isinstance(circ, QuantumEncoding):
             circ = circ(x)
+        elif params is not None:
+            nparams = len(circ.get_parameters())
+            circ.set_parameters(params[index : index + nparams])
+            index += nparams
         circuit += circ
     return circuit
 

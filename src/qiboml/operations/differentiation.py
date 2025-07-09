@@ -30,7 +30,6 @@ class Differentiation(ABC):
         circuit_structure: List[Union[Circuit, QuantumEncoding]],
         decoding: QuantumDecoding,
         backend: Backend,
-        independent_params_map: dict[int, set[int]],
         *parameters: list[ndarray],
         wrt_inputs: bool = False,
     ):  # pragma: no cover
@@ -121,14 +120,15 @@ class PSR(Differentiation):
             )
 
         # Construct circuit using the full circuit helper
-        circuit = circuit_from_structure(
-            circuit_structure=circuit_structure,
-            x=x,
-        )
+        # circuit = circuit_from_structure(
+        #    circuit_structure=circuit_structure,
+        #    x=x,
+        #    params=parameters
+        # )
 
         # Inject parameters into the circuit
         # circuit.set_parameters(parameters)
-        set_parameters(circuit, parameters, independent_params_map)
+        # set_parameters(circuit, parameters, independent_params_map)
 
         gradient = []
         if wrt_inputs:
@@ -144,7 +144,7 @@ class PSR(Differentiation):
                 backend.np.reshape(
                     self.gradient_wrt_inputs(
                         x=x,
-                        circuit=circuit,
+                        circuit=circuit_structure,
                         decoding=decoding,
                         backend=backend,
                     ),
@@ -164,12 +164,11 @@ class PSR(Differentiation):
         for i in range(len(parameters)):
             gradient.append(
                 self.one_parameter_shift(
-                    circuit=circuit,
+                    circuit=circuit_structure,
                     decoding=decoding,
                     parameters=parameters,
                     parameter_index=i,
                     backend=backend,
-                    independent_params_map=independent_params_map,
                 )
             )
         return gradient
@@ -181,7 +180,6 @@ class PSR(Differentiation):
         parameters,
         parameter_index,
         backend,
-        independent_params_map,
     ):
         """Compute one derivative of the decoding strategy w.r.t. a target parameter."""
         gate = circuit.associate_gates_with_parameters()[parameter_index]
@@ -384,11 +382,9 @@ class Jax(Differentiation):
     @partial(jax.jit, static_argnums=(1, 2, 3))
     def _run(x, circuit_structure, decoding, independent_params_map, *parameters):
         circ = circuit_from_structure(
-            circuit_structure=circuit_structure,
-            x=x,
+            circuit_structure=circuit_structure, x=x, params=parameters
         )
-        # circ.set_parameters(parameters)
-        _jax_set_parameters(circ, parameters, independent_params_map)
+        # _jax_set_parameters(circ, parameters, independent_params_map)
         return decoding(circ)
 
 

@@ -85,13 +85,13 @@ class TrainableCircuit(Circuit):
                 gates.append(self.queue[idx])
         return gates
 
-    def get_parameters(self, independent=True):
-        if independent:
-            return [g.parameters for g in self.independent_trainable_gates]
-        return super().get_parameters()
+    def get_parameters(
+        self,
+    ):
+        return [g.parameters for g in self.independent_trainable_gates]
 
     def set_parameters(self, params):
-        new_params = len(self.get_parameters(independent=False)) * [
+        new_params = len(super().get_parameters()) * [
             None,
         ]
         for i in range(len(self._independent_parameters_map)):
