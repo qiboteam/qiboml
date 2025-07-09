@@ -86,6 +86,12 @@ class QuantumDecoding:
             (CircuitResult | QuantumState | MeasurementOutcomes): the execution ``qibo.result`` object.
         """
         # Standardize the density matrix attribute
+        x = self.preprocessing(x)
+
+        return self.backend.execute_circuit(x + self._circuit, nshots=self.nshots)
+
+    def preprocessing(self, x: Circuit) -> Circuit:
+        # Standardize the density matrix attribute
         self._align_density_matrix(x)
 
         wire_names = list(self.wire_names) if self.wire_names is not None else None
@@ -96,11 +102,9 @@ class QuantumDecoding:
             x, _ = self.transpiler(x)
 
         if self.noise_model is not None:
-            executable_circuit = self.noise_model.apply(x + self._circuit)
-        else:
-            executable_circuit = x + self._circuit
+            x = self.noise_model.apply(x)
 
-        return self.backend.execute_circuit(executable_circuit, nshots=self.nshots)
+        return x
 
     @property
     def circuit(
@@ -277,17 +281,13 @@ class Expectation(QuantumDecoding):
             expval = self.observable.expectation(super().__call__(x).state())
         else:
             if isinstance(self.observable, SymbolicHamiltonian):
-                self._circuit.density_matrix = x.density_matrix
-                self._circuit.init_kwargs["density_matrix"] = x.density_matrix
-                x = x + self._circuit
-                if self.transpiler is not None:
-                    x, _ = self.transpiler(x)
+                x = self.preprocessing(x)
                 expval = self.observable.expectation_from_circuit(
                     x,
                     nshots=self.nshots,
                 ).reshape(1, 1)
+                expval = self.backend.cast(expval, dtype=self.backend.np.float64)
             else:
-                breakpoint()
                 expval = self.observable.expectation_from_samples(
                     super().__call__(x).frequencies(),
                     qubit_map=self.qubits,

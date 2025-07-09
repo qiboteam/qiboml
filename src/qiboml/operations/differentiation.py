@@ -317,7 +317,7 @@ class Jax(Differentiation):
         """
         if x is not None:
             x = backend.to_numpy(x)
-            x = self._jax.cast(x, self._jax.precision)
+            x = self._jax.cast(x, self._jax.np.float64)
 
         circuit_structure = tuple(circuit_structure)
 
@@ -357,7 +357,7 @@ class Jax(Differentiation):
             )
         decoding.set_backend(backend)
         return [
-            backend.cast(self._jax.to_numpy(grad).tolist(), backend.precision)
+            backend.cast(self._jax.to_numpy(grad).tolist(), backend.np.float64)
             for grad in gradients
         ]
 
