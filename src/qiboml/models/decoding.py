@@ -2,7 +2,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Union
 
-from qibo import Circuit, gates, transpiler
+from qibo import Circuit, gates, get_transpiler, transpiler
 from qibo.backends import Backend, NumpyBackend, _check_backend
 from qibo.config import log, raise_error
 from qibo.hamiltonians import Hamiltonian, Z
@@ -104,8 +104,12 @@ class QuantumDecoding:
             executable_circuit = self.noise_model.apply(x + self._circuit)
         else:
             executable_circuit = x + self._circuit
-
-        return self.backend.execute_circuit(executable_circuit, nshots=self.nshots)
+        # breakpoint()
+        # transpiler = get_transpiler()
+        # return self.backend.execute_circuit(executable_circuit, nshots=self.nshots)
+        executable_circuit.draw()
+        # breakpoint()
+        return executable_circuit(nshots=self.nshots)
 
     @property
     def circuit(
@@ -288,7 +292,9 @@ class Expectation(QuantumDecoding):
                 self.mitigator(expval),
                 dtype=self.backend.np.float64,
             )
-
+        
+        if self.calibrator_config is not None:
+            self.calibrator.calibration()
         return expval.reshape(1, 1)
 
     @property

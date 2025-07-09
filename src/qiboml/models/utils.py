@@ -155,10 +155,11 @@ class Calibrator:
         self.nshots = cfg["nshots"]
 
     def calibration(self):
+        # breakpoint()
         platform = self.backend.platform
         assert platform is None, "Invalid None platform"
         params = single_shot_classification.parameters_type.load(
-            nshots = self.nshots,
+            {"nshots":self.nshots},
         ) 
         platform.connect()
         self.data, _ = single_shot_classification.acquisition(
@@ -169,7 +170,7 @@ class Calibrator:
         platform.disconnect()
 
         # post-processing
-        self.results,  = single_shot_classification.fit(data=data)
+        self.results, _ = single_shot_classification.fit(data=data)
 
 
 def _get_wire_names_and_qubits(nqubits, qubits):
