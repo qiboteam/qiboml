@@ -382,14 +382,18 @@ class Samples(QuantumDecoding):
     
 @dataclass(kw_only=True)
 class VariationalQuantumLinearSolver(QuantumDecoding):
-    """Decoder for the Variational Quantum Linear Solver (VQLS).
-    Adapted from the following paper arXiv:1909.05820v4 by Carlos Bravo-Prieto et al. 
+    """Decoder for the Variational Quantum Linear Solver (VQLS). 
 
     Args:
         target_state (ndarray): Target solution vector :math:`\\ket{b}`.
         A (ndarray): The matrix ``A`` in the linear system :math:`A \\, \\ket{x} = \\ket{b}`.
     
     Ensure QiboML backend set to Pytorch. 
+
+    Reference:
+        C. Bravo-Prieto, R. LaRose, M. Cerezo, Y. Subasi, L. Cincio, and P. J. Coles,
+        *Variational quantum linear solver*,
+        Quantum 7, 1188 (2023) <https://doi.org/10.22331/q-2023-11-22-1188>
     """
     target_state: ndarray 
     A: ndarray 
