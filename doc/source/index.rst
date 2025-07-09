@@ -38,6 +38,7 @@ Contents
    tutorials/binary_mnist
    tutorials/data_reuploading
    tutorials/vqe
+   tutorials/real_time_error_mitigation
 
 .. toctree::
     :maxdepth: 1
