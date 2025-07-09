@@ -451,10 +451,6 @@ def test_composition(backend, frontend):
 
 @pytest.mark.parametrize("dense,nshots", ((True, None), (False, 100)))
 def test_vqe(backend, frontend, dense, nshots):
-    if nshots is not None and backend.platform == "tensorflow":
-        pytest.skip(
-            "Tensorflow is too slow for the current implementation of execute_circuits."
-        )
     seed = 42
     set_device(frontend)
     set_seed(frontend, seed)
