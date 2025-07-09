@@ -105,7 +105,6 @@ class Mitigator:
         circuit: Circuit,
         observable: Union[ndarray, Hamiltonian],
         noise_model: NoiseModel,
-        nshots: Optional[int],
     ):
         """
         Check if the mitigation map is reliable. If not, execute the
@@ -116,7 +115,6 @@ class Mitigator:
                 circuit=circuit,
                 observable=observable,
                 noise_model=noise_model,
-                nshots=nshots,
             )
             self._n_maps_computed += 1
         self._n_checks += 1

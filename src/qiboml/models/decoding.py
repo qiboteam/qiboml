@@ -430,5 +430,4 @@ def _check_or_recompute_map(decoder: Expectation, x: Circuit):
         circuit=x + decoder._circuit,
         observable=decoder.observable,
         noise_model=decoder.noise_model,
-        nshots=decoder.nshots,
     )
