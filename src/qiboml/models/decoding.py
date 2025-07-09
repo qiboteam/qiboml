@@ -400,7 +400,7 @@ class VariationalQuantumLinearSolver(QuantumDecoding):
     Reference:
         C. Bravo-Prieto, R. LaRose, M. Cerezo, Y. Subasi, L. Cincio, and P. J. Coles,
         *Variational quantum linear solver*,
-        Quantum 7, 1188 (2023) <https://doi.org/10.22331/q-2023-11-22-1188>
+        `Quantum 7, 1188 (2023) <https://doi.org/10.22331/q-2023-11-22-1188>`_.
     """
     target_state: ndarray 
     A: ndarray 
