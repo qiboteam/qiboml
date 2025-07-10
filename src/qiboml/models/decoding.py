@@ -85,7 +85,6 @@ class QuantumDecoding:
         Returns:
             (CircuitResult | QuantumState | MeasurementOutcomes): the execution ``qibo.result`` object.
         """
-        # Standardize the density matrix attribute
         x = self.preprocessing(x)
 
         return self.backend.execute_circuit(x + self._circuit, nshots=self.nshots)
@@ -284,13 +283,12 @@ class Expectation(QuantumDecoding):
                 expval = self.observable.expectation_from_circuit(
                     x,
                     nshots=self.nshots,
-                ).reshape(1, 1)
-                expval = self.backend.cast(expval, dtype=self.backend.np.float64)
+                )
             else:
                 expval = self.observable.expectation_from_samples(
                     super().__call__(x).frequencies(),
                     qubit_map=self.qubits,
-                ).reshape(1, 1)
+                )
 
         # apply mitigation if requested
         if self.mitigation_config is not None:
