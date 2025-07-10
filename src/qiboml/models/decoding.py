@@ -2,7 +2,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Union
 
-from qibo import Circuit, gates, transpiler
+from qibo import Circuit, gates, get_transpiler, transpiler
 from qibo.backends import Backend, NumpyBackend, _check_backend
 from qibo.config import log, raise_error
 from qibo.hamiltonians import Hamiltonian, Z
@@ -12,7 +12,7 @@ from qibo.result import CircuitResult, MeasurementOutcomes, QuantumState
 from qibo.transpiler import Passes
 
 from qiboml import ndarray
-from qiboml.models.utils import Mitigator
+from qiboml.models.utils import Calibrator, Mitigator
 
 
 @dataclass
@@ -95,8 +95,12 @@ class QuantumDecoding:
             executable_circuit = self.noise_model.apply(x + self._circuit)
         else:
             executable_circuit = x + self._circuit
-
-        return self.backend.execute_circuit(executable_circuit, nshots=self.nshots)
+        # breakpoint()
+        # transpiler = get_transpiler()
+        # return self.backend.execute_circuit(executable_circuit, nshots=self.nshots)
+        executable_circuit.draw()
+        # breakpoint()
+        return executable_circuit(nshots=self.nshots)
 
     @property
     def circuit(
@@ -241,6 +245,7 @@ class Expectation(QuantumDecoding):
 
     observable: Union[ndarray, Hamiltonian] = None
     mitigation_config: Optional[Dict[str, Any]] = None
+    calibrator_config: Optional[Dict[str, Any]] = None
 
     def __post_init__(self):
         """Ancillary post initialization operations."""
@@ -253,6 +258,14 @@ class Expectation(QuantumDecoding):
             self.mitigator = Mitigator(
                 mitigation_config=self.mitigation_config,
                 backend=self.backend,
+            )
+
+        if self.calibrator_config is not None:
+            self.calibrator = Calibrator(
+                calibrator_config = self.calibrator_config,
+                backend = self.backend,
+                targets = list(self.wire_names),
+                
             )
 
         super().__post_init__()
@@ -290,7 +303,9 @@ class Expectation(QuantumDecoding):
                 self.mitigator(expval),
                 dtype=self.backend.np.float64,
             )
-
+        
+        if self.calibrator_config is not None:
+            self.calibrator()
         return expval.reshape(1, 1)
 
     @property
@@ -425,6 +440,8 @@ def _check_or_recompute_map(decoder: Expectation, x: Circuit):
             freqs, qubit_map=decoder.qubits
         )
     # Check or update noise map
+    decoder._circuit.draw()
+    a = x + decoder._circuit
     decoder.mitigator.check_or_update_map(
         noisy_reference_value=reference_expval,
         circuit=x + decoder._circuit,
