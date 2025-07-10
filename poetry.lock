@@ -3740,7 +3740,7 @@ qulacs = ["qulacs (>=0.6.4,<0.7.0)"]
 type = "git"
 url = "https://github.com/qiboteam/qibo"
 reference = "exp_fix"
-resolved_reference = "095d0a0061e79b8e890adde3afabeb1a8d21d572"
+resolved_reference = "d128c4032fc51d14308befc68503e99fb8ff26cd"
 
 [[package]]
 name = "qibojit"
