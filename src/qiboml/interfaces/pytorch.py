@@ -75,9 +75,8 @@ class QuantumModel(torch.nn.Module):
             circuit = utils.circuit_from_structure(
                 circuit_structure=self.circuit_structure,
                 x=x,
+                params=list(self.parameters())[0],
             )
-
-            circuit.set_parameters(list(self.parameters())[0])
             x = self.decoding(circuit)
         else:
             x = QuantumModelAutoGrad.apply(
@@ -160,6 +159,7 @@ class QuantumModelAutoGrad(torch.autograd.Function):
         decoding: QuantumDecoding,
         backend,
         differentiation,
+        independent_params_map,
         *parameters: List[torch.nn.Parameter],
     ):
         # Save the context
@@ -168,6 +168,7 @@ class QuantumModelAutoGrad(torch.autograd.Function):
         ctx.decoding = decoding
         ctx.backend = backend
         ctx.differentiation = differentiation
+        ctx.independent_params_map = independent_params_map
         dtype = getattr(backend.np, str(parameters[0].dtype).split(".")[-1])
         ctx.dtype = dtype
 
@@ -197,7 +198,8 @@ class QuantumModelAutoGrad(torch.autograd.Function):
             else:
                 circuit += circ
 
-        circuit.set_parameters(params)
+        # circuit.set_parameters(params)
+        utils.set_parameters(circuit, params, independent_params_map)
         x_clone = decoding(circuit)
         x_clone = torch.as_tensor(
             backend.to_numpy(x_clone).tolist(),
@@ -233,6 +235,7 @@ class QuantumModelAutoGrad(torch.autograd.Function):
                 ctx.circuit_structure,
                 ctx.decoding,
                 ctx.backend,
+                ctx.independent_params_map,
                 *params,
                 wrt_inputs=wrt_inputs,
             )
@@ -247,6 +250,7 @@ class QuantumModelAutoGrad(torch.autograd.Function):
         grad_input = grad_output @ grad_input if x is not None else None
         return (
             grad_input,
+            None,
             None,
             None,
             None,
