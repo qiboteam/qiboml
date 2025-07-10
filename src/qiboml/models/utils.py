@@ -58,6 +58,9 @@ class Mitigator:
         self._reference_circuit = None
         self._reference_value = None
 
+        self._n_checks = 0
+        self._n_maps_computed = 0
+
     def __call__(self, expval):
         """
         Take a noisy expectation value and return value mitigated with current
@@ -102,7 +105,6 @@ class Mitigator:
         circuit: Circuit,
         observable: Union[ndarray, Hamiltonian],
         noise_model: NoiseModel,
-        nshots: Optional[int],
     ):
         """
         Check if the mitigation map is reliable. If not, execute the
@@ -113,15 +115,15 @@ class Mitigator:
                 circuit=circuit,
                 observable=observable,
                 noise_model=noise_model,
-                nshots=nshots,
             )
+            self._n_maps_computed += 1
+        self._n_checks += 1
 
     def data_regression(
         self,
         circuit: Circuit,
         observable: Union[ndarray, Hamiltonian],
         noise_model: NoiseModel,
-        nshots: Optional[int],
     ):
         """
         Perform data regression on noisy and exact data.
