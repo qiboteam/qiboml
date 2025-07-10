@@ -246,8 +246,9 @@ class Expectation(QuantumDecoding):
 
     def __post_init__(self):
         """Ancillary post initialization operations."""
+        super().__post_init__()
         if self.observable is None:
-            self.observable = Z(len(self.qubits), dense=True, backend=self.backend)
+            self.observable = Z(len(self.qubits), dense=False, backend=self.backend)
 
         # If mitigation is requested
         if self.mitigation_config is not None:
@@ -256,8 +257,6 @@ class Expectation(QuantumDecoding):
                 mitigation_config=self.mitigation_config,
                 backend=self.backend,
             )
-
-        super().__post_init__()
 
     def __call__(self, x: Circuit) -> ndarray:
         """
