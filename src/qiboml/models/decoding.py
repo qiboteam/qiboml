@@ -380,7 +380,7 @@ class Samples(QuantumDecoding):
         Returns:
             (ndarray): the generated samples.
         """
-        return self.backend.cast(super().__call__(x).samples(), self.backend.precision)
+        return self.backend.cast(super().__call__(x).samples(), self.backend.np.float64)
 
     @property
     def output_shape(self) -> tuple[int, int]:
