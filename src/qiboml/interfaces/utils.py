@@ -44,7 +44,6 @@ def circuit_from_structure(
     circuit = Circuit(
         circuit_structure[0].nqubits,
         density_matrix=circuit_structure[0].density_matrix,
-        wire_names=circuit_structure[0].wire_names,
     )
     for circ in circuit_structure:
         if isinstance(circ, QuantumEncoding):
