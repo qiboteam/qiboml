@@ -6,6 +6,7 @@ from qibo import Circuit, gates, transpiler
 from qibo.backends import Backend, NumpyBackend, _check_backend
 from qibo.config import log, raise_error
 from qibo.hamiltonians import Hamiltonian, Z
+from qibo.hamiltonians.hamiltonians import SymbolicHamiltonian
 from qibo.models.error_mitigation import error_sensitive_circuit
 from qibo.noise import NoiseModel
 from qibo.result import CircuitResult, MeasurementOutcomes, QuantumState
@@ -84,6 +85,11 @@ class QuantumDecoding:
         Returns:
             (CircuitResult | QuantumState | MeasurementOutcomes): the execution ``qibo.result`` object.
         """
+        x = self.preprocessing(x)
+
+        return self.backend.execute_circuit(x + self._circuit, nshots=self.nshots)
+
+    def preprocessing(self, x: Circuit) -> Circuit:
         # Standardize the density matrix attribute
         self._align_density_matrix(x)
         self._align_wire_names(x)
@@ -92,11 +98,9 @@ class QuantumDecoding:
             x, _ = self.transpiler(x)
 
         if self.noise_model is not None:
-            executable_circuit = self.noise_model.apply(x + self._circuit)
-        else:
-            executable_circuit = x + self._circuit
+            x = self.noise_model.apply(x)
 
-        return self.backend.execute_circuit(executable_circuit, nshots=self.nshots)
+        return x
 
     @property
     def circuit(
@@ -244,8 +248,9 @@ class Expectation(QuantumDecoding):
 
     def __post_init__(self):
         """Ancillary post initialization operations."""
+        super().__post_init__()
         if self.observable is None:
-            self.observable = Z(self.nqubits, dense=True, backend=self.backend)
+            self.observable = Z(len(self.qubits), dense=False, backend=self.backend)
 
         # If mitigation is requested
         if self.mitigation_config is not None:
@@ -254,8 +259,6 @@ class Expectation(QuantumDecoding):
                 mitigation_config=self.mitigation_config,
                 backend=self.backend,
             )
-
-        super().__post_init__()
 
     def __call__(self, x: Circuit) -> ndarray:
         """
@@ -279,10 +282,17 @@ class Expectation(QuantumDecoding):
         if self.analytic:
             expval = self.observable.expectation(super().__call__(x).state())
         else:
-            freqs = super().__call__(x).frequencies()
-            expval = self.observable.expectation_from_samples(
-                freqs, qubit_map=self.qubits
-            )
+            if isinstance(self.observable, SymbolicHamiltonian):
+                x = self.preprocessing(x)
+                expval = self.observable.expectation_from_circuit(
+                    x,
+                    nshots=self.nshots,
+                )
+            else:
+                expval = self.observable.expectation_from_samples(
+                    super().__call__(x).frequencies(),
+                    qubit_map=self.qubits,
+                )
 
         # apply mitigation if requested
         if self.mitigation_config is not None:
@@ -374,7 +384,7 @@ class Samples(QuantumDecoding):
         Returns:
             (ndarray): the generated samples.
         """
-        return self.backend.cast(super().__call__(x).samples(), self.backend.precision)
+        return self.backend.cast(super().__call__(x).samples(), self.backend.np.float64)
 
     @property
     def output_shape(self) -> tuple[int, int]:
