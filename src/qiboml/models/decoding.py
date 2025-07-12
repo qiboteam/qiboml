@@ -86,10 +86,7 @@ class QuantumDecoding:
         """
         # Standardize the density matrix attribute
         self._align_density_matrix(x)
-
-        wire_names = list(self.wire_names) if self.wire_names is not None else None
-        x.wire_names = wire_names
-        x.init_kwargs["wire_names"] = wire_names
+        self._align_wire_names(x)
 
         if self.transpiler is not None:
             x, _ = self.transpiler(x)
@@ -147,6 +144,12 @@ class QuantumDecoding:
         # Aligning the density_matrix attribute of all the circuits
         self._circuit.init_kwargs["density_matrix"] = density_matrix
         x.init_kwargs["density_matrix"] = density_matrix
+
+    def _align_wire_names(self, x: Circuit):
+        """Share the wire names with the input circuit."""
+        wire_names = list(self.wire_names) if self.wire_names is not None else None
+        x.wire_names = wire_names
+        x.init_kwargs["wire_names"] = wire_names
 
     @contextmanager
     def _temporary_nshots(self, nshots):
@@ -269,6 +272,7 @@ class Expectation(QuantumDecoding):
         if self.mitigation_config is not None:
             # In this case it is required before the super.call
             self._align_density_matrix(x)
+            self._align_wire_names(x)
             _real_time_mitigation_check(self, x)
 
         # run circuit
@@ -426,5 +430,4 @@ def _check_or_recompute_map(decoder: Expectation, x: Circuit):
         circuit=x + decoder._circuit,
         observable=decoder.observable,
         noise_model=decoder.noise_model,
-        nshots=decoder.nshots,
     )

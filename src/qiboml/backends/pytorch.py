@@ -92,7 +92,7 @@ class PyTorchBackend(NumpyBackend):
         return getattr(self.np, dtype)
 
     def set_device(self, device):  # pragma: no cover
-        self.device = device
+        self.device = "cpu" if "CPU" in device else device
 
     def cast(
         self,
