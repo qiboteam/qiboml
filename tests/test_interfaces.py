@@ -1,6 +1,8 @@
 import inspect
 import os
 import random
+import torch 
+import tensorflow as tf
 
 import numpy as np
 import pytest
@@ -596,3 +598,63 @@ def test_qibolab(frontend):
     train_model(frontend, model, data, target, max_epochs=1)
     _, loss_trained = eval_model(frontend, model, data, target)
     assert loss_untrained > loss_trained
+
+
+@pytest.mark.parametrize("layer,seed", zip(ENCODING_LAYERS, [2]))
+def test_angles(backend, frontend, layer, seed):
+    set_device(frontend)
+    set_seed(frontend, seed)
+
+    nqubits = 2
+    dim = 2
+    density_matrix = False
+
+    initializer = 0
+    if frontend == "keras":
+        initializer = tf.keras.initializers.RandomNormal(mean=0.0, stddev=0.05, seed=None)
+    elif frontend == "pytorch":
+        initializer = torch.nn.init.normal_
+
+
+    training_layer = ans.HardwareEfficient(
+        nqubits, random_subset(nqubits, dim), density_matrix=density_matrix
+    )
+
+    decoding_qubits = random_subset(nqubits, dim)
+    observable = hamiltonians.SymbolicHamiltonian(
+        sum([Z(int(i)) for i in decoding_qubits]),
+        nqubits=nqubits,
+        backend=backend,
+    )
+    decoding_layer = dec.Expectation(
+        nqubits=nqubits,
+        qubits=decoding_qubits,
+        observable=observable,
+        backend=backend,
+    )
+
+    encoding_layer = layer(
+        nqubits, random_subset(nqubits, dim), density_matrix=density_matrix
+    )
+    circuit_structure = [encoding_layer, training_layer]
+
+    binary = True if encoding_layer.__class__.__name__ == "BinaryEncoding" else False
+    activation = build_activation(frontend, binary)
+    q_model = build_sequential_model(
+        frontend,
+        [
+            activation,
+            frontend.QuantumModel(
+                circuit_structure=circuit_structure,
+                angles_initialisation=initializer,
+                decoding=decoding_layer,
+            ),
+        ],
+    )
+    setattr(q_model, "decoding", decoding_layer)
+
+    data = random_tensor(frontend, (100, dim), binary)
+    target = prepare_targets(frontend, q_model, data)
+
+    backprop_test(frontend, q_model, data, target)
+    

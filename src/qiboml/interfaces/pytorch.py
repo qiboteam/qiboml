@@ -62,11 +62,10 @@ class QuantumModel(torch.nn.Module):
             torch.nn.init.normal_(self.circuit_parameters, mean=0.0, std=0.01)
         else:
             if callable(self.angles_initialisation):
-                self.circuit_parameters = torch.empty(params.shape)
-                self.angles_initialisation(self.circuit_parameters)
+                self.circuit_parameters = torch.empty(params.shape, dtype=torch.float64, requires_grad = True)
+                self.circuit_parameters = torch.nn.Parameter(self.angles_initialisation(self.circuit_parameters))
             elif isinstance(self.angles_initialisation, np.ndarray):
                 if self.angles_initialisation.shape != params.shape:
-                    params = params.numpy()
                     raise_error(
                         ValueError,
                         f"Shape not valid for angles_initialisation. The shape should be {params.shape}.",
@@ -76,6 +75,9 @@ class QuantumModel(torch.nn.Module):
                 ).ravel()
                 parameters.requires_grad = True
                 self.circuit_parameters = torch.nn.Parameter(parameters)
+            else:
+                raise_error(ValueError, "angles_initialisation should a `np.ndarray`, `keras.initializers.Initializer` or `torch.nn.init`.")
+
 
         if self.differentiation is None:
             self.differentiation = utils.get_default_differentiation(

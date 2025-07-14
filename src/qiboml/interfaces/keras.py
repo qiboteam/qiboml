@@ -52,6 +52,7 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
     ] = None
     differentiation: Optional[Differentiation] = None
 
+
     def __post_init__(self):
         super().__init__()
 
