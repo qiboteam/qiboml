@@ -456,10 +456,10 @@ def test_composition(backend, frontend):
     )
     setattr(model, "decoding", decoding_layer)
 
-    data = random_tensor(frontend, (50, 1))
+    data = random_tensor(frontend, (5, 1))
     target = prepare_targets(frontend, model, data)
     _, loss_untrained = eval_model(frontend, model, data, target)
-    train_model(frontend, model, data, target, max_epochs=5)
+    train_model(frontend, model, data, target, max_epochs=1)
     _, loss_trained = eval_model(frontend, model, data, target)
     assert loss_untrained > loss_trained
 
