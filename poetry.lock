@@ -28,15 +28,15 @@ files = [
 
 [[package]]
 name = "alembic"
-version = "1.16.3"
+version = "1.16.4"
 description = "A database migration tool for SQLAlchemy."
 optional = false
 python-versions = ">=3.9"
 groups = ["main", "tests"]
 markers = "(sys_platform == \"linux\" or sys_platform == \"darwin\" or sys_platform != \"linux\" and sys_platform != \"darwin\") and (python_version <= \"3.11\" or python_version >= \"3.12\" or sys_platform != \"linux\" and sys_platform != \"darwin\")"
 files = [
-    {file = "alembic-1.16.3-py3-none-any.whl", hash = "sha256:70a7c7829b792de52d08ca0e3aefaf060687cb8ed6bebfa557e597a1a5e5a481"},
-    {file = "alembic-1.16.3.tar.gz", hash = "sha256:18ad13c1f40a5796deee4b2346d1a9c382f44b8af98053897484fa6cf88025e4"},
+    {file = "alembic-1.16.4-py3-none-any.whl", hash = "sha256:b05e51e8e82efc1abd14ba2af6392897e145930c3e0a2faf2b0da2f7f7fd660d"},
+    {file = "alembic-1.16.4.tar.gz", hash = "sha256:efab6ada0dd0fae2c92060800e0bf5c1dc26af15a10e02fb4babff164b4725e2"},
 ]
 
 [package.dependencies]
@@ -220,14 +220,14 @@ css = ["tinycss2 (>=1.1.0,<1.5)"]
 
 [[package]]
 name = "certifi"
-version = "2025.7.9"
+version = "2025.7.14"
 description = "Python package for providing Mozilla's CA Bundle."
 optional = false
 python-versions = ">=3.7"
 groups = ["main", "docs", "tests"]
 files = [
-    {file = "certifi-2025.7.9-py3-none-any.whl", hash = "sha256:d842783a14f8fdd646895ac26f719a061408834473cfc10203f6a575beb15d39"},
-    {file = "certifi-2025.7.9.tar.gz", hash = "sha256:c1d2ec05395148ee10cf672ffc28cd37ea0ab0d99f9cc74c43e588cbd111b079"},
+    {file = "certifi-2025.7.14-py3-none-any.whl", hash = "sha256:6b31f564a415d79ee77df69d757bb49a5bb53bd9f756cbbe24394ffd6fc1f4b2"},
+    {file = "certifi-2025.7.14.tar.gz", hash = "sha256:8ea99dbdfaaf2ba2f9bac77b9249ef62ec5218e7c2b2e903378ed5fccf765995"},
 ]
 markers = {main = "(sys_platform == \"linux\" or sys_platform == \"darwin\") and python_version <= \"3.11\" or (sys_platform == \"linux\" or sys_platform == \"darwin\") and python_version >= \"3.12\"", docs = "(sys_platform == \"linux\" or sys_platform == \"darwin\" or sys_platform != \"linux\" and sys_platform != \"darwin\") and (python_version <= \"3.11\" or python_version >= \"3.12\" or sys_platform != \"linux\" and sys_platform != \"darwin\")", tests = "(sys_platform == \"linux\" or sys_platform == \"darwin\") and python_version <= \"3.11\" or (sys_platform == \"linux\" or sys_platform == \"darwin\") and python_version >= \"3.12\""}
 
@@ -3740,7 +3740,7 @@ qulacs = ["qulacs (>=0.6.4,<0.7.0)"]
 type = "git"
 url = "https://github.com/qiboteam/qibo"
 reference = "exp_fix"
-resolved_reference = "6caf8fe4145ef7d7e93a3812acd3ec2b06859036"
+resolved_reference = "c241c7e801cea59b35e643864d1709d68cc7c956"
 
 [[package]]
 name = "qibojit"
