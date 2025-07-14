@@ -76,7 +76,7 @@ class QuantumModel(torch.nn.Module):
                 parameters.requires_grad = True
                 self.circuit_parameters = torch.nn.Parameter(parameters)
             else:
-                raise_error(ValueError, "angles_initialisation should a `np.ndarray`, `keras.initializers.Initializer` or `torch.nn.init`.")
+                raise_error(ValueError, "angles_initialisation should be a `np.ndarray` or `torch.nn.init`.")
 
 
         if self.differentiation is None:

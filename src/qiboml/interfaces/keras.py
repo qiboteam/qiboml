@@ -92,6 +92,8 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
                     trainable=True,
                 )
                 self.circuit_parameters.assign(self.angles_initialisation)
+            else:
+                raise_error(ValueError, "angles_initialisation should be a `np.ndarray` or `keras.initializers.Initializer`.")
 
         if self.differentiation is None:
             self.differentiation = utils.get_default_differentiation(

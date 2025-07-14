@@ -600,7 +600,7 @@ def test_qibolab(frontend):
     assert loss_untrained > loss_trained
 
 
-@pytest.mark.parametrize("layer,seed", zip(ENCODING_LAYERS, [2]))
+@pytest.mark.parametrize("layer, seed", zip(ENCODING_LAYERS, [2]))
 def test_angles(backend, frontend, layer, seed):
     set_device(frontend)
     set_seed(frontend, seed)
@@ -610,10 +610,11 @@ def test_angles(backend, frontend, layer, seed):
     density_matrix = False
 
     initializer = 0
-    if frontend == "keras":
+    print(frontend)
+    if frontend.__name__ == "qiboml.interfaces.keras":
         initializer = tf.keras.initializers.RandomNormal(mean=0.0, stddev=0.05, seed=None)
-    elif frontend == "pytorch":
-        initializer = torch.nn.init.normal_
+    elif frontend.__name__ == "qiboml.interfaces.pytorch":
+        initializer = lambda p: torch.nn.init.normal_(p, mean=0, std=0.5)
 
 
     training_layer = ans.HardwareEfficient(
