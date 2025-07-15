@@ -31,7 +31,10 @@ def get_layers(module, layer_type=None):
 
 
 ENCODING_LAYERS = get_layers(enc, enc.QuantumEncoding)
-DECODING_LAYERS = get_layers(dec, dec.QuantumDecoding)
+DECODING_LAYERS = [
+    layer for layer in get_layers(dec, dec.QuantumDecoding)
+    if not issubclass(layer, dec.VariationalQuantumLinearSolver)
+]
 ANSATZE_LAYERS = get_layers(ans)
 
 

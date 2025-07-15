@@ -38,7 +38,9 @@ Contents
    tutorials/binary_mnist
    tutorials/data_reuploading
    tutorials/vqe
+   tutorials/variational_quantum_linear_solver
    tutorials/real_time_error_mitigation
+
 
 .. toctree::
     :maxdepth: 1
