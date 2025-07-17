@@ -1,6 +1,6 @@
 from functools import partial
 
-import jax  # pylint: disable=import-error
+import jax
 import jax.numpy as jnp  # pylint: disable=import-error
 import numpy as np
 from qibo import __version__
