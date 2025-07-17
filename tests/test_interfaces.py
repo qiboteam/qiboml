@@ -618,7 +618,7 @@ def test_angles(backend, frontend, layer, seed):
 
 
     training_layer = ans.HardwareEfficient(
-        nqubits, random_subset(nqubits, dim), density_matrix=density_matrix
+        nqubits, random_subset(nqubits, dim)
     )
 
     decoding_qubits = random_subset(nqubits, dim)
