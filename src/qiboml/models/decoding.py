@@ -274,8 +274,7 @@ class Expectation(QuantumDecoding):
 
         if self.mitigation_config is not None:
             # In this case it is required before the super.call
-            self._align_density_matrix(x)
-            self._align_wire_names(x)
+            x = self.preprocessing(x)
             _real_time_mitigation_check(self, x)
 
         # run circuit
