@@ -34,8 +34,8 @@ class QuantumModel(torch.nn.Module):
             by sequentially stacking the elements of the given list. It is also possible
             to pass a single circuit, in the case a sequential structure is not needed.
         decoding (QuantumDecoding): the decoding layer.
-        angles_initialisation (Union[keras.initializers.Initializer, np.ndarray]]): the initial parameters of the
-        circuit.
+        angles_initialisation (Union[keras.initializers.Initializer, np.ndarray]]): if an initialiser is provided it will be used
+        either as the parameters or to sample the parameters of the model.
         differentiation (Differentiation, optional): the differentiation engine,
             if not provided a default one will be picked following what described in the :ref:`docs <_differentiation_engine>`.
     """
@@ -58,8 +58,8 @@ class QuantumModel(torch.nn.Module):
         params = torch.as_tensor(self.backend.to_numpy(x=params)).ravel()
 
         if self.angles_initialisation is None:
-            self.circuit_parameters = torch.nn.Parameter(torch.empty(params.shape))
-            torch.nn.init.normal_(self.circuit_parameters, mean=0.0, std=0.01)
+            params.requires_grad = True
+            self.circuit_parameters = torch.nn.Parameter(params)
         else:
             if callable(self.angles_initialisation):
                 self.circuit_parameters = torch.empty(params.shape, dtype=torch.float64, requires_grad = True)

@@ -1,8 +1,6 @@
 import inspect
 import os
 import random
-import torch 
-import tensorflow as tf
 
 import numpy as np
 import pytest
@@ -456,10 +454,10 @@ def test_composition(backend, frontend):
     )
     setattr(model, "decoding", decoding_layer)
 
-    data = random_tensor(frontend, (5, 1))
+    data = random_tensor(frontend, (50, 1))
     target = prepare_targets(frontend, model, data)
     _, loss_untrained = eval_model(frontend, model, data, target)
-    train_model(frontend, model, data, target, max_epochs=1)
+    train_model(frontend, model, data, target, max_epochs=5)
     _, loss_trained = eval_model(frontend, model, data, target)
     assert loss_untrained > loss_trained
 
@@ -607,18 +605,15 @@ def test_angles(backend, frontend, layer, seed):
 
     nqubits = 2
     dim = 2
-    density_matrix = False
 
-    initializer = 0
-    print(frontend)
     if frontend.__name__ == "qiboml.interfaces.keras":
-        initializer = tf.keras.initializers.RandomNormal(mean=0.0, stddev=0.05, seed=None)
+        initializer = frontend.tf.keras.initializers.RandomNormal(mean=0.0, stddev=0.05, seed=None)
     elif frontend.__name__ == "qiboml.interfaces.pytorch":
-        initializer = lambda p: torch.nn.init.normal_(p, mean=0, std=0.5)
+        initializer = lambda p: frontend.torch.nn.init.normal_(p, mean=0, std=0.5)
 
 
     training_layer = ans.HardwareEfficient(
-        nqubits, random_subset(nqubits, dim), density_matrix=density_matrix
+        nqubits, random_subset(nqubits, dim)
     )
 
     decoding_qubits = random_subset(nqubits, dim)
@@ -635,7 +630,7 @@ def test_angles(backend, frontend, layer, seed):
     )
 
     encoding_layer = layer(
-        nqubits, random_subset(nqubits, dim), density_matrix=density_matrix
+        nqubits, random_subset(nqubits, dim)
     )
     circuit_structure = [encoding_layer, training_layer]
 

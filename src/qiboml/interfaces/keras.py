@@ -39,8 +39,8 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
             by sequentially stacking the elements of the given list. It is also possible
             to pass a single circuit, in the case a sequential structure is not needed.
         decoding (QuantumDecoding): the decoding layer.
-        angles_initialisation (Union[keras.initializers.Initializer, np.ndarray]]): the initial parameters of the
-        circuit.
+        angles_initialisation (Union[keras.initializers.Initializer, np.ndarray]]): if an initialiser is provided it will be used
+        either as the parameters or to sample the parameters of the model.
         differentiation (Differentiation, optional): the differentiation engine,
             if not provided a default one will be picked following what described in the :ref:`docs <_differentiation_engine>`.
     """
@@ -68,9 +68,10 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
         if self.angles_initialisation is None:
             self.circuit_parameters = self.add_weight(
                 shape=params.shape,
-                initializer=keras.initializers.RandomNormal(stddev=0.01),
+                initializer="zeros",
                 trainable=True,
             )
+            self.set_weights([params])
 
         else:
             if isinstance(self.angles_initialisation, keras.initializers.Initializer):
