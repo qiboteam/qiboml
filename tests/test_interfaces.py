@@ -48,6 +48,7 @@ def build_linear_layer(frontend, input_dim, output_dim):
     else:
         raise_error(RuntimeError, f"Unknown frontend {frontend}.")
 
+    
 
 def build_sequential_model(frontend, layers):
     if frontend.__name__ == "qiboml.interfaces.pytorch":
@@ -307,9 +308,9 @@ def backprop_test(frontend, model, data, target):
     # thus for now I am just allowing the == to cover those
     # specific (rare) cases
 
-
+@pytest.mark.parametrize("with_initializer", [True, False])
 @pytest.mark.parametrize("layer,seed", zip(ENCODING_LAYERS, [2]))
-def test_encoding(backend, frontend, layer, seed):
+def test_encoding(backend, frontend, layer, seed, with_initializer):
     set_device(frontend)
     set_seed(frontend, seed)
 
@@ -341,17 +342,26 @@ def test_encoding(backend, frontend, layer, seed):
 
     binary = True if encoding_layer.__class__.__name__ == "BinaryEncoding" else False
     activation = build_activation(frontend, binary)
+    initializer = None
+    if with_initializer:
+        if frontend.__name__ == "qiboml.interfaces.keras":
+            initializer = frontend.tf.keras.initializers.RandomNormal(mean=0.0, stddev=0.05)
+        elif frontend.__name__ == "qiboml.interfaces.pytorch":
+            initializer = lambda p: frontend.torch.nn.init.normal_(p, mean=0, std=0.5)
+        else:
+            raise_error(RuntimeError, f"Unknown frontend {frontend}.")
+
     q_model = build_sequential_model(
         frontend,
         [
             activation,
             frontend.QuantumModel(
                 circuit_structure=circuit_structure,
-                angles_initialisation=np.random.normal(size=(4,)),
+                angles_initialisation=initializer,
                 decoding=decoding_layer,
             ),
         ],
-    )
+        )
     setattr(q_model, "decoding", decoding_layer)
 
     data = random_tensor(frontend, (100, dim), binary)
@@ -599,17 +609,12 @@ def test_qibolab(frontend):
 
 
 @pytest.mark.parametrize("layer, seed", zip(ENCODING_LAYERS, [2]))
-def test_angles(backend, frontend, layer, seed):
+def test_angles(backend, frontend, layer, seed, with_initializer):
     set_device(frontend)
     set_seed(frontend, seed)
 
     nqubits = 2
     dim = 2
-
-    if frontend.__name__ == "qiboml.interfaces.keras":
-        initializer = frontend.tf.keras.initializers.RandomNormal(mean=0.0, stddev=0.05, seed=None)
-    elif frontend.__name__ == "qiboml.interfaces.pytorch":
-        initializer = lambda p: frontend.torch.nn.init.normal_(p, mean=0, std=0.5)
 
 
     training_layer = ans.HardwareEfficient(
@@ -636,6 +641,16 @@ def test_angles(backend, frontend, layer, seed):
 
     binary = True if encoding_layer.__class__.__name__ == "BinaryEncoding" else False
     activation = build_activation(frontend, binary)
+
+    initializer = None
+    if with_initializer:
+        if frontend.__name__ == "qiboml.interfaces.keras":
+            initializer = frontend.tf.keras.initializers.RandomNormal(mean=0.0, stddev=0.05)
+        elif frontend.__name__ == "qiboml.interfaces.pytorch":
+            initializer = lambda p: frontend.torch.nn.init.normal_(p, mean=0, std=0.5)
+        else:
+            raise_error(RuntimeError, f"Unknown frontend {frontend}.")
+
     q_model = build_sequential_model(
         frontend,
         [
@@ -646,7 +661,9 @@ def test_angles(backend, frontend, layer, seed):
                 decoding=decoding_layer,
             ),
         ],
-    )
+        )
+
+    
     setattr(q_model, "decoding", decoding_layer)
 
     data = random_tensor(frontend, (100, dim), binary)
