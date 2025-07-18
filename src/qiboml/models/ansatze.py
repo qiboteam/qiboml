@@ -20,7 +20,7 @@ def HardwareEfficient(
             circuit.add(gates.RY(q, theta=random.random() * np.pi, trainable=True))
             circuit.add(gates.RZ(q, theta=random.random() * np.pi, trainable=True))
         if nqubits > 1:
-            for i, q in enumerate(qubits[:-2]):
+            for i, q in enumerate(qubits[:-1]):
                 circuit.add(gates.CNOT(q0=q, q1=qubits[i + 1]))
             circuit.add(gates.CNOT(q0=qubits[-1], q1=qubits[0]))
 
