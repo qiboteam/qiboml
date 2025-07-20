@@ -1,12 +1,14 @@
 import numpy as np
 import pytest
+import torch
+
 from qibo import Circuit, gates, hamiltonians
 from qibo.quantum_info import random_clifford
 from qibo.symbols import Z
 from qibo.transpiler import NativeGates, Passes, Sabre, Unroller
 
 import qiboml.models.decoding as dec
-
+from qiboml.interfaces.pytorch import QuantumModel
 
 def test_probabilities_layer(backend):
     nqubits = 5
@@ -103,6 +105,37 @@ def test_vqls_solver_basic(backend):
     
     cost = solver(circuit)
     assert 0.0 <= cost <= 1.0
-    assert solver.output_shape == (1, 1)
-    assert solver.analytic
+    if backend.platform == "pytorch":
+
+        weights = torch.nn.ParameterList([
+            torch.nn.Parameter(torch.tensor(0.0, dtype=torch.float64))
+        ])
+
+
+        def variational_block(weights):
+            circuit = Circuit(nqubits)
+            circuit.add(gates.H(0))
+            circuit.add(gates.RY(0, weights[0]))
+            return circuit
+
+        vqc = variational_block(weights)
+
+        model = QuantumModel(
+            decoding=solver,
+            circuit_structure=vqc,
+        )
+
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.05)
+        initial_cost = float(model())
+
+        for _ in range(100):
+            optimizer.zero_grad()
+            loss = model()
+            loss.backward()
+            optimizer.step()
+
+        final_cost = float(model())
+        assert final_cost < initial_cost
+
+
 

@@ -391,8 +391,6 @@ class Samples(QuantumDecoding):
 class VariationalQuantumLinearSolver(QuantumDecoding):
     """Decoder for the Variational Quantum Linear Solver (VQLS). 
     
-    For optimization pipelines requiring autograd, ensure the backend supports differentiation (e.g., PyTorch or TensorFlow)
-
     Args:
         target_state (ndarray): Target solution vector :math:`\\ket{b}`.
         A (ndarray): The matrix ``A`` in the linear system :math:`A \\, \\ket{x} = \\ket{b}`.
