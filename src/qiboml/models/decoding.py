@@ -101,11 +101,13 @@ class QuantumDecoding:
         self._align_wire_names(x)
 
     def transpile(self, x: Circuit) -> Circuit:
+        """Transpile a given circuit ``x`` using the instructions provided by the ``transpiler`` attribute."""
         if self.transpiler is not None:
             x, _ = self.transpiler(x)
         return x
 
     def apply_noise(self, x: Circuit) -> Circuit:
+        """Apply the decoder ``noise_model`` to the target circuit."""
         if self.noise_model is not None:
             x = self.noise_model.apply(x)
         return x
