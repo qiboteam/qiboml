@@ -90,12 +90,14 @@ class QuantumDecoding:
         return self.backend.execute_circuit(x + self._circuit, nshots=self.nshots)
 
     def preprocessing(self, x: Circuit) -> Circuit:
+        """Perform some preprocessing on the input circuit to run with the settings specified by the decoder. In detail, transpilation and noise application on the input circuit is performed."""
         self.align_circuits(x)
         x = self.transpile(x)
         x = self.apply_noise(x)
         return x
 
     def align_circuits(self, x: Circuit):
+        """Align some attributes of the input circuit with the internal one, e.g. sets the density_matrix and wire_names."""
         # Standardize the density matrix attribute
         self._align_density_matrix(x)
         self._align_wire_names(x)
