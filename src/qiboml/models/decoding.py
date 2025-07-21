@@ -90,16 +90,24 @@ class QuantumDecoding:
         return self.backend.execute_circuit(x + self._circuit, nshots=self.nshots)
 
     def preprocessing(self, x: Circuit) -> Circuit:
+        self.align_circuits(x)
+        x = self.transpile(x)
+        x = self.apply_noise(x)
+        return x
+
+    def align_circuits(self, x: Circuit):
         # Standardize the density matrix attribute
         self._align_density_matrix(x)
         self._align_wire_names(x)
 
+    def transpile(self, x: Circuit) -> Circuit:
         if self.transpiler is not None:
             x, _ = self.transpiler(x)
+        return x
 
+    def apply_noise(self, x: Circuit) -> Circuit:
         if self.noise_model is not None:
             x = self.noise_model.apply(x)
-
         return x
 
     @property
@@ -274,7 +282,8 @@ class Expectation(QuantumDecoding):
 
         if self.mitigation_config is not None:
             # In this case it is required before the super.call
-            x = self.preprocessing(x)
+            self.align_circuits(x)
+            x = self.transpile(x)
             _real_time_mitigation_check(self, x)
 
         # run circuit
