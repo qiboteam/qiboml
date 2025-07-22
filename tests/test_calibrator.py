@@ -18,6 +18,8 @@ from qiboml.models.decoding import Expectation
 from qiboml.models.utils import Calibrator
 from qiboml.operations.differentiation import PSR
 
+NQUBITS = 5
+
 
 def _default_transpiler(backend):
     from qibo.transpiler.optimizer import Preprocessing
@@ -25,7 +27,7 @@ def _default_transpiler(backend):
     from qibo.transpiler.router import Sabre
     from qibo.transpiler.unroller import NativeGates, Unroller
 
-    qubits = [0, 1]
+    qubits = list(range(NQUBITS))
     natives = backend.natives
     connectivity_edges = backend.connectivity
     if qubits is not None and natives is not None:
@@ -49,7 +51,7 @@ def _default_transpiler(backend):
 
 def _set_circuit():
     vqe_circ = Circuit(
-        2,
+        NQUBITS,
     )
     vqe_circ.add(gates.RX(0, 3 * np.pi / 4, trainable=True))
     vqe_circ.add(gates.RX(1, np.pi / 4, trainable=True))
@@ -58,13 +60,12 @@ def _set_circuit():
 
 
 def test_calibrator():
-    backend = QibolabBackend(platform="mock")
+    backend = QibolabBackend(platform="dummy")
     transpiler = _default_transpiler(backend=backend)
-    nqubits = 2
     epochs = 3
     vqe_circ = _set_circuit()
 
-    wire_names = (i for i in range(nqubits))
+    wire_names = (i for i in range(NQUBITS))
 
     single_shot_action = Action(
         id="sgle_shot",
@@ -83,7 +84,7 @@ def test_calibrator():
         trigger_shots=10,
     )
     dec = Expectation(
-        nqubits=nqubits,
+        nqubits=NQUBITS,
         nshots=1024,
         density_matrix=False,
         wire_names=wire_names,
