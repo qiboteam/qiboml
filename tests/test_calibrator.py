@@ -1,23 +1,19 @@
+import tempfile
 from pathlib import Path
-import tempfile 
 
+import networkx as nx
 import numpy as np
 import torch
-from qibo import (Circuit, gates, get_backend, get_transpiler, set_backend,
-                  set_transpiler)
+from qibo import Circuit, gates, get_backend, get_transpiler, set_backend
 from qibo.backends import _Global
 from qibo.noise import NoiseModel, PauliError
-from qibolab._core.backends import QibolabBackend
 from qibo.transpiler import NativeGates, Passes, Unroller
 from qibocal.auto.runcard import Runcard
 from qibocal.auto.task import Action
 from qibocal.protocols.allxy import allxy
-from qibocal.protocols.classification.classification import \
-    single_shot_classification
-import networkx as nx
+from qibolab._core.backends import QibolabBackend
 
 from qiboml.interfaces.pytorch import QuantumModel
-from qiboml.models.ansatze import HardwareEfficient
 from qiboml.models.decoding import Expectation
 from qiboml.models.utils import Calibrator
 from qiboml.operations.differentiation import PSR
@@ -29,7 +25,7 @@ def _default_transpiler(backend):
     from qibo.transpiler.router import Sabre
     from qibo.transpiler.unroller import NativeGates, Unroller
 
-    qubits = [0,1]
+    qubits = [0, 1]
     natives = backend.natives
     connectivity_edges = backend.connectivity
     if qubits is not None and natives is not None:
@@ -50,44 +46,40 @@ def _default_transpiler(backend):
         )
     return Passes(passes=[])
 
+
 def _set_circuit():
-    vqe_circ = Circuit(2,)
-    vqe_circ.add(gates.RX(0, 3*np.pi/4, trainable=True))
-    vqe_circ.add(gates.RX(1, np.pi/4, trainable=True))
-    vqe_circ.add(gates.CZ(0,1))
+    vqe_circ = Circuit(
+        2,
+    )
+    vqe_circ.add(gates.RX(0, 3 * np.pi / 4, trainable=True))
+    vqe_circ.add(gates.RX(1, np.pi / 4, trainable=True))
+    vqe_circ.add(gates.CZ(0, 1))
     return vqe_circ
 
+
 def test_calibrator():
-    backend = QibolabBackend(platform = "mock")
+    backend = QibolabBackend(platform="mock")
     transpiler = _default_transpiler(backend=backend)
     nqubits = 2
     epochs = 3
     vqe_circ = _set_circuit()
 
-    wire_names=(i for i in range(nqubits))
+    wire_names = (i for i in range(nqubits))
 
     single_shot_action = Action(
-
-        id = "sgle_shot",
-        operation =  "single_shot_classification",
-        parameters={"nshots": 100}
-
+        id="sgle_shot",
+        operation="single_shot_classification",
+        parameters={"nshots": 100},
     )
-    allxy = Action(
-        id = "allxy",
-        operation =  "allxy",
-        parameters={"nshots": 100}
-
-    )
+    allxy = Action(id="allxy", operation="allxy", parameters={"nshots": 100})
     runcard = Runcard(
         actions=[single_shot_action, allxy],
-        targets = ["0", "1"],
-
+        targets=["0", "1"],
     )
     calibrator = Calibrator(
-        runcard=runcard, 
-        backend = backend,
-        path = Path(tempfile.gettempdir()+"/report_test"),
+        runcard=runcard,
+        backend=backend,
+        path=Path(tempfile.gettempdir() + "/report_test"),
         trigger_shots=10,
     )
     dec = Expectation(
@@ -99,14 +91,9 @@ def test_calibrator():
         calibrator=calibrator,
     )
     model = QuantumModel(
-      circuit_structure=vqe_circ,
-      decoding=dec,
-      differentiation=PSR()
+        circuit_structure=vqe_circ, decoding=dec, differentiation=PSR()
     )
-    optimizer = torch.optim.Adam(
-      model.parameters(), 
-      lr=0.1
-    )
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.1)
 
     for epoch in range(epochs):
         optimizer.zero_grad()
