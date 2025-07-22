@@ -228,10 +228,16 @@ class TensorflowBackend(NumpyBackend):
             return self.tf.linalg.eigh(matrix)
         return self.tf.linalg.eig(matrix)
 
-    def calculate_matrix_exp(self, a, matrix, eigenvectors=None, eigenvalues=None):
+    def calculate_matrix_exp(
+        self,
+        matrix,
+        phase: Union[float, int, complex] = 1,
+        eigenvectors=None,
+        eigenvalues=None,
+    ):
         if eigenvectors is None or self.is_sparse(matrix):
-            return self.tf.linalg.expm(-1j * a * matrix)
-        return super().calculate_matrix_exp(a, matrix, eigenvectors, eigenvalues)
+            return self.tf.linalg.expm(phase * matrix)
+        return super().calculate_matrix_exp(matrix, phase, eigenvectors, eigenvalues)
 
     def calculate_matrix_power(
         self,
