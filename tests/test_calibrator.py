@@ -113,5 +113,5 @@ def test_calibrator():
         cost = model()
         cost.backward()
         optimizer.step()
-    print("QQQQQQQQ",dec.calibrator._history) 
+
     assert dec.calibrator._history != None
