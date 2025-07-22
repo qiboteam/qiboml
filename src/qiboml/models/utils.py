@@ -151,7 +151,8 @@ class Calibrator:
     calibrator_config: Optional[Dict[str, Any]] = None
     backend: Optional[Backend] = None
     targets: Optional[list[QubitId]] = None
-    trigger_shots: int = 100
+    nshots: Optional[int] = None
+    trigger_shots_factor: int = 10
     _data: list[Data] = field(default_factory=list)
     _results: list[Results] = field(default_factory=list)
     _counter: int = 0 
@@ -162,8 +163,8 @@ class Calibrator:
         self.nshots = cfg["nshots"]
 
     def __call__(self):
-        self._counter += 1
-        if self._counter == self.trigger_shots:
+        self._counter += self.nshots
+        if self._counter % (self.nshots *self.trigger_shots) == 0:
             self.calibration()
 
     def calibration(self):

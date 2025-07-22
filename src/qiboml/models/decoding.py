@@ -1,3 +1,4 @@
+import sys
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Union
@@ -265,7 +266,7 @@ class Expectation(QuantumDecoding):
                 calibrator_config = self.calibrator_config,
                 backend = self.backend,
                 targets = list(self.wire_names),
-                
+                nshots = self.nshots,          
             )
 
         super().__post_init__()
@@ -306,6 +307,9 @@ class Expectation(QuantumDecoding):
         
         if self.calibrator_config is not None:
             self.calibrator()
+            # if not self.is_calibrated:
+            #     print("Fidelity too low", file = sys.stderr) #TODO: add more info 
+
         return expval.reshape(1, 1)
 
     @property
