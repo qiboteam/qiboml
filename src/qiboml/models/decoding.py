@@ -1,4 +1,3 @@
-import sys
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Union
@@ -96,12 +95,7 @@ class QuantumDecoding:
             executable_circuit = self.noise_model.apply(x + self._circuit)
         else:
             executable_circuit = x + self._circuit
-        # breakpoint()
-        # transpiler = get_transpiler()
-        # return self.backend.execute_circuit(executable_circuit, nshots=self.nshots)
-        executable_circuit.draw()
-        # breakpoint()
-        return executable_circuit(nshots=self.nshots)
+        return self.backend.execute_circuit(executable_circuit, nshots=self.nshots)
 
     @property
     def circuit(
@@ -261,7 +255,6 @@ class Expectation(QuantumDecoding):
                 backend=self.backend,
             )
 
-
         super().__post_init__()
 
     def __call__(self, x: Circuit) -> ndarray:
@@ -297,7 +290,7 @@ class Expectation(QuantumDecoding):
                 self.mitigator(expval),
                 dtype=self.backend.np.float64,
             )
-        
+
         if self.calibrator is not None:
             self.calibrator()
 
@@ -435,8 +428,6 @@ def _check_or_recompute_map(decoder: Expectation, x: Circuit):
             freqs, qubit_map=decoder.qubits
         )
     # Check or update noise map
-    decoder._circuit.draw()
-    a = x + decoder._circuit
     decoder.mitigator.check_or_update_map(
         noisy_reference_value=reference_expval,
         circuit=x + decoder._circuit,

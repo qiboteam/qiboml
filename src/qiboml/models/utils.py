@@ -1,5 +1,5 @@
+import datetime
 from dataclasses import dataclass, field
-import os, datetime 
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Union
 
@@ -150,6 +150,7 @@ class Mitigator:
         self._mitigation_map_popt = self.backend.cast(popt, dtype="double")
         log.info(f"Obtained noise map params: {self._mitigation_map_popt}.")
 
+
 @dataclass
 class Calibrator:
 
@@ -161,8 +162,12 @@ class Calibrator:
     """Qibo backend."""
     trigger_shots: int = 100
     """NUmber of shots to trigger :meth:`qiboml.models.utils.Calibrator.execute_experiments`"""
-    _history: Optional[History] = None
+    _history: list[History] = field(default_factory=list)
     _counter: int = 0
+
+    @property
+    def history(self):
+        return self._history
 
     def __call__(self):
         self._counter += 1
@@ -173,14 +178,29 @@ class Calibrator:
         """Execute the experiments in the runcard."""
         platform = self.backend.platform
         assert platform is not None, "Invalid None platform"
-        output_folder = self.path / datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-        self._history = self.runcard.run(
-            output = output_folder, 
-            platform = platform,
-            mode = AUTOCALIBRATION,
-            update = False,
-        ) 
+        output_folder = self.path / datetime.datetime.now().strftime(
+            "%Y-%m-%d_%H-%M-%S"
+        )
+        self._history.append(
+            self.runcard.run(
+                output=output_folder,
+                platform=platform,
+                mode=AUTOCALIBRATION,
+                update=False,
+            )
+        )
 
+    def data(self, id: str, execution_number: int):
+        """Return the data of the protocol with the specific `id` at its
+        `execution_number` execution.
+        """
+        return self._history[execution_number][id][0].data
+
+    def results(self, id: str, execution_number: int):
+        """Return the results of the protocol with the specific `id` at its
+        `execution_number` execution.
+        """
+        return self._history[execution_number][id][0].results
 
 
 def _get_wire_names_and_qubits(nqubits, qubits):
