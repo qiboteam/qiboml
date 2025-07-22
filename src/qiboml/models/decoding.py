@@ -246,7 +246,7 @@ class Expectation(QuantumDecoding):
 
     observable: Union[ndarray, Hamiltonian] = None
     mitigation_config: Optional[Dict[str, Any]] = None
-    calibrator_config: Optional[Dict[str, Any]] = None
+    calibrator: Optional[Calibrator] = None
 
     def __post_init__(self):
         """Ancillary post initialization operations."""
@@ -261,13 +261,6 @@ class Expectation(QuantumDecoding):
                 backend=self.backend,
             )
 
-        if self.calibrator_config is not None:
-            self.calibrator = Calibrator(
-                calibrator_config = self.calibrator_config,
-                backend = self.backend,
-                targets = list(self.wire_names),
-                nshots = self.nshots,          
-            )
 
         super().__post_init__()
 
@@ -305,10 +298,8 @@ class Expectation(QuantumDecoding):
                 dtype=self.backend.np.float64,
             )
         
-        if self.calibrator_config is not None:
+        if self.calibrator is not None:
             self.calibrator()
-            # if not self.is_calibrated:
-            #     print("Fidelity too low", file = sys.stderr) #TODO: add more info 
 
         return expval.reshape(1, 1)
 

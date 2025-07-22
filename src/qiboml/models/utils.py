@@ -1,4 +1,6 @@
 from dataclasses import dataclass, field
+import os, datetime 
+from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Union
 
 from qibo import Circuit
@@ -7,6 +9,9 @@ from qibo.config import log
 from qibo.hamiltonians import Hamiltonian
 from qibo.models import error_mitigation
 from qibo.noise import NoiseModel
+from qibocal.auto.history import History
+from qibocal.auto.mode import AUTOCALIBRATION
+from qibocal.auto.runcard import Runcard
 from qibocal.auto.task import Data, Results
 from qibocal.protocols import single_shot_classification
 from qibocal.update import QubitId
@@ -148,44 +153,34 @@ class Mitigator:
 @dataclass
 class Calibrator:
 
-    calibrator_config: Optional[Dict[str, Any]] = None
-    backend: Optional[Backend] = None
-    targets: Optional[list[QubitId]] = None
-    nshots: Optional[int] = None
-    trigger_shots_factor: int = 10
-    _data: list[Data] = field(default_factory=list)
-    _results: list[Results] = field(default_factory=list)
-    _counter: int = 0 
-
-    def __post_init__(self):
-        self.backend = _check_backend(self.backend)
-        cfg = self.calibrator_config or {}
-        self.nshots = cfg["nshots"]
+    runcard: Runcard
+    """Qibocal runcard with the calibration protocol to be executed."""
+    path: Path
+    """Folder to dump the protocol's data and results."""
+    backend: Backend
+    """Qibo backend."""
+    trigger_shots: int = 100
+    """NUmber of shots to trigger :meth:`qiboml.models.utils.Calibrator.execute_experiments`"""
+    _history: Optional[History] = None
+    _counter: int = 0
 
     def __call__(self):
-        self._counter += self.nshots
-        if self._counter % (self.nshots *self.trigger_shots) == 0:
-            self.calibration()
+        self._counter += 1
+        if self._counter % self.trigger_shots == 0:
+            self.execute_experiments()
 
-    def calibration(self):
-        # breakpoint()
+    def execute_experiments(self):
+        """Execute the experiments in the runcard."""
         platform = self.backend.platform
         assert platform is not None, "Invalid None platform"
-        params = single_shot_classification.parameters_type.load(
-            {"nshots":self.nshots},
-        ) 
-        platform.connect()
-        data, _ = single_shot_classification.acquisition(
-            params = params,
+        output_folder = self.path / datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        self._history = self.runcard.run(
+            output = output_folder, 
             platform = platform,
-            targets = self.targets,
-        )
-        platform.disconnect()
-        self._data.append(data)
-        # post-processing
-        results, _ = single_shot_classification.fit(data=self.data)
-        self._results.append(results)
-        print(self.results)
+            mode = AUTOCALIBRATION,
+            update = False,
+        ) 
+
 
 
 def _get_wire_names_and_qubits(nqubits, qubits):
