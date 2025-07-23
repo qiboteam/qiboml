@@ -289,11 +289,11 @@ class ExactGeodesicTransportCG:
             count += 1
 
         if True:  # pragma: no cover
-        # Fallback to last tried point
-        x_new = self.exponential_map_with_direction(u_prev, eta)
-        angles_trial = self.amplitudes_to_angles(x_new)
-        self.angles = angles_trial
-        v_new = self.tangent_vector()
+            # Fallback to last tried point
+            x_new = self.exponential_map_with_direction(u_prev, eta)
+            angles_trial = self.amplitudes_to_angles(x_new)
+            self.angles = angles_trial
+            v_new = self.tangent_vector()
 
         return x_new, angles_trial, v_new, eta
 
