@@ -342,7 +342,7 @@ class ExactGeodesicTransportCG:
             u (ndarray): Vector to transport.
             v (ndarray): Direction of geodesic.
             a (ndarray): Starting point on sphere.
-            eta (float, optional): Step size. If ``None``, fefaults to current ``eta``.
+            eta (float, optional): Step size. If ``None``, defaults to current ``eta``.
                 Defaults to ``None``.
 
         Returns:
