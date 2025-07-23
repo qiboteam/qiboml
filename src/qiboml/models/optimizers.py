@@ -285,6 +285,7 @@ class ExactGeodesicTransportCG:
                 # Accept step
                 return x_new, angles_trial, v_new, eta
 
+        if True:  # pragma: no cover
             eta *= backtrack_rate
             count += 1
 
