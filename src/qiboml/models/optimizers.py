@@ -106,7 +106,7 @@ class ExactGeodesicTransportCG:
             circuit (qibo.models.hamming_weight_encoder): Circuit prepared with current amplitudes.
         """
         amps = self.angles_to_amplitudes(self.angles)
-        self.circuit = hamming_weight_encoder(amps, self.nqubits, self.weight)
+        self.circuit = hamming_weight_encoder(amps, self.nqubits, self.weight, backend=self.backend)
 
     def state(self, initial_state=None, nshots=1000):
         """Return the statevector after encoding.
