@@ -229,8 +229,7 @@ class ExactGeodesicTransportCG:
         # Compute gradient(either finite difference or geometric)
         grad = self.geom_gradient() if self.geometric_gradient else self.gradient()
         # Compute inverse metric
-        g_diag = self.metric_tensor()
-        inv_g = 1.0 / g_diag
+        inv_g = 1.0 / self.metric_tensor()
         # Compute natural gradient
         nat_grad = -inv_g * grad
         jacobian = self.jacobian()
