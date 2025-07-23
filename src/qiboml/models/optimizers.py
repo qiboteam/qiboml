@@ -285,9 +285,9 @@ class ExactGeodesicTransportCG:
                 # Accept step
                 return x_new, angles_trial, v_new, eta
 
-        if True:  # pragma: no cover
-            eta *= backtrack_rate
-            count += 1
+            if True:  # pragma: no cover
+                eta *= backtrack_rate
+                count += 1
 
         if True:  # pragma: no cover
             # Fallback to last tried point
@@ -296,7 +296,7 @@ class ExactGeodesicTransportCG:
             self.angles = angles_trial
             v_new = self.tangent_vector()
 
-        return x_new, angles_trial, v_new, eta
+            return x_new, angles_trial, v_new, eta
 
     def exponential_map_with_direction(self, direction, eta=None):
         """Exponential map from current point along specified direction.
