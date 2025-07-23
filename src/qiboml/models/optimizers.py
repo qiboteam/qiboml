@@ -227,10 +227,7 @@ class ExactGeodesicTransportCG:
             ndarray: Tangent vector in the tangent space of the hypersphere.
         """
         # Compute gradient(either finite difference or geometric)
-        if self.geometric_gradient:
-            grad = self.geom_gradient()
-        else:
-            grad = self.gradient()
+        grad = self.geom_gradient() if self.geometric_gradient else self.gradient()
         # Compute inverse metric
         g_diag = self.metric_tensor()
         inv_g = 1.0 / g_diag
