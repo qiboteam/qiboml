@@ -59,5 +59,3 @@ def test_geometric_vs_numerical():
 
     assert final_loss_geo == pytest.approx(final_loss_num, rel=0.05)
 
-
-

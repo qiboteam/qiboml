@@ -141,7 +141,7 @@ class ExactGeodesicTransportCG:
         """Numerically compute gradient of loss wrt angles.
         
         Returns:
-            gradients (array): Gradient of loss wrt angles 
+            ndarray: Gradient of loss w.r.t. ``angles``. 
         """
         grad = self.backend.np.zeros_like(self.angles)
         for idx in range(len(self.angles)):
@@ -192,7 +192,7 @@ class ExactGeodesicTransportCG:
         """Compute Jacobian of amplitudes wrt angles.
 
         Returns:
-            jacobian (ndarray): Jacobian matrix
+            ndarray: Jacobian matrix.
         """
         dim = len(self.angles) 
         jacob = self.backend.np.zeros((dim + 1, dim), dtype=self.backend.np.float64)
@@ -341,7 +341,8 @@ class ExactGeodesicTransportCG:
             u (ndarray): Vector to transport.
             v (ndarray): Direction of geodesic.
             a (ndarray): Starting point on sphere.
-            eta (float, optional): Step size. Defaults to current eta.
+            eta (float, optional): Step size. If ``None``, fefaults to current ``eta``.
+                Defaults to ``None``.
 
         Returns:
             ndarray: Transported vector.
@@ -415,7 +416,7 @@ class ExactGeodesicTransportCG:
         """Run the EGT-CG optimizer for a specified number of steps.
 
         Args:
-            steps (int, optional): Number of optimization iterations. Defaults to 10.
+            steps (int, optional): Number of optimization iterations. Defaults to :math:`10`.
 
         Returns:
             tuple: (final_loss, losses, final_parameters)
@@ -502,6 +503,6 @@ class ExactGeodesicTransportCG:
             steps (int): Number of optimization steps.
 
         Returns:
-            tuple: (final loss, loss log, final_parameters) 
+            tuple: Respectively, final loss, loss log, and final parameters.
         """
         return self.run_egt_cg(steps=steps)
