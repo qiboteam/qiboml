@@ -55,7 +55,7 @@ def test_geometric_vs_numerical():
         angles=theta_init.copy(),
         geometric_gradient=True,
     )
-    final_loss_geo, _, _ = optimizer_geo.run_egt_cg(steps=10)
+    final_loss_geo, _, _ = optimizer_geo(steps=10)
 
     assert final_loss_geo == pytest.approx(final_loss_num, rel=0.05)
 
