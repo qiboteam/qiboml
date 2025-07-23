@@ -498,13 +498,15 @@ class ExactGeodesicTransportCG:
         final_parameters = self.angles
         return final_loss, losses, final_parameters
 
-    def __call__(self, steps=10):
+    def __call__(self, steps: int = 10, tolerance: float = 1e-8):
         """Run the optimizer.
 
         Args:
             steps (int): Number of optimization steps.
+            tolerance (float): Maximum tolerance for the residue of the gradient update.
+                Defaults to :math:`10^{-8}.`
 
         Returns:
             tuple: Respectively, final loss, loss log, and final parameters.
         """
-        return self.run_egt_cg(steps=steps)
+        return self.run_egt_cg(steps=steps, tolerance=tolerance)
