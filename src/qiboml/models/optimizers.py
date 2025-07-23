@@ -254,7 +254,7 @@ class ExactGeodesicTransportCG:
         eta = self.eta
         count = 0
 
-        while 1e-6 < eta:
+        while eta > 1e-6:
             transported_u = self.parallel_transport(u_prev, u_prev, x_prev, eta)
             x_new = self.exponential_map_with_direction(u_prev, eta)
             angles_trial = self.amplitudes_to_angles(x_new)
