@@ -412,11 +412,13 @@ class ExactGeodesicTransportCG:
         ) - self.sphere_inner_product(-self.v, self.u, self.x)
         return numerator / denominator
 
-    def run_egt_cg(self, steps=10):
+    def run_egt_cg(self, steps: int = 10, tolerance: float = 1e-8):
         """Run the EGT-CG optimizer for a specified number of steps.
 
         Args:
             steps (int, optional): Number of optimization iterations. Defaults to :math:`10`.
+            tolerance (float, optional): Maximum tolerance for the residue of the gradient update.
+                Defaults to :math:`10^{-8}`.
 
         Returns:
             tuple: (final_loss, losses, final_parameters)
@@ -434,7 +436,7 @@ class ExactGeodesicTransportCG:
             res = (
                 self.sphere_inner_product(-self.v, self.u, self.x) ** 2
             ) / self.sphere_inner_product(self.u, self.u, self.x)
-            if res < 1e-6:
+            if res < tolerance:  # pragma: no cover
                 break
 
             # Save current state
