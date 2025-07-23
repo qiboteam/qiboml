@@ -132,7 +132,7 @@ class ExactGeodesicTransportCG:
             \\mathcal{L} = \\bra{\\psi} \\, H \\, \\ket{\\psi} \\, .  
 
         Returns:
-            (float): Expectation value of ``hamiltonain``.
+            float: Expectation value of ``hamiltonain``.
         """
         state = self.state()
         return self.hamiltonian.expectation(state)
