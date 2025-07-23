@@ -245,7 +245,7 @@ class ExactGeodesicTransportCG:
             loss_prev (float): Loss at previous position.
 
         Returns:
-            tuple: (x_new, angles_trial, v_new, eta) updated position, angles, gradient, and step size.
+            tuple: Respectively, updated position, angles, gradient, and step size.
         """
         backtrack_rate = self.backtrack_rate
         if backtrack_rate is None:
