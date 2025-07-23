@@ -306,8 +306,9 @@ class ExactGeodesicTransportCG:
         Returns:
             ndarray: New point on the hypersphere.
         """
-        if eta == None:
+        if eta is None:  # pragma: no cover
             eta = self.eta
+
         norm_dir = self.backend.np.sqrt(
             self.sphere_inner_product(direction, direction, self.x)
         )
