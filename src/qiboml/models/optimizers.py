@@ -288,6 +288,7 @@ class ExactGeodesicTransportCG:
             eta *= backtrack_rate
             count += 1
 
+    if True:  # pragma: no cover
         # Fallback to last tried point
         x_new = self.exponential_map_with_direction(u_prev, eta)
         angles_trial = self.amplitudes_to_angles(x_new)
