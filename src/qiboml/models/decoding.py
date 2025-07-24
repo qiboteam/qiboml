@@ -10,6 +10,7 @@ from qibo.models.error_mitigation import error_sensitive_circuit
 from qibo.noise import NoiseModel
 from qibo.result import CircuitResult, MeasurementOutcomes, QuantumState
 from qibo.transpiler import Passes
+from qibo.quantum_info.metrics import infidelity
 
 from qiboml import ndarray
 from qiboml.models.utils import Mitigator
@@ -389,6 +390,49 @@ class Samples(QuantumDecoding):
     def analytic(self) -> bool:  # pragma: no cover
         return False
 
+    
+@dataclass(kw_only=True)
+class VariationalQuantumLinearSolver(QuantumDecoding):
+    """Decoder for the Variational Quantum Linear Solver (VQLS). 
+    
+    Args:
+        target_state (ndarray): Target solution vector :math:`\\ket{b}`.
+        A (ndarray): The matrix ``A`` in the linear system :math:`A \\, \\ket{x} = \\ket{b}`.
+
+    Reference:
+        C. Bravo-Prieto, R. LaRose, M. Cerezo, Y. Subasi, L. Cincio, and P. J. Coles,
+        *Variational quantum linear solver*,
+        `Quantum 7, 1188 (2023) <https://doi.org/10.22331/q-2023-11-22-1188>`_.
+    """
+    target_state: ndarray 
+    A: ndarray 
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.target_state = self.backend.cast(self.target_state, dtype=self.backend.np.complex128)
+        self.A = self.backend.cast(self.A, dtype=self.backend.np.complex128)
+
+        
+    def __call__(self, circuit: Circuit):
+        result = super().__call__(circuit)
+        state = result.state() 
+        final_state = self.A @ state
+        normalized = final_state / self.backend.calculate_vector_norm(final_state)
+        cost = infidelity(normalized, self.target_state, backend=self.backend)
+        return self.backend.cast(self.backend.np.real(cost), dtype=self.backend.np.float64)
+    
+    @property
+    def output_shape(self) -> tuple[int, int]:
+        return (1, 1)
+
+    @property
+    def analytic(self) -> bool:
+        return True
+
+
+
+
+
 
 def _real_time_mitigation_check(decoder: Expectation, x: Circuit):
     """
@@ -431,3 +475,4 @@ def _check_or_recompute_map(decoder: Expectation, x: Circuit):
         observable=decoder.observable,
         noise_model=decoder.noise_model,
     )
+
