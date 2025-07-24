@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 from qibo import Circuit, gates, hamiltonians
+from qibo.models.encodings import comp_basis_encoder
 from qibo.quantum_info import random_clifford
 from qibo.symbols import X, Z
 from qibo.transpiler import NativeGates, Passes, Sabre, Unroller
@@ -38,8 +39,7 @@ def test_expectation_layer(backend, nshots, observable):
     rng = np.random.default_rng(42)
     nqubits = 5
 
-    c = Circuit(5)
-    c.add([gates.X(i) for i in range(5)])
+    c = comp_basis_encoder("1" * 5)
 
     if observable is not None:
         observable = observable(nqubits, 0.1, False, backend)

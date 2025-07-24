@@ -456,7 +456,7 @@ def test_vqe(backend, frontend, dense, nshots):
     set_seed(frontend, seed)
     backend.set_seed(42)
 
-    tfim = hamiltonians.TFIM(nqubits=2, h=0.1, backend=backend, dense=dense)
+    tfim = hamiltonians.TFIM(nqubits=2, h=0.1, dense=dense, backend=backend)
 
     nqubits = 2
     training_layer = ans.HardwareEfficient(

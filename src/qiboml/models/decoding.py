@@ -5,8 +5,7 @@ from typing import Any, Dict, Optional, Union
 from qibo import Circuit, gates, transpiler
 from qibo.backends import Backend, NumpyBackend, _check_backend
 from qibo.config import log, raise_error
-from qibo.hamiltonians import Hamiltonian, Z
-from qibo.hamiltonians.hamiltonians import SymbolicHamiltonian
+from qibo.hamiltonians import Hamiltonian, SymbolicHamiltonian, Z
 from qibo.models.error_mitigation import error_sensitive_circuit
 from qibo.noise import NoiseModel
 from qibo.result import CircuitResult, MeasurementOutcomes, QuantumState
@@ -394,7 +393,7 @@ class Samples(QuantumDecoding):
             x (Circuit): input Circuit.
 
         Returns:
-            (ndarray): the generated samples.
+            ndarray: Generated samples.
         """
         return self.backend.cast(super().__call__(x).samples(), self.backend.np.float64)
 
