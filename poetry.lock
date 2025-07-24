@@ -5038,10 +5038,10 @@ files = [
 ]
 
 [extras]
-keras = ["keras", "tensorflow"]
+tf = ["keras", "tensorflow"]
 torch = ["torch"]
 
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.13"
-content-hash = "38be9cd7a503a0c4b3b83b4feacc612acb64456f6e05270ee6b06e29495d7e09"
+content-hash = "e47fbc76b9367e02cfe44d1d4c631242dd135b530db84288d9c7b5d70b2bed35"
