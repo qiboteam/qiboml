@@ -93,3 +93,7 @@ addopts = [
   '--cov-report=html',
   '--durations=60',
 ]
+
+[tool.poetry.extras]
+torch = ["torch"]
+tf = ["tensorflow", "keras"]
