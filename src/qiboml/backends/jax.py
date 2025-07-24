@@ -3,6 +3,7 @@ from functools import partial
 import jax
 import jax.numpy as jnp  # pylint: disable=import-error
 import numpy as np
+from jax.experimental import sparse
 from qibo import __version__
 from qibo.backends import einsum_utils
 from qibo.backends.npmatrices import NumpyMatrices
