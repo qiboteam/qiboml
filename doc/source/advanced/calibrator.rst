@@ -1,5 +1,5 @@
-Defining Calibrator
--------------------
+Defining a Calibrator
+---------------------
 
 If there is the possibility to execute a quantum circuit on a sel-fhosted
 quantum lab. Through the `Qibolab` backend, the Encoder allows the user to execute
