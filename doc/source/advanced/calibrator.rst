@@ -63,8 +63,8 @@ Now we can collect our protocols into the `Runcard` object and pass it to the
             trigger_shots = 10,
         )
 
-At the end, we can define the `Expectation` and specify the `Calibrator`.
-Every `trigger_shots` time the Executor is called, the calibration protocols are
+Finally, we can pass the `Calibrator` to the `Expectation` decoder as an additional argument.
+Every `trigger_shots` time the calibration protocols are
 executed, and the results are dumped into the `path`.
 
 .. code::
