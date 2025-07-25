@@ -94,7 +94,6 @@ class PSR(Differentiation):
         circuit_structure: List[Union[Circuit, QuantumEncoding]],
         decoding: QuantumDecoding,
         backend: Backend,
-        independent_params_map: dict[int, set[int]],
         *parameters: List[ndarray],
         wrt_inputs: bool = False,
     ):
@@ -307,7 +306,6 @@ class Jax(Differentiation):
         circuit_structure: List[Union[Circuit, QuantumEncoding]],
         decoding: QuantumDecoding,
         backend: Backend,
-        independent_params_map: dict[int, set[int]],
         *parameters: list[ndarray],
         wrt_inputs: bool = False,
     ):
@@ -326,12 +324,6 @@ class Jax(Differentiation):
         Returns:
             (list[ndarray]): the calculated gradients.
         """
-        # have to convert to tuple because dicts are not
-        # hashable, I also discard the keys that are not strictly
-        # necessary
-        independent_params_map = tuple(
-            tuple(v) for v in independent_params_map.values()
-        )
         if x is not None:
             x = backend.to_numpy(x)
             x = self._jax.cast(x, self._jax.precision)
@@ -362,14 +354,14 @@ class Jax(Differentiation):
 
         if wrt_inputs:
             gradients = self._jacobian(  # pylint: disable=no-member
-                x, circuit_structure, decoding, independent_params_map, *parameters
+                x, circuit_structure, decoding, *parameters
             )
         else:
             shape = 0 if x is None else (decoding.output_shape[-1], x.shape[-1])
             gradients = (
                 self._jax.numpy.zeros(shape),
                 self._jacobian_without_inputs(  # pylint: disable=no-member
-                    x, circuit_structure, decoding, independent_params_map, *parameters
+                    x, circuit_structure, decoding, *parameters
                 ),
             )
         decoding.set_backend(backend)
@@ -380,7 +372,7 @@ class Jax(Differentiation):
 
     @staticmethod
     @partial(jax.jit, static_argnums=(1, 2, 3))
-    def _run(x, circuit_structure, decoding, independent_params_map, *parameters):
+    def _run(x, circuit_structure, decoding, *parameters):
         circ = circuit_from_structure(
             circuit_structure=circuit_structure, x=x, params=parameters
         )

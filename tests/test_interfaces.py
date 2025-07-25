@@ -5,7 +5,7 @@ import random
 import numpy as np
 import pytest
 import torch
-from qibo import construct_backend, gates, hamiltonians
+from qibo import Circuit, construct_backend, gates, hamiltonians
 from qibo.config import raise_error
 from qibo.noise import NoiseModel, PauliError
 from qibo.symbols import Z
@@ -604,23 +604,40 @@ def test_qibolab(frontend):
 
 
 def test_equivariant(backend, frontend):
-    # 4 total parameters
+
+    engine = (
+        frontend.torch
+        if frontend.__name__ == "qiboml.interfaces.pytorch"
+        else frontend.tf
+    )
+
+    # this defines 3 independent parameters
+    def custom_circuit(th, phi, lam):
+        c = Circuit(2)
+        delta = 2 * engine.cos(phi) + lam**2
+        gamma = lam * engine.exp(th / 2)
+        c.add([gates.RZ(i, theta=th) for i in range(2)])
+        c.add([gates.RX(i, theta=lam) for i in range(2)])
+        c.add([gates.RY(i, theta=phi) for i in range(2)])
+        c.add(gates.RZ(0, theta=delta))
+        c.add(gates.RX(1, theta=gamma))
+        return c
+
+    # these are 4 independent parameters
     circuit = ans.HardwareEfficient(2)
-    # only 2 independent
-    ind_params = torch.randn(2)
-    # in numpy you need to use slicing to get references
-    # otherwise you will get copies, in torch instead you could
-    # just use ind_params[0] and ind_params[1]
-    dep_params = [ind_params[0], ind_params[1], ind_params[0], ind_params[1]]
-    circuit.set_parameters(dep_params)
     decoding = dec.Expectation(2, backend=backend)
     model = frontend.QuantumModel(
-        [
-            circuit,
-        ],
+        [circuit, custom_circuit],
         decoding,
     )
-    m_params = np.array(get_parameters(frontend, model, return_array=True))
-    ind_params = ind_params.numpy()
-    assert len(m_params) == 2
-    np.testing.assert_allclose(m_params, ind_params)
+    assert len(list(model.parameters())[0]) == 7
+
+    none = np.array(
+        5
+        * [
+            None,
+        ]
+    )
+    grad = train_model(frontend, model, none, none, max_epochs=10)
+    cost = model()
+    backend.assert_allclose(float(cost), -2.0, atol=5e-2)

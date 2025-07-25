@@ -162,7 +162,6 @@ class QuantumModelAutoGrad(torch.autograd.Function):
         decoding: QuantumDecoding,
         backend,
         differentiation,
-        independent_params_map,
         *parameters: List[torch.nn.Parameter],
     ):
         # Save the context
@@ -171,7 +170,6 @@ class QuantumModelAutoGrad(torch.autograd.Function):
         ctx.decoding = decoding
         ctx.backend = backend
         ctx.differentiation = differentiation
-        ctx.independent_params_map = independent_params_map
         dtype = getattr(backend.np, str(parameters[0].dtype).split(".")[-1])
         ctx.dtype = dtype
 
@@ -179,30 +177,23 @@ class QuantumModelAutoGrad(torch.autograd.Function):
             # Cloning, detaching and converting to backend arrays
             x_clone = x.clone().detach().cpu().numpy()
             x_clone = backend.cast(x_clone, dtype=x_clone.dtype)
+        else:
+            x_clone = x
         params = [
             backend.cast(par.clone().detach().cpu().numpy(), dtype=dtype)
             for par in parameters
         ]
 
-        # Build the temporary circuit from the circuit structure.
-        ctx.differentiable_encodings = True
-        circuit = Circuit(
-            decoding.nqubits,
-            density_matrix=circuit_structure[0].density_matrix,
+        # all the encodings need to be differentiatble
+        # TODO: open to debate
+        ctx.differentiable_encodings = all(
+            enc.differentiable
+            for enc in circuit_structure
+            if isinstance(enc, QuantumEncoding)
         )
-        for circ in circuit_structure:
-            if isinstance(circ, QuantumEncoding):
-                circuit += circ(x_clone)
-                # Record if any encoding is differentiable.
-                # TODO: discuss if we want to solve it like this, namely all non
-                # differentiable if at least one it is not
-                if not circ.differentiable:
-                    ctx.differentiable_encodings = False
-            else:
-                circuit += circ
+        circuit = utils.circuit_from_structure(circuit_structure, x_clone, params)
 
-        # circuit.set_parameters(params)
-        utils.set_parameters(circuit, params, independent_params_map)
+        # utils.set_parameters(circuit, params, independent_params_map)
         x_clone = decoding(circuit)
         x_clone = torch.as_tensor(
             backend.to_numpy(x_clone).tolist(),
@@ -238,7 +229,6 @@ class QuantumModelAutoGrad(torch.autograd.Function):
                 ctx.circuit_structure,
                 ctx.decoding,
                 ctx.backend,
-                ctx.independent_params_map,
                 *params,
                 wrt_inputs=wrt_inputs,
             )
