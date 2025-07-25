@@ -309,7 +309,7 @@ def backprop_test(frontend, model, data, target):
     # specific (rare) cases
 
 
-@pytest.mark.parametrize("with_initializer", [False, True, "numpy"])
+@pytest.mark.parametrize("with_initializer", [False, True, "numpy_array", "error_check"])
 @pytest.mark.parametrize("layer,seed", zip(ENCODING_LAYERS, [2]))
 def test_encoding(backend, frontend, layer, seed, with_initializer):
     set_device(frontend)
@@ -343,7 +343,14 @@ def test_encoding(backend, frontend, layer, seed, with_initializer):
 
     binary = True if encoding_layer.__class__.__name__ == "BinaryEncoding" else False
     activation = build_activation(frontend, binary)
-    initializer = None
+
+    def final_steps(q_model, decoding_layer, dim):
+        setattr(q_model, "decoding", decoding_layer)
+        data = random_tensor(frontend, (100, dim), binary)
+        target = prepare_targets(frontend, q_model, data)
+        backprop_test(frontend, q_model, data, target)
+
+
     if with_initializer == True:
         if frontend.__name__ == "qiboml.interfaces.keras":
             initializer = frontend.tf.keras.initializers.RandomNormal(mean=0.0, stddev=0.05)
@@ -351,29 +358,42 @@ def test_encoding(backend, frontend, layer, seed, with_initializer):
             initializer = lambda p: frontend.torch.nn.init.normal_(p, mean=0, std=0.5)
         else:
             raise_error(RuntimeError, f"Unknown frontend {frontend}.")
-    if with_initializer == "numpy":
-        initializer = np.array([0.5, 0.6, 0.7, 0.8])
 
-
-    q_model = build_sequential_model(
-        frontend,
-        [
-            activation,
-            frontend.QuantumModel(
+        q_model = build_sequential_model(frontend, [
+                activation,
+                frontend.QuantumModel(
                 circuit_structure=circuit_structure,
                 angles_initialisation=initializer,
+                decoding=decoding_layer)
+                ])
+        final_steps(q_model, decoding_layer, dim)
+    elif with_initializer == False:
+        q_model = build_sequential_model(frontend, [
+                activation,
+                frontend.QuantumModel(
+                circuit_structure=circuit_structure,
+                decoding=decoding_layer)
+                ])
+        final_steps(q_model, decoding_layer, dim)
+    elif with_initializer == "numpy_array":
+        initializer = np.array([0.5, 0.6, 0.7, 0.8])
+        q_model = build_sequential_model(frontend, [
+                activation,
+                frontend.QuantumModel(
+                circuit_structure=circuit_structure,
+                angles_initialisation=initializer,
+                decoding=decoding_layer)
+                ])
+        final_steps(q_model, decoding_layer, dim)
+    else:
+        with pytest.raises(ValueError):
+            q_model = frontend.QuantumModel(
+                circuit_structure=circuit_structure,
+                angles_initialisation=np.array([0.5, 0.6, 0.7, 0.8, 0.9, 0.7, 0.8, 0.9]),
                 decoding=decoding_layer,
-            ),
-        ],
-        )
-    setattr(q_model, "decoding", decoding_layer)
+            )
 
-    data = random_tensor(frontend, (100, dim), binary)
-    target = prepare_targets(frontend, q_model, data)
-
-    backprop_test(frontend, q_model, data, target)
-
-
+ 
 @pytest.mark.parametrize("layer,seed", zip(DECODING_LAYERS, [1, 3, 1, 26]))
 def test_decoding(backend, frontend, layer, seed):
     if not layer.analytic and not layer is dec.Expectation:
@@ -610,3 +630,48 @@ def test_qibolab(frontend):
     train_model(frontend, model, data, target, max_epochs=1)
     _, loss_trained = eval_model(frontend, model, data, target)
     assert loss_untrained > loss_trained
+
+
+@pytest.mark.parametrize("layer", ENCODING_LAYERS)
+def test_raise_error(frontend, backend, layer):
+    nqubits = 2
+    dim = 2
+    density_matrix = False
+
+    training_layer = ans.HardwareEfficient(
+        nqubits, random_subset(nqubits, dim), density_matrix=density_matrix
+    )
+
+    decoding_qubits = random_subset(nqubits, dim)
+    observable = hamiltonians.SymbolicHamiltonian(
+        sum([Z(int(i)) for i in decoding_qubits]),
+        nqubits=nqubits,
+        backend=backend,
+    )
+    decoding_layer = dec.Expectation(
+        nqubits=nqubits,
+        qubits=decoding_qubits,
+        observable=observable,
+        backend=backend,
+    )
+
+    encoding_layer = layer(
+        nqubits, random_subset(nqubits, dim), density_matrix=density_matrix
+    )
+    circuit_structure = [encoding_layer, training_layer]
+
+    binary = True if encoding_layer.__class__.__name__ == "BinaryEncoding" else False
+    activation = build_activation(frontend, binary)
+    with pytest.raises(ValueError):
+        q_model = frontend.QuantumModel(
+            circuit_structure=circuit_structure,
+            angles_initialisation=np.array([0.5, 0.6, 0.7, 0.8, 0.6, 0.7, 0.8]),
+            decoding=decoding_layer,
+        )
+
+    setattr(q_model, "decoding", decoding_layer)
+
+    data = random_tensor(frontend, (100, dim), binary)
+    target = prepare_targets(frontend, q_model, data)
+
+    backprop_test(frontend, q_model, data, target)
