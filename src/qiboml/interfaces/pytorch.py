@@ -1,7 +1,8 @@
 """Torch interface to qiboml layers"""
 
 from dataclasses import dataclass
-from typing import List, Optional, Union
+from inspect import signature
+from typing import Callable, List, Optional, Union
 
 import numpy as np
 import torch
@@ -50,7 +51,9 @@ class QuantumModel(torch.nn.Module):
             self.circuit_structure = [self.circuit_structure]
         utils._uniform_circuit_structure(self.circuit_structure)
 
-        params = utils.get_params_from_circuit_structure(self.circuit_structure)
+        params = utils.get_params_from_circuit_structure(
+            self.circuit_structure, circuit_trace
+        )
         params = torch.as_tensor(self.backend.to_numpy(x=params)).ravel()
         params.requires_grad = True
         self.circuit_parameters = torch.nn.Parameter(params)
@@ -75,9 +78,8 @@ class QuantumModel(torch.nn.Module):
             circuit = utils.circuit_from_structure(
                 circuit_structure=self.circuit_structure,
                 x=x,
+                params=list(self.parameters())[0],
             )
-
-            circuit.set_parameters(list(self.parameters())[0])
             x = self.decoding(circuit)
         else:
             x = QuantumModelAutoGrad.apply(
@@ -156,7 +158,7 @@ class QuantumModelAutoGrad(torch.autograd.Function):
     def forward(
         ctx,
         x: torch.Tensor,
-        circuit_structure: List[Union[QuantumEncoding, Circuit]],
+        circuit_structure: List[Union[QuantumEncoding, Circuit, Callable]],
         decoding: QuantumDecoding,
         backend,
         differentiation,
@@ -175,29 +177,23 @@ class QuantumModelAutoGrad(torch.autograd.Function):
             # Cloning, detaching and converting to backend arrays
             x_clone = x.clone().detach().cpu().numpy()
             x_clone = backend.cast(x_clone, dtype=x_clone.dtype)
+        else:
+            x_clone = x
         params = [
             backend.cast(par.clone().detach().cpu().numpy(), dtype=dtype)
             for par in parameters
         ]
 
-        # Build the temporary circuit from the circuit structure.
-        ctx.differentiable_encodings = True
-        circuit = Circuit(
-            decoding.nqubits,
-            density_matrix=circuit_structure[0].density_matrix,
+        # all the encodings need to be differentiatble
+        # TODO: open to debate
+        ctx.differentiable_encodings = all(
+            enc.differentiable
+            for enc in circuit_structure
+            if isinstance(enc, QuantumEncoding)
         )
-        for circ in circuit_structure:
-            if isinstance(circ, QuantumEncoding):
-                circuit += circ(x_clone)
-                # Record if any encoding is differentiable.
-                # TODO: discuss if we want to solve it like this, namely all non
-                # differentiable if at least one it is not
-                if not circ.differentiable:
-                    ctx.differentiable_encodings = False
-            else:
-                circuit += circ
+        circuit = utils.circuit_from_structure(circuit_structure, x_clone, params)
 
-        circuit.set_parameters(params)
+        # utils.set_parameters(circuit, params, independent_params_map)
         x_clone = decoding(circuit)
         x_clone = torch.as_tensor(
             backend.to_numpy(x_clone).tolist(),
@@ -251,5 +247,26 @@ class QuantumModelAutoGrad(torch.autograd.Function):
             None,
             None,
             None,
+            None,
             *gradients,
         )
+
+
+def circuit_trace(f: Callable) -> tuple[dict[int, tuple[int]], torch.Tensor]:
+    nparams = len(signature(f).parameters)
+    params = torch.randn(nparams)
+
+    def build(x):
+        # one parameter gates only
+        return tuple(par[0] for par in f(*x).get_parameters())
+
+    jac = torch.autograd.functional.jacobian(build, params)
+    par_map = {}
+    for i, row in enumerate(jac):
+        for j in row.nonzero():
+            j = j.item()
+            if j in par_map:
+                par_map[j] += (i,)
+            else:
+                par_map[j] = (i,)
+    return par_map, params

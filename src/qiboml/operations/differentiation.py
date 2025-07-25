@@ -12,7 +12,7 @@ from qibo.config import raise_error
 
 from qiboml import ndarray
 from qiboml.backends.jax import JaxBackend
-from qiboml.interfaces.utils import circuit_from_structure
+from qiboml.interfaces.utils import circuit_from_structure, set_parameters
 from qiboml.models.decoding import QuantumDecoding
 from qiboml.models.encoding import QuantumEncoding
 
@@ -119,13 +119,15 @@ class PSR(Differentiation):
             )
 
         # Construct circuit using the full circuit helper
-        circuit = circuit_from_structure(
-            circuit_structure=circuit_structure,
-            x=x,
-        )
+        # circuit = circuit_from_structure(
+        #    circuit_structure=circuit_structure,
+        #    x=x,
+        #    params=parameters
+        # )
 
         # Inject parameters into the circuit
-        circuit.set_parameters(parameters)
+        # circuit.set_parameters(parameters)
+        # set_parameters(circuit, parameters, independent_params_map)
 
         gradient = []
         if wrt_inputs:
@@ -141,7 +143,7 @@ class PSR(Differentiation):
                 backend.np.reshape(
                     self.gradient_wrt_inputs(
                         x=x,
-                        circuit=circuit,
+                        circuit=circuit_structure,
                         decoding=decoding,
                         backend=backend,
                     ),
@@ -161,7 +163,7 @@ class PSR(Differentiation):
         for i in range(len(parameters)):
             gradient.append(
                 self.one_parameter_shift(
-                    circuit=circuit,
+                    circuit=circuit_structure,
                     decoding=decoding,
                     parameters=parameters,
                     parameter_index=i,
@@ -171,7 +173,12 @@ class PSR(Differentiation):
         return gradient
 
     def one_parameter_shift(
-        self, circuit, decoding, parameters, parameter_index, backend
+        self,
+        circuit,
+        decoding,
+        parameters,
+        parameter_index,
+        backend,
     ):
         """Compute one derivative of the decoding strategy w.r.t. a target parameter."""
         gate = circuit.associate_gates_with_parameters()[parameter_index]
@@ -181,12 +188,14 @@ class PSR(Differentiation):
         tmp_params = backend.cast(parameters, copy=True, dtype=parameters[0].dtype)
         tmp_params = self.shift_parameter(tmp_params, parameter_index, s, backend)
 
-        circuit.set_parameters(tmp_params)
+        # circuit.set_parameters(tmp_params)
+        set_parameters(circuit, tmp_params, independent_params_map)
         forward = decoding(circuit)
 
         tmp_params = self.shift_parameter(tmp_params, parameter_index, -2 * s, backend)
 
-        circuit.set_parameters(tmp_params)
+        # circuit.set_parameters(tmp_params)
+        set_parameters(circuit, tmp_params, independent_params_map)
         backward = decoding(circuit)
         return generator_eigenval * (forward - backward)
 
@@ -322,18 +331,18 @@ class Jax(Differentiation):
         circuit_structure = tuple(circuit_structure)
 
         if self._argnums is None:
-            self._argnums = tuple(range(3, len(parameters) + 3))
+            self._argnums = tuple(range(4, len(parameters) + 4))
             setattr(
                 self,
                 "_jacobian",
-                partial(jax.jit, static_argnums=(1, 2))(
+                partial(jax.jit, static_argnums=(1, 2, 3))(
                     jax.jacfwd(self._run, (0,) + self._argnums),
                 ),
             )
             setattr(
                 self,
                 "_jacobian_without_inputs",
-                partial(jax.jit, static_argnums=(1, 2))(
+                partial(jax.jit, static_argnums=(1, 2, 3))(
                     jax.jacfwd(self._run, self._argnums),
                 ),
             )
@@ -362,11 +371,20 @@ class Jax(Differentiation):
         ]
 
     @staticmethod
-    @partial(jax.jit, static_argnums=(1, 2))
+    @partial(jax.jit, static_argnums=(1, 2, 3))
     def _run(x, circuit_structure, decoding, *parameters):
         circ = circuit_from_structure(
-            circuit_structure=circuit_structure,
-            x=x,
+            circuit_structure=circuit_structure, x=x, params=parameters
         )
-        circ.set_parameters(parameters)
+        # _jax_set_parameters(circ, parameters, independent_params_map)
         return decoding(circ)
+
+
+def _jax_set_parameters(circuit, parameters, imap):
+    new_params = len(circuit.get_parameters()) * [
+        None,
+    ]
+    for p, indices in zip(parameters, imap):
+        for i in indices:
+            new_params[i] = p
+    circuit.set_parameters(new_params)

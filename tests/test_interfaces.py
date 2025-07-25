@@ -4,7 +4,8 @@ import random
 
 import numpy as np
 import pytest
-from qibo import construct_backend, gates, hamiltonians
+import torch
+from qibo import Circuit, construct_backend, gates, hamiltonians
 from qibo.config import raise_error
 from qibo.noise import NoiseModel, PauliError
 from qibo.symbols import Z
@@ -253,11 +254,17 @@ def random_parameters(frontend, model):
     return new_params
 
 
-def get_parameters(frontend, model):
+def get_parameters(frontend, model, return_array=False):
     if frontend.__name__ == "qiboml.interfaces.pytorch":
-        return {k: v.clone() for k, v in model.state_dict().items()}
+        par = {k: v.clone() for k, v in model.state_dict().items()}
+        if return_array:
+            par = par.get("circuit_parameters")
+        return par
     elif frontend.__name__ == "qiboml.interfaces.keras":
-        return model.get_weights()
+        par = model.get_weights()
+        if return_array:
+            par = par[0]
+        return par
 
 
 def set_device(frontend):
@@ -587,3 +594,43 @@ def test_qibolab(frontend):
     train_model(frontend, model, data, target, max_epochs=1)
     _, loss_trained = eval_model(frontend, model, data, target)
     assert loss_untrained > loss_trained
+
+
+def test_equivariant(backend, frontend):
+
+    engine = (
+        frontend.torch
+        if frontend.__name__ == "qiboml.interfaces.pytorch"
+        else frontend.tf
+    )
+
+    # this defines 3 independent parameters
+    def custom_circuit(th, phi, lam):
+        c = Circuit(2)
+        delta = 2 * engine.cos(phi) + lam**2
+        gamma = lam * engine.exp(th / 2)
+        c.add([gates.RZ(i, theta=th) for i in range(2)])
+        c.add([gates.RX(i, theta=lam) for i in range(2)])
+        c.add([gates.RY(i, theta=phi) for i in range(2)])
+        c.add(gates.RZ(0, theta=delta))
+        c.add(gates.RX(1, theta=gamma))
+        return c
+
+    # these are 4 independent parameters
+    circuit = ans.HardwareEfficient(2)
+    decoding = dec.Expectation(2, backend=backend)
+    model = frontend.QuantumModel(
+        [circuit, custom_circuit],
+        decoding,
+    )
+    assert len(list(model.parameters())[0]) == 7
+
+    none = np.array(
+        5
+        * [
+            None,
+        ]
+    )
+    grad = train_model(frontend, model, none, none, max_epochs=10)
+    cost = model()
+    backend.assert_allclose(float(cost), -2.0, atol=5e-2)

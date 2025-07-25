@@ -1,4 +1,5 @@
-from typing import Dict, List, Optional, Union
+from inspect import signature
+from typing import Callable, Dict, List, Optional, Union
 
 import numpy as np
 from qibo import Circuit
@@ -10,7 +11,7 @@ from qiboml.models.encoding import QuantumEncoding
 
 
 def get_params_from_circuit_structure(
-    circuit_structure: Union[Circuit, List[Union[Circuit, QuantumEncoding]]]
+    circuit_structure: List[Union[Circuit, QuantumEncoding, Callable]], tracer: Callable
 ):
     """
     Helper function to retrieve the list of trainable parameters of a circuit
@@ -18,14 +19,16 @@ def get_params_from_circuit_structure(
     """
     params = []
     for circ in circuit_structure:
-        if not isinstance(circ, QuantumEncoding):
+        if isinstance(circ, Circuit):
             params.extend([p for param in circ.get_parameters() for p in param])
+        elif isinstance(circ, Callable):
+            par_map, pars = tracer(circ)
+            params.extend([float(p) for p in pars])
     return params
 
 
 def circuit_from_structure(
-    circuit_structure,
-    x: Optional[ndarray],
+    circuit_structure, x: Optional[ndarray], params: Optional[ndarray]
 ):
     """
     Helper function to reconstruct the whole circuit from a circuit structure.
@@ -45,9 +48,20 @@ def circuit_from_structure(
         circuit_structure[0].nqubits,
         density_matrix=circuit_structure[0].density_matrix,
     )
+    index = 0
     for circ in circuit_structure:
         if isinstance(circ, QuantumEncoding):
             circ = circ(x)
+        elif params is not None:
+            if isinstance(circ, Circuit):
+                nparams = len(circ.get_parameters())
+                circ.set_parameters(params[index : index + nparams])
+            elif isinstance(circ, Callable):
+                nparams = len(signature(circ).parameters)
+                circ = circ(*params[index : index + nparams])
+            else:
+                raise RuntimeError
+            index += nparams
         circuit += circ
     return circuit
 
@@ -108,6 +122,54 @@ def _uniform_circuit_structure(circuit_structure):
     Align the ``density_matrix`` attribute of all circuits composing the circuit structure.
     Namely, setting their ``density_matrix=True`` if at least one component of the circuit has ``density_matrix==True``.
     """
-    density_matrix = any(circ.density_matrix for circ in circuit_structure)
+    density_matrix = any(
+        circ.density_matrix
+        for circ in circuit_structure
+        if not isinstance(circ, Callable)
+    )
     for circ in circuit_structure:
         circ.density_matrix = density_matrix
+
+
+def _independent_params_map(params):
+    """
+    Extract the independent parameters among ``params`` by looking for all the
+    elements of ``params`` that share the same memory (numpy.shares_memory).
+    After that, a mapping is built that associates the index of an independent
+    element with all the indices where it is repeated, for instance if ``params``
+    is:
+
+    array([0.1, 0.2, 0.1, 0.1, 0.2])
+
+    the constructed map will be:
+
+    {0: {0,2,3}, 1: {1,4}}
+
+    (modulo the set ordering)
+    """
+    # the first element is surely independent, start from there
+    imap = {0: {0}}
+    # check all the other parameters
+    for i, p1 in enumerate(params[1:], start=1):
+        # check if any of the independent elements in imap share the
+        # memory with the current element
+        keys = [j for j in imap if np.shares_memory(p1, params[j])]
+        # none found -> i (p1) is independent
+        if len(keys) == 0:
+            imap[i] = {i}
+        # not independent, add i to the j (it should be only one) that
+        # shares the memory with it
+        else:
+            for j in keys:
+                imap[j].add(i)
+    return imap
+
+
+def set_parameters(circuit, params, imap):
+    new_params = len(circuit.get_parameters()) * [
+        None,
+    ]
+    for i in range(len(imap)):
+        for j in imap[i]:
+            new_params[j] = params[i]
+    circuit.set_parameters(new_params)
