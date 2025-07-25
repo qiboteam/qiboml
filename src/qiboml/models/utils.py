@@ -29,6 +29,7 @@ class Mitigator:
     backend: Optional[Backend] = None
 
     def __post_init__(self):
+
         self.backend = _check_backend(self.backend)
         self._mitigation_map: Callable[..., ndarray] = lambda x, a=1, b=0: a * x + b
 
