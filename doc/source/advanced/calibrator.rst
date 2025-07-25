@@ -1,10 +1,9 @@
 Defining a Calibrator
 ---------------------
 
-If there is the possibility to execute a quantum circuit on a sel-fhosted
-quantum lab. Through the `Qibolab` backend, the Encoder allows the user to execute
-calibration protocols to check the status of the quantum hardware.
-The calibration protocols are the ones provided by `Qibocal`.
+In `Qiboml`, the decoder allows for the execution of 
+calibration protocols to check the status of the quantum hardware during training. 
+To do that, a `Calibrator` object is implemented, to be customized by appending the `Qibocal` routines to be run. For more information about the available calibration routines please check `Qibocal`'s [documentation](https://qibo.science/qibocal/stable/).
 
 This tutorial shows how to specify the calibration protocols and retrieve
 their data and results.
