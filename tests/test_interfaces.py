@@ -309,7 +309,7 @@ def backprop_test(frontend, model, data, target):
     # specific (rare) cases
 
 
-@pytest.mark.parametrize("with_initializer", [False, True, "numpy_array", "error_check"])
+@pytest.mark.parametrize("with_initializer", [False, True, "numpy_array", "error_check_numpy", "error_check_keras_torch"])
 @pytest.mark.parametrize("layer,seed", zip(ENCODING_LAYERS, [2]))
 def test_encoding(backend, frontend, layer, seed, with_initializer):
     set_device(frontend)
@@ -385,6 +385,14 @@ def test_encoding(backend, frontend, layer, seed, with_initializer):
                 decoding=decoding_layer)
                 ])
         final_steps(q_model, decoding_layer, dim)
+    elif with_initializer == "error_check_keras_torch":
+        with pytest.raises(ValueError):
+            dummy_input = 1
+            q_model = frontend.QuantumModel(
+                circuit_structure=circuit_structure,
+                angles_initialisation=dummy_input,
+                decoding=decoding_layer,
+            )
     else:
         with pytest.raises(ValueError):
             q_model = frontend.QuantumModel(
