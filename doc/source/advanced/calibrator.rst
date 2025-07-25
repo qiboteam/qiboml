@@ -23,9 +23,9 @@ the circuit's gates into the native ones) and the circuit.
         vqe_circ.add(gates.RX(1, np.pi/4, trainable=True))
         vqe_circ.add(gates.CZ(0,1))
 
-If we want to check the status of the  calibration, we could be interested in
-evaluating the readout fidelity and the quality of the single qubit gates, for
-this reason we need to execute the classification experiment and the `allxy`.
+In order to check the status of the  calibration, we could be interested, for instance, in
+evaluating the readout fidelity and the quality of the single qubit gates. 
+This is achieved in `Qibocal` through the classification experiment and the `allxy` routine.
 
 .. code::
 
