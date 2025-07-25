@@ -1,8 +1,8 @@
 Defining a Calibrator
 ---------------------
 
-In `Qiboml`, the decoder allows for the execution of 
-calibration protocols to check the status of the quantum hardware during training. 
+In `Qiboml`, the decoder allows for the execution of
+calibration protocols to check the status of the quantum hardware during training.
 To do that, a `Calibrator` object is implemented, to be customized by appending the `Qibocal` routines to be run. For more information about the available calibration routines please check `Qibocal`'s [documentation](https://qibo.science/qibocal/stable/).
 
 This tutorial shows how to specify the calibration protocols and retrieve
@@ -24,7 +24,7 @@ the circuit's gates into the native ones) and the circuit.
         vqe_circ.add(gates.CZ(0,1))
 
 In order to check the status of the  calibration, we could be interested, for instance, in
-evaluating the readout fidelity and the quality of the single qubit gates. 
+evaluating the readout fidelity and the quality of the single qubit gates.
 This is achieved in `Qibocal` through the classification experiment and the `allxy` routine.
 
 .. code::
@@ -43,7 +43,7 @@ This is achieved in `Qibocal` through the classification experiment and the `all
 
         )
 
-The `id` is a user-chosen name to identify the specific protocol execution, whereas 
+The `id` is a user-chosen name to identify the specific protocol execution, whereas
 the `operation` and `parameters` are the name of the protocol in `Qibocal` and
 its parameter, respectively.
 
@@ -101,4 +101,4 @@ with its id and progressive number.
 
 
         data = calibrator.data("allxy", execution_time = 0)
-        results = calibrator.results("sgle_shot", execution_time = 0)
+        results = calibrator.results("single_shot", execution_time = 0)
