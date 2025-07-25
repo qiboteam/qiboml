@@ -12,7 +12,8 @@ from qibo.result import CircuitResult, MeasurementOutcomes, QuantumState
 from qibo.transpiler import Passes
 
 from qiboml import ndarray
-from qiboml.models.utils import Calibrator, Mitigator
+from qiboml.models.calibrator import Calibrator
+from qiboml.models.utils import Mitigator
 
 
 @dataclass

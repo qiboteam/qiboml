@@ -14,8 +14,8 @@ from qibocal.protocols.allxy import allxy
 from qibolab._core.backends import QibolabBackend
 
 from qiboml.interfaces.pytorch import QuantumModel
+from qiboml.models.calibrator import Calibrator
 from qiboml.models.decoding import Expectation
-from qiboml.models.utils import Calibrator
 from qiboml.operations.differentiation import PSR
 
 NQUBITS = 5
