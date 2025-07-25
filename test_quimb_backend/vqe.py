@@ -26,7 +26,7 @@ def build_vqe_circuit(nqubits, nlayers):
         for q in range(nqubits):
             c.add(gates.RY(q=q, theta=np.random.randn()))
             c.add(gates.RZ(q=q, theta=np.random.randn()))
-        # [c.add(gates.CRX(q0=q%nqubits, q1=(q+1)%nqubits, theta=np.random.randn())) for q in range(nqubits)]
+        [c.add(gates.CNOT(q0=q%nqubits, q1=(q+1)%nqubits)) for q in range(nqubits)]
     return c
 
 # Define the target Hamiltonian
@@ -55,7 +55,6 @@ decoding = Expectation(
     nqubits=nqubits,
     observable=hamiltonian,
     backend=sim_backend,
-    nshots=100
 )
 
 model = QuantumModel(
