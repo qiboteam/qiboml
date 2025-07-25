@@ -1,4 +1,5 @@
-from typing import Dict, List, Optional, Union
+from inspect import signature
+from typing import Callable, Dict, List, Optional, Union
 
 import numpy as np
 from qibo import Circuit
@@ -10,7 +11,7 @@ from qiboml.models.encoding import QuantumEncoding
 
 
 def get_params_from_circuit_structure(
-    circuit_structure: Union[Circuit, List[Union[Circuit, QuantumEncoding]]]
+    circuit_structure: List[Union[Circuit, QuantumEncoding, Callable]], tracer: Callable
 ):
     """
     Helper function to retrieve the list of trainable parameters of a circuit
@@ -18,8 +19,11 @@ def get_params_from_circuit_structure(
     """
     params = []
     for circ in circuit_structure:
-        if not isinstance(circ, QuantumEncoding):
+        if isinstance(circ, Circuit):
             params.extend([p for param in circ.get_parameters() for p in param])
+        elif isinstance(circ, Callable):
+            par_map, pars = tracer(circ)
+            params.extend([float(p) for p in pars])
     return params
 
 
@@ -49,8 +53,14 @@ def circuit_from_structure(
         if isinstance(circ, QuantumEncoding):
             circ = circ(x)
         elif params is not None:
-            nparams = len(circ.get_parameters())
-            circ.set_parameters(params[index : index + nparams])
+            if isinstance(circ, Circuit):
+                nparams = len(circ.get_parameters())
+                circ.set_parameters(params[index : index + nparams])
+            elif isinstance(circ, Callable):
+                nparams = len(signature(circ).parameters)
+                circ = circ(*params[index : index + nparams])
+            else:
+                raise RuntimeError
             index += nparams
         circuit += circ
     return circuit
@@ -112,7 +122,11 @@ def _uniform_circuit_structure(circuit_structure):
     Align the ``density_matrix`` attribute of all circuits composing the circuit structure.
     Namely, setting their ``density_matrix=True`` if at least one component of the circuit has ``density_matrix==True``.
     """
-    density_matrix = any(circ.density_matrix for circ in circuit_structure)
+    density_matrix = any(
+        circ.density_matrix
+        for circ in circuit_structure
+        if not isinstance(circ, Callable)
+    )
     for circ in circuit_structure:
         circ.density_matrix = density_matrix
 

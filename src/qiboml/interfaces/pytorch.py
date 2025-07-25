@@ -51,7 +51,9 @@ class QuantumModel(torch.nn.Module):
             self.circuit_structure = [self.circuit_structure]
         utils._uniform_circuit_structure(self.circuit_structure)
 
-        params = utils.get_params_from_circuit_structure(self.circuit_structure)
+        params = utils.get_params_from_circuit_structure(
+            self.circuit_structure, circuit_trace
+        )
         params = torch.as_tensor(self.backend.to_numpy(x=params)).ravel()
         params.requires_grad = True
         self.circuit_parameters = torch.nn.Parameter(params)
@@ -156,7 +158,7 @@ class QuantumModelAutoGrad(torch.autograd.Function):
     def forward(
         ctx,
         x: torch.Tensor,
-        circuit_structure: List[Union[QuantumEncoding, Circuit]],
+        circuit_structure: List[Union[QuantumEncoding, Circuit, Callable]],
         decoding: QuantumDecoding,
         backend,
         differentiation,
@@ -260,7 +262,7 @@ class QuantumModelAutoGrad(torch.autograd.Function):
         )
 
 
-def circuit_trace(f: Callable) -> dict[int, tuple[int]]:
+def circuit_trace(f: Callable) -> tuple[dict[int, tuple[int]], torch.Tensor]:
     nparams = len(signature(f).parameters)
     params = torch.randn(nparams)
 
@@ -277,4 +279,4 @@ def circuit_trace(f: Callable) -> dict[int, tuple[int]]:
                 par_map[j] += (i,)
             else:
                 par_map[j] = (i,)
-    return par_map
+    return par_map, params
