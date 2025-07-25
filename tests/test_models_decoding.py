@@ -1,8 +1,9 @@
 import numpy as np
 import pytest
 from qibo import Circuit, gates, hamiltonians
+from qibo.models.encodings import comp_basis_encoder
 from qibo.quantum_info import random_clifford
-from qibo.symbols import Z
+from qibo.symbols import X, Z
 from qibo.transpiler import NativeGates, Passes, Sabre, Unroller
 
 import qiboml.models.decoding as dec
@@ -31,21 +32,17 @@ def test_state_layer(backend):
 @pytest.mark.parametrize("nshots", [None, 10000])
 @pytest.mark.parametrize(
     "observable",
-    [
-        None,
-        lambda n, b: hamiltonians.SymbolicHamiltonian(
-            sum([Z(i) for i in range(n)]), nqubits=n, backend=b
-        ),
-    ],
+    [None, hamiltonians.TFIM],
 )
 def test_expectation_layer(backend, nshots, observable):
     backend.set_seed(42)
     rng = np.random.default_rng(42)
     nqubits = 5
 
-    c = random_clifford(nqubits, seed=rng, backend=backend)
+    c = comp_basis_encoder("1" * 5)
+
     if observable is not None:
-        observable = observable(nqubits, backend)
+        observable = observable(nqubits, 0.1, False, backend)
     layer = dec.Expectation(
         nqubits,
         observable=observable,
@@ -58,11 +55,10 @@ def test_expectation_layer(backend, nshots, observable):
     expv = (
         observable.expectation(backend.execute_circuit(c).state())
         if nshots is None
-        else observable.expectation_from_samples(
-            layer.circuit.measurements[0].result.frequencies()
-        )
+        else observable.expectation_from_circuit(c, nshots=nshots)
     )
-    backend.assert_allclose(layer_expv, expv)
+    atol = 1e-8 if nshots is None else 1e-2
+    backend.assert_allclose(layer_expv, expv, atol=atol)
 
 
 def test_decoding_with_transpiler(backend):

@@ -449,24 +449,22 @@ def test_composition(backend, frontend):
     assert loss_untrained > loss_trained
 
 
-def test_vqe(backend, frontend):
+@pytest.mark.parametrize("dense,nshots", ((True, None), (False, 100)))
+def test_vqe(backend, frontend, dense, nshots):
     seed = 42
     set_device(frontend)
     set_seed(frontend, seed)
     backend.set_seed(42)
 
-    tfim = hamiltonians.TFIM(nqubits=2, backend=backend)
+    tfim = hamiltonians.TFIM(nqubits=2, h=0.1, dense=dense, backend=backend)
 
     nqubits = 2
-    dim = 2
     training_layer = ans.HardwareEfficient(
         nqubits,
         nlayers=2,
     )
     decoding_layer = dec.Expectation(
-        nqubits=nqubits,
-        backend=backend,
-        observable=tfim,
+        nqubits=nqubits, backend=backend, observable=tfim, nshots=nshots
     )
     circuit_structure = [
         training_layer,
@@ -558,7 +556,11 @@ def test_qibolab(frontend):
     encoding_layer = enc.PhaseEncoding(nqubits)
     training_layer = ans.HardwareEfficient(nqubits)
     decoding_layer = dec.Expectation(
-        nqubits, wire_names=["0"], backend=backend, transpiler=transpiler, nshots=1000
+        nqubits,
+        wire_names=[0],
+        backend=backend,
+        transpiler=transpiler,
+        nshots=1000,
     )
 
     activation = build_activation(
