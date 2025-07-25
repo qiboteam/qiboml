@@ -43,7 +43,7 @@ This is achieved in `Qibocal` through the classification experiment and the `all
 
         )
 
-The `id` is a name that the user chooses to identify the specific protocol execution,
+The `id` is a user-chosen name to identify the specific protocol execution, whereas 
 the `operation` and `parameters` are the name of the protocol in `Qibocal` and
 its parameter, respectively.
 
