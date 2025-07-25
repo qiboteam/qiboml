@@ -8,7 +8,7 @@ To do that, a `Calibrator` object is implemented, to be customized by appending 
 This tutorial shows how to specify the calibration protocols and retrieve
 their data and results.
 First of all, let's define the backend, the transpiler (fundamental to decompose
-the circuit gate into the native ones) and the circuit.
+the circuit's gates into the native ones) and the circuit.
 
 .. code::
 
