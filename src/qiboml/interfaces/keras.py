@@ -85,7 +85,7 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
                 if self.angles_initialisation.shape != params.shape:
                     raise_error(
                         ValueError,
-                        f"Shape not valid for angles_initialisation. The shape should be {params.shape}.",
+                        f"Shape not valid for `angles_initialisation`. The shape should be {params.shape}.",
                     )
                 self.circuit_parameters = self.add_weight(
                     shape=params.shape,
@@ -94,7 +94,7 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
                 )
                 self.circuit_parameters.assign(self.angles_initialisation)
             else:
-                raise_error(ValueError, "angles_initialisation should be a `np.ndarray` or `keras.initializers.Initializer`.")
+                raise_error(ValueError, "`angles_initialisation` should be a `np.ndarray` or `keras.initializers.Initializer`.")
 
         if self.differentiation is None:
             self.differentiation = utils.get_default_differentiation(

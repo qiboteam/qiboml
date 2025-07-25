@@ -308,7 +308,8 @@ def backprop_test(frontend, model, data, target):
     # thus for now I am just allowing the == to cover those
     # specific (rare) cases
 
-@pytest.mark.parametrize("with_initializer", [True, False])
+
+@pytest.mark.parametrize("with_initializer", [False, True, "numpy"])
 @pytest.mark.parametrize("layer,seed", zip(ENCODING_LAYERS, [2]))
 def test_encoding(backend, frontend, layer, seed, with_initializer):
     set_device(frontend)
@@ -343,13 +344,16 @@ def test_encoding(backend, frontend, layer, seed, with_initializer):
     binary = True if encoding_layer.__class__.__name__ == "BinaryEncoding" else False
     activation = build_activation(frontend, binary)
     initializer = None
-    if with_initializer:
+    if with_initializer == True:
         if frontend.__name__ == "qiboml.interfaces.keras":
             initializer = frontend.tf.keras.initializers.RandomNormal(mean=0.0, stddev=0.05)
         elif frontend.__name__ == "qiboml.interfaces.pytorch":
             initializer = lambda p: frontend.torch.nn.init.normal_(p, mean=0, std=0.5)
         else:
             raise_error(RuntimeError, f"Unknown frontend {frontend}.")
+    if with_initializer == "numpy":
+        initializer = np.array([0.5, 0.6, 0.7, 0.8])
+
 
     q_model = build_sequential_model(
         frontend,
