@@ -161,7 +161,7 @@ class Calibrator:
     backend: Backend
     """Qibo backend."""
     trigger_shots: int = 100
-    """NUmber of shots to trigger :meth:`qiboml.models.utils.Calibrator.execute_experiments`"""
+    """Number of shots to trigger :meth:`qiboml.models.utils.Calibrator.execute_experiments`"""
     _history: list[History] = field(default_factory=list)
     _counter: int = 0
 
