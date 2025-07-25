@@ -93,8 +93,8 @@ executed, and the results are dumped into the `path`.
             cost.backward()
             optimizer.step()
 
-If we want to access the data and results of the calibration protocols we can
-just call the `data` and `results` methods specifying the protocol execution
+In order to access the data and results of the calibration protocols we can
+just call the corresponding `data` and `results` methods and specify the protocol execution
 with its id and progressive number.
 
 .. code::
