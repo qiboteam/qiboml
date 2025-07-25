@@ -22,7 +22,7 @@ try:
         backend: Backend
         """Qibo backend."""
         trigger_shots: int = 100
-        """Number of shots to trigger :meth:`qiboml.models.utils.Calibrator.execute_experiments`"""
+        """Number of Expectation calls to trigger :meth:`qiboml.models.utils.Calibrator.execute_experiments`"""
         _history: list[History] = field(default_factory=list)
         _counter: int = 0
 
@@ -38,7 +38,7 @@ try:
         def execute_experiments(self):
             """Execute the experiments in the runcard."""
             platform = self.backend.platform
-            assert platform is not None, "Invalid None platform"
+            assert platform is not None
             output_folder = self.path / datetime.datetime.now().strftime(
                 "%Y-%m-%d_%H-%M-%S"
             )
