@@ -31,7 +31,7 @@ This is achieved in `Qibocal` through the classification experiment and the `all
 
         single_shot_action = Action(
 
-            id = "sgle_shot",
+            id = "single_shot",
             operation =  "single_shot_classification",
             parameters={"nshots": 100}
 
