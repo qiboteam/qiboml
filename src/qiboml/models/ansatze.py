@@ -45,6 +45,13 @@ def brickwork_givens(nqubits: int, weight: int, full_hwp: bool = False, **kwargs
 
     Returns:
         :class:`qibo.models.circuit.Circuit`: Hamming-weight-preserving brickwork circuit.
+
+    References:
+        1. B. T. Gard, L. Zhu1, G. S. Barron, N. J. Mayhall, S. E. Economou, and Edwin Barnes,
+        *Efﬁcient symmetry-preserving state preparation circuits for the variational quantum
+        eigensolver algorithm*, `npj Quantum Information (2020) 6:10 
+        <https://doi.org/10.1038/s41534-019-0240-1>`_.
+
     """
     n_choose_k = int(binom(nqubits, weight))
 
