@@ -612,7 +612,7 @@ def test_equivariant(backend, frontend):
     )
 
     # this defines 3 independent parameters
-    def custom_circuit(th, phi, lam):
+    def custom_circuit(engine, th, phi, lam):
         c = Circuit(2)
         delta = 2 * engine.cos(phi) + lam**2
         gamma = lam * engine.exp(th / 2)

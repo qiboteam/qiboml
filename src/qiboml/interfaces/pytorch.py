@@ -1,7 +1,6 @@
 """Torch interface to qiboml layers"""
 
 from dataclasses import dataclass
-from inspect import signature
 from typing import Callable, List, Optional, Union
 
 import numpy as np
@@ -52,7 +51,7 @@ class QuantumModel(torch.nn.Module):
         utils._uniform_circuit_structure(self.circuit_structure)
 
         params = utils.get_params_from_circuit_structure(
-            self.circuit_structure, circuit_trace
+            self.circuit_structure,
         )
         params = torch.as_tensor(self.backend.to_numpy(x=params)).ravel()
         params.requires_grad = True
@@ -79,6 +78,7 @@ class QuantumModel(torch.nn.Module):
                 circuit_structure=self.circuit_structure,
                 x=x,
                 params=list(self.parameters())[0],
+                backend=self.backend,
             )
             x = self.decoding(circuit)
         else:
@@ -250,23 +250,3 @@ class QuantumModelAutoGrad(torch.autograd.Function):
             None,
             *gradients,
         )
-
-
-def circuit_trace(f: Callable) -> tuple[dict[int, tuple[int]], torch.Tensor]:
-    nparams = len(signature(f).parameters)
-    params = torch.randn(nparams)
-
-    def build(x):
-        # one parameter gates only
-        return tuple(par[0] for par in f(*x).get_parameters())
-
-    jac = torch.autograd.functional.jacobian(build, params)
-    par_map = {}
-    for i, row in enumerate(jac):
-        for j in row.nonzero():
-            j = j.item()
-            if j in par_map:
-                par_map[j] += (i,)
-            else:
-                par_map[j] = (i,)
-    return par_map, params

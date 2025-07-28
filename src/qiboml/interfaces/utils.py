@@ -1,8 +1,11 @@
+import random
 from inspect import signature
 from typing import Callable, Dict, List, Optional, Union
 
 import numpy as np
 from qibo import Circuit
+from qibo.backends import _check_backend
+from qibo.backends.abstract import Backend
 from qibo.ui.mpldrawer import plot_circuit
 
 from qiboml import ndarray
@@ -11,7 +14,7 @@ from qiboml.models.encoding import QuantumEncoding
 
 
 def get_params_from_circuit_structure(
-    circuit_structure: List[Union[Circuit, QuantumEncoding, Callable]], tracer: Callable
+    circuit_structure: List[Union[Circuit, QuantumEncoding, Callable]],
 ):
     """
     Helper function to retrieve the list of trainable parameters of a circuit
@@ -22,13 +25,19 @@ def get_params_from_circuit_structure(
         if isinstance(circ, Circuit):
             params.extend([p for param in circ.get_parameters() for p in param])
         elif isinstance(circ, Callable):
-            par_map, pars = tracer(circ)
-            params.extend([float(p) for p in pars])
+            # par_map, pars = tracer(circ)
+            params.extend(
+                random.random() for key in signature(circ).parameters if key != "engine"
+            )
+            # params.extend([float(p) for p in pars])
     return params
 
 
 def circuit_from_structure(
-    circuit_structure, x: Optional[ndarray], params: Optional[ndarray]
+    circuit_structure,
+    x: Optional[ndarray],
+    params: Optional[ndarray],
+    backend: Optional[Backend],
 ):
     """
     Helper function to reconstruct the whole circuit from a circuit structure.
@@ -44,6 +53,8 @@ def circuit_from_structure(
             "x cannot be None when encoding layers are present in the circuit structure."
         )
 
+    backend = _check_backend(backend)
+
     circuit = Circuit(
         circuit_structure[0].nqubits,
         density_matrix=circuit_structure[0].density_matrix,
@@ -57,8 +68,11 @@ def circuit_from_structure(
                 nparams = len(circ.get_parameters())
                 circ.set_parameters(params[index : index + nparams])
             elif isinstance(circ, Callable):
-                nparams = len(signature(circ).parameters)
-                circ = circ(*params[index : index + nparams])
+                param_dict = signature(circ).parameters
+                nparams = len(param_dict)
+                if "engine" in param_dict:
+                    nparams -= 1
+                circ = circ(backend.np, *params[index : index + nparams])
             else:
                 raise RuntimeError
             index += nparams
