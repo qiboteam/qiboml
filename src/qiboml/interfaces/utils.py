@@ -122,7 +122,15 @@ def draw_circuit(circuit_structure, backend, plt_drawing=True, **plt_kwargs):
         if encoding_layer is not None
         else None
     )
-    circuit = circuit_from_structure(circuit_structure, dummy_data)
+    dummy_params = []
+    for circ in circuit_structure:
+        if isinstance(circ, Circuit):
+            dummy_params.extend(len(circ.get_parameters()) * [0.0])
+        elif not isinstance(circ, QuantumEncoding) and isinstance(circ, Callable):
+            dummy_params.extend((len(signature(circ).parameters) - 1) * [0.0])
+    circuit = circuit_from_structure(
+        circuit_structure, x=dummy_data, params=dummy_params, backend=backend
+    )
     if plt_drawing:
         _, fig = plot_circuit(circuit, **plt_kwargs)
         return fig
