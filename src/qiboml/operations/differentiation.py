@@ -118,12 +118,10 @@ class PSR(Differentiation):
                 "Parameter Shift Rule only supports expectation value decoding.",
             )
 
-        # Construct circuit using the full circuit helper
-        # circuit = circuit_from_structure(
-        #    circuit_structure=circuit_structure,
-        #    x=x,
-        #    params=parameters
-        # )
+        # Construct the circuit
+        circuit = circuit_from_structure(
+            circuit_structure=circuit_structure, x=x, params=parameters, backend=backend
+        )
 
         # Inject parameters into the circuit
         # circuit.set_parameters(parameters)
@@ -143,7 +141,7 @@ class PSR(Differentiation):
                 backend.np.reshape(
                     self.gradient_wrt_inputs(
                         x=x,
-                        circuit=circuit_structure,
+                        circuit=circuit,
                         decoding=decoding,
                         backend=backend,
                     ),
@@ -163,7 +161,7 @@ class PSR(Differentiation):
         for i in range(len(parameters)):
             gradient.append(
                 self.one_parameter_shift(
-                    circuit=circuit_structure,
+                    circuit=circuit,
                     decoding=decoding,
                     parameters=parameters,
                     parameter_index=i,
@@ -188,14 +186,12 @@ class PSR(Differentiation):
         tmp_params = backend.cast(parameters, copy=True, dtype=parameters[0].dtype)
         tmp_params = self.shift_parameter(tmp_params, parameter_index, s, backend)
 
-        # circuit.set_parameters(tmp_params)
-        set_parameters(circuit, tmp_params, independent_params_map)
+        circuit.set_parameters(tmp_params)
         forward = decoding(circuit)
 
         tmp_params = self.shift_parameter(tmp_params, parameter_index, -2 * s, backend)
 
-        # circuit.set_parameters(tmp_params)
-        set_parameters(circuit, tmp_params, independent_params_map)
+        circuit.set_parameters(tmp_params)
         backward = decoding(circuit)
         return generator_eigenval * (forward - backward)
 
@@ -379,15 +375,4 @@ class Jax(Differentiation):
             params=parameters,
             backend=decoding.backend,
         )
-        # _jax_set_parameters(circ, parameters, independent_params_map)
         return decoding(circ)
-
-
-def _jax_set_parameters(circuit, parameters, imap):
-    new_params = len(circuit.get_parameters()) * [
-        None,
-    ]
-    for p, indices in zip(parameters, imap):
-        for i in indices:
-            new_params[i] = p
-    circuit.set_parameters(new_params)
