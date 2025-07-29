@@ -326,23 +326,23 @@ class Jax(Differentiation):
         """
         if x is not None:
             x = backend.to_numpy(x)
-            x = self._jax.cast(x, self._jax.precision)
+            x = self._jax.cast(x, dtype=self._jax.np.float64)
 
         circuit_structure = tuple(circuit_structure)
 
         if self._argnums is None:
-            self._argnums = tuple(range(4, len(parameters) + 4))
+            self._argnums = tuple(range(3, len(parameters) + 3))
             setattr(
                 self,
                 "_jacobian",
-                partial(jax.jit, static_argnums=(1, 2, 3))(
+                partial(jax.jit, static_argnums=(1, 2))(
                     jax.jacfwd(self._run, (0,) + self._argnums),
                 ),
             )
             setattr(
                 self,
                 "_jacobian_without_inputs",
-                partial(jax.jit, static_argnums=(1, 2, 3))(
+                partial(jax.jit, static_argnums=(1, 2))(
                     jax.jacfwd(self._run, self._argnums),
                 ),
             )
@@ -366,15 +366,18 @@ class Jax(Differentiation):
             )
         decoding.set_backend(backend)
         return [
-            backend.cast(self._jax.to_numpy(grad).tolist(), backend.precision)
+            backend.cast(self._jax.to_numpy(grad).tolist(), backend.np.float64)
             for grad in gradients
         ]
 
     @staticmethod
-    @partial(jax.jit, static_argnums=(1, 2, 3))
+    @partial(jax.jit, static_argnums=(1, 2))
     def _run(x, circuit_structure, decoding, *parameters):
         circ = circuit_from_structure(
-            circuit_structure=circuit_structure, x=x, params=parameters
+            circuit_structure=circuit_structure,
+            x=x,
+            params=parameters,
+            backend=decoding.backend,
         )
         # _jax_set_parameters(circ, parameters, independent_params_map)
         return decoding(circ)

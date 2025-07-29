@@ -191,9 +191,9 @@ class QuantumModelAutoGrad(torch.autograd.Function):
             for enc in circuit_structure
             if isinstance(enc, QuantumEncoding)
         )
-        circuit = utils.circuit_from_structure(circuit_structure, x_clone, params)
-
-        # utils.set_parameters(circuit, params, independent_params_map)
+        circuit = utils.circuit_from_structure(
+            circuit_structure, x_clone, params, backend=backend
+        )
         x_clone = decoding(circuit)
         x_clone = torch.as_tensor(
             backend.to_numpy(x_clone).tolist(),

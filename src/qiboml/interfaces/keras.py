@@ -54,11 +54,8 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
         utils._uniform_circuit_structure(self.circuit_structure)
 
         params = utils.get_params_from_circuit_structure(self.circuit_structure)
-        self._independent_params_map = utils._independent_params_map(params)
         params = keras.ops.cast(
-            self.backend.to_numpy(
-                [params[i] for i in self._independent_params_map.keys()]
-            ),
+            self.backend.to_numpy(params),
             "float64",
         )  # pylint: disable=no-member
 
@@ -79,22 +76,19 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
                 self.decoding,
                 self.backend,
                 self.differentiation,
-                self._independent_params_map,
             )
 
     def compute_output_shape(self, input_shape):
         return self.decoding.output_shape
 
     def call(self, x: Optional[tf.Tensor] = None) -> tf.Tensor:
-        circuit = utils.circuit_from_structure(
-            x=x, circuit_structure=self.circuit_structure
-        )
-
         if self.differentiation is None:
-            # This 1 * is needed otherwise a TypeError is raised
-            # circuit.set_parameters(1 * self.circuit_parameters)
-            utils.set_parameters(
-                circuit, 1 * self.circuit_parameters, self._independent_params_map
+            # This `1 * self.circuit_parameters` is needed otherwise a TypeError is raised
+            circuit = utils.circuit_from_structure(
+                x=x,
+                circuit_structure=self.circuit_structure,
+                params=1 * self.circuit_parameters,
+                backend=self.backend,
             )
             output = self.decoding(circuit)
             return output[None, :]
@@ -148,7 +142,6 @@ class QuantumModelCustomGradient:
     decoding: QuantumDecoding
     backend: Backend
     differentiation: Differentiation
-    independent_params_map: dict[int, set[int]]
     wrt_inputs: bool = False
 
     @tf.custom_gradient
@@ -174,12 +167,13 @@ class QuantumModelCustomGradient:
                 x = self.backend.cast(
                     keras.ops.convert_to_numpy(x), dtype=self.backend.np.float64
                 )
+            params = self.backend.cast(params, dtype=self.backend.np.float64)
             circuit = utils.circuit_from_structure(
                 circuit_structure=self.circuit_structure,
                 x=x,
+                params=params,
+                backend=self.backend,
             )
-            # circuit.set_parameters(params)
-            utils.set_parameters(circuit, params, self.independent_params_map)
             y = self.decoding(circuit)
             y = self.backend.to_numpy(y)
             return keras.ops.cast(y, dtype=y.dtype)
@@ -198,7 +192,6 @@ class QuantumModelCustomGradient:
                 self.circuit_structure,
                 self.decoding,
                 self.backend,
-                self.independent_params_map,
                 *params,
                 wrt_inputs=self.wrt_inputs,
             )

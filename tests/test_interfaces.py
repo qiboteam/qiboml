@@ -630,7 +630,7 @@ def test_equivariant(backend, frontend):
         [circuit, custom_circuit],
         decoding,
     )
-    assert len(list(model.parameters())[0]) == 7
+    assert len(get_parameters(frontend, model, return_array=True)) == 7
 
     none = np.array(
         5
