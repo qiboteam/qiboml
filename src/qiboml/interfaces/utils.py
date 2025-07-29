@@ -152,8 +152,12 @@ def _uniform_circuit_structure(circuit_structure):
         if not (isinstance(circ, Callable) and not isinstance(circ, QuantumEncoding))
     )
     for circ in circuit_structure:
-        circ.density_matrix = density_matrix
-        circ.init_kwargs["density_matrix"] = density_matrix
+        is_circuit = isinstance(circ, Circuit)
+        is_encoding = isinstance(circ, QuantumEncoding)
+        if is_circuit or is_encoding:
+            circ.density_matrix = density_matrix
+            if is_circuit:
+                circ.init_kwargs["density_matrix"] = density_matrix
 
 
 def _independent_params_map(params):
