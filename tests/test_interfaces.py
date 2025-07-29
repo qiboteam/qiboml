@@ -15,6 +15,8 @@ import qiboml.models.ansatze as ans
 import qiboml.models.decoding as dec
 import qiboml.models.encoding as enc
 
+from .utils import set_seed
+
 
 def get_layers(module, layer_type=None):
     layers = []
@@ -30,7 +32,10 @@ def get_layers(module, layer_type=None):
 
 
 ENCODING_LAYERS = get_layers(enc, enc.QuantumEncoding)
-DECODING_LAYERS = get_layers(dec, dec.QuantumDecoding)
+DECODING_LAYERS = [
+    layer for layer in get_layers(dec, dec.QuantumDecoding)
+    if not issubclass(layer, dec.VariationalQuantumLinearSolver)
+]
 ANSATZE_LAYERS = get_layers(ans)
 
 
@@ -226,19 +231,6 @@ def eval_model(frontend, model, data, target=None):
     if target is not None:
         loss = loss_f(target, outputs)
     return outputs, loss
-
-
-def set_seed(frontend, seed):
-    random.seed(seed)
-    np.random.seed(seed)
-    if frontend.__name__ == "qiboml.interfaces.pytorch":
-        frontend.torch.set_default_dtype(frontend.torch.float64)
-        frontend.torch.manual_seed(seed)
-    elif frontend.__name__ == "qiboml.interfaces.keras":
-        frontend.keras.backend.set_floatx("float64")
-        frontend.tf.keras.backend.set_floatx("float64")
-        frontend.keras.utils.set_random_seed(seed)
-        frontend.tf.config.experimental.enable_op_determinism()
 
 
 def random_parameters(frontend, model):
@@ -467,24 +459,22 @@ def test_composition(backend, frontend):
     assert loss_untrained > loss_trained
 
 
-def test_vqe(backend, frontend):
+@pytest.mark.parametrize("dense,nshots", ((True, None), (False, 100)))
+def test_vqe(backend, frontend, dense, nshots):
     seed = 42
     set_device(frontend)
     set_seed(frontend, seed)
     backend.set_seed(42)
 
-    tfim = hamiltonians.TFIM(nqubits=2, backend=backend)
+    tfim = hamiltonians.TFIM(nqubits=2, h=0.1, dense=dense, backend=backend)
 
     nqubits = 2
-    dim = 2
     training_layer = ans.HardwareEfficient(
         nqubits,
         nlayers=2,
     )
     decoding_layer = dec.Expectation(
-        nqubits=nqubits,
-        backend=backend,
-        observable=tfim,
+        nqubits=nqubits, backend=backend, observable=tfim, nshots=nshots
     )
     circuit_structure = [
         training_layer,
@@ -510,7 +500,7 @@ def test_noise(backend, frontend):
     backend.set_seed(42)
     set_seed(frontend, 42)
 
-    nqubits = 6
+    nqubits = 4
     noise = NoiseModel()
     noise.add(PauliError([("X", 0.5)]), gates.CNOT)
     noise.add(PauliError([("Y", 0.2)]), gates.RY)
@@ -518,10 +508,11 @@ def test_noise(backend, frontend):
 
     encoding_layer = random.choice(ENCODING_LAYERS)(nqubits, density_matrix=True)
     training_layer = ans.HardwareEfficient(nqubits, density_matrix=True)
-    noisy_training_layer = noise.apply(training_layer.copy())
     circuit = [encoding_layer, training_layer]
-    noisy_circuit = [encoding_layer, noisy_training_layer]
-    decoding_layer = random.choice(DECODING_LAYERS)(nqubits, backend=backend)
+
+    # Noiseless decoding layer
+    # Fixing it because we want to use the same and not sampling
+    decoding_layer = dec.Expectation(nqubits, backend=backend)
     activation = build_activation(frontend, binary=False)
     model = build_sequential_model(
         frontend,
@@ -533,20 +524,20 @@ def test_noise(backend, frontend):
             ),
         ],
     )
-    setattr(model, "decoding", decoding_layer)
+    # Now initialising the same problem with noise
+    noisy_decoding_layer = dec.Expectation(nqubits, backend=backend, noise_model=noise)
     noisy_model = build_sequential_model(
         frontend,
         [
             activation,
             frontend.QuantumModel(
-                circuit_structure=noisy_circuit,
-                decoding=decoding_layer,
+                circuit_structure=circuit,
+                decoding=noisy_decoding_layer,
             ),
         ],
     )
-    setattr(noisy_model, "decoding", decoding_layer)
 
-    data = random_tensor(frontend, (100, nqubits))
+    data = random_tensor(frontend, (50, nqubits))
     target = prepare_targets(frontend, model, data)
     train_model(frontend, model, data, target, max_epochs=1)
     _, loss = eval_model(frontend, model, data, target)
@@ -575,7 +566,11 @@ def test_qibolab(frontend):
     encoding_layer = enc.PhaseEncoding(nqubits)
     training_layer = ans.HardwareEfficient(nqubits)
     decoding_layer = dec.Expectation(
-        nqubits, wire_names=["0"], backend=backend, transpiler=transpiler, nshots=1000
+        nqubits,
+        wire_names=[0],
+        backend=backend,
+        transpiler=transpiler,
+        nshots=1000,
     )
 
     activation = build_activation(

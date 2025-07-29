@@ -92,7 +92,7 @@ class PyTorchBackend(NumpyBackend):
         return getattr(self.np, dtype)
 
     def set_device(self, device):  # pragma: no cover
-        self.device = device
+        self.device = "cpu" if "CPU" in device else device
 
     def cast(
         self,
@@ -289,14 +289,22 @@ class PyTorchBackend(NumpyBackend):
             return self.np.linalg.eigh(matrix)  # pylint: disable=not-callable
         return self.np.linalg.eig(matrix)  # pylint: disable=not-callable
 
-    def calculate_matrix_exp(self, a, matrix, eigenvectors=None, eigenvalues=None):
+    def calculate_matrix_exp(
+        self,
+        matrix,
+        phase: Union[float, int, complex] = 1,
+        eigenvectors=None,
+        eigenvalues=None,
+    ):
         if eigenvectors is None or self.is_sparse(matrix):
             return self.np.linalg.matrix_exp(  # pylint: disable=not-callable
-                -1j * a * matrix
+                phase * matrix
             )
-        expd = self.np.diag(self.np.exp(-1j * a * eigenvalues))
+
+        expd = self.np.exp(phase * eigenvalues)
         ud = self.np.conj(eigenvectors).T
-        return self.np.matmul(eigenvectors, self.np.matmul(expd, ud))
+
+        return (eigenvectors * expd) @ ud
 
     def calculate_matrix_power(
         self,

@@ -148,7 +148,7 @@ class PSR(Differentiation):
                     (decoding.output_shape[-1], x.shape[-1]),
                 )
             )
-        elif x is not None:
+        elif x is not None and len(x) > 0:
             gradient.append(
                 backend.np.zeros(
                     (decoding.output_shape[-1], x.shape[-1]), dtype=x.dtype
