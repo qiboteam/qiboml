@@ -247,6 +247,5 @@ class QuantumModelAutoGrad(torch.autograd.Function):
             None,
             None,
             None,
-            None,
             *gradients,
         )

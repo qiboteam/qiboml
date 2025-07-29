@@ -58,9 +58,8 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
             self.backend.to_numpy(params),
             "float64",
         )  # pylint: disable=no-member
-
         self.circuit_parameters = self.add_weight(
-            shape=params.shape, initializer="zeros", trainable=True
+            shape=params.shape, initializer="zeros", trainable=True, dtype="float64"
         )
         self.set_weights([params])
 
@@ -93,7 +92,7 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
             output = self.decoding(circuit)
             return output[None, :]
         if x is None:
-            x = tf.constant([])
+            x = tf.constant([], dtype=np.float64)
         return self.custom_gradient.evaluate(x, 1 * self.circuit_parameters)
 
     def draw(self, plt_drawing=True, **plt_kwargs):
