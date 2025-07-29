@@ -75,7 +75,7 @@ class Mitigator:
     ):
         """Construct reference error sensitive circuit."""
         self._reference_circuit = error_mitigation.error_sensitive_circuit(
-            circuit=circuit, observable=observable
+            circuit=circuit, observable=observable, backend=self._simulation_backend
         )[0]
         # Execute the reference circuit
         reference_state = self._simulation_backend.execute_circuit(
@@ -134,6 +134,7 @@ class Mitigator:
             observable=observable,
             noise_model=noise_model,
             full_output=True,
+            backend=self.backend,
             **self._mitigation_method_kwargs,
         )
 

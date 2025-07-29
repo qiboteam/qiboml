@@ -71,6 +71,10 @@ def circuit_from_structure(
                 if "engine" in param_dict:
                     nparams -= 1
                 circ = circ(backend.np, *params[index : index + nparams])
+                for attr in ("density_matrix", "wire_names"):
+                    value = getattr(circuit, attr)
+                    setattr(circ, attr, value)
+                    circ.init_kwargs[attr] = value
             else:
                 raise RuntimeError
             index += nparams
@@ -145,10 +149,11 @@ def _uniform_circuit_structure(circuit_structure):
     density_matrix = any(
         circ.density_matrix
         for circ in circuit_structure
-        if not isinstance(circ, Callable)
+        if not (isinstance(circ, Callable) and not isinstance(circ, QuantumEncoding))
     )
     for circ in circuit_structure:
         circ.density_matrix = density_matrix
+        circ.init_kwargs["density_matrix"] = density_matrix
 
 
 def _independent_params_map(params):
