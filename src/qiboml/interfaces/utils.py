@@ -55,7 +55,7 @@ def circuit_from_structure(
 
     circuit = Circuit(
         circuit_structure[0].nqubits,
-        density_matrix=circuit_structure[0].density_matrix,
+        # density_matrix=circuit_structure[0].density_matrix,
     )
     index = 0
     for circ in circuit_structure:
@@ -71,10 +71,6 @@ def circuit_from_structure(
                 if "engine" in param_dict:
                     nparams -= 1
                 circ = circ(backend.np, *params[index : index + nparams])
-                for attr in ("density_matrix", "wire_names"):
-                    value = getattr(circuit, attr)
-                    setattr(circ, attr, value)
-                    circ.init_kwargs[attr] = value
             else:
                 raise RuntimeError
             index += nparams
