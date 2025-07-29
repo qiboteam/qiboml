@@ -24,12 +24,10 @@ def get_params_from_circuit_structure(
     for circ in circuit_structure:
         if isinstance(circ, Circuit):
             params.extend([p for param in circ.get_parameters() for p in param])
-        elif isinstance(circ, Callable):
-            # par_map, pars = tracer(circ)
+        elif not isinstance(circ, QuantumEncoding) and isinstance(circ, Callable):
             params.extend(
                 random.random() for key in signature(circ).parameters if key != "engine"
             )
-            # params.extend([float(p) for p in pars])
     return params
 
 
