@@ -12,7 +12,7 @@ from qibo.config import raise_error
 
 from qiboml import ndarray
 from qiboml.backends.jax import JaxBackend
-from qiboml.interfaces.utils import circuit_from_structure, set_parameters
+from qiboml.interfaces.utils import circuit_from_structure
 from qiboml.models.decoding import QuantumDecoding
 from qiboml.models.encoding import QuantumEncoding
 
@@ -122,10 +122,6 @@ class PSR(Differentiation):
         circuit = circuit_from_structure(
             circuit_structure=circuit_structure, x=x, params=parameters, backend=backend
         )
-
-        # Inject parameters into the circuit
-        # circuit.set_parameters(parameters)
-        # set_parameters(circuit, parameters, independent_params_map)
 
         gradient = []
         if wrt_inputs:
