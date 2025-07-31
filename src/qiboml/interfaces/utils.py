@@ -33,9 +33,9 @@ def get_params_from_circuit_structure(
 
 def circuit_from_structure(
     circuit_structure,
-    x: Optional[ndarray],
-    params: Optional[ndarray],
-    backend: Optional[Backend],
+    x: Optional[ndarray] = None,
+    params: Optional[ndarray] = None,
+    backend: Optional[Backend] = None,
 ):
     """
     Helper function to reconstruct the whole circuit from a circuit structure.
@@ -123,7 +123,9 @@ def draw_circuit(circuit_structure, backend, plt_drawing=True, **plt_kwargs):
     for circ in circuit_structure:
         if isinstance(circ, Circuit):
             dummy_params.extend(len(circ.get_parameters()) * [0.0])
-        elif not isinstance(circ, QuantumEncoding) and isinstance(circ, Callable):
+        elif not isinstance(circ, QuantumEncoding) and isinstance(
+            circ, Callable
+        ):  # pragma: no cover
             dummy_params.extend((len(signature(circ).parameters) - 1) * [0.0])
     circuit = circuit_from_structure(
         circuit_structure, x=dummy_data, params=dummy_params, backend=backend
