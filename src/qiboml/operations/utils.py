@@ -13,8 +13,10 @@ def circuit_trace(
     nparams = len(signature(f).parameters)
     params = backend.cast(
         np.random.randn(nparams), dtype=backend.np.float64, device=backend.device
-    )
+    )  # pragma: no cover
 
+    # this will be useful for the PSR, and in general when you need to trace
+    # which circuit rotations are affected by which parameters
     def build(x):
         # one parameter gates only
         return tuple(par[0] for par in f(backend.np, *x).get_parameters())
