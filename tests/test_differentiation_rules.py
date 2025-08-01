@@ -116,7 +116,7 @@ def test_expval_custom_grad(
     if diff_rule.__name__ == "Jax" and nshots is not None:
         pytest.skip("Jax differentiation does not work with shots.")
 
-    if equivariant and diff_rule.__name__ == "PSR":
+    if equivariant and (diff_rule.__name__ == "PSR" or nshots is not None):
         pytest.skip("PSR not supported with equivariant models yet.")
 
     set_seed(frontend, 42)

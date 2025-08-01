@@ -17,7 +17,7 @@ from qibo.config import raise_error
 from qiboml.interfaces import utils
 from qiboml.models.decoding import QuantumDecoding
 from qiboml.models.encoding import QuantumEncoding
-from qiboml.operations.differentiation import Differentiation, Jax
+from qiboml.operations.differentiation import PSR, Differentiation, Jax
 
 DEFAULT_DIFFERENTIATION = {
     "qiboml-pytorch": Jax,
@@ -78,10 +78,11 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
             )
 
         if any(
-            isinstance(circuit, Callable) and not isinstance(circuit, QuantumEncoding)
+            isinstance(circuit, Callable)
+            and not isinstance(circuit, QuantumEncoding | Circuit)
             for circuit in self.circuit_structure
         ) and (
-            self.differentiation is not None and self.differentiation.__name__ == "PSR"
+            isinstance(self.differentiation, PSR)
         ):  # pragma: no cover
             raise_error(
                 NotImplementedError, "Equivariant circuits not working with PSR yet."
