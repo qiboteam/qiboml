@@ -7,6 +7,8 @@ import numpy as np
 import torch
 from qibo import Circuit
 from qibo.backends import Backend
+from qibo.config import raise_error
+from qibo.models import circuit
 
 from qiboml.interfaces import utils
 from qiboml.models.decoding import QuantumDecoding
@@ -60,6 +62,16 @@ class QuantumModel(torch.nn.Module):
             self.differentiation = utils.get_default_differentiation(
                 decoding=self.decoding,
                 instructions=DEFAULT_DIFFERENTIATION,
+            )
+
+        if any(
+            isinstance(circuit, Callable) and not isinstance(circuit, QuantumEncoding)
+            for circuit in self.circuit_structure
+        ) and (
+            self.differentiation is not None and self.differentiation.__name__ == "PSR"
+        ):  # pragma: no cover
+            raise_error(
+                NotImplementedError, "Equivariant circuits not working with PSR yet."
             )
 
     def forward(self, x: Optional[torch.Tensor] = None):

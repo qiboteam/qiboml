@@ -5,13 +5,14 @@
 
 import string
 from dataclasses import dataclass
-from typing import List, Optional, Union
+from typing import Callable, List, Optional, Union
 
 import keras
 import numpy as np
 import tensorflow as tf  # pylint: disable=import-error
 from qibo import Circuit
 from qibo.backends import Backend
+from qibo.config import raise_error
 
 from qiboml.interfaces import utils
 from qiboml.models.decoding import QuantumDecoding
@@ -74,6 +75,16 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
                 self.decoding,
                 self.backend,
                 self.differentiation,
+            )
+
+        if any(
+            isinstance(circuit, Callable) and not isinstance(circuit, QuantumEncoding)
+            for circuit in self.circuit_structure
+        ) and (
+            self.differentiation is not None and self.differentiation.__name__ == "PSR"
+        ):  # pragma: no cover
+            raise_error(
+                NotImplementedError, "Equivariant circuits not working with PSR yet."
             )
 
     def compute_output_shape(self, input_shape):
