@@ -1,17 +1,18 @@
 """Torch interface to qiboml layers"""
 
 from dataclasses import dataclass
-from typing import List, Optional, Union
+from typing import Callable, List, Optional, Union
 
 import numpy as np
 import torch
 from qibo import Circuit
 from qibo.backends import Backend
+from qibo.config import raise_error
 
 from qiboml.interfaces import utils
 from qiboml.models.decoding import QuantumDecoding
 from qiboml.models.encoding import QuantumEncoding
-from qiboml.operations.differentiation import Differentiation, Jax
+from qiboml.operations.differentiation import PSR, Differentiation, Jax
 
 DEFAULT_DIFFERENTIATION = {
     "qiboml-pytorch": None,
@@ -48,9 +49,10 @@ class QuantumModel(torch.nn.Module):
 
         if isinstance(self.circuit_structure, Circuit):
             self.circuit_structure = [self.circuit_structure]
-        utils._uniform_circuit_structure(self.circuit_structure)
 
-        params = utils.get_params_from_circuit_structure(self.circuit_structure)
+        params = utils.get_params_from_circuit_structure(
+            self.circuit_structure,
+        )
         params = torch.as_tensor(self.backend.to_numpy(x=params)).ravel()
         params.requires_grad = True
         self.circuit_parameters = torch.nn.Parameter(params)
@@ -59,6 +61,17 @@ class QuantumModel(torch.nn.Module):
             self.differentiation = utils.get_default_differentiation(
                 decoding=self.decoding,
                 instructions=DEFAULT_DIFFERENTIATION,
+            )
+
+        if any(
+            isinstance(circuit, Callable)
+            and not isinstance(circuit, QuantumEncoding | Circuit)
+            for circuit in self.circuit_structure
+        ) and (
+            isinstance(self.differentiation, PSR)
+        ):  # pragma: no cover
+            raise_error(
+                NotImplementedError, "Equivariant circuits not working with PSR yet."
             )
 
     def forward(self, x: Optional[torch.Tensor] = None):
@@ -75,9 +88,9 @@ class QuantumModel(torch.nn.Module):
             circuit = utils.circuit_from_structure(
                 circuit_structure=self.circuit_structure,
                 x=x,
+                params=list(self.parameters())[0],
+                backend=self.backend,
             )
-
-            circuit.set_parameters(list(self.parameters())[0])
             x = self.decoding(circuit)
         else:
             x = QuantumModelAutoGrad.apply(
@@ -156,7 +169,7 @@ class QuantumModelAutoGrad(torch.autograd.Function):
     def forward(
         ctx,
         x: torch.Tensor,
-        circuit_structure: List[Union[QuantumEncoding, Circuit]],
+        circuit_structure: List[Union[QuantumEncoding, Circuit, Callable]],
         decoding: QuantumDecoding,
         backend,
         differentiation,
@@ -175,29 +188,23 @@ class QuantumModelAutoGrad(torch.autograd.Function):
             # Cloning, detaching and converting to backend arrays
             x_clone = x.clone().detach().cpu().numpy()
             x_clone = backend.cast(x_clone, dtype=x_clone.dtype)
+        else:
+            x_clone = x
         params = [
             backend.cast(par.clone().detach().cpu().numpy(), dtype=dtype)
             for par in parameters
         ]
 
-        # Build the temporary circuit from the circuit structure.
-        ctx.differentiable_encodings = True
-        circuit = Circuit(
-            decoding.nqubits,
-            density_matrix=circuit_structure[0].density_matrix,
+        # all the encodings need to be differentiatble
+        # TODO: open to debate
+        ctx.differentiable_encodings = all(
+            enc.differentiable
+            for enc in circuit_structure
+            if isinstance(enc, QuantumEncoding)
         )
-        for circ in circuit_structure:
-            if isinstance(circ, QuantumEncoding):
-                circuit += circ(x_clone)
-                # Record if any encoding is differentiable.
-                # TODO: discuss if we want to solve it like this, namely all non
-                # differentiable if at least one it is not
-                if not circ.differentiable:
-                    ctx.differentiable_encodings = False
-            else:
-                circuit += circ
-
-        circuit.set_parameters(params)
+        circuit = utils.circuit_from_structure(
+            circuit_structure, x_clone, params, backend=backend
+        )
         x_clone = decoding(circuit)
         x_clone = torch.as_tensor(
             backend.to_numpy(x_clone).tolist(),

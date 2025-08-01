@@ -1,7 +1,11 @@
-from typing import Dict, List, Optional, Union
+import random
+from inspect import signature
+from typing import Callable, Dict, List, Optional, Union
 
 import numpy as np
 from qibo import Circuit
+from qibo.backends import _check_backend
+from qibo.backends.abstract import Backend
 from qibo.ui.mpldrawer import plot_circuit
 
 from qiboml import ndarray
@@ -10,7 +14,7 @@ from qiboml.models.encoding import QuantumEncoding
 
 
 def get_params_from_circuit_structure(
-    circuit_structure: Union[Circuit, List[Union[Circuit, QuantumEncoding]]]
+    circuit_structure: List[Union[Circuit, QuantumEncoding, Callable]],
 ):
     """
     Helper function to retrieve the list of trainable parameters of a circuit
@@ -18,14 +22,20 @@ def get_params_from_circuit_structure(
     """
     params = []
     for circ in circuit_structure:
-        if not isinstance(circ, QuantumEncoding):
+        if isinstance(circ, Circuit):
             params.extend([p for param in circ.get_parameters() for p in param])
+        elif not isinstance(circ, QuantumEncoding) and isinstance(circ, Callable):
+            params.extend(
+                random.random() for key in signature(circ).parameters if key != "engine"
+            )
     return params
 
 
 def circuit_from_structure(
     circuit_structure,
-    x: Optional[ndarray],
+    x: Optional[ndarray] = None,
+    params: Optional[ndarray] = None,
+    backend: Optional[Backend] = None,
 ):
     """
     Helper function to reconstruct the whole circuit from a circuit structure.
@@ -41,13 +51,28 @@ def circuit_from_structure(
             "x cannot be None when encoding layers are present in the circuit structure."
         )
 
+    backend = _check_backend(backend)
+
     circuit = Circuit(
         circuit_structure[0].nqubits,
-        density_matrix=circuit_structure[0].density_matrix,
     )
+    index = 0
     for circ in circuit_structure:
         if isinstance(circ, QuantumEncoding):
             circ = circ(x)
+        elif params is not None:
+            if isinstance(circ, Circuit):
+                nparams = len(circ.get_parameters())
+                circ.set_parameters(params[index : index + nparams])
+            elif isinstance(circ, Callable):
+                param_dict = signature(circ).parameters
+                nparams = len(param_dict)
+                if "engine" in param_dict:
+                    nparams -= 1
+                circ = circ(backend.np, *params[index : index + nparams])
+            else:
+                raise RuntimeError
+            index += nparams
         circuit += circ
     return circuit
 
@@ -94,20 +119,20 @@ def draw_circuit(circuit_structure, backend, plt_drawing=True, **plt_kwargs):
         if encoding_layer is not None
         else None
     )
-    circuit = circuit_from_structure(circuit_structure, dummy_data)
+    dummy_params = []
+    for circ in circuit_structure:
+        if isinstance(circ, Circuit):
+            dummy_params.extend(len(circ.get_parameters()) * [0.0])
+        elif not isinstance(circ, QuantumEncoding) and isinstance(
+            circ, Callable
+        ):  # pragma: no cover
+            dummy_params.extend((len(signature(circ).parameters) - 1) * [0.0])
+    circuit = circuit_from_structure(
+        circuit_structure, x=dummy_data, params=dummy_params, backend=backend
+    )
     if plt_drawing:
         _, fig = plot_circuit(circuit, **plt_kwargs)
         return fig
     else:
         circuit.draw()
         return str(circuit)
-
-
-def _uniform_circuit_structure(circuit_structure):
-    """
-    Align the ``density_matrix`` attribute of all circuits composing the circuit structure.
-    Namely, setting their ``density_matrix=True`` if at least one component of the circuit has ``density_matrix==True``.
-    """
-    density_matrix = any(circ.density_matrix for circ in circuit_structure)
-    for circ in circuit_structure:
-        circ.density_matrix = density_matrix

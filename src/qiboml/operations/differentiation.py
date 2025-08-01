@@ -118,14 +118,10 @@ class PSR(Differentiation):
                 "Parameter Shift Rule only supports expectation value decoding.",
             )
 
-        # Construct circuit using the full circuit helper
+        # Construct the circuit
         circuit = circuit_from_structure(
-            circuit_structure=circuit_structure,
-            x=x,
+            circuit_structure=circuit_structure, x=x, params=parameters, backend=backend
         )
-
-        # Inject parameters into the circuit
-        circuit.set_parameters(parameters)
 
         gradient = []
         if wrt_inputs:
@@ -171,7 +167,12 @@ class PSR(Differentiation):
         return gradient
 
     def one_parameter_shift(
-        self, circuit, decoding, parameters, parameter_index, backend
+        self,
+        circuit,
+        decoding,
+        parameters,
+        parameter_index,
+        backend,
     ):
         """Compute one derivative of the decoding strategy w.r.t. a target parameter."""
         gate = circuit.associate_gates_with_parameters()[parameter_index]
@@ -317,7 +318,7 @@ class Jax(Differentiation):
         """
         if x is not None:
             x = backend.to_numpy(x)
-            x = self._jax.cast(x, self._jax.np.float64)
+            x = self._jax.cast(x, dtype=self._jax.np.float64)
 
         circuit_structure = tuple(circuit_structure)
 
@@ -367,6 +368,7 @@ class Jax(Differentiation):
         circ = circuit_from_structure(
             circuit_structure=circuit_structure,
             x=x,
+            params=parameters,
+            backend=decoding.backend,
         )
-        circ.set_parameters(parameters)
         return decoding(circ)

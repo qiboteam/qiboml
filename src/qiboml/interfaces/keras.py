@@ -5,18 +5,19 @@
 
 import string
 from dataclasses import dataclass
-from typing import List, Optional, Union
+from typing import Callable, List, Optional, Union
 
 import keras
 import numpy as np
 import tensorflow as tf  # pylint: disable=import-error
 from qibo import Circuit
 from qibo.backends import Backend
+from qibo.config import raise_error
 
 from qiboml.interfaces import utils
 from qiboml.models.decoding import QuantumDecoding
 from qiboml.models.encoding import QuantumEncoding
-from qiboml.operations.differentiation import Differentiation, Jax
+from qiboml.operations.differentiation import PSR, Differentiation, Jax
 
 DEFAULT_DIFFERENTIATION = {
     "qiboml-pytorch": Jax,
@@ -51,15 +52,14 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
 
         if isinstance(self.circuit_structure, Circuit):
             self.circuit_structure = [self.circuit_structure]
-        utils._uniform_circuit_structure(self.circuit_structure)
 
         params = utils.get_params_from_circuit_structure(self.circuit_structure)
         params = keras.ops.cast(
-            self.backend.to_numpy(params), "float64"
+            self.backend.to_numpy(params),
+            "float64",
         )  # pylint: disable=no-member
-
         self.circuit_parameters = self.add_weight(
-            shape=params.shape, initializer="zeros", trainable=True
+            shape=params.shape, initializer="zeros", trainable=True, dtype="float64"
         )
         self.set_weights([params])
 
@@ -77,21 +77,33 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
                 self.differentiation,
             )
 
+        if any(
+            isinstance(circuit, Callable)
+            and not isinstance(circuit, QuantumEncoding | Circuit)
+            for circuit in self.circuit_structure
+        ) and (
+            isinstance(self.differentiation, PSR)
+        ):  # pragma: no cover
+            raise_error(
+                NotImplementedError, "Equivariant circuits not working with PSR yet."
+            )
+
     def compute_output_shape(self, input_shape):
         return self.decoding.output_shape
 
     def call(self, x: Optional[tf.Tensor] = None) -> tf.Tensor:
-        circuit = utils.circuit_from_structure(
-            x=x, circuit_structure=self.circuit_structure
-        )
-
         if self.differentiation is None:
-            # This 1 * is needed otherwise a TypeError is raised
-            circuit.set_parameters(1 * self.circuit_parameters)
+            # This `1 * self.circuit_parameters` is needed otherwise a TypeError is raised
+            circuit = utils.circuit_from_structure(
+                x=x,
+                circuit_structure=self.circuit_structure,
+                params=1 * self.circuit_parameters,
+                backend=self.backend,
+            )
             output = self.decoding(circuit)
             return output[None, :]
         if x is None:
-            x = tf.constant([])
+            x = tf.constant([], dtype=np.float64)
         return self.custom_gradient.evaluate(x, 1 * self.circuit_parameters)
 
     def draw(self, plt_drawing=True, **plt_kwargs):
@@ -165,11 +177,13 @@ class QuantumModelCustomGradient:
                 x = self.backend.cast(
                     keras.ops.convert_to_numpy(x), dtype=self.backend.np.float64
                 )
+            params = self.backend.cast(params, dtype=self.backend.np.float64)
             circuit = utils.circuit_from_structure(
                 circuit_structure=self.circuit_structure,
                 x=x,
+                params=params,
+                backend=self.backend,
             )
-            circuit.set_parameters(params)
             y = self.decoding(circuit)
             y = self.backend.to_numpy(y)
             return keras.ops.cast(y, dtype=y.dtype)

@@ -63,7 +63,7 @@ def test_rtqem(frontend, backend):
     set_seed(frontend=frontend, seed=42)
 
     # We build a trainable circuit
-    vqe = HardwareEfficient(nqubits=nqubits, nlayers=3, density_matrix=True)
+    vqe = HardwareEfficient(nqubits=nqubits, nlayers=3)
 
     # First we build a model with noise and without mitigation
     noisy_decoding = Expectation(
@@ -123,7 +123,7 @@ def test_custom_map(frontend):
     set_seed(frontend=frontend, seed=42)
 
     # We build a trainable circuit
-    vqe = HardwareEfficient(nqubits=1, nlayers=2, density_matrix=True)
+    vqe = HardwareEfficient(nqubits=1, nlayers=2)
 
     mitigation_config = {
         "real_time": True,
