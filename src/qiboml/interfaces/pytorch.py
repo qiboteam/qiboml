@@ -87,9 +87,9 @@ class QuantumModel(torch.nn.Module):
         if self.differentiation is None:
             circuit = utils.circuit_from_structure(
                 circuit_structure=self.circuit_structure,
-                x=x,
                 params=list(self.parameters())[0],
-                backend=self.backend,
+                engine=torch,
+                x=x,
             )
             x = self.decoding(circuit)
         else:
@@ -260,3 +260,134 @@ class QuantumModelAutoGrad(torch.autograd.Function):
             None,
             *gradients,
         )
+
+
+class QuantumModelAutoGrad_new(torch.autograd.Function):
+    """
+    Custom Autograd to enable the autodifferentiation of the QuantumModel for
+    non-pytorch backends.
+    """
+
+    @staticmethod
+    def forward(
+        ctx,
+        x: torch.Tensor,
+        circuit_structure: List[Union[QuantumEncoding, Circuit, Callable]],
+        decoding: QuantumDecoding,
+        differentiation,
+        *parameters: List[torch.nn.Parameter],
+    ):
+        tracer = circuit_trace if torch.is_grad_enabled() else None
+        circuit, jacobian_wrt_inputs, jacobian = utils.circuit_from_structure(
+            circuit_structure, parameters, torch, x, tracer
+        )
+        # Save the context
+        ctx.save_for_backward(*parameters)
+        ctx.circuit = circuit
+        ctx.differentiation = differentiation
+        dtype = getattr(backend.np, str(parameters[0].dtype).split(".")[-1])
+        ctx.dtype = dtype
+
+        """
+        if x is not None:
+            # Cloning, detaching and converting to backend arrays
+            x_clone = x.clone().detach().cpu().numpy()
+            x_clone = backend.cast(x_clone, dtype=x_clone.dtype)
+        else:
+            x_clone = x
+        """
+        params = [
+            decoding.backend.cast(par.clone().detach().cpu().numpy(), dtype=dtype)
+            for par in circuit.get_parameters(include_not_trainable=True)
+        ]
+        """
+        # all the encodings need to be differentiatble
+        # TODO: open to debate
+        ctx.differentiable_encodings = all(
+            enc.differentiable
+            for enc in circuit_structure
+            if isinstance(enc, QuantumEncoding)
+        )
+        circuit = utils.circuit_from_structure(
+            circuit_structure, x_clone, params, backend=backend
+        )
+        """
+        circuit.set_parameters(params)
+        x_clone = decoding(circuit)
+        x_clone = torch.as_tensor(
+            decoding.backend.to_numpy(x_clone).tolist(),
+            dtype=dtype,
+            device=parameters[0].device,
+        )
+        return x_clone
+
+    @staticmethod
+    def backward(ctx, grad_output: torch.Tensor):
+        parameters = ctx.saved_tensors
+
+        params = [
+            ctx.backend.cast(par.clone().detach().cpu().numpy(), dtype=ctx.dtype)
+            for par in parameters
+        ]
+        grad_input, *gradients = (
+            torch.as_tensor(
+                ctx.backend.to_numpy(grad).tolist(),
+                dtype=parameters[0].dtype,
+                device=parameters[0].device,
+            )
+            for grad in ctx.differentiation.evaluate(
+                x_clone,
+                ctx.circuit_structure,
+                ctx.decoding,
+                ctx.backend,
+                *params,
+                wrt_inputs=wrt_inputs,
+            )
+        )
+        gradients = torch.vstack(gradients).view((-1,) + grad_output.shape)
+        left_indices = tuple(range(len(gradients.shape)))
+        right_indices = left_indices[::-1][: len(gradients.shape) - 2] + (
+            len(left_indices),
+        )
+        # TODO: grad_output.mT when we move to batching
+        gradients = torch.einsum(gradients, left_indices, grad_output.T, right_indices)
+        grad_input = grad_output @ grad_input if x is not None else None
+        return (
+            grad_input,
+            None,
+            None,
+            None,
+            None,
+            *gradients,
+        )
+
+
+def circuit_trace(f: Callable, params):
+
+    circuit = None
+
+    def build(x):
+        nonlocal circuit
+        is_encoding = isinstance(f, QuantumEncoding)
+        circuit = f(x) if is_encoding else f(*x)
+        # one parameter gates only
+        return torch.vstack(
+            [
+                par[0]
+                for par in circuit.get_parameters(include_not_trainable=is_encoding)
+            ]
+        )
+
+    # fwd or bkwd mode?
+    # we always assume the input is a 1-dim array, even for encodings
+    # thus the jacobian is a matrix
+    jac = torch.autograd.functional.jacobian(build, params).reshape(-1, len(params))
+    par_map = {}
+    for i, row in enumerate(jac):
+        for j in torch.nonzero(row):
+            j = int(j)
+            if j in par_map:
+                par_map[j] += (i,)
+            else:
+                par_map[j] = (i,)
+    return jac, par_map, circuit

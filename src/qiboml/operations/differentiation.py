@@ -9,6 +9,7 @@ import numpy as np
 from qibo import Circuit
 from qibo.backends import Backend
 from qibo.config import raise_error
+from tensorflow import no_op
 
 from qiboml import ndarray
 from qiboml.backends.jax import JaxBackend
@@ -372,3 +373,78 @@ class Jax(Differentiation):
             backend=decoding.backend,
         )
         return decoding(circ)
+
+
+class Jax_new(Differentiation):
+
+    def __init__(self, circuit: Circuit, decoding: QuantumDecoding):
+        self._jax: Backend = JaxBackend()
+        self._circuit = circuit
+        self._decoding = decoding
+        self.__post_init__()
+
+    def __post_init__(self):
+        n_params = len(
+            [
+                p
+                for params in self.circuit.get_parameters(include_not_trainable=True)
+                for p in params
+            ]
+        )
+        n_outputs = int(np.prod(self.decoding.output_shape))
+        jac = jax.jacfwd if n_params < n_outputs else jax.jacrev
+        self._jacobian: Callable = partial(jax.jit, static_argnums=(0, 1))(
+            jac(self._run, tuple(range(2, n_params + 2))),
+        )
+
+    @staticmethod
+    @partial(jax.jit, static_argnums=(0, 1))
+    def _run(circuit, decoding, *parameters):
+        for g, p in zip(circuit.parametrized_gates, parameters):
+            g.parameters = p
+        # circuit.set_parameters(parameters)
+        return decoding(circuit)
+
+    @property
+    def circuit(self):
+        return self._circuit
+
+    @circuit.setter
+    def circuit(self, circ):
+        self._circuit = circ
+        self.__post_init__()
+
+    @property
+    def decoding(self):
+        return self._decoding
+
+    @decoding.setter
+    def decoding(self, dec):
+        self._decoding = dec
+        self.__post_init__()
+
+    def evaluate(self, parameters):
+        """
+        Evaluate the jacobian of the internal quantum model (circuit + decoding) w.r.t to its ``parameters``,
+        i.e. the parameterized gates in the circuit.
+        Args:
+            parameters (list[ndarray]): the parameters at which to evaluate the circuit, and thus the derivatives.
+        Returns:
+            (ndarray): the calculated jacobian.
+        """
+        # backup the backend
+        backend = self.decoding.backend
+        # convert params to jax
+        params = np.array(backend.to_numpy(parameters))
+        params = self._jax.cast(params, dtype=self._jax.np.float64)
+        # set jax for running
+        self.decoding.set_backend(self._jax)
+        # calculate the jacobian
+        jacobian = self._jacobian(self.circuit, self.decoding, *params)
+        # reset the original backend
+        self.decoding.set_backend(backend)
+        # reset the original parameters
+        for g, p in zip(self.circuit.parametrized_gates, parameters):
+            g.parameters = p
+        # transform back to the backend native array
+        return backend.cast(self._jax.to_numpy(jacobian).tolist(), backend.np.float64)
