@@ -1,6 +1,7 @@
 """Torch interface to qiboml layers"""
 
 from dataclasses import dataclass
+from functools import reduce
 from typing import Callable, List, Optional, Union
 
 import numpy as np
@@ -46,14 +47,14 @@ class QuantumModel(torch.nn.Module):
         self,
     ):
         super().__init__()
-
         if isinstance(self.circuit_structure, Circuit):
             self.circuit_structure = [self.circuit_structure]
 
         params = utils.get_params_from_circuit_structure(
             self.circuit_structure,
         )
-        params = torch.as_tensor(self.backend.to_numpy(x=params)).ravel()
+        # params = torch.as_tensor(self.backend.to_numpy(x=params)).ravel()
+        params = torch.as_tensor(params).ravel()
         params.requires_grad = True
         self.circuit_parameters = torch.nn.Parameter(params)
 
@@ -93,11 +94,10 @@ class QuantumModel(torch.nn.Module):
             )
             x = self.decoding(circuit)
         else:
-            x = QuantumModelAutoGrad.apply(
+            x = QuantumModelAutoGrad_new.apply(
                 x,
                 self.circuit_structure,
                 self.decoding,
-                self.backend,
                 self.differentiation,
                 *list(self.parameters())[0],
             )
@@ -277,29 +277,7 @@ class QuantumModelAutoGrad_new(torch.autograd.Function):
         differentiation,
         *parameters: List[torch.nn.Parameter],
     ):
-        tracer = circuit_trace if torch.is_grad_enabled() else None
-        circuit, jacobian_wrt_inputs, jacobian = utils.circuit_from_structure(
-            circuit_structure, parameters, torch, x, tracer
-        )
-        # Save the context
-        ctx.save_for_backward(*parameters)
-        ctx.circuit = circuit
-        ctx.differentiation = differentiation
-        dtype = getattr(backend.np, str(parameters[0].dtype).split(".")[-1])
-        ctx.dtype = dtype
-
-        """
-        if x is not None:
-            # Cloning, detaching and converting to backend arrays
-            x_clone = x.clone().detach().cpu().numpy()
-            x_clone = backend.cast(x_clone, dtype=x_clone.dtype)
-        else:
-            x_clone = x
-        """
-        params = [
-            decoding.backend.cast(par.clone().detach().cpu().numpy(), dtype=dtype)
-            for par in circuit.get_parameters(include_not_trainable=True)
-        ]
+        tracer = circuit_trace  # if torch.is_grad_enabled() else None
         """
         # all the encodings need to be differentiatble
         # TODO: open to debate
@@ -308,53 +286,104 @@ class QuantumModelAutoGrad_new(torch.autograd.Function):
             for enc in circuit_structure
             if isinstance(enc, QuantumEncoding)
         )
-        circuit = utils.circuit_from_structure(
-            circuit_structure, x_clone, params, backend=backend
-        )
         """
-        circuit.set_parameters(params)
+        circuit, jacobian_wrt_inputs, jacobian, input_to_gate_map = (
+            utils.circuit_from_structure(
+                circuit_structure, torch.stack(parameters), torch, x, tracer
+            )
+        )
+        params = [
+            par
+            for params in circuit.get_parameters(include_not_trainable=True)
+            for par in params
+        ]
+        # Save the context
+        ctx.save_for_backward(jacobian_wrt_inputs, jacobian, *params)
+        ctx.circuit = circuit
+        ctx.differentiation = differentiation
+        ctx.input_to_gate_map = input_to_gate_map
+        dtype = getattr(decoding.backend.np, str(parameters[0].dtype).split(".")[-1])
+        ctx.dtype = dtype
+        # convert the parameters to backend native arrays
+        params = [
+            decoding.backend.cast(par.clone().detach().cpu().numpy(), dtype=dtype)
+            for par in params
+        ]
+        for g, p in zip(circuit.parametrized_gates, params):
+            g.parameters = p
+        # circuit.set_parameters(params)
         x_clone = decoding(circuit)
         x_clone = torch.as_tensor(
             decoding.backend.to_numpy(x_clone).tolist(),
-            dtype=dtype,
+            dtype=parameters[0].dtype,
             device=parameters[0].device,
         )
         return x_clone
 
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor):
-        parameters = ctx.saved_tensors
-
+        jacobian_wrt_inputs, jacobian, *parameters = ctx.saved_tensors
+        backend = ctx.differentiation.decoding.backend
         params = [
-            ctx.backend.cast(par.clone().detach().cpu().numpy(), dtype=ctx.dtype)
+            backend.cast(par.clone().detach().cpu().numpy(), dtype=ctx.dtype)
             for par in parameters
         ]
-        grad_input, *gradients = (
-            torch.as_tensor(
-                ctx.backend.to_numpy(grad).tolist(),
-                dtype=parameters[0].dtype,
-                device=parameters[0].device,
-            )
-            for grad in ctx.differentiation.evaluate(
-                x_clone,
-                ctx.circuit_structure,
-                ctx.decoding,
-                ctx.backend,
-                *params,
-                wrt_inputs=wrt_inputs,
-            )
+        # get the jacobian of the output wrt each angle of the circuit
+        # (i.e. each rotation gate)
+        jacobian_wrt_angles = torch.as_tensor(
+            backend.to_numpy(
+                ctx.differentiation.evaluate(
+                    *params,
+                )
+            ),
+            dtype=parameters[0].dtype,
+            device=parameters[0].device,
         )
-        gradients = torch.vstack(gradients).view((-1,) + grad_output.shape)
+
+        # extract the rows corresponding to encoding gates
+        # thus those element to be combined with the jacobian
+        # wrt the inputs
+        jacobian_wrt_encoding_angles = torch.vstack(
+            [
+                jacobian_wrt_angles[list(indices)]
+                for indices in zip(*ctx.input_to_gate_map.values())
+            ]
+        )
+        # discard the elements corresponding to encoding gates
+        # to obtain only the part wrt the model's parameters
+        indices_to_discard = reduce(tuple.__add__, ctx.input_to_gate_map.values())
+        out_shape = ctx.differentiation.decoding.output_shape
+        jacobian_wrt_angles = torch.vstack(
+            [
+                row
+                for i, row in enumerate(jacobian_wrt_angles)
+                if i not in indices_to_discard
+            ]
+        ).reshape(-1, *out_shape)
+
+        # combine the jacobians wrt parameters/inputs with those
+        # wrt the circuit angles
+        contraction = ((0, 1), (0,) + tuple(range(2, len(out_shape) + 2)))
+        gradients = torch.einsum(
+            jacobian, contraction[0], jacobian_wrt_angles, contraction[1]
+        )
+        grad_input = torch.einsum(
+            jacobian_wrt_inputs,
+            contraction[0],
+            jacobian_wrt_encoding_angles,
+            contraction[1],
+        )
+
+        # combine with the gradients coming from outside
         left_indices = tuple(range(len(gradients.shape)))
         right_indices = left_indices[::-1][: len(gradients.shape) - 2] + (
             len(left_indices),
         )
         # TODO: grad_output.mT when we move to batching
         gradients = torch.einsum(gradients, left_indices, grad_output.T, right_indices)
-        grad_input = grad_output @ grad_input if x is not None else None
+        grad_input = grad_output @ grad_input
         return (
             grad_input,
-            None,
             None,
             None,
             None,

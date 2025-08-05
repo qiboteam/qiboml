@@ -53,20 +53,34 @@ def circuit_from_structure(
     # the jacobian for each sub-circuit
     jacobians = []
     jacobians_wrt_inputs = []
+    input_to_gate_map = {}
+    param_to_gate_map = {}
+    dtype = params.dtype
 
     index = 0
     for circ in circuit_structure:
         if isinstance(circ, QuantumEncoding):
             if tracer is not None:
                 jacobian, input_map, circ = tracer(circ, x)
+                # update the input_map to the index of the global circuit
+                input_map = {
+                    inp: tuple(i + index for i in indices)
+                    for inp, indices in input_map.items()
+                }
+                # update the global map
+                for inp, indices in input_map.items():
+                    if inp in input_to_gate_map:
+                        input_to_gate_map[inp] += indices
+                    else:
+                        input_to_gate_map[inp] = indices
             else:
-                jacobian, input_map, circ = None, None, circ(x)
+                jacobian, _, circ = None, None, circ(x)
             jacobians_wrt_inputs.append(jacobian)
         else:
             if isinstance(circ, Circuit):
                 nparams = len(circ.get_parameters())
                 circ.set_parameters(params[index : index + nparams])
-                jacobian = engine.eye(nparams)
+                jacobian = engine.eye(nparams, dtype=dtype)
             elif isinstance(circ, Callable):
                 param_dict = signature(circ).parameters
                 nparams = len(param_dict)
@@ -101,7 +115,7 @@ def circuit_from_structure(
             position += shape
     else:
         J = None
-    return circuit, engine.vstack(jacobians_wrt_inputs), J
+    return circuit, engine.vstack(jacobians_wrt_inputs), J, input_to_gate_map
 
 
 def get_default_differentiation(decoding: QuantumDecoding, instructions: Dict):
