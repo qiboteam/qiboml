@@ -26,7 +26,7 @@ def get_params_from_circuit_structure(
             params.extend([p for param in circ.get_parameters() for p in param])
         elif not isinstance(circ, QuantumEncoding) and isinstance(circ, Callable):
             params.extend(
-                random.random() for key in signature(circ).parameters if key != "engine"
+                random.random() for _ in range(len(signature(circ).parameters))
             )
     return params
 
@@ -105,7 +105,7 @@ def circuit_from_structure(
     if tracer is not None:
         total_dim = tuple(sum(np.array(j.shape) for j in jacobians))
         # build the global jacobian
-        J = engine.zeros(total_dim)
+        J = engine.zeros(total_dim, dtype=dtype)
         position = np.array([0, 0])
         # insert each sub-jacobian in the total one
         for j in jacobians:

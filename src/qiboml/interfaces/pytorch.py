@@ -287,53 +287,63 @@ class QuantumModelAutoGrad_new(torch.autograd.Function):
             if isinstance(enc, QuantumEncoding)
         )
         """
+        parameters = torch.stack(parameters)
         circuit, jacobian_wrt_inputs, jacobian, input_to_gate_map = (
             utils.circuit_from_structure(
-                circuit_structure, torch.stack(parameters), torch, x, tracer
+                circuit_structure, parameters, torch, x, tracer
             )
         )
-        params = [
-            par
-            for params in circuit.get_parameters(include_not_trainable=True)
-            for par in params
-        ]
+        jacobian = jacobian.to(parameters.device)
+        params = torch.stack(
+            [
+                par
+                for params in circuit.get_parameters(include_not_trainable=True)
+                for par in params
+            ]
+        )
         # Save the context
-        ctx.save_for_backward(jacobian_wrt_inputs, jacobian, *params)
+        ctx.save_for_backward(jacobian_wrt_inputs, jacobian, params)
         ctx.circuit = circuit
         ctx.differentiation = differentiation
         ctx.input_to_gate_map = input_to_gate_map
-        dtype = getattr(decoding.backend.np, str(parameters[0].dtype).split(".")[-1])
+        dtype = getattr(decoding.backend.np, str(parameters.dtype).split(".")[-1])
         ctx.dtype = dtype
         # convert the parameters to backend native arrays
-        params = [
-            decoding.backend.cast(par.clone().detach().cpu().numpy(), dtype=dtype)
-            for par in params
-        ]
+        # params = [
+        #    decoding.backend.cast(par.clone().detach().cpu().numpy(), dtype=dtype)
+        #    for par in params
+        # ]
+        params = decoding.backend.cast(
+            params.clone().detach().cpu().numpy(), dtype=dtype
+        )
         for g, p in zip(circuit.parametrized_gates, params):
             g.parameters = p
         # circuit.set_parameters(params)
         x_clone = decoding(circuit)
         x_clone = torch.as_tensor(
             decoding.backend.to_numpy(x_clone).tolist(),
-            dtype=parameters[0].dtype,
-            device=parameters[0].device,
+            dtype=parameters.dtype,
+            device=parameters.device,
         )
         return x_clone
 
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor):
-        jacobian_wrt_inputs, jacobian, *parameters = ctx.saved_tensors
+        jacobian_wrt_inputs, jacobian, parameters = ctx.saved_tensors
         backend = ctx.differentiation.decoding.backend
-        params = [
-            backend.cast(par.clone().detach().cpu().numpy(), dtype=ctx.dtype)
-            for par in parameters
-        ]
+        # params = [
+        #    backend.cast(par.clone().detach().cpu().numpy(), dtype=ctx.dtype)
+        #    for par in parameters
+        # ]
+        params = backend.cast(
+            parameters.clone().detach().cpu().numpy(), dtype=ctx.dtype
+        )
         # get the jacobian of the output wrt each angle of the circuit
         # (i.e. each rotation gate)
         jacobian_wrt_angles = torch.as_tensor(
             backend.to_numpy(
                 ctx.differentiation.evaluate(
-                    *params,
+                    params,
                 )
             ),
             dtype=parameters[0].dtype,
@@ -376,12 +386,16 @@ class QuantumModelAutoGrad_new(torch.autograd.Function):
 
         # combine with the gradients coming from outside
         left_indices = tuple(range(len(gradients.shape)))
-        right_indices = left_indices[::-1][: len(gradients.shape) - 2] + (
-            len(left_indices),
-        )
+        right_indices = left_indices[
+            1:
+        ]  # left_indices[::-1][: len(gradients.shape) - 2] + (
+        # len(left_indices),
+        # )
         # TODO: grad_output.mT when we move to batching
-        gradients = torch.einsum(gradients, left_indices, grad_output.T, right_indices)
-        grad_input = grad_output @ grad_input
+        gradients = torch.einsum(gradients, left_indices, grad_output, right_indices)
+        grad_input = torch.einsum(
+            grad_input, left_indices, grad_output, right_indices
+        )  # grad_output @ grad_input
         return (
             grad_input,
             None,
