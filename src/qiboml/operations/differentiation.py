@@ -375,7 +375,7 @@ class Jax(Differentiation):
         return decoding(circ)
 
 
-class Jax_new(Differentiation):
+class Jax(Differentiation):
 
     def __init__(self, circuit: Circuit, decoding: QuantumDecoding):
         self._jax: Backend = JaxBackend()

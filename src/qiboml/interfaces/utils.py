@@ -132,10 +132,10 @@ def get_default_differentiation(decoding: QuantumDecoding, instructions: Dict):
     if not decoding.analytic or backend_string not in instructions.keys():
         from qiboml.operations.differentiation import PSR
 
-        differentiation = PSR()
+        differentiation = PSR
     else:
-        diff = instructions[backend_string]
-        differentiation = diff() if diff is not None else None
+        differentiation = instructions[backend_string]
+        # differentiation = diff if diff is not None else None
 
     return differentiation
 
