@@ -59,7 +59,6 @@ class CircuitTracer(ABC):
         self,
     ) -> dict[int, Callable]:
         jacobians = {}
-        jac = self.jacfwd if self.derivation_mode == "forward" else self.jacrev
         for circ in self.circuit_structure:
             if isinstance(circ, Circuit):
                 jacobians[id(circ)] = self.identity
@@ -85,12 +84,31 @@ class CircuitTracer(ABC):
                     par_map[j] = (i,)
         return jac, par_map
 
+    @cached_property
+    def is_encoding_differentiable(self) -> bool:
+        diff_encodings = [
+            circ.differentiable
+            for circ in self.circuit_structure
+            if isinstance(circ, QuantumEncoding)
+        ]
+        if len(diff_encodings) == 0:
+            return False
+        # all the encodings must be differentiable
+        # open to debate, not the only possible choice
+        return all(diff_encodings)
+
+    @abstractmethod
+    def requires_gradient(self, x: ndarray) -> bool:
+        pass
+
     def _build_from_encoding(
         self, encoding: QuantumEncoding, x: ndarray, trace: bool = True
     ):
         circuit = encoding(x)
         if trace:
-            return *self.trace(encoding, x), circuit
+            if self.is_encoding_differentiable and self.requires_gradient(x):
+                return *self.trace(encoding, x), circuit
+            return None, None, circuit
         return circuit
 
     def _build_from_circuit(
@@ -132,7 +150,7 @@ class CircuitTracer(ABC):
 
     def __call__(
         self, params: ndarray, x: Optional[ndarray] = None
-    ) -> Tuple[Circuit, ndarray, ndarray, dict]:
+    ) -> Tuple[Circuit, Optional[ndarray], ndarray, Optional[dict]]:
 
         if (
             any(isinstance(circ, QuantumEncoding) for circ in self.circuit_structure)
@@ -148,7 +166,6 @@ class CircuitTracer(ABC):
         jacobians = []
         jacobians_wrt_inputs = []
         input_to_gate_map = {}
-        param_to_gate_map = {}
 
         index = 0
         for circ in self.circuit_structure:
@@ -158,28 +175,29 @@ class CircuitTracer(ABC):
                 jacobian, input_map, circ = self._build_from_encoding(
                     circ, x, trace=True
                 )
-                # update the input_map to the index of the global circuit
-                input_map = {
-                    inp: tuple(i + index for i in indices)
-                    for inp, indices in input_map.items()
-                }
-                # update the global map
-                for inp, indices in input_map.items():
-                    if inp in input_to_gate_map:
-                        input_to_gate_map[inp] += indices
-                    else:
-                        input_to_gate_map[inp] = indices
+                if input_map is not None:
+                    # update the input_map to the index of the global circuit
+                    input_map = {
+                        inp: tuple(i + index for i in indices)
+                        for inp, indices in input_map.items()
+                    }
+                    # update the global map
+                    for inp, indices in input_map.items():
+                        if inp in input_to_gate_map:
+                            input_to_gate_map[inp] += indices
+                        else:
+                            input_to_gate_map[inp] = indices
                 jacobians_wrt_inputs.append(jacobian)
             elif isinstance(circ, Circuit):
                 nparams = len(circ.get_parameters())
-                jacobian, par_map, circ = self._build_from_circuit(
+                jacobian, _, circ = self._build_from_circuit(
                     circ, params[index : index + nparams], trace=True
                 )
                 jacobians.append(jacobian)
             else:
                 param_dict = signature(circ).parameters
                 nparams = len(param_dict)
-                jacobian, par_map, circ = self._build_from_callable(
+                jacobian, _, circ = self._build_from_callable(
                     circ, params[index : index + nparams], trace=True
                 )
                 jacobians.append(jacobian)
@@ -202,7 +220,15 @@ class CircuitTracer(ABC):
             J[interval[0][0] : interval[0][1], interval[1][0] : interval[1][1]] = j
             position += shape
 
-        return circuit, self.engine.vstack(jacobians_wrt_inputs), J, input_to_gate_map
+        jacobians_wrt_inputs = (
+            None
+            if jacobians_wrt_inputs[0] is None
+            else self.engine.vstack(jacobians_wrt_inputs)
+        )
+        if len(input_to_gate_map) == 0:
+            input_to_gate_map = None
+
+        return circuit, jacobians_wrt_inputs, J, input_to_gate_map
 
     def build_circuit(self, params: ndarray, x: Optional[ndarray] = None) -> Circuit:
         circuit = None

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from functools import partial
+from functools import cached_property, partial
 from typing import Callable, Tuple
 
 import jax
@@ -12,7 +12,6 @@ from tensorflow import no_op
 
 from qiboml import ndarray
 from qiboml.backends.jax import JaxBackend
-from qiboml.interfaces.utils import circuit_from_structure
 from qiboml.models.decoding import QuantumDecoding
 from qiboml.models.encoding import QuantumEncoding
 
@@ -28,17 +27,23 @@ class Differentiation(ABC):
 
     @abstractmethod
     def evaluate(
-        self,
-        parameters: ndarray,
+        self, parameters: ndarray, wrt_inputs: bool = False
     ):  # pragma: no cover
         """
-        Evaluate the gradient of the quantum circuit w.r.t its parameters.
+        Evaluate the gradient of the quantum circuit w.r.t its parameters, i.e. its rotation angles.
         """
         pass
 
     @property
     def backend(self):
         return self.decoding.backend
+
+    @cached_property
+    def non_trainable_gates(self):
+        return [g for g in self.circuit.parametrized_gates if not g.trainable]
+
+    def nparams(self, wrt_inputs):
+        return len(self.circuit.get_parameters(include_not_trainable=wrt_inputs))
 
 
 class PSR(Differentiation):
@@ -47,32 +52,22 @@ class PSR(Differentiation):
     derivative calculation which, thus, makes it hardware compatible.
     """
 
-    def evaluate(
-        self,
-        parameters: ndarray,
-    ):
+    def evaluate(self, parameters: ndarray, wrt_inputs: bool = False):
         """
-        Evaluate the gradient of a quantum model w.r.t inputs and parameters,
-        respectively represented by `x` and `parameters`.
+        Evaluate the gradient of the quantum circuit w.r.t its parameters, i.e. its rotation angles.
         Args:
-            x (ndarray): the input data.
-            circuit_structure (List[Union[Circuit, QuantumEncoding]]): structure
-                of the circuit. It can be composed of `QuantumEncoding`s and
-                Qibo's circuits.
-            decoding (QuantumDecoding): the decoding layer.
-            backend (Backend): the backend to execute the circuit with.
             parameters (List[ndarray]): the parameters at which to evaluate the model, and thus the derivative.
             wrt_inputs (bool): whether to calculate the derivate with respect to inputs or not, by default ``False``.
         Returns:
-            (list[ndarray]): the calculated gradients.
+            (ndarray): the calculated gradients.
         """
+
         circuits = []
         eigvals = []
 
-        for i in range(len(parameters)):
+        for i in range(self.nparams(wrt_inputs)):
             forward, backward, eigval = self.one_parameter_shift(
-                parameters=parameters,
-                parameter_index=i,
+                parameters=parameters, parameter_index=i, wrt_inputs=wrt_inputs
             )
             circuits.extend([forward, backward])
             eigvals.append(eigval)
@@ -90,12 +85,15 @@ class PSR(Differentiation):
         return (forwards - backwards) * eigvals
 
     def one_parameter_shift(
-        self,
-        parameters: ndarray,
-        parameter_index: int,
+        self, parameters: ndarray, parameter_index: int, wrt_inputs: bool = False
     ) -> Tuple[Circuit, Circuit, float]:
         """Compute one derivative of the decoding strategy w.r.t. a target parameter."""
-        gate = self.circuit.parametrized_gates[parameter_index]
+        target_gates = (
+            self.circuit.parametrized_gates
+            if wrt_inputs
+            else self.circuit.trainable_gates
+        )
+        gate = target_gates[parameter_index]
         generator_eigenval = gate.generator_eigenvalue()
         s = np.pi / (4 * generator_eigenval)
 
@@ -103,16 +101,22 @@ class PSR(Differentiation):
         tmp_params = self.shift_parameter(tmp_params, parameter_index, s, self.backend)
 
         forward = self.circuit.copy(True)
+        target_gates = (
+            forward.parametrized_gates if wrt_inputs else forward.trainable_gates
+        )
         # forward.set_parameters(tmp_params)
-        for g, p in zip(forward.parametrized_gates, tmp_params):
+        for g, p in zip(target_gates, tmp_params):
             g.parameters = p
 
         tmp_params = self.backend.cast(parameters, copy=True, dtype=parameters[0].dtype)
         tmp_params = self.shift_parameter(tmp_params, parameter_index, -s, self.backend)
 
         backward = self.circuit.copy(True)
+        target_gates = (
+            backward.parametrized_gates if wrt_inputs else backward.trainable_gates
+        )
         # backward.set_parameters(tmp_params)
-        for g, p in zip(backward.parametrized_gates, tmp_params):
+        for g, p in zip(target_gates, tmp_params):
             g.parameters = p
 
         return forward, backward, generator_eigenval
@@ -142,7 +146,7 @@ class Jax(Differentiation):
         n_params = len(
             [
                 p
-                for params in self.circuit.get_parameters(include_not_trainable=True)
+                for params in self.circuit.get_parameters(include_not_trainable=False)
                 for p in params
             ]
         )
@@ -151,10 +155,29 @@ class Jax(Differentiation):
         self._jacobian: Callable = partial(jax.jit, static_argnums=(0, 1))(
             jac(self._run, tuple(range(2, n_params + 2))),
         )
+        n_params = len(
+            [
+                p
+                for params in self.circuit.get_parameters(include_not_trainable=True)
+                for p in params
+            ]
+        )
+        jac = jax.jacfwd if n_params < n_outputs else jax.jacrev
+        self._jacobian_with_inputs: Callable = partial(jax.jit, static_argnums=(0, 1))(
+            jac(self._run_with_inputs, tuple(range(2, n_params + 2))),
+        )
 
     @staticmethod
     @partial(jax.jit, static_argnums=(0, 1))
     def _run(circuit, decoding, *parameters):
+        for g, p in zip(circuit.trainable_gates, parameters):
+            g.parameters = p
+        # circuit.set_parameters(parameters)
+        return decoding(circuit)
+
+    @staticmethod
+    @partial(jax.jit, static_argnums=(0, 1))
+    def _run_with_inputs(circuit, decoding, *parameters):
         for g, p in zip(circuit.parametrized_gates, parameters):
             g.parameters = p
         # circuit.set_parameters(parameters)
@@ -178,7 +201,13 @@ class Jax(Differentiation):
         self._decoding = dec
         self.__post_init__()
 
-    def evaluate(self, parameters):
+    def _cast_non_trainable_parameters(self, src_backend, tgt_backend):
+        for g in self.non_trainable_gates:
+            g.parameters = tgt_backend.cast(
+                [src_backend.to_numpy(par) for par in g.parameters]
+            )
+
+    def evaluate(self, parameters, wrt_inputs: bool = False):
         """
         Evaluate the jacobian of the internal quantum model (circuit + decoding) w.r.t to its ``parameters``,
         i.e. the parameterized gates in the circuit.
@@ -192,14 +221,24 @@ class Jax(Differentiation):
         # convert params to jax
         params = np.array(backend.to_numpy(parameters))
         params = self._jax.cast(params, dtype=self._jax.np.float64)
+        if not wrt_inputs:
+            self._cast_non_trainable_parameters(self.backend, self._jax)
         # set jax for running
         self.decoding.set_backend(self._jax)
         # calculate the jacobian
-        jacobian = self._jacobian(self.circuit, self.decoding, *params)
+        jac_f = self._jacobian_with_inputs if wrt_inputs else self._jacobian
+        jacobian = jac_f(self.circuit, self.decoding, *params)
         # reset the original backend
         self.decoding.set_backend(backend)
         # reset the original parameters
-        for g, p in zip(self.circuit.parametrized_gates, parameters):
+        target_gates = (
+            self.circuit.parametrized_gates
+            if wrt_inputs
+            else self.circuit.trainable_gates
+        )
+        for g, p in zip(target_gates, parameters):
             g.parameters = p
+        if not wrt_inputs:
+            self._cast_non_trainable_parameters(self._jax, self.backend)
         # transform back to the backend native array
         return backend.cast(self._jax.to_numpy(jacobian).tolist(), backend.np.float64)
