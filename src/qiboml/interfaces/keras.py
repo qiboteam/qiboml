@@ -15,6 +15,7 @@ from qibo.backends import Backend
 from qibo.config import raise_error
 
 from qiboml.interfaces import utils
+from qiboml.interfaces.circuit_tracer import CircuitTracer
 from qiboml.models.decoding import QuantumDecoding
 from qiboml.models.encoding import QuantumEncoding
 from qiboml.operations.differentiation import PSR, Differentiation, Jax
@@ -25,6 +26,53 @@ DEFAULT_DIFFERENTIATION = {
     "qiboml-jax": Jax,
     "numpy": Jax,
 }
+
+
+class KerasCircuitTracer(CircuitTracer):
+
+    @property
+    def engine(self):
+        return keras.ops
+
+    @staticmethod
+    def jacrev(f: Callable, argnums: Union[int, Tuple[int]]) -> Callable:
+        if isinstance(f, QuantumEncoding):
+
+            @tf.function
+            def jac_functional(x):
+                with tf.GradientTape() as tape:
+                    tape.watch(x)
+                    y = f(x)
+                return tape.jacobian(y, x)
+
+        else:
+
+            @tf.function
+            def jac_functional(x):
+                with tf.GradientTape() as tape:
+                    tape.watch(x)
+                    y = f(*x)
+                return tape.jacobian(y, x)
+
+        return jac_functional
+
+    @staticmethod
+    def jacfwd(f: Callable, argnums: Union[int, Tuple[int]]) -> Callable:
+        # no available implementation of forward differentiation in tensorflow
+        return KerasCircuitTracer.jacrev(f, argnums)
+
+    def identity(
+        self, dim: int, dtype: torch.dtype, device: torch.device
+    ) -> torch.Tensor:
+        return torch.eye(dim, dtype=dtype, device=device)
+
+    def zeros(
+        self, shape: Union[int, Tuple[int]], dtype: torch.dtype, device: torch.device
+    ) -> torch.Tensor:
+        return torch.zeros(shape, dtype=dtype, device=device)
+
+    def requires_gradient(self, x: torch.Tensor) -> bool:
+        return not x.is_leaf or x.requires_grad
 
 
 @dataclass(eq=False)

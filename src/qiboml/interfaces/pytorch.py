@@ -31,11 +31,11 @@ class TorchCircuitTracer(CircuitTracer):
         return torch
 
     @staticmethod
-    def jacfwd(f: Callable, argnums: Union[int, Tuple[int]]):
+    def jacfwd(f: Callable, argnums: Union[int, Tuple[int]]) -> Callable:
         return torch.func.jacfwd(f, argnums)
 
     @staticmethod
-    def jacrev(f: Callable, argnums: Union[int, Tuple[int]]):
+    def jacrev(f: Callable, argnums: Union[int, Tuple[int]]) -> Callable:
         return torch.func.jacrev(f, argnums)
 
     def identity(
