@@ -5,6 +5,7 @@
 
 import string
 from dataclasses import dataclass
+from functools import reduce
 from typing import Callable, List, Optional, Union
 
 import keras
@@ -62,17 +63,24 @@ class KerasCircuitTracer(CircuitTracer):
         return KerasCircuitTracer.jacrev(f, argnums)
 
     def identity(
-        self, dim: int, dtype: torch.dtype, device: torch.device
-    ) -> torch.Tensor:
-        return torch.eye(dim, dtype=dtype, device=device)
+        self, dim: int, dtype, device: tf.python.eager.context._EagerDeviceContext
+    ) -> tf.Tensor:
+        with device:
+            eye = keras.ops.eye(dim, dtype=dtype)
+        return eye
 
     def zeros(
-        self, shape: Union[int, Tuple[int]], dtype: torch.dtype, device: torch.device
-    ) -> torch.Tensor:
-        return torch.zeros(shape, dtype=dtype, device=device)
+        self,
+        shape: Union[int, Tuple[int]],
+        dtype,
+        device: tf.python.eager.context._EagerDeviceContext,
+    ) -> tf.Tensor:
+        with device:
+            z = keras.ops.zeros(shape, dtype=dtype)
+        return z
 
-    def requires_gradient(self, x: torch.Tensor) -> bool:
-        return not x.is_leaf or x.requires_grad
+    def requires_gradient(self, x: tf.Tensor) -> bool:
+        return hasattr(x, "op") and len(x.op.inputs) > 0
 
 
 @dataclass(eq=False)
@@ -94,6 +102,7 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
     circuit_structure: Union[Circuit, List[Union[Circuit, QuantumEncoding]]]
     decoding: QuantumDecoding
     differentiation: Optional[Differentiation] = None
+    circuit_tracer: Optional[CircuitTracer] = None
 
     def __post_init__(self):
         super().__init__()
@@ -103,7 +112,8 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
 
         params = utils.get_params_from_circuit_structure(self.circuit_structure)
         params = keras.ops.cast(
-            self.backend.to_numpy(params),
+            #    self.backend.to_numpy(params),
+            params,
             "float64",
         )  # pylint: disable=no-member
         self.circuit_parameters = self.add_weight(
@@ -111,12 +121,16 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
         )
         self.set_weights([params])
 
+        if self.circuit_tracer is None:
+            self.circuit_tracer = KerasCircuitTracer
+        self.circuit_tracer = self.circuit_tracer(self.circuit_structure)
+
         if self.differentiation is None:
             self.differentiation = utils.get_default_differentiation(
                 decoding=self.decoding,
                 instructions=DEFAULT_DIFFERENTIATION,
             )
-
+        """
         if self.differentiation is not None:
             self.custom_gradient = QuantumModelCustomGradient(
                 self.circuit_structure,
@@ -124,17 +138,8 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
                 self.backend,
                 self.differentiation,
             )
-
-        if any(
-            isinstance(circuit, Callable)
-            and not isinstance(circuit, QuantumEncoding | Circuit)
-            for circuit in self.circuit_structure
-        ) and (
-            isinstance(self.differentiation, PSR)
-        ):  # pragma: no cover
-            raise_error(
-                NotImplementedError, "Equivariant circuits not working with PSR yet."
-            )
+        """
+        self.custom_gradient = None
 
     def compute_output_shape(self, input_shape):
         return self.decoding.output_shape
@@ -142,14 +147,22 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
     def call(self, x: Optional[tf.Tensor] = None) -> tf.Tensor:
         if self.differentiation is None:
             # This `1 * self.circuit_parameters` is needed otherwise a TypeError is raised
-            circuit = utils.circuit_from_structure(
-                x=x,
-                circuit_structure=self.circuit_structure,
+            circuit = self.circuit_tracer.build_circuit(
                 params=1 * self.circuit_parameters,
-                backend=self.backend,
+                x=x,
             )
             output = self.decoding(circuit)
             return output[None, :]
+        if self.custom_gradient is None:
+            self.differentiation = self.differentiation(
+                self.circuit_tracer.build_circuit(1 * self.circuit_parameters, x=x),
+                self.decoding,
+            )
+            self.custom_gradient = QuantumModelCustomGradient(
+                self.decoding,
+                self.differentiation,
+                self.circuit_tracer,
+            )
         if x is None:
             x = tf.constant([], dtype=np.float64)
         return self.custom_gradient.evaluate(x, 1 * self.circuit_parameters)
@@ -196,89 +209,129 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
 @dataclass
 class QuantumModelCustomGradient:
 
-    circuit_structure: Union[Circuit, List[Union[Circuit, QuantumEncoding]]]
     decoding: QuantumDecoding
-    backend: Backend
     differentiation: Differentiation
+    circuit_tracer: CircuitTracer
     wrt_inputs: bool = False
+
+    @property
+    def backend(self):
+        return self.decoding.backend
 
     @tf.custom_gradient
     def evaluate(self, x, params):
         x_is_not_None = x.shape[0] != 0
         # check whether we have to derive wrt inputs
-        if x_is_not_None and tf.is_symbolic_tensor(
-            x
-        ):  # how to check if tf.tensor is leaf?
-
-            differentiable_encodings = True
-            for circ in self.circuit_structure:
-                if isinstance(circ, QuantumEncoding):
-                    if not circ.differentiable:
-                        differentiable_encodings = False
+        if x_is_not_None and tf.is_symbolic_tensor(x):
 
             self.wrt_inputs = (
-                differentiable_encodings and hasattr(x, "op") and len(x.op.inputs) > 0
+                self.circuit_tracer.is_encoding_differentiable
+                and self.circuit_tracer.requires_gradient(x)
             )
 
-        def forward(x, params):
-            if x_is_not_None:
-                x = self.backend.cast(
-                    keras.ops.convert_to_numpy(x), dtype=self.backend.np.float64
-                )
-            params = self.backend.cast(params, dtype=self.backend.np.float64)
-            circuit = utils.circuit_from_structure(
-                circuit_structure=self.circuit_structure,
-                x=x,
-                params=params,
-                backend=self.backend,
-            )
+        circuit, jacobian_wrt_inputs, jacobian, input_to_gate_map = self.circuit_tracer(
+            params, x=x
+        )
+        angles = keras.ops.stack(
+            [
+                par
+                for params in circuit.get_parameters(include_not_trainable=True)
+                for par in params
+            ]
+        )
+        angles = keras.ops.convert_to_numpy(angles)
+
+        def forward(angles):
+            angles = self.backend.cast(angles, dtype=self.backend.np.float64)
+            for i, g in enumerate(self.differentiation.circuit.parametrized_gates):
+                g.parameters = angles[i]
+            circuit = self.differentiation.circuit
             y = self.decoding(circuit)
             y = self.backend.to_numpy(y)
-            return keras.ops.cast(y, dtype=y.dtype)
+            return y
 
-        y = tf.numpy_function(func=forward, inp=[x, params], Tout=tf.float64)
+        y = tf.numpy_function(func=forward, inp=[angles], Tout=tf.float64)
         # check output shape of decoding layers, their returned tensor
         # shape should match the output_shape attribute and this should
         # not be necessary (only useful for symbolic execution)!!
         y = keras.ops.reshape(y, self.decoding.output_shape)
 
-        def get_gradients(x, params):
-            if x_is_not_None:
-                x = self.backend.cast(x, dtype=self.backend.np.float64)
-            d_x, *d_params = self.differentiation.evaluate(
-                x,
-                self.circuit_structure,
-                self.decoding,
-                self.backend,
-                *params,
+        def jacobian_wrt_angles(angles):
+            angles = self.backend.cast(angles, dtype=self.backend.np.float64)
+            d_angles = self.differentiation.evaluate(
+                params,
                 wrt_inputs=self.wrt_inputs,
             )
-            d_params = self.backend.to_numpy(
-                self.backend.cast(d_params, dtype=self.backend.np.float64)
+            d_angles = self.backend.to_numpy(
+                self.backend.cast(d_angles, dtype=self.backend.np.float64)
             )
-            d_x = self.backend.to_numpy(d_x)
-            d_x = keras.ops.cast(d_x, d_x.dtype)
-            d_params = keras.ops.cast(d_params, d_params.dtype)
-            return d_x, d_params
+            return d_angles
 
         # Custom gradient
         def grad(dy):
-            d_x, d_params = tf.numpy_function(
-                func=get_gradients, inp=[x, params], Tout=[tf.float64, tf.float64]
+            d_angles = tf.numpy_function(
+                func=jacobian_wrt_angles, inp=[angles], Tout=[tf.float64]
             )
+
+            out_shape = self.differentiation.decoding.output_shape
+            # contraction to combine jacobians wrt inputs/parameters with those
+            # wrt the circuit angles
+            contraction = ((0, 1), (0,) + tuple(range(2, len(out_shape) + 2)))
+            contraction = ",".join(
+                "".join(string.ascii_letters[i] for i in indices)
+                for indices in contraction
+            )
+            # contraction to combine with the gradients coming from outside
+            indices = tuple(range(len(dy.shape)))
+            lhs = "".join(string.ascii_letters[i] for i in indices)
+            rhs = string.ascii_letters[len(indices)] + lhs
+
+            if jacobian_wrt_inputs is not None:
+                # extract the rows corresponding to encoding gates
+                # thus those element to be combined with the jacobian
+                # wrt the inputs
+                d_encoding_angles = keras.ops.vstack(
+                    [
+                        d_angles[list(indices)]
+                        for indices in zip(*input_to_gate_map.values())
+                    ]
+                )
+                # discard the elements corresponding to encoding gates
+                # to obtain only the part wrt the model's parameters
+                indices_to_discard = reduce(tuple.__add__, input_to_gate_map.values())
+                d_angles = keras.ops.reshape(
+                    keras.ops.vstack(
+                        [
+                            row
+                            for i, row in enumerate(d_angles)
+                            if i not in indices_to_discard
+                        ]
+                    ),
+                    (-1, *out_shape),
+                )
+                # combine the jacobians wrt inputs with those
+                # wrt the circuit angles
+                d_x = keras.ops.einsum(
+                    contraction,
+                    jacobian_wrt_inputs,
+                    d_encoding_angles,
+                )
+                tmp = lhs + "".join(
+                    string.ascii_letters[i] for i in range(len(indices), len(d_x.shape))
+                )
+                d_x = keras.ops.einsum(f"{lhs},{tmp}", d_x, dy)
+            else:
+                d_x = None
+
+            """
             if x_is_not_None:
                 # double check this
                 # the reshape here should be needed for symbolic execution only
                 d_x = keras.ops.reshape(d_x, dy.shape + x.shape)
-            d_params = keras.ops.reshape(d_params, tuple(params.shape) + dy.shape)
-            indices = tuple(range(len(dy.shape)))
-            lhs = "".join(string.ascii_letters[i] for i in indices)
-            rhs = string.ascii_letters[len(indices)] + lhs
+            """
+            d_params = keras.ops.einsum(contraction, jacobian, d_angles)
+            # d_params = keras.ops.reshape(d_params, tuple(params.shape) + dy.shape)
             d_params = keras.ops.einsum(f"{lhs},{rhs}", dy, d_params)
-            rhs = lhs + "".join(
-                string.ascii_letters[i] for i in range(len(indices), len(d_x.shape))
-            )
-            d_x = keras.ops.einsum(f"{lhs},{rhs}", dy, d_x) if x_is_not_None else None
             return d_x, d_params
 
         return y, grad
