@@ -5,7 +5,7 @@ import numpy as np
 from scipy.special import binom
 
 from qibo import Circuit, gates
-from qibo.models.encodings import entangling_layer, phase_encoder
+from qibo.models.encodings import entangling_layer
 
 
 def HardwareEfficient(
