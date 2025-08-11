@@ -2,10 +2,9 @@ import random
 from typing import Optional
 
 import numpy as np
-from scipy.special import binom
-
 from qibo import Circuit, gates
 from qibo.models.encodings import entangling_layer
+from scipy.special import binom
 
 
 def HardwareEfficient(
@@ -49,11 +48,12 @@ def brickwork_givens(nqubits: int, weight: int, full_hwp: bool = False, **kwargs
     References:
         1. B. T. Gard, L. Zhu1, G. S. Barron, N. J. Mayhall, S. E. Economou, and Edwin Barnes,
         *Efﬁcient symmetry-preserving state preparation circuits for the variational quantum
-        eigensolver algorithm*, `npj Quantum Information (2020) 6:10 
+        eigensolver algorithm*, `npj Quantum Information (2020) 6:10
         <https://doi.org/10.1038/s41534-019-0240-1>`_.
 
     """
     n_choose_k = int(binom(nqubits, weight))
+    _weight = weight if not full_hwp else 0
 
     circuit = Circuit(nqubits, **kwargs)
 
@@ -67,13 +67,19 @@ def brickwork_givens(nqubits: int, weight: int, full_hwp: bool = False, **kwargs
         else:
             circuit.add(gates.X(2 * qubit) for qubit in range(weight))
 
-    for _ in range(n_choose_k // (nqubits - 1)):
-        circuit += entangling_layer(
-            nqubits,
-            architecture="shifted",
-            entangling_gate=gates.GIVENS,
-            closed_boundary=False,
-            **kwargs
-        )
+    layer = entangling_layer(
+        nqubits,
+        architecture="shifted",
+        entangling_gate=gates.GIVENS,
+        closed_boundary=False,
+        **kwargs
+    )
+
+    for _ in range(n_choose_k // (nqubits - 1) - 1):
+        circuit += layer.copy(deep=True)
+
+    ngates = len(circuit.gates_of_type(gates.GIVENS))
+
+    circuit.add(layer.copy(deep=True).queue[: (n_choose_k - 1) - ngates])
 
     return circuit
