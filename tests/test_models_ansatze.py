@@ -20,10 +20,10 @@ def test_brickwork_givens(backend, nqubits, weight, full_hwp, density_matrix):
 
     qubits = tuple(range(0, nqubits - 1, 2)) + tuple(range(1, nqubits - 1, 2))
     depth = n_choose_k // len(qubits)
+    half_filling = nqubits // 2
 
     target_circ = Circuit(nqubits, density_matrix=density_matrix)
     if not full_hwp:
-        half_filling = nqubits // 2
         _weight = half_filling if weight > half_filling else weight
         target_circ.add(gates.X(2 * qubit) for qubit in range(_weight))
         if weight > half_filling:
@@ -32,11 +32,12 @@ def test_brickwork_givens(backend, nqubits, weight, full_hwp, density_matrix):
             )
 
     _weight = weight if not full_hwp else 0
-    for _ in range(depth):
+    _odd = 0 if half_filling == nqubits / 2 else 1
+    for _ in range(depth + _odd):
         target_circ.add(
             gates.GIVENS(qubit, qubit + 1, 0.0)
             for qubit in qubits
-            if len(target_circ.queue) < n_choose_k + _weight - 1
+            if len(target_circ.queue) < (n_choose_k - 1) + _weight
         )
     target_circ.set_parameters(params)
     target = target_circ.unitary(backend)

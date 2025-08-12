@@ -1,4 +1,5 @@
 import random
+from copy import deepcopy
 from typing import Optional
 
 import numpy as np
@@ -54,11 +55,10 @@ def brickwork_givens(nqubits: int, weight: int, full_hwp: bool = False, **kwargs
     """
     n_choose_k = int(binom(nqubits, weight))
     _weight = weight if not full_hwp else 0
+    half_filling = nqubits // 2
 
     circuit = Circuit(nqubits, **kwargs)
-
     if not full_hwp:
-        half_filling = nqubits // 2
         if weight > half_filling:
             circuit.add(gates.X(2 * qubit) for qubit in range(half_filling))
             circuit.add(
@@ -67,19 +67,26 @@ def brickwork_givens(nqubits: int, weight: int, full_hwp: bool = False, **kwargs
         else:
             circuit.add(gates.X(2 * qubit) for qubit in range(weight))
 
-    layer = entangling_layer(
+    for _ in range(n_choose_k // (nqubits - 1) - 1):
+        circuit += entangling_layer(
+            nqubits,
+            architecture="shifted",
+            entangling_gate=gates.GIVENS,
+            closed_boundary=False,
+            **kwargs
+        )
+
+    ngates = len(circuit.gates_of_type(gates.GIVENS))
+    nmissing = (n_choose_k - 1) - ngates
+
+    queue = entangling_layer(
         nqubits,
         architecture="shifted",
         entangling_gate=gates.GIVENS,
         closed_boundary=False,
         **kwargs
-    )
+    ).queue
 
-    for _ in range(n_choose_k // (nqubits - 1) - 1):
-        circuit += layer.copy(deep=True)
-
-    ngates = len(circuit.gates_of_type(gates.GIVENS))
-
-    circuit.add(layer.copy(deep=True).queue[: (n_choose_k - 1) - ngates])
+    circuit.add(deepcopy(queue[elem % len(queue)]) for elem in range(nmissing))
 
     return circuit
