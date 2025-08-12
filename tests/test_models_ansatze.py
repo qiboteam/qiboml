@@ -9,8 +9,8 @@ from qiboml.models.ansatze import brickwork_givens
 
 @pytest.mark.parametrize("density_matrix", [False, True])
 @pytest.mark.parametrize("full_hwp", [False, True])
-@pytest.mark.parametrize("weight", [2])
-@pytest.mark.parametrize("nqubits", [4])
+@pytest.mark.parametrize("weight", [2, 3, 4])
+@pytest.mark.parametrize("nqubits", [6, 7])
 def test_brickwork_givens(backend, nqubits, weight, full_hwp, density_matrix):
     n_choose_k = int(binom(nqubits, weight))
 
