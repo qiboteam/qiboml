@@ -16,7 +16,7 @@ packages = [{ include = "qiboml", from = "src" }]
 [tool.poetry.dependencies]
 python = ">=3.10,<3.13"
 numpy = "^2.0.0"
-keras = { version = "^3.0.0", optional = true }
+keras = { version = "^3.11.0", optional = true }
 tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux' or sys_platform == 'darwin'", optional = true }
 # TODO: the marker is a temporary solution due to the lack of the tensorflow-io 0.32.0's wheels for Windows, this package is one of
 # the tensorflow requirements
@@ -39,7 +39,7 @@ nbsphinx = "^0.9.6"
 setuptools = "^78.1.1"
 ipykernel = "^6.29.5"
 torchmetrics = "^1.7.0"
-keras = { version = "^3.0.0" }
+keras = { version = "^3.11.0" }
 tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux' or sys_platform == 'darwin'"}
 torch = { version = "^2.7.0"}
 
@@ -59,7 +59,7 @@ pylint = "3.1.0"
 pytest-cov = "4.0.0"
 qibojit = "^0.1.7"
 matplotlib = "^3.7.0"
-keras = "^3.0.0"
+keras = "^3.11.0"
 tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux' or sys_platform == 'darwin'"}
 torch = { version = "^2.7.0"}
 qibolab = { git="https://github.com/qiboteam/qibolab", extras=["emulator"] }
