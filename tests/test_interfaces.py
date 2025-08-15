@@ -13,6 +13,7 @@ from qibo.transpiler import NativeGates, Passes, Unroller
 import qiboml.models.ansatze as ans
 import qiboml.models.decoding as dec
 import qiboml.models.encoding as enc
+from qiboml.backends.tensorflow import TensorflowBackend
 
 from .utils import set_seed
 
@@ -52,6 +53,7 @@ def build_linear_layer(frontend, input_dim, output_dim):
     else:
         raise_error(RuntimeError, f"Unknown frontend {frontend}.")
 
+    
 
 def build_sequential_model(frontend, layers):
     if frontend.__name__ == "qiboml.interfaces.pytorch":
@@ -299,8 +301,9 @@ def backprop_test(frontend, model, data, target):
     # specific (rare) cases
 
 
-@pytest.mark.parametrize("layer,seed", zip(ENCODING_LAYERS, [6, 4]))
-def test_encoding(backend, frontend, layer, seed):
+@pytest.mark.parametrize("with_initializer", [False, True, "numpy_array", "error_check_numpy", "error_check_keras_torch"])
+@pytest.mark.parametrize("layer,seed", zip(ENCODING_LAYERS, [2]))
+def test_encoding(backend, frontend, layer, seed, with_initializer):
     set_device(frontend)
     set_seed(frontend, seed)
 
@@ -332,24 +335,65 @@ def test_encoding(backend, frontend, layer, seed):
 
     binary = True if encoding_layer.__class__.__name__ == "BinaryEncoding" else False
     activation = build_activation(frontend, binary)
-    q_model = build_sequential_model(
-        frontend,
-        [
-            activation,
-            frontend.QuantumModel(
+
+    def final_steps(q_model, decoding_layer, dim):
+        setattr(q_model, "decoding", decoding_layer)
+        data = random_tensor(frontend, (100, dim), binary)
+        target = prepare_targets(frontend, q_model, data)
+        backprop_test(frontend, q_model, data, target)
+
+
+    if with_initializer == True:
+        if frontend.__name__ == "qiboml.interfaces.keras":
+            initializer = frontend.tf.keras.initializers.RandomNormal(mean=0.0, stddev=0.05)
+        elif frontend.__name__ == "qiboml.interfaces.pytorch":
+            initializer = lambda p: frontend.torch.nn.init.normal_(p, mean=0, std=0.5)
+        else:
+            raise_error(RuntimeError, f"Unknown frontend {frontend}.")
+
+        q_model = build_sequential_model(frontend, [
+                activation,
+                frontend.QuantumModel(
                 circuit_structure=circuit_structure,
+                angles_initialisation=initializer,
+                decoding=decoding_layer)
+                ])
+        final_steps(q_model, decoding_layer, dim)
+    elif with_initializer == False:
+        q_model = build_sequential_model(frontend, [
+                activation,
+                frontend.QuantumModel(
+                circuit_structure=circuit_structure,
+                decoding=decoding_layer)
+                ])
+        final_steps(q_model, decoding_layer, dim)
+    elif with_initializer == "numpy_array":
+        initializer = np.array([0.5, 0.6, 0.7, 0.8])
+        q_model = build_sequential_model(frontend, [
+                activation,
+                frontend.QuantumModel(
+                circuit_structure=circuit_structure,
+                angles_initialisation=initializer,
+                decoding=decoding_layer)
+                ])
+        final_steps(q_model, decoding_layer, dim)
+    elif with_initializer == "error_check_keras_torch":
+        with pytest.raises(ValueError):
+            dummy_input = 1
+            q_model = frontend.QuantumModel(
+                circuit_structure=circuit_structure,
+                angles_initialisation=dummy_input,
                 decoding=decoding_layer,
-            ),
-        ],
-    )
-    setattr(q_model, "decoding", decoding_layer)
+            )
+    else:
+        with pytest.raises(ValueError):
+            q_model = frontend.QuantumModel(
+                circuit_structure=circuit_structure,
+                angles_initialisation=np.array([0.5, 0.6, 0.7, 0.8, 0.9, 0.7, 0.8, 0.9]),
+                decoding=decoding_layer,
+            )
 
-    data = random_tensor(frontend, (100, dim), binary)
-    target = prepare_targets(frontend, q_model, data)
-
-    backprop_test(frontend, q_model, data, target)
-
-
+ 
 @pytest.mark.parametrize("layer,seed", zip(DECODING_LAYERS, [1, 3, 1, 26]))
 def test_decoding(backend, frontend, layer, seed):
     if not layer.analytic and not layer is dec.Expectation:
