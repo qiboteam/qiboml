@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional, Union
 
 from qibo import Circuit
-from qibo.backends import Backend, CliffordBackend, NumpyBackend, _check_backend
+from qibo.backends import Backend, CliffordBackend, _check_backend
 from qibo.config import log
 from qibo.hamiltonians import Hamiltonian
 from qibo.models import error_mitigation
@@ -56,12 +56,7 @@ class Mitigator:
         self._mitigation_map_initial_popt = self.backend.cast(defaults, dtype="double")
         self._mitigation_map_popt = self.backend.cast(defaults, dtype="double")
         self._mitigation_function = getattr(error_mitigation, self._mitigation_method)
-        # TODO: replace with Clifford backend once the Unitary bug is fixed
-        self._simulation_backend = (
-            CliffordBackend(engine="numpy")
-            if self._mitigation_method == "ICS"
-            else NumpyBackend()
-        )
+        self._simulation_backend = CliffordBackend(engine="numpy")
         self._reference_circuit = None
         self._reference_value = None
         self._training_data = None
