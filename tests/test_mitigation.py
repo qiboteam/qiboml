@@ -57,7 +57,8 @@ def train_vqe(frontend, backend, model, epochs):
 
 
 @pytest.mark.parametrize("backend", BACKENDS)
-def test_rtqem(frontend, backend):
+@pytest.mark.parametrize("mitigation_method", ["ICS", "CDR"])
+def test_rtqem(frontend, backend, mitigation_method):
     nqubits = 1
     nshots = 10000
     set_seed(frontend=frontend, seed=42)
@@ -89,7 +90,7 @@ def test_rtqem(frontend, backend):
 
     mitigation_config = {
         "threshold": 3e-1,
-        "method": "CDR",
+        "method": mitigation_method,
         "method_kwargs": {"n_training_samples": 50},
     }
 
@@ -130,7 +131,6 @@ def test_custom_map(frontend):
         "method": "CDR",
         "method_kwargs": {
             "n_training_samples": 70,
-            "model": lambda x, a, b, c: a * x**2 + b * x + c,
         },
     }
 
