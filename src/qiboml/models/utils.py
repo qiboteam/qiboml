@@ -75,6 +75,14 @@ class Mitigator:
         circuit: Circuit,
     ):
         """Construct reference error sensitive circuit."""
+        # Ensuring the observable backend is the simulation one
+        matrix = self._simulation_backend.to_numpy(observable.matrix)
+        observable = Hamiltonian(
+            nqubits=circuit.nqubits,
+            matrix=self._simulation_backend.cast(matrix),
+            backend=self._simulation_backend,
+        )
+
         self._reference_circuit = error_mitigation.error_sensitive_circuit(
             circuit=circuit, observable=observable
         )[0]
