@@ -6,7 +6,7 @@
 import string
 from dataclasses import dataclass
 from functools import reduce
-from typing import Callable, List, Optional, Union
+from typing import Callable, List, Optional, Tuple, Union
 
 import keras
 import numpy as np
@@ -37,23 +37,13 @@ class KerasCircuitTracer(CircuitTracer):
 
     @staticmethod
     def jacrev(f: Callable, argnums: Union[int, Tuple[int]]) -> Callable:
-        if isinstance(f, QuantumEncoding):
 
-            @tf.function
-            def jac_functional(x):
-                with tf.GradientTape() as tape:
-                    tape.watch(x)
-                    y = f(x)
-                return tape.jacobian(y, x)
-
-        else:
-
-            @tf.function
-            def jac_functional(x):
-                with tf.GradientTape() as tape:
-                    tape.watch(x)
-                    y = f(*x)
-                return tape.jacobian(y, x)
+        @tf.function
+        def jac_functional(x):
+            with tf.GradientTape() as tape:
+                tape.watch(x)
+                y = f(x)
+            return tape.jacobian(y, x)
 
         return jac_functional
 
@@ -62,22 +52,27 @@ class KerasCircuitTracer(CircuitTracer):
         # no available implementation of forward differentiation in tensorflow
         return KerasCircuitTracer.jacrev(f, argnums)
 
-    def identity(
-        self, dim: int, dtype, device: tf.python.eager.context._EagerDeviceContext
-    ) -> tf.Tensor:
-        with device:
+    def nonzero(self, array: tf.Tensor) -> tf.Tensor:
+        return self.engine.nonzero(array)[0]
+
+    def identity(self, dim: int, dtype, device: str) -> tf.Tensor:
+        with tf.device(device):
             eye = keras.ops.eye(dim, dtype=dtype)
         return eye
 
-    def zeros(
-        self,
-        shape: Union[int, Tuple[int]],
-        dtype,
-        device: tf.python.eager.context._EagerDeviceContext,
-    ) -> tf.Tensor:
-        with device:
+    def zeros(self, shape: Union[int, Tuple[int]], dtype, device: str) -> tf.Tensor:
+        with tf.device(device):
             z = keras.ops.zeros(shape, dtype=dtype)
         return z
+
+    def fill_jacobian(
+        self,
+        jacobian: tf.Tensor,
+        row_span: Tuple[int, int],
+        col_span: Tuple[int, int],
+        values: tf.Tensor,
+    ) -> tf.Tensor:
+        return keras.ops.slice_update(jacobian, (row_span[0], col_span[0]), values)
 
     def requires_gradient(self, x: tf.Tensor) -> bool:
         return hasattr(x, "op") and len(x.op.inputs) > 0
@@ -259,7 +254,7 @@ class QuantumModelCustomGradient:
         def jacobian_wrt_angles(angles):
             angles = self.backend.cast(angles, dtype=self.backend.np.float64)
             d_angles = self.differentiation.evaluate(
-                params,
+                angles,
                 wrt_inputs=self.wrt_inputs,
             )
             d_angles = self.backend.to_numpy(

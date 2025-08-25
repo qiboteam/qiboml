@@ -105,7 +105,7 @@ class PhaseEncoding(QuantumEncoding):
             (Circuit): the constructed ``qibo.Circuit``.
         """
         circuit = self.circuit
-        x = x.ravel()
+        # x = x.ravel()
         for i, q in enumerate(self.qubits):
             this_gate_params = {"trainable": False}
             [this_gate_params.update({p: x[i]}) for p in self.gate_encoding_params]

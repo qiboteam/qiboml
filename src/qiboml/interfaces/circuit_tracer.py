@@ -40,8 +40,13 @@ class CircuitTracer(ABC):
 
         def build(x):
             is_encoding = isinstance(_tmp_circuit, QuantumEncoding)
-            circuit = _tmp_circuit(x) if is_encoding else _tmp_circuit(*x)
-            return self.engine.vstack(
+            if is_encoding:
+                circuit = _tmp_circuit(x)
+            else:
+                # this is needed for symbolic execution with tf
+                x = [x[i] for i in range(len(x))]
+                circuit = _tmp_circuit(*x)
+            out = self.engine.stack(
                 [
                     p
                     for pars in circuit.get_parameters(
@@ -50,6 +55,7 @@ class CircuitTracer(ABC):
                     for p in pars
                 ]
             )
+            return self.engine.reshape(out, (-1, 1))
 
         jac = self.jacfwd if self.derivation_mode == "forward" else self.jacrev
         return jac(build, argnums=0)
@@ -68,6 +74,9 @@ class CircuitTracer(ABC):
                 )  # jac(build, argnums=0)
         return jacobians
 
+    def nonzero(self, array: ndarray) -> ndarray:
+        return self.engine.nonzero(array)
+
     def trace(self, f: Callable, params: ndarray):
         # we always assume the input is a 1-dim array, even for encodings
         # thus the jacobian is always a matrix
@@ -76,7 +85,7 @@ class CircuitTracer(ABC):
         )
         par_map = {}
         for i, row in enumerate(jac):
-            for j in self.engine.nonzero(row):
+            for j in self.nonzero(row):
                 j = int(j)
                 if j in par_map:
                     par_map[j] += (i,)
@@ -122,7 +131,7 @@ class CircuitTracer(ABC):
                 device=self._get_device(params),
             )
             # all the circuit parameters are considered independent
-            par_map = {i: (i,) for i in enumerate(params)}
+            par_map = {i: (i,) for i in range(len(params))}
             return jacobian, par_map, circuit
         return circuit
 
@@ -147,6 +156,16 @@ class CircuitTracer(ABC):
     @abstractmethod
     def zeros(self, shape: Union[int, Tuple[int]], dtype, device) -> ndarray:
         pass
+
+    def fill_jacobian(
+        self,
+        jacobian: ndarray,
+        row_span: Tuple[int, int],
+        col_span: Tuple[int, int],
+        values: ndarray,
+    ) -> ndarray:
+        jacobian[row_span[0] : row_span[1], col_span[0] : col_span[1]] = values
+        return jacobian
 
     def __call__(
         self, params: ndarray, x: Optional[ndarray] = None
@@ -217,7 +236,9 @@ class CircuitTracer(ABC):
         for j in jacobians:
             shape = np.array(j.shape)
             interval = tuple(zip(position, shape + position))
-            J[interval[0][0] : interval[0][1], interval[1][0] : interval[1][1]] = j
+            J = self.fill_jacobian(J, interval[0], interval[1], j)
+            # direct assignment works with torch/numpy only
+            # J[interval[0][0] : interval[0][1], interval[1][0] : interval[1][1]] = j
             position += shape
 
         jacobians_wrt_inputs = (
