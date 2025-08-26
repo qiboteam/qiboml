@@ -83,8 +83,7 @@ class QuantumModel(torch.nn.Module):
         params = utils.get_params_from_circuit_structure(
             self.circuit_structure,
         )
-        # params = torch.as_tensor(self.backend.to_numpy(x=params)).ravel()
-        params = torch.as_tensor(params).ravel()
+        params = torch.as_tensor(self.backend.to_numpy(x=params)).ravel()
         params.requires_grad = True
         self.circuit_parameters = torch.nn.Parameter(params)
 
@@ -201,6 +200,7 @@ class QuantumModelAutoGrad(torch.autograd.Function):
         *parameters: List[torch.nn.Parameter],
     ):
         parameters = torch.stack(parameters)
+
         # it would be maybe better to perform the tracing in the backward only
         # this way the jacobians are calculated only if the backward is called
         circuit, jacobian_wrt_inputs, jacobian, input_to_gate_map = circuit_tracer(
@@ -224,8 +224,6 @@ class QuantumModelAutoGrad(torch.autograd.Function):
         circuit = differentiation.circuit
         # circuit.set_parameters(params)
 
-        wrt_inputs = jacobian_wrt_inputs is not None
-
         # Save the context
         ctx.save_for_backward(jacobian_wrt_inputs, jacobian)
         ctx.circuit = circuit
@@ -233,7 +231,7 @@ class QuantumModelAutoGrad(torch.autograd.Function):
         ctx.differentiation = differentiation
         ctx.input_to_gate_map = input_to_gate_map
         ctx.dtype = dtype
-        ctx.wrt_inputs = wrt_inputs
+        ctx.wrt_inputs = jacobian_wrt_inputs is not None
 
         x_clone = decoding(circuit)
         x_clone = torch.as_tensor(

@@ -243,7 +243,7 @@ class CircuitTracer(ABC):
 
         jacobians_wrt_inputs = (
             None
-            if jacobians_wrt_inputs[0] is None
+            if len(jacobians_wrt_inputs) == 0 or jacobians_wrt_inputs[0] is None
             else self.engine.vstack(jacobians_wrt_inputs)
         )
         if len(input_to_gate_map) == 0:

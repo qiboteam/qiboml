@@ -75,7 +75,25 @@ class KerasCircuitTracer(CircuitTracer):
         return keras.ops.slice_update(jacobian, (row_span[0], col_span[0]), values)
 
     def requires_gradient(self, x: tf.Tensor) -> bool:
-        return hasattr(x, "op") and len(x.op.inputs) > 0
+        for circ in self.circuit_structure:
+            if isinstance(circ, QuantumEncoding):
+                """
+                with tf.GradientTape() as tape:
+                    y = circ(x)
+                    y = tf.stack([
+                        p
+                        for pars in y.get_parameters(
+                                include_not_trainable=True
+                        )
+                        for p in pars
+                    ])
+                grad = tape.gradients(y, x)
+                """
+                grad = self.jacobian_functionals[id(circ)](x)
+                if grad is not None:
+                    return True
+        # return hasattr(x, "op") and len(x.op.inputs) > 0
+        return False
 
 
 @dataclass(eq=False)
@@ -107,8 +125,8 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
 
         params = utils.get_params_from_circuit_structure(self.circuit_structure)
         params = keras.ops.cast(
-            #    self.backend.to_numpy(params),
-            params,
+            self.backend.to_numpy(params),
+            # params,
             "float64",
         )  # pylint: disable=no-member
         self.circuit_parameters = self.add_weight(
@@ -216,6 +234,7 @@ class QuantumModelCustomGradient:
     @tf.custom_gradient
     def evaluate(self, x, params):
         x_is_not_None = x.shape[0] != 0
+
         # check whether we have to derive wrt inputs
         if x_is_not_None and tf.is_symbolic_tensor(x):
 

@@ -593,10 +593,16 @@ def test_qibolab(frontend):
 
 def test_equivariant(backend, frontend):
 
+    engine = (
+        frontend.torch
+        if frontend.__name__ == "qiboml.interfaces.pytorch"
+        else frontend.keras.ops
+    )
+
     set_seed(frontend, 42)
 
     # this defines 3 independent parameters
-    def custom_circuit(engine, th, phi, lam):
+    def custom_circuit(th, phi, lam):
         c = Circuit(2)
         delta = 2 * engine.cos(phi) + lam**2
         gamma = lam * engine.exp(th / 2)
