@@ -75,20 +75,24 @@ class CircuitTracer(ABC):
     def nonzero(self, array: ndarray) -> ndarray:
         return self.engine.nonzero(array)
 
-    def trace(self, f: Callable, params: ndarray):
-        # we always assume the input is a 1-dim array, even for encodings
-        # thus the jacobian is always a matrix
-        jac = self.engine.reshape(
-            self.jacobian_functionals[id(f)](params), (-1, len(params))
-        )
+    def _build_parameters_map(self, jacobian):
         par_map = {}
-        for i, row in enumerate(jac):
+        for i, row in enumerate(jacobian):
             for j in self.nonzero(row):
                 j = int(j)
                 if j in par_map:
                     par_map[j] += (i,)
                 else:
                     par_map[j] = (i,)
+        return par_map
+
+    def trace(self, f: Callable, params: ndarray):
+        # we always assume the input is a 1-dim array, even for encodings
+        # thus the jacobian is always a matrix
+        jac = self.engine.reshape(
+            self.jacobian_functionals[id(f)](params), (-1, params.shape[0])
+        )
+        par_map = self._build_parameters_map(jac)
         return jac, par_map
 
     @cached_property
@@ -124,12 +128,12 @@ class CircuitTracer(ABC):
         circuit.set_parameters(params)
         if trace:
             jacobian = self.identity(
-                len(params),
+                params.shape[0],
                 dtype=self._get_dtype(params),
                 device=self._get_device(params),
             )
             # all the circuit parameters are considered independent
-            par_map = {i: (i,) for i in range(len(params))}
+            par_map = {i: (i,) for i in range(params.shape[0])}
             return jacobian, par_map, circuit
         return circuit
 

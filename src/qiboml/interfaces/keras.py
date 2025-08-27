@@ -65,6 +65,12 @@ class KerasCircuitTracer(CircuitTracer):
             z = keras.ops.zeros(shape, dtype=dtype)
         return z
 
+    def _build_parameters_map(self, jacobian):
+        if tf.is_symbolic_tensor(jacobian):
+            # just a placeholder map to continue symbolic computation
+            return {0: (0,)}
+        return super()._build_parameters_map(jacobian)
+
     def fill_jacobian(
         self,
         jacobian: tf.Tensor,
@@ -227,7 +233,6 @@ class QuantumModelCustomGradient:
     decoding: QuantumDecoding
     differentiation: Differentiation
     circuit_tracer: CircuitTracer
-    # wrt_inputs: bool = False
 
     @property
     def backend(self):
@@ -258,7 +263,6 @@ class QuantumModelCustomGradient:
                 for par in params
             ]
         )
-        angles = keras.ops.convert_to_numpy(angles)
 
         def forward(angles):
             angles = self.backend.cast(angles, dtype=self.backend.np.float64)
@@ -291,8 +295,13 @@ class QuantumModelCustomGradient:
             d_angles = tf.numpy_function(
                 func=jacobian_wrt_angles, inp=[angles], Tout=[tf.float64]
             )
-
+            # in symbolic execution d_angles is returned as a list containing just one
+            # tensor for some reason... thus the added vstack
+            d_angles = keras.ops.vstack(d_angles)
             out_shape = self.differentiation.decoding.output_shape
+            if tf.is_symbolic_tensor(d_angles):
+                # breakpoint()
+                d_angles = keras.ops.reshape(d_angles, (jacobian.shape[0],) + out_shape)
             # contraction to combine jacobians wrt inputs/parameters with those
             # wrt the circuit angles
             contraction = ((0, 1), (0,) + tuple(range(2, len(out_shape) + 2)))
@@ -324,14 +333,21 @@ class QuantumModelCustomGradient:
                 # discard the elements corresponding to encoding gates
                 # to obtain only the part wrt the model's parameters
                 indices_to_discard = reduce(tuple.__add__, input_to_gate_map.values())
+                if tf.is_symbolic_tensor(d_angles):
+                    # breakpoint()
+                    # just some placeholder rows to continue symbolic computation
+                    rows = [
+                        d_angles[i]
+                        for i in range(jacobian.shape[0] - len(indices_to_discard))
+                    ]
+                else:
+                    rows = [
+                        row
+                        for i, row in enumerate(d_angles)
+                        if i not in indices_to_discard
+                    ]
                 d_angles = keras.ops.reshape(
-                    keras.ops.vstack(
-                        [
-                            row
-                            for i, row in enumerate(d_angles)
-                            if i not in indices_to_discard
-                        ]
-                    ),
+                    keras.ops.vstack(rows),
                     (-1, *out_shape),
                 )
                 # combine the jacobians wrt inputs with those

@@ -270,9 +270,10 @@ def get_parameters(frontend, model, return_array=False):
 
 def set_device(frontend):
     if frontend.__name__ == "qiboml.interfaces.pytorch":
-        frontend.torch.set_default_device(
-            "cuda:0" if frontend.torch.cuda.is_available() else "cpu"
-        )
+        # frontend.torch.set_default_device(
+        #    "cuda:0" if frontend.torch.cuda.is_available() else "cpu"
+        # )
+        pass
     elif frontend.__name__ == "qiboml.interfaces.keras":
         # tf should automatically use GPU by default when available
         pass
