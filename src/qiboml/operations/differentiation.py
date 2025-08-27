@@ -8,7 +8,6 @@ import numpy as np
 from qibo import Circuit
 from qibo.backends import Backend
 from qibo.config import raise_error
-from tensorflow import no_op
 
 from qiboml import ndarray
 from qiboml.backends.jax import JaxBackend
