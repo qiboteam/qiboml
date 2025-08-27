@@ -227,9 +227,9 @@ class Jax(Differentiation):
         self.decoding.set_backend(self._jax)
         # calculate the jacobian
         jac_f = self._jacobian_with_inputs if wrt_inputs else self._jacobian
-        jacobian = jac_f(
+        jacobian = jac_f(  # pylint: disable=not-callable
             self.circuit, self.decoding, *params
-        )  # pylint: disable=not-callable
+        )
         # reset the original backend
         self.decoding.set_backend(backend)
         # reset the original parameters
