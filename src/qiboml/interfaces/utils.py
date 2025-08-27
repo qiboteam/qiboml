@@ -53,7 +53,7 @@ def get_default_differentiation(decoding: QuantumDecoding, instructions: Dict):
     return differentiation
 
 
-def draw_circuit(circuit_structure, backend, plt_drawing=True, **plt_kwargs):
+def draw_circuit(model, plt_drawing=True, **plt_kwargs):
     """
     Draw the full circuit structure.
 
@@ -63,7 +63,8 @@ def draw_circuit(circuit_structure, backend, plt_drawing=True, **plt_kwargs):
         plt_kwargs (dict): extra arguments which can be set to customize the
             `qibo.ui.plot_circuit` function.
     """
-
+    circuit_structure = model.circuit_structure
+    backend = model.backend
     encoding_layer = next(
         (circ for circ in circuit_structure if isinstance(circ, QuantumEncoding)),
         None,
@@ -77,13 +78,9 @@ def draw_circuit(circuit_structure, backend, plt_drawing=True, **plt_kwargs):
     for circ in circuit_structure:
         if isinstance(circ, Circuit):
             dummy_params.extend(len(circ.get_parameters()) * [0.0])
-        elif not isinstance(circ, QuantumEncoding) and isinstance(
-            circ, Callable
-        ):  # pragma: no cover
-            dummy_params.extend((len(signature(circ).parameters) - 1) * [0.0])
-    circuit = circuit_from_structure(
-        circuit_structure, x=dummy_data, params=dummy_params, backend=backend
-    )
+        elif not isinstance(circ, QuantumEncoding) and isinstance(circ, Callable):
+            dummy_params.extend((len(signature(circ).parameters)) * [0.0])
+    circuit = model.circuit_tracer.build_circuit(params=dummy_params, x=dummy_data)
     if plt_drawing:
         _, fig = plot_circuit(circuit, **plt_kwargs)
         return fig
