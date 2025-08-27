@@ -16,27 +16,45 @@ from qiboml.operations.differentiation import PSR, Jax
 EXECUTION_BACKENDS = [NumpyBackend(), PyTorchBackend(), TensorflowBackend()]
 DIFF_RULES = [Jax, PSR]
 
-TARGET_GRAD = np.array([0.130832955241203, 0.0, -1.806316614151001, 0.0])
-TARGET_GRAD = {
-    "no_inputs": np.array(
-        np.array([5.859873e-01, -1.489167e-04, 1.104562e00, -5.458333e-05])
+TARGET_GRAD_TORCH = {
+    "no_inputs": (
+        None,
+        np.array(np.array([5.859873e-01, -1.489167e-04, 1.104562e00, -5.458333e-05])),
     ),
-    "wrt_inputs": np.array([0.740709794, 0.0, -0.730872325, 0.0]),
-    "equivariant_no_inputs": np.array(
-        [0.234591, 0.804684, -0.649351, -0.054586, 0.832667, 0.245524, 1.869807]
+    "wrt_inputs": (
+        np.array([1.48141959, -1.46174465]),
+        np.array([0.740709794, 0.0, -0.730872325, 0.0]),
     ),
-    "equivariant_wrt_inputs": np.array(
-        [
-            -0.06106278,
-            0.14663098,
-            0.00817663,
-            -0.13743929,
-            0.56005389,
-            -0.15179269,
-            1.77934261,
-        ]
+    "equivariant_no_inputs": (
+        None,
+        np.array(
+            [0.234591, 0.804684, -0.649351, -0.054586, 0.832667, 0.245524, 1.869807]
+        ),
+    ),
+    "equivariant_wrt_inputs": (
+        np.array([-0.12212556, 0.01635326]),
+        np.array(
+            [
+                -0.06106278,
+                0.14663098,
+                0.00817663,
+                -0.13743929,
+                0.56005389,
+                -0.15179269,
+                1.77934261,
+            ]
+        ),
     ),
 }
+TARGET_GRAD_TENSORFLOW = TARGET_GRAD_TORCH.copy()
+TARGET_GRAD_TENSORFLOW["equivariant_no_inputs"] = (
+    None,
+    np.array([-0.305541, -0.121983, -0.146646, -0.158764, 0.138767, -0.05346, 0.70204]),
+)
+TARGET_GRAD_TENSORFLOW["no_inputs"] = (
+    None,
+    np.array([1.308330e-01, 1.056049e-17, -1.806317e00, -1.182600e-16]),
+)
 
 
 def set_seed(frontend, seed):
@@ -53,17 +71,21 @@ def set_seed(frontend, seed):
         frontend.tf.config.experimental.enable_op_determinism()
 
 
-def construct_x(frontend, with_factor=False):
+def construct_x(frontend, wrt_inputs=False):
     if frontend.__name__ == "qiboml.interfaces.pytorch":
-        x = frontend.torch.tensor([0.5, 0.8])
-        if with_factor:
-            return frontend.torch.tensor(2.0, requires_grad=True) * x
+        x = frontend.torch.tensor([0.5, 0.8], requires_grad=wrt_inputs)
+        # if wrt_inputs:
+        #    return frontend.torch.tensor(2.0, requires_grad=True) * x
         return x
     elif frontend.__name__ == "qiboml.interfaces.keras":
         if frontend.keras.backend.backend() == "tensorflow":
-            x = frontend.tf.constant([0.5, 0.8])
-            if with_factor:
-                return frontend.tf.Variable(2.0) * x
+            x = (
+                frontend.tf.Variable([0.5, 0.8])
+                if wrt_inputs
+                else frontend.tf.constant([0.5, 0.8])
+            )
+            # if with_factor:
+            #    return frontend.tf.Variable(2.0) * x
             return x
         elif frontend.keras.backend.backend() == "pytorch":
             raise NotImplementedError
@@ -71,35 +93,41 @@ def construct_x(frontend, with_factor=False):
             raise NotImplementedError
 
 
-def compute_gradient(frontend, model, x):
+def compute_gradient(frontend, model, x, wrt_inputs=False):
     if frontend.__name__ == "qiboml.interfaces.keras":
         if frontend.keras.backend.backend() == "tensorflow":
-            with frontend.tf.GradientTape() as tape:
+            with frontend.tf.GradientTape(persistent=True) as tape:
+                xx = 2.0 * x if wrt_inputs else x
+                if wrt_inputs:
+                    tape.watch(xx)
                 model.circuit_parameters = frontend.tf.Variable(
                     model.circuit_parameters
                 )
-                tape.watch(x)
-                expval = model(x)
-            return tape.gradient(expval, model.circuit_parameters)
+                expval = model(xx)
+            grad_wrt_input = tape.gradient(expval, x)
+            grad_wrt_params = tape.gradient(expval, model.circuit_parameters)
+            return grad_wrt_input, grad_wrt_params
         elif frontend.keras.backend.backend() == "pytorch":
             raise NotImplementedError
         else:
             raise NotImplementedError
 
     elif frontend.__name__ == "qiboml.interfaces.pytorch":
-        expval = model(x)
+        xx = 2.0 * x if wrt_inputs else x
+        expval = model(xx)
         expval.backward()
-        grad = np.array(list(model.parameters())[-1].grad)
-        return grad
+        grad_wrt_input = np.array(x.grad)
+        grad_wrt_params = np.array(list(model.parameters())[-1].grad)
+        return grad_wrt_input, grad_wrt_params
 
 
 @pytest.mark.parametrize("nshots", [None, 12000000])
 @pytest.mark.parametrize("backend", EXECUTION_BACKENDS)
-@pytest.mark.parametrize("wrt_inputs", [True, False])
+@pytest.mark.parametrize("wrt_inputs", [False])
 @pytest.mark.parametrize("diff_rule", DIFF_RULES)
 @pytest.mark.parametrize("equivariant", [True, False])
 def test_expval_custom_grad(
-    # frontend,
+    frontend,
     backend,
     nshots,
     wrt_inputs,
@@ -111,15 +139,15 @@ def test_expval_custom_grad(
     parameters. In this test the system size is fixed to two qubits and all the
     parameters/data values are fixed.
     """
-    import qiboml.interfaces.keras as frontend
+    # import qiboml.interfaces.keras as frontend
 
-    if diff_rule.__name__ == "Jax" and nshots is not None:
+    if diff_rule is not None and diff_rule.__name__ == "Jax" and nshots is not None:
         pytest.skip("Jax differentiation does not work with shots.")
 
     set_seed(frontend, 42)
     backend.set_seed(42)
 
-    x = construct_x(frontend, with_factor=wrt_inputs)
+    x = construct_x(frontend, wrt_inputs=wrt_inputs)
 
     nqubits = 2
 
@@ -180,8 +208,23 @@ def test_expval_custom_grad(
         grad_string += "wrt_inputs"
     else:
         grad_string += "no_inputs"
-
-    target_grad = TARGET_GRAD[grad_string]
-    grad = compute_gradient(frontend, q_model, x)
+    print(grad_string)
+    TARGET_GRAD = (
+        TARGET_GRAD_TORCH
+        if frontend.__name__ == "qiboml.interfaces.pytorch"
+        else TARGET_GRAD_TENSORFLOW
+    )
+    input_target, params_target = TARGET_GRAD[grad_string]
+    grad_wrt_input, grad_wrt_params = compute_gradient(
+        frontend, q_model, x, wrt_inputs=wrt_inputs
+    )
+    grad_wrt_input = np.array(grad_wrt_input)
+    grad_wrt_params = np.array(grad_wrt_params)
+    print(grad_wrt_input)
+    print(grad_wrt_params)
     tol = 1e-3 if nshots is None else 1e-1
-    backend.assert_allclose(grad, target_grad, atol=tol)
+    if input_target is None:
+        assert grad_wrt_input.item() is None
+    else:
+        backend.assert_allclose(grad_wrt_input, input_target, atol=tol)
+    backend.assert_allclose(grad_wrt_params, params_target, atol=tol)

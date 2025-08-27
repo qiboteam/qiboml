@@ -75,10 +75,11 @@ class KerasCircuitTracer(CircuitTracer):
         return keras.ops.slice_update(jacobian, (row_span[0], col_span[0]), values)
 
     def requires_gradient(self, x: tf.Tensor) -> bool:
+        """
         for circ in self.circuit_structure:
             if isinstance(circ, QuantumEncoding):
-                """
                 with tf.GradientTape() as tape:
+                    tape.watch(x)
                     y = circ(x)
                     y = tf.stack([
                         p
@@ -87,13 +88,15 @@ class KerasCircuitTracer(CircuitTracer):
                         )
                         for p in pars
                     ])
-                grad = tape.gradients(y, x)
-                """
-                grad = self.jacobian_functionals[id(circ)](x)
+                grad = tape.gradient(y, x)
+
+                #grad = self.jacobian_functionals[id(circ)](x)
                 if grad is not None:
                     return True
+                break
+        """
         # return hasattr(x, "op") and len(x.op.inputs) > 0
-        return False
+        return True
 
 
 @dataclass(eq=False)
@@ -225,7 +228,7 @@ class QuantumModelCustomGradient:
     decoding: QuantumDecoding
     differentiation: Differentiation
     circuit_tracer: CircuitTracer
-    wrt_inputs: bool = False
+    # wrt_inputs: bool = False
 
     @property
     def backend(self):
@@ -233,6 +236,7 @@ class QuantumModelCustomGradient:
 
     @tf.custom_gradient
     def evaluate(self, x, params):
+        """
         x_is_not_None = x.shape[0] != 0
 
         # check whether we have to derive wrt inputs
@@ -242,10 +246,12 @@ class QuantumModelCustomGradient:
                 self.circuit_tracer.is_encoding_differentiable
                 and self.circuit_tracer.requires_gradient(x)
             )
+        """
 
         circuit, jacobian_wrt_inputs, jacobian, input_to_gate_map = self.circuit_tracer(
             params, x=x
         )
+        wrt_inputs = jacobian_wrt_inputs is not None
         angles = keras.ops.stack(
             [
                 par
@@ -274,7 +280,7 @@ class QuantumModelCustomGradient:
             angles = self.backend.cast(angles, dtype=self.backend.np.float64)
             d_angles = self.differentiation.evaluate(
                 angles,
-                wrt_inputs=self.wrt_inputs,
+                wrt_inputs=wrt_inputs,
             )
             d_angles = self.backend.to_numpy(
                 self.backend.cast(d_angles, dtype=self.backend.np.float64)
@@ -296,9 +302,15 @@ class QuantumModelCustomGradient:
                 for indices in contraction
             )
             # contraction to combine with the gradients coming from outside
+            """
             indices = tuple(range(len(dy.shape)))
             lhs = "".join(string.ascii_letters[i] for i in indices)
             rhs = string.ascii_letters[len(indices)] + lhs
+            """
+            rhs = "".join(
+                string.ascii_letters[i] for i in tuple(range(1, len(dy.shape) + 1))
+            )
+            lhs = string.ascii_letters[0] + rhs
 
             if jacobian_wrt_inputs is not None:
                 # extract the rows corresponding to encoding gates
@@ -330,10 +342,11 @@ class QuantumModelCustomGradient:
                     jacobian_wrt_inputs,
                     d_encoding_angles,
                 )
-                tmp = lhs + "".join(
-                    string.ascii_letters[i] for i in range(len(indices), len(d_x.shape))
-                )
-                d_x = keras.ops.einsum(f"{lhs},{tmp}", d_x, dy)
+                # tmp = lhs + "".join(
+                #    string.ascii_letters[i] for i in range(len(indices), len(d_x.shape))
+                # )
+                # d_x = keras.ops.einsum(f"{lhs},{tmp}", d_x, dy)
+                d_x = keras.ops.einsum(f"{lhs},{rhs}", d_x, dy)
             else:
                 d_x = None
 
@@ -345,7 +358,7 @@ class QuantumModelCustomGradient:
             """
             d_params = keras.ops.einsum(contraction, jacobian, d_angles)
             # d_params = keras.ops.reshape(d_params, tuple(params.shape) + dy.shape)
-            d_params = keras.ops.einsum(f"{lhs},{rhs}", dy, d_params)
+            d_params = keras.ops.einsum(f"{lhs},{rhs}", d_params, dy)
             return d_x, d_params
 
         return y, grad

@@ -69,9 +69,7 @@ class CircuitTracer(ABC):
             if isinstance(circ, Circuit):
                 jacobians[id(circ)] = self.identity
             else:
-                jacobians[id(circ)] = self._compute_jacobian_functional(
-                    circ
-                )  # jac(build, argnums=0)
+                jacobians[id(circ)] = self._compute_jacobian_functional(circ)
         return jacobians
 
     def nonzero(self, array: ndarray) -> ndarray:
