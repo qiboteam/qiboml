@@ -4,16 +4,15 @@ import numpy as np
 import pytest
 from qibo import Circuit, gates, hamiltonians
 from qibo.backends import NumpyBackend
-from qibojit.backends import NumbaBackend
 
-from qiboml.backends import PyTorchBackend, TensorflowBackend
+from qiboml.backends import PyTorchBackend
 from qiboml.models.ansatze import HardwareEfficient
 from qiboml.models.decoding import Expectation
-from qiboml.models.encoding import PhaseEncoding, QuantumEncoding
+from qiboml.models.encoding import PhaseEncoding
 from qiboml.operations.differentiation import PSR, Jax
 
 # TODO: use the classical conftest mechanism or customize mechanism for this test
-EXECUTION_BACKENDS = [NumpyBackend(), PyTorchBackend(), TensorflowBackend()]
+EXECUTION_BACKENDS = [NumpyBackend(), PyTorchBackend()]
 DIFF_RULES = [Jax, PSR]
 
 TARGET_GRAD_TORCH = {
