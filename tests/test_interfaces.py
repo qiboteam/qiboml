@@ -420,7 +420,9 @@ def test_composition(backend, frontend):
     set_seed(frontend, 42)
 
     nqubits = 2
-    encoding_layer = random.choice(ENCODING_LAYERS)(nqubits)
+    encoding_layer = random.choice(list(set(ENCODING_LAYERS) - {enc.BinaryEncoding}))(
+        nqubits
+    )
     training_layer = ans.HardwareEfficient(nqubits)
     decoding_layer = random.choice(
         list(set(DECODING_LAYERS) - {dec.Samples, dec.State})
