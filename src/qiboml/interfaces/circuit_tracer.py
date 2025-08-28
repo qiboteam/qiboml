@@ -118,6 +118,8 @@ class CircuitTracer(ABC):
         circuit = encoding(x)
         if trace:
             if self.is_encoding_differentiable and self.requires_gradient(x):
+                if len(x.shape) > 1:
+                    x = x[0]
                 return *self.trace(encoding, x), circuit
             return None, None, circuit
         return circuit

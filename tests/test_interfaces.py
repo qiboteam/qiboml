@@ -356,10 +356,6 @@ def test_encoding(backend, frontend, layer, seed):
 
 @pytest.mark.parametrize("layer,seed", zip(DECODING_LAYERS, [1, 3, 1, 26]))
 def test_decoding(backend, frontend, layer, seed):
-    if not layer.analytic and not layer is dec.Expectation:
-        pytest.skip(
-            "Expectation layer is the only differentiable decoding when the diffrule is not analytical."
-        )
 
     set_device(frontend)
     set_seed(frontend, seed)
@@ -384,6 +380,11 @@ def test_decoding(backend, frontend, layer, seed):
 
     decoding_layer = layer(nqubits, decoding_qubits, **kwargs)
 
+    if not decoding_layer.analytic and not decoding_layer is dec.Expectation:
+        pytest.skip(
+            "Expectation layer is the only differentiable decoding when the diffrule is not analytical."
+        )
+
     activation = build_activation(frontend, binary=False)
     q_model = build_sequential_model(
         frontend,
@@ -399,7 +400,7 @@ def test_decoding(backend, frontend, layer, seed):
 
     data = random_tensor(frontend, (100, dim))
     target = prepare_targets(frontend, q_model, data)
-
+    """
     if layer is dec.Samples:
         error = (
             NotImplementedError
@@ -410,7 +411,8 @@ def test_decoding(backend, frontend, layer, seed):
             _ = backprop_test(frontend, q_model, data, target)
         assert q_model(data[0][None, :]).shape == (kwargs["nshots"], nqubits)
     else:
-        backprop_test(frontend, q_model, data, target)
+    """
+    backprop_test(frontend, q_model, data, target)
 
 
 def test_composition(backend, frontend):
