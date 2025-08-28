@@ -11,7 +11,7 @@ from qibo.config import raise_error
 
 from qiboml import ndarray
 from qiboml.backends.jax import JaxBackend
-from qiboml.models.decoding import QuantumDecoding
+from qiboml.models.decoding import Expectation, QuantumDecoding
 from qiboml.models.encoding import QuantumEncoding
 
 
@@ -148,12 +148,14 @@ class Adjoint(Differentiation):
         Returns:
             (ndarray): the calculated gradients.
         """
-
+        assert isinstance(
+            self.decoding, Expectation
+        ), "Adjoint diff supported only for Expectation."
         gradients = []
         lam = self.backend.execute_circuit(self.circuit).state()
         nqubits = self.circuit.nqubits
         phi = lam
-        lam = self.decoding.observable @ lam
+        lam = self.decoding.observable @ lam  # pylint: disable=E1101
         gate_list = (
             self.circuit.trainable_gates
             if not wrt_inputs
@@ -164,7 +166,9 @@ class Adjoint(Differentiation):
             if gate in gate_list:
                 mu = phi
                 mu = self.backend.apply_gate(gate.gradient(), mu, nqubits=nqubits)
-                gradients.append(2 * np.vdot(lam, mu).real)
+                gradients.append(
+                    2 * self.backend.np.real(self.backend.np.vdot(lam, mu))
+                )
             lam = self.backend.apply_gate(gate.dagger(), lam, nqubits=nqubits)
         return self.backend.cast(gradients[::-1], dtype=parameters.dtype).reshape(
             -1, *self.decoding.output_shape
