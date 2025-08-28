@@ -101,7 +101,8 @@ class KerasCircuitTracer(CircuitTracer):
                     return True
                 break
         """
-        # return hasattr(x, "op") and len(x.op.inputs) > 0
+        if tf.is_symbolic_tensor(x):
+            return hasattr(x, "op") and len(x.op.inputs) > 0
         return True
 
 
@@ -251,7 +252,8 @@ class QuantumModelCustomGradient:
                 and self.circuit_tracer.requires_gradient(x)
             )
         """
-
+        if x.shape[0] == 0:
+            x = None
         circuit, jacobian_wrt_inputs, jacobian, input_to_gate_map = self.circuit_tracer(
             params, x=x
         )
@@ -299,9 +301,6 @@ class QuantumModelCustomGradient:
             # tensor for some reason... thus the added vstack
             d_angles = keras.ops.vstack(d_angles)
             out_shape = self.differentiation.decoding.output_shape
-            if tf.is_symbolic_tensor(d_angles):
-                # breakpoint()
-                d_angles = keras.ops.reshape(d_angles, (jacobian.shape[0],) + out_shape)
             # contraction to combine jacobians wrt inputs/parameters with those
             # wrt the circuit angles
             contraction = ((0, 1), (0,) + tuple(range(2, len(out_shape) + 2)))
@@ -321,6 +320,13 @@ class QuantumModelCustomGradient:
             lhs = string.ascii_letters[0] + rhs
 
             if jacobian_wrt_inputs is not None:
+                if tf.is_symbolic_tensor(d_angles):
+                    # breakpoint()
+                    d_angles = keras.ops.reshape(
+                        d_angles, (angles.shape[0],) + out_shape
+                    )
+                    placeholder_idx = tuple(range(x.shape[-1]))
+                    input_to_gate_map = {i: (i,) for i in placeholder_idx}
                 # extract the rows corresponding to encoding gates
                 # thus those element to be combined with the jacobian
                 # wrt the inputs
@@ -338,7 +344,7 @@ class QuantumModelCustomGradient:
                     # just some placeholder rows to continue symbolic computation
                     rows = [
                         d_angles[i]
-                        for i in range(jacobian.shape[0] - len(indices_to_discard))
+                        for i in range(d_angles.shape[0] - len(indices_to_discard))
                     ]
                 else:
                     rows = [
@@ -363,6 +369,11 @@ class QuantumModelCustomGradient:
                 # d_x = keras.ops.einsum(f"{lhs},{tmp}", d_x, dy)
                 d_x = keras.ops.einsum(f"{lhs},{rhs}", d_x, dy)
             else:
+                if tf.is_symbolic_tensor(d_angles):
+                    # breakpoint()
+                    d_angles = keras.ops.reshape(
+                        d_angles, (jacobian.shape[0],) + out_shape
+                    )
                 d_x = None
 
             """

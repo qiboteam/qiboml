@@ -570,7 +570,12 @@ def test_qibolab(frontend):
     activation = build_activation(
         frontend, binary=encoding_layer.__class__.__name__ == "BinaryEncoding"
     )
-    model = build_sequential_model(
+    model = frontend.QuantumModel(
+        circuit_structure=[encoding_layer, training_layer],
+        decoding=decoding_layer,
+    )
+    """
+    build_sequential_model(
         frontend,
         [
             build_linear_layer(frontend, 1, nqubits),
@@ -583,6 +588,7 @@ def test_qibolab(frontend):
         ],
     )
     setattr(model, "decoding", decoding_layer)
+    """
 
     data = random_tensor(frontend, (10, 1))
     target = prepare_targets(frontend, model, data)
