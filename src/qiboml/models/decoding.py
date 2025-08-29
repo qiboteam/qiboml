@@ -207,8 +207,6 @@ class Probabilities(QuantumDecoding):
             (tuple[int, int]): a ``(1, 2**nqubits)`` shape.
         """
         n = 2 ** len(self.qubits)
-        if self.density_matrix:
-            return (n, n)
         return (1, n)
 
     @property
@@ -379,7 +377,10 @@ class State(QuantumDecoding):
         Returns:
             (tuple[int, int, int]): a ``(2, 1, 2**nqubits)`` shape.
         """
-        return (2, 1, 2**self.nqubits)
+        n = 2 ** len(self.qubits)
+        if self.density_matrix:
+            return (2, n, n)
+        return (2, 1, n)
 
     @property
     def analytic(self) -> bool:
