@@ -1,7 +1,6 @@
 import numpy as np
 import pytest
 import torch
-
 from qibo import Circuit, gates, hamiltonians
 from qibo.models.encodings import comp_basis_encoder
 from qibo.quantum_info import random_clifford
@@ -10,6 +9,7 @@ from qibo.transpiler import NativeGates, Passes, Sabre, Unroller
 
 import qiboml.models.decoding as dec
 from qiboml.interfaces.pytorch import QuantumModel
+
 
 def test_probabilities_layer(backend):
     nqubits = 5
@@ -71,7 +71,9 @@ def test_decoding_with_transpiler(backend):
         connectivity=[[0, 1], [0, 2]], passes=[Unroller(NativeGates.default(), Sabre())]
     )
     layer = dec.Probabilities(3, transpiler=transpiler, backend=backend)
-    backend.assert_allclose(backend.execute_circuit(c).probabilities(), layer(c))
+    backend.assert_allclose(
+        backend.execute_circuit(c).probabilities(), layer(c).ravel()
+    )
 
 
 def test_decoding_wire_names(backend):
@@ -98,17 +100,16 @@ def test_vqls_solver_basic(backend):
         A=A,
         backend=backend,
     )
-    
+
     cost = solver(circuit)
     assert 0.0 <= cost <= 1.0
     assert solver.output_shape == (1, 1)
     assert solver.analytic
     if backend.platform == "pytorch":
 
-        weights = torch.nn.ParameterList([
-            torch.nn.Parameter(torch.tensor(0.0, dtype=torch.float64))
-        ])
-
+        weights = torch.nn.ParameterList(
+            [torch.nn.Parameter(torch.tensor(0.0, dtype=torch.float64))]
+        )
 
         def variational_block(weights):
             circuit = Circuit(nqubits)
@@ -134,6 +135,3 @@ def test_vqls_solver_basic(backend):
 
         final_cost = float(model())
         assert final_cost < initial_cost
-
-
-

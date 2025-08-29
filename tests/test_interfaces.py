@@ -4,7 +4,6 @@ import random
 
 import numpy as np
 import pytest
-import torch
 from qibo import Circuit, construct_backend, gates, hamiltonians
 from qibo.config import raise_error
 from qibo.noise import NoiseModel, PauliError
