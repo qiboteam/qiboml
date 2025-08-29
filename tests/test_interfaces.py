@@ -158,20 +158,12 @@ def train_model(frontend, model, data, target, max_epochs=5):
         loss_f = frontend.keras.losses.MeanSquaredError()
 
         def train_step(x, y):
-            print("\n------------------- Step----------------------")
             with frontend.tf.GradientTape() as tape:
                 if x is not None:
                     predictions = model(x)
                     loss = loss_f(y, predictions)
                 else:
                     loss = model()
-            print(
-                x.shape,
-                y.shape,
-                predictions.shape,
-                loss.shape,
-                "\n------------------------------------------------------------",
-            )
             gradients = tape.gradient(
                 loss, model.trainable_variables
             )  # Compute gradients
@@ -430,12 +422,7 @@ def test_decoding(backend, frontend, layer, seed):
     backprop_test(frontend, q_model, data, target)
 
 
-def test_composition(
-    backend,
-    # frontend
-):
-
-    import qiboml.interfaces.keras as frontend
+def test_composition(backend, frontend):
 
     set_device(frontend)
     seed = 42
