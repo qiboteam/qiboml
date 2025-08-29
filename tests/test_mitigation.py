@@ -77,7 +77,7 @@ def test_rtqem(frontend, backend):
     noisy_model = frontend.QuantumModel(
         circuit_structure=deepcopy(vqe),
         decoding=noisy_decoding,
-        differentiation=PSR(),
+        differentiation=PSR,
     )
 
     noisy_result = train_vqe(
@@ -106,7 +106,7 @@ def test_rtqem(frontend, backend):
     mit_model = frontend.QuantumModel(
         circuit_structure=deepcopy(vqe),
         decoding=mit_decoding,
-        differentiation=PSR(),
+        differentiation=PSR,
     )
 
     mit_result = train_vqe(
@@ -149,7 +149,7 @@ def test_custom_map(frontend):
     mit_model = frontend.QuantumModel(
         circuit_structure=deepcopy(vqe),
         decoding=mit_decoding,
-        differentiation=PSR(),
+        differentiation=PSR,
     )
 
     _ = train_vqe(

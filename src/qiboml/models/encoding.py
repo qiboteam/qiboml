@@ -105,7 +105,9 @@ class PhaseEncoding(QuantumEncoding):
             (Circuit): the constructed ``qibo.Circuit``.
         """
         circuit = self.circuit
-        x = x.ravel()
+        # x = x.ravel()
+        if len(x.shape) > 1:
+            x = x[0]
         for i, q in enumerate(self.qubits):
             this_gate_params = {"trainable": False}
             [this_gate_params.update({p: x[i]}) for p in self.gate_encoding_params]
@@ -131,7 +133,9 @@ class BinaryEncoding(QuantumEncoding):
                 f"Invalid input dimension {x.shape[-1]}, but the allocated qubits are {self.qubits}.",
             )
         circuit = self.circuit
-        x = x.ravel()
+        # = x.ravel()
+        if len(x.shape) > 1:
+            x = x[0]
         for i, q in enumerate(self.qubits):
             circuit.add(gates.RX(q, theta=x[i] * np.pi, trainable=False))
         return circuit

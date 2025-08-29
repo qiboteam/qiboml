@@ -1,6 +1,6 @@
 import random
 from inspect import signature
-from typing import Callable, Dict, List, Optional, Union
+from typing import Callable, Dict, List, Union
 
 import numpy as np
 from qibo import Circuit
@@ -26,55 +26,9 @@ def get_params_from_circuit_structure(
             params.extend([p for param in circ.get_parameters() for p in param])
         elif not isinstance(circ, QuantumEncoding) and isinstance(circ, Callable):
             params.extend(
-                random.random() for key in signature(circ).parameters if key != "engine"
+                random.random() for _ in range(len(signature(circ).parameters))
             )
     return params
-
-
-def circuit_from_structure(
-    circuit_structure,
-    x: Optional[ndarray] = None,
-    params: Optional[ndarray] = None,
-    backend: Optional[Backend] = None,
-):
-    """
-    Helper function to reconstruct the whole circuit from a circuit structure.
-    In the case the circuit structure involves encodings, the encoding data has
-    to be provided as well.
-    """
-
-    if (
-        any(isinstance(circ, QuantumEncoding) for circ in circuit_structure)
-        and x is None
-    ):
-        raise ValueError(
-            "x cannot be None when encoding layers are present in the circuit structure."
-        )
-
-    backend = _check_backend(backend)
-
-    circuit = Circuit(
-        circuit_structure[0].nqubits,
-    )
-    index = 0
-    for circ in circuit_structure:
-        if isinstance(circ, QuantumEncoding):
-            circ = circ(x)
-        elif params is not None:
-            if isinstance(circ, Circuit):
-                nparams = len(circ.get_parameters())
-                circ.set_parameters(params[index : index + nparams])
-            elif isinstance(circ, Callable):
-                param_dict = signature(circ).parameters
-                nparams = len(param_dict)
-                if "engine" in param_dict:
-                    nparams -= 1
-                circ = circ(backend.np, *params[index : index + nparams])
-            else:
-                raise RuntimeError
-            index += nparams
-        circuit += circ
-    return circuit
 
 
 def get_default_differentiation(decoding: QuantumDecoding, instructions: Dict):
@@ -91,15 +45,15 @@ def get_default_differentiation(decoding: QuantumDecoding, instructions: Dict):
     if not decoding.analytic or backend_string not in instructions.keys():
         from qiboml.operations.differentiation import PSR
 
-        differentiation = PSR()
+        differentiation = PSR
     else:
-        diff = instructions[backend_string]
-        differentiation = diff() if diff is not None else None
+        differentiation = instructions[backend_string]
+        # differentiation = diff if diff is not None else None
 
     return differentiation
 
 
-def draw_circuit(circuit_structure, backend, plt_drawing=True, **plt_kwargs):
+def draw_circuit(model, plt_drawing=True, **plt_kwargs):
     """
     Draw the full circuit structure.
 
@@ -109,7 +63,8 @@ def draw_circuit(circuit_structure, backend, plt_drawing=True, **plt_kwargs):
         plt_kwargs (dict): extra arguments which can be set to customize the
             `qibo.ui.plot_circuit` function.
     """
-
+    circuit_structure = model.circuit_structure
+    backend = model.backend
     encoding_layer = next(
         (circ for circ in circuit_structure if isinstance(circ, QuantumEncoding)),
         None,
@@ -123,13 +78,9 @@ def draw_circuit(circuit_structure, backend, plt_drawing=True, **plt_kwargs):
     for circ in circuit_structure:
         if isinstance(circ, Circuit):
             dummy_params.extend(len(circ.get_parameters()) * [0.0])
-        elif not isinstance(circ, QuantumEncoding) and isinstance(
-            circ, Callable
-        ):  # pragma: no cover
-            dummy_params.extend((len(signature(circ).parameters) - 1) * [0.0])
-    circuit = circuit_from_structure(
-        circuit_structure, x=dummy_data, params=dummy_params, backend=backend
-    )
+        elif not isinstance(circ, QuantumEncoding) and isinstance(circ, Callable):
+            dummy_params.extend((len(signature(circ).parameters)) * [0.0])
+    circuit = model.circuit_tracer.build_circuit(params=dummy_params, x=dummy_data)
     if plt_drawing:
         _, fig = plot_circuit(circuit, **plt_kwargs)
         return fig
