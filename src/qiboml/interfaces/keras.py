@@ -321,12 +321,11 @@ class QuantumModelCustomGradient:
 
             if jacobian_wrt_inputs is not None:
                 if tf.is_symbolic_tensor(d_angles):
-                    # breakpoint()
                     d_angles = keras.ops.reshape(
                         d_angles, (angles.shape[0],) + out_shape
                     )
                     placeholder_idx = tuple(range(x.shape[-1]))
-                    input_to_gate_map = {i: (i,) for i in placeholder_idx}
+                    input_to_gate_map.update({i: (i,) for i in placeholder_idx})
                 # extract the rows corresponding to encoding gates
                 # thus those element to be combined with the jacobian
                 # wrt the inputs
@@ -340,7 +339,6 @@ class QuantumModelCustomGradient:
                 # to obtain only the part wrt the model's parameters
                 indices_to_discard = reduce(tuple.__add__, input_to_gate_map.values())
                 if tf.is_symbolic_tensor(d_angles):
-                    # breakpoint()
                     # just some placeholder rows to continue symbolic computation
                     rows = [
                         d_angles[i]
@@ -368,6 +366,7 @@ class QuantumModelCustomGradient:
                 # )
                 # d_x = keras.ops.einsum(f"{lhs},{tmp}", d_x, dy)
                 d_x = keras.ops.einsum(f"{lhs},{rhs}", d_x, dy)
+                d_x = keras.ops.reshape(d_x, x.shape)
             else:
                 if tf.is_symbolic_tensor(d_angles):
                     # breakpoint()
@@ -385,6 +384,8 @@ class QuantumModelCustomGradient:
             d_params = keras.ops.einsum(contraction, jacobian, d_angles)
             # d_params = keras.ops.reshape(d_params, tuple(params.shape) + dy.shape)
             d_params = keras.ops.einsum(f"{lhs},{rhs}", d_params, dy)
+            # if not tf.is_symbolic_tensor(d_params):
+            #    breakpoint()
             return d_x, d_params
 
         return y, grad

@@ -72,16 +72,16 @@ def set_seed(frontend, seed):
 
 def construct_x(frontend, wrt_inputs=False):
     if frontend.__name__ == "qiboml.interfaces.pytorch":
-        x = frontend.torch.tensor([0.5, 0.8], requires_grad=wrt_inputs)
+        x = frontend.torch.tensor([[0.5, 0.8]], requires_grad=wrt_inputs)
         # if wrt_inputs:
         #    return frontend.torch.tensor(2.0, requires_grad=True) * x
         return x
     elif frontend.__name__ == "qiboml.interfaces.keras":
         if frontend.keras.backend.backend() == "tensorflow":
             x = (
-                frontend.tf.Variable([0.5, 0.8])
+                frontend.tf.Variable([[0.5, 0.8]])
                 if wrt_inputs
-                else frontend.tf.constant([0.5, 0.8])
+                else frontend.tf.constant([[0.5, 0.8]])
             )
             # if with_factor:
             #    return frontend.tf.Variable(2.0) * x

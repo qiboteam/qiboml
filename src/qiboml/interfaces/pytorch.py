@@ -264,6 +264,7 @@ class QuantumModelAutoGrad(torch.autograd.Function):
         left_indices = (0,) + right_indices
 
         if jacobian_wrt_inputs is not None:
+
             # extract the rows corresponding to encoding gates
             # thus those element to be combined with the jacobian
             # wrt the inputs

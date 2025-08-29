@@ -45,11 +45,19 @@ class Differentiation(ABC):
         return len(self.circuit.get_parameters(include_not_trainable=wrt_inputs))
 
 
+@dataclass
 class PSR(Differentiation):
     """
     The Parameter Shift Rule differentiator. Especially useful for non analytical
     derivative calculation which, thus, makes it hardware compatible.
     """
+
+    def __post_init__(self):
+        if np.prod(self.decoding.output_shape) != 1:
+            raise_error(
+                RuntimeError,
+                "PSR differentiation works only for decoders with scalar outpus, i.e. expectation values.",
+            )
 
     def evaluate(self, parameters: ndarray, wrt_inputs: bool = False):
         """
