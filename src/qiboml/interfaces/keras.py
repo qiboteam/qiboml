@@ -366,6 +366,7 @@ class QuantumModelCustomGradient:
                 # )
                 # d_x = keras.ops.einsum(f"{lhs},{tmp}", d_x, dy)
                 d_x = keras.ops.einsum(f"{lhs},{rhs}", d_x, dy)
+                d_x = keras.ops.reshape(d_x, x.shape)
             else:
                 if tf.is_symbolic_tensor(d_angles):
                     # breakpoint()
@@ -383,6 +384,8 @@ class QuantumModelCustomGradient:
             d_params = keras.ops.einsum(contraction, jacobian, d_angles)
             # d_params = keras.ops.reshape(d_params, tuple(params.shape) + dy.shape)
             d_params = keras.ops.einsum(f"{lhs},{rhs}", d_params, dy)
+            # if not tf.is_symbolic_tensor(d_params):
+            #    breakpoint()
             return d_x, d_params
 
         return y, grad

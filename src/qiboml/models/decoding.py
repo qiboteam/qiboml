@@ -316,7 +316,7 @@ class Expectation(QuantumDecoding):
                 dtype=self.backend.np.float64,
             )
 
-        return expval.reshape(1, 1)
+        return self.backend.np.reshape(expval, (1, 1))
 
     @property
     def output_shape(self) -> tuple[int, int]:

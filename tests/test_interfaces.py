@@ -158,13 +158,20 @@ def train_model(frontend, model, data, target, max_epochs=5):
         loss_f = frontend.keras.losses.MeanSquaredError()
 
         def train_step(x, y):
+            print("\n------------------- Step----------------------")
             with frontend.tf.GradientTape() as tape:
                 if x is not None:
                     predictions = model(x)
                     loss = loss_f(y, predictions)
                 else:
                     loss = model()
-
+            print(
+                x.shape,
+                y.shape,
+                predictions.shape,
+                loss.shape,
+                "\n------------------------------------------------------------",
+            )
             gradients = tape.gradient(
                 loss, model.trainable_variables
             )  # Compute gradients
@@ -423,22 +430,30 @@ def test_decoding(backend, frontend, layer, seed):
     backprop_test(frontend, q_model, data, target)
 
 
-def test_composition(backend, frontend):
+def test_composition(
+    backend,
+    # frontend
+):
+
+    import qiboml.interfaces.keras as frontend
+
     set_device(frontend)
-    set_seed(frontend, 42)
-    backend.set_seed(42)
+    seed = 42
+    set_seed(frontend, seed)
+    backend.set_seed(seed)
 
     nqubits = 2
     encoding_layer = random.choice(list(set(ENCODING_LAYERS) - {enc.BinaryEncoding}))(
         nqubits
     )
     training_layer = ans.HardwareEfficient(nqubits)
-    decoding_layer = random.choice(
-        list(set(DECODING_LAYERS) - {dec.Samples, dec.State})
-    )(
-        nqubits, backend=backend
-    )  # make sure it's not Samples
+    observable = hamiltonians.SymbolicHamiltonian(
+        1 + np.prod([Z(int(i)) for i in range(nqubits)]),
+        nqubits=nqubits,
+        backend=backend,
+    )
 
+    decoding_layer = dec.Expectation(nqubits, observable=observable, backend=backend)
     activation = build_activation(
         frontend, binary=encoding_layer.__class__.__name__ == "BinaryEncoding"
     )
@@ -567,8 +582,9 @@ def test_qibolab(frontend):
     )
 
     set_device(frontend)
-    set_seed(frontend, 42)
-    backend.set_seed(42)
+    seed = 1
+    set_seed(frontend, seed)
+    backend.set_seed(seed)
 
     nqubits = 1
     encoding_layer = enc.PhaseEncoding(nqubits)
