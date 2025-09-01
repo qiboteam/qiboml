@@ -23,7 +23,7 @@ class CircuitTracer(ABC):
 
     @property
     @abstractmethod
-    def engine(self):
+    def engine(self):  # pragma: no cover
         """The calculation engine used."""
         pass
 
