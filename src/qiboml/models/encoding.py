@@ -133,7 +133,6 @@ class BinaryEncoding(QuantumEncoding):
                 f"Invalid input dimension {x.shape[-1]}, but the allocated qubits are {self.qubits}.",
             )
         circuit = self.circuit
-        # = x.ravel()
         if len(x.shape) > 1:
             x = x[0]
         for i, q in enumerate(self.qubits):

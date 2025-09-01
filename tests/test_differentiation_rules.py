@@ -73,8 +73,6 @@ def set_seed(frontend, seed):
 def construct_x(frontend, wrt_inputs=False):
     if frontend.__name__ == "qiboml.interfaces.pytorch":
         x = frontend.torch.tensor([[0.5, 0.8]], requires_grad=wrt_inputs)
-        # if wrt_inputs:
-        #    return frontend.torch.tensor(2.0, requires_grad=True) * x
         return x
     elif frontend.__name__ == "qiboml.interfaces.keras":
         if frontend.keras.backend.backend() == "tensorflow":
@@ -83,8 +81,6 @@ def construct_x(frontend, wrt_inputs=False):
                 if wrt_inputs
                 else frontend.tf.constant([[0.5, 0.8]])
             )
-            # if with_factor:
-            #    return frontend.tf.Variable(2.0) * x
             return x
         elif frontend.keras.backend.backend() == "pytorch":
             raise NotImplementedError
@@ -138,7 +134,6 @@ def test_expval_custom_grad(
     parameters. In this test the system size is fixed to two qubits and all the
     parameters/data values are fixed.
     """
-    # import qiboml.interfaces.keras as frontend
 
     if diff_rule is not None and diff_rule.__name__ == "Jax" and nshots is not None:
         pytest.skip("Jax differentiation does not work with shots.")
