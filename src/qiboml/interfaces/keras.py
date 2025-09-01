@@ -39,7 +39,7 @@ class KerasCircuitTracer(CircuitTracer):
     def jacrev(f: Callable, argnums: Union[int, Tuple[int]]) -> Callable:
 
         @tf.function
-        def jac_functional(x):
+        def jac_functional(x):  # pragma: no cover
             with tf.GradientTape() as tape:
                 tape.watch(x)
                 y = f(x)

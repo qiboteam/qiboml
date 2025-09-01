@@ -29,13 +29,13 @@ class CircuitTracer(ABC):
 
     @staticmethod
     @abstractmethod
-    def jacfwd(f: Callable, argnums: Union[int, Tuple[int]]):
+    def jacfwd(f: Callable, argnums: Union[int, Tuple[int]]):  # pragma: no cover
         """The jacobian functional in forward derivation mode."""
         pass
 
     @staticmethod
     @abstractmethod
-    def jacrev(f: Callable, argnums: Union[int, Tuple[int]]):
+    def jacrev(f: Callable, argnums: Union[int, Tuple[int]]):  # pragma: no cover
         """The jacobian functional in reverse derivation mode."""
         pass
 
@@ -147,7 +147,7 @@ class CircuitTracer(ABC):
         return all(diff_encodings)
 
     @abstractmethod
-    def requires_gradient(self, x: ndarray) -> bool:
+    def requires_gradient(self, x: ndarray) -> bool:  # pragma: no cover
         """Check whether the input array needs gradients to be calculated for it."""
         pass
 
@@ -234,12 +234,14 @@ class CircuitTracer(ABC):
         return array.dtype
 
     @abstractmethod
-    def identity(self, dim: int, dtype, device) -> ndarray:
+    def identity(self, dim: int, dtype, device) -> ndarray:  # pragma: no cover
         """The numpy-like np.eye function of the current engine."""
         pass
 
     @abstractmethod
-    def zeros(self, shape: Union[int, Tuple[int]], dtype, device) -> ndarray:
+    def zeros(
+        self, shape: Union[int, Tuple[int]], dtype, device
+    ) -> ndarray:  # pragma: no cover
         """The numpy-like np.zeros function of the current engine."""
         pass
 
