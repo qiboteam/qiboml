@@ -12,11 +12,10 @@ def HardwareEfficient(
     nqubits: int,
     qubits: Optional[tuple[int]] = None,
     nlayers: int = 1,
-    density_matrix: Optional[bool] = False,
 ) -> Circuit:
     if qubits is None:
         qubits = list(range(nqubits))
-    circuit = Circuit(nqubits, density_matrix=density_matrix)
+    circuit = Circuit(nqubits)
 
     for _ in range(nlayers):
         for q in qubits:
