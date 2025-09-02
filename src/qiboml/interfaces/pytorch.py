@@ -300,15 +300,15 @@ class QuantumModelAutoGrad(torch.autograd.Function):
 
         # combine the jacobians wrt parameters with those
         # wrt the circuit angles
-        gradients = torch.einsum(
+        gradient = torch.einsum(
             jacobian, contraction[0], jacobian_wrt_angles, contraction[1]
         )
         # combine with the gradients coming from outside
-        gradients = torch.einsum(gradients, left_indices, grad_output, right_indices)
+        gradient = torch.einsum(gradient, left_indices, grad_output, right_indices)
         return (
             grad_input,
             None,
             None,
             None,
-            *gradients,
+            *gradient,
         )
