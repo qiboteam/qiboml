@@ -42,7 +42,7 @@ class CircuitTracer(ABC):
     def _compute_jacobian_functional(
         self, circuit: Union[QuantumEncoding, Callable]
     ) -> Callable:
-        """Computes the jacobian functional for the input function.
+        """Compute the jacobian functional for the input function.
 
         Args:
             circuit (Callable): the input functions that build the circuit.
@@ -271,7 +271,7 @@ class CircuitTracer(ABC):
     def __call__(
         self, params: ndarray, x: Optional[ndarray] = None
     ) -> Tuple[Circuit, Optional[ndarray], ndarray, Optional[dict]]:
-        """Construct the circuit defined by the internal ``circuit_structure`` and computes
+        """Construct the circuit defined by the internal ``circuit_structure`` and compute
         the jacobian wrt to the parameters `params` and inputs `x` of the construction process.
 
         Args:
