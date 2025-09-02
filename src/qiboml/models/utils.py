@@ -57,6 +57,7 @@ class Mitigator:
         self._simulation_backend = NumpyBackend()
         self._reference_circuit = None
         self._reference_value = None
+        self._training_data = None
 
         self._n_checks = 0
         self._n_maps_computed = 0
@@ -75,7 +76,7 @@ class Mitigator:
     ):
         """Construct reference error sensitive circuit."""
         self._reference_circuit = error_mitigation.error_sensitive_circuit(
-            circuit=circuit, observable=observable
+            circuit=circuit, observable=observable, backend=self._simulation_backend
         )[0]
         # Execute the reference circuit
         reference_state = self._simulation_backend.execute_circuit(
@@ -129,11 +130,12 @@ class Mitigator:
         Perform data regression on noisy and exact data.
         """
 
-        _, _, popt, _ = self._mitigation_function(
+        _, _, popt, self._training_data = self._mitigation_function(
             circuit=circuit,
             observable=observable,
             noise_model=noise_model,
             full_output=True,
+            backend=self.backend,
             **self._mitigation_method_kwargs,
         )
 
