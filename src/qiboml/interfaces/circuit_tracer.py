@@ -111,13 +111,14 @@ class CircuitTracer(ABC):
         return par_map
 
     def trace(
-        self, f: Callable, params: ndarray
+        self, f: Union[Callable, QuantumEncoding], params: ndarray
     ) -> Tuple[ndarray, dict[int, Tuple[int]]]:
         """Trace the construction of a circuit through the function `f` with given
         parameters `params`.
 
         Args:
-            f (Callable): the function that builds the circuit.
+            f (Callable): the function that builds the circuit, either a custom user-defined
+        function or an encoder.
             params (ndarray): the parameters assigned to the built circuit.
 
         Returns:

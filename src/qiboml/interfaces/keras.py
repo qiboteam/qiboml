@@ -6,6 +6,7 @@
 import string
 from dataclasses import dataclass
 from functools import reduce
+from logging import warning
 from typing import Callable, List, Optional, Tuple, Union
 
 import keras
@@ -13,7 +14,6 @@ import numpy as np
 import tensorflow as tf  # pylint: disable=import-error
 from qibo import Circuit
 from qibo.backends import Backend
-from qibo.config import raise_error
 
 from qiboml.interfaces import utils
 from qiboml.interfaces.circuit_tracer import CircuitTracer
@@ -49,7 +49,9 @@ class KerasCircuitTracer(CircuitTracer):
 
     @staticmethod
     def jacfwd(f: Callable, argnums: Union[int, Tuple[int]]) -> Callable:
-        # no available implementation of forward differentiation in tensorflow
+        warning(
+            "No available implementation of forward differentiation in tensorflow, falling back to reverse mode differentiation."
+        )
         return KerasCircuitTracer.jacrev(f, argnums)
 
     def nonzero(self, array: tf.Tensor) -> tf.Tensor:
@@ -92,7 +94,7 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
     The Keras interface to qiboml models.
 
     Args:
-        circuit_structure (Union[List[QuantumEncoding, Circuit], Circuit]):
+        circuit_structure (Union[List[QuantumEncoding, Circuit, Callable], Circuit]):
             a list of Qibo circuits and Qiboml encoding layers, which defines
             the complete structure of the model. The whole circuit will be mounted
             by sequentially stacking the elements of the given list. It is also possible
@@ -100,9 +102,10 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
         decoding (QuantumDecoding): the decoding layer.
         differentiation (Differentiation, optional): the differentiation engine,
             if not provided a default one will be picked following what described in the :ref:`docs <_differentiation_engine>`.
+        circuit_tracer (CircuitTracer, optional): tracer used to build the circuit and trace the operations performed upon construction. Defaults to ``KerasCircuitTracer``.
     """
 
-    circuit_structure: Union[Circuit, List[Union[Circuit, QuantumEncoding]]]
+    circuit_structure: Union[Circuit, List[Union[Circuit, QuantumEncoding, Callable]]]
     decoding: QuantumDecoding
     differentiation: Optional[Differentiation] = None
     circuit_tracer: Optional[CircuitTracer] = None

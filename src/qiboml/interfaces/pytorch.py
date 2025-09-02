@@ -8,7 +8,6 @@ import numpy as np
 import torch
 from qibo import Circuit
 from qibo.backends import Backend
-from qibo.config import raise_error
 
 from qiboml.interfaces import utils
 from qiboml.interfaces.circuit_tracer import CircuitTracer
@@ -58,7 +57,7 @@ class QuantumModel(torch.nn.Module):
     The pytorch interface to qiboml models.
 
     Args:
-        circuit_structure (Union[List[QuantumEncoding, Circuit], Circuit]):
+        circuit_structure (Union[List[QuantumEncoding, Circuit, Callable], Circuit]):
             a list of Qibo circuits and Qiboml encoding layers, which defines
             the complete structure of the model. The whole circuit will be mounted
             by sequentially stacking the elements of the given list. It is also possible
@@ -66,9 +65,10 @@ class QuantumModel(torch.nn.Module):
         decoding (QuantumDecoding): the decoding layer.
         differentiation (Differentiation, optional): the differentiation engine,
             if not provided a default one will be picked following what described in the :ref:`docs <_differentiation_engine>`.
+        circuit_tracer (CircuitTracer, optional): tracer used to build the circuit and trace the operations performed upon construction. Defaults to ``TorchCircuitTracer``.
     """
 
-    circuit_structure: Union[Circuit, List[Union[Circuit, QuantumEncoding]]]
+    circuit_structure: Union[Circuit, List[Union[Circuit, QuantumEncoding, Callable]]]
     decoding: QuantumDecoding
     differentiation: Optional[Differentiation] = None
     circuit_tracer: Optional[CircuitTracer] = None
