@@ -57,6 +57,7 @@ class Mitigator:
         self._simulation_backend = NumpyBackend()
         self._reference_circuit = None
         self._reference_value = None
+        self._training_data = None
 
         self._n_checks = 0
         self._n_maps_computed = 0
@@ -129,7 +130,7 @@ class Mitigator:
         Perform data regression on noisy and exact data.
         """
 
-        _, _, popt, _ = self._mitigation_function(
+        _, _, popt, self._training_data = self._mitigation_function(
             circuit=circuit,
             observable=observable,
             noise_model=noise_model,
