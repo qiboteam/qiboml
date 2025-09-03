@@ -4,7 +4,7 @@ from typing import Any, Callable, Dict, Optional, Union
 from qibo import Circuit
 from qibo.backends import Backend, NumpyBackend, _check_backend
 from qibo.config import log
-from qibo.hamiltonians import Hamiltonian
+from qibo.hamiltonians import Hamiltonian, SymbolicHamiltonian
 from qibo.models import error_mitigation
 from qibo.noise import NoiseModel
 
@@ -77,7 +77,11 @@ class Mitigator:
         """Construct reference error sensitive circuit."""
         # Ensuring the observable backend is the simulation one
         if isinstance(observable, SymbolicHamiltonian):
-            observable = SymbolicHamiltonian(observable.form, nqubits=observable.nqubits, backend=self._simulation_backend)
+            observable = SymbolicHamiltonian(
+                observable.form,
+                nqubits=observable.nqubits,
+                backend=self._simulation_backend,
+            )
         else:
             matrix = observable.backend.to_numpy(observable.matrix)
             observable = Hamiltonian(
