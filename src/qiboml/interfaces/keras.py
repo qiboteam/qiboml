@@ -294,20 +294,21 @@ class QuantumModelCustomGradient:
                 indices_to_discard = reduce(tuple.__add__, input_to_gate_map.values())
                 if tf.is_symbolic_tensor(d_angles):
                     # just some placeholder rows to continue symbolic computation
-                    rows = [
-                        d_angles[i]
-                        for i in range(d_angles.shape[0] - len(indices_to_discard))
-                    ]
+                    dim = d_angles.shape[0] - len(indices_to_discard)
+                    rows = [d_angles[i] for i in range(dim)]
                 else:
                     rows = [
                         row
                         for i, row in enumerate(d_angles)
                         if i not in indices_to_discard
                     ]
-                d_angles = keras.ops.reshape(
-                    keras.ops.vstack(rows),
-                    (-1, *out_shape),
-                )
+                if len(rows) > 0:
+                    d_angles = keras.ops.reshape(
+                        keras.ops.vstack(rows),
+                        (-1, *out_shape),
+                    )
+                else:
+                    d_angles = keras.ops.cast(rows, jacobian_wrt_inputs.dtype)
                 # combine the jacobians wrt inputs with those
                 # wrt the circuit angles
                 d_x = keras.ops.einsum(
@@ -320,12 +321,16 @@ class QuantumModelCustomGradient:
             else:
                 if tf.is_symbolic_tensor(d_angles):
                     d_angles = keras.ops.reshape(
-                        d_angles, (jacobian.shape[0],) + out_shape
+                        d_angles, (params.shape[0],) + out_shape
                     )
                 d_x = None
 
-            d_params = keras.ops.einsum(contraction, jacobian, d_angles)
-            d_params = keras.ops.einsum(f"{lhs},{rhs}", d_params, dy)
+            if jacobian is not None:
+                d_params = keras.ops.einsum(contraction, jacobian, d_angles)
+                d_params = keras.ops.einsum(f"{lhs},{rhs}", d_params, dy)
+            else:
+                d_params = None
+
             return d_x, d_params
 
         return y, grad

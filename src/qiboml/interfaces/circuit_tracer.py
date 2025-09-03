@@ -338,20 +338,25 @@ class CircuitTracer(ABC):
             else:
                 circuit += circ
 
-        total_dim = tuple(sum(np.array(j.shape) for j in jacobians))
-        # build the global jacobian
-        J = self.zeros(
-            total_dim, dtype=self._get_dtype(params), device=self._get_device(params)
-        )
-        position = np.array([0, 0])
-        # insert each sub-jacobian in the total one
-        for j in jacobians:
-            shape = np.array(j.shape)
-            interval = tuple(zip(position, shape + position))
-            J = self.fill_jacobian(J, interval[0], interval[1], j)
-            # direct assignment works with torch/numpy only
-            # J[interval[0][0] : interval[0][1], interval[1][0] : interval[1][1]] = j
-            position += shape
+        if len(jacobians) > 0:
+            total_dim = tuple(sum(np.array(j.shape) for j in jacobians))
+            # build the global jacobian
+            J = self.zeros(
+                total_dim,
+                dtype=self._get_dtype(params),
+                device=self._get_device(params),
+            )
+            position = np.array([0, 0])
+            # insert each sub-jacobian in the total one
+            for j in jacobians:
+                shape = np.array(j.shape)
+                interval = tuple(zip(position, shape + position))
+                J = self.fill_jacobian(J, interval[0], interval[1], j)
+                # direct assignment works with torch/numpy only
+                # J[interval[0][0] : interval[0][1], interval[1][0] : interval[1][1]] = j
+                position += shape
+        else:
+            J = None
 
         jacobians_wrt_inputs = (
             None
