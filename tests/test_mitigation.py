@@ -63,7 +63,7 @@ def test_rtqem(frontend, backend):
     set_seed(frontend=frontend, seed=42)
 
     # We build a trainable circuit
-    vqe = HardwareEfficient(nqubits=nqubits, nlayers=3, density_matrix=True)
+    vqe = HardwareEfficient(nqubits=nqubits, nlayers=3)
 
     # First we build a model with noise and without mitigation
     noisy_decoding = Expectation(
@@ -77,7 +77,7 @@ def test_rtqem(frontend, backend):
     noisy_model = frontend.QuantumModel(
         circuit_structure=deepcopy(vqe),
         decoding=noisy_decoding,
-        differentiation=PSR(),
+        differentiation=PSR,
     )
 
     noisy_result = train_vqe(
@@ -106,7 +106,7 @@ def test_rtqem(frontend, backend):
     mit_model = frontend.QuantumModel(
         circuit_structure=deepcopy(vqe),
         decoding=mit_decoding,
-        differentiation=PSR(),
+        differentiation=PSR,
     )
 
     mit_result = train_vqe(
@@ -123,7 +123,7 @@ def test_custom_map(frontend):
     set_seed(frontend=frontend, seed=42)
 
     # We build a trainable circuit
-    vqe = HardwareEfficient(nqubits=1, nlayers=2, density_matrix=True)
+    vqe = HardwareEfficient(nqubits=1, nlayers=2)
 
     mitigation_config = {
         "real_time": True,
@@ -149,7 +149,7 @@ def test_custom_map(frontend):
     mit_model = frontend.QuantumModel(
         circuit_structure=deepcopy(vqe),
         decoding=mit_decoding,
-        differentiation=PSR(),
+        differentiation=PSR,
     )
 
     _ = train_vqe(

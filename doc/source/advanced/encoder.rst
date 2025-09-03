@@ -71,27 +71,7 @@ The abstract :py:meth:`qiboml.models.encoding.QuantumEncoding` provides a proper
            return True
        return False
 
-Keep in mind that, when ``differentiable`` is set to ``False``, all the gradients of the ``QuantumModel`` with respect to the inputs :math:`x` are going to automatically set to zero in the differentiation step.
-
-Finally, there is an important property we have to set to allow for the computation of gradients with respect to inputs in case a hardware-compatible method is used (namely, the Parameter Shift Rule :py:class:`qiboml.operations.differentiation.PSR`). This is the ``._data_to_gate`` method, which defines an ``encoding_map`` in the form of a dictionary, where the keys are the indices of the components of the input data and the value for each key is a list of integers, that specifies the indices of the gates in the generated circuit where that input entered. Therefore, for instance, a ``{0: [0,1], 1: [1,2]}`` dictionary indicates that the first component of the input data is loaded in the first two gates of the circuit (gate ``0`` and gate ``1``), whereas the second component of ``x`` affects the second and third gates (gate ``1`` and gate ``2``).
-
-Hence, in our case the ``_data_to_gate`` method reads:
-
-.. code::
-
-    @cached_property
-    def _data_to_gate(self):
-        """
-        Associate each data component with its index in the gates queue.
-        In this case, we will follow the presented strategy, namely encoding ``x[0]``
-        into the first ``n1`` qubits and ``x[1]`` in the second ``n2`` qubits.
-        """
-        return {
-            "0": self.x1_qubits,
-            "1": self.x2_qubits,
-        }
-
-This way, we allow the :py:class:`qiboml.operations.differentiation.PSR` to properly recombine all the derivatives that are associated to the same input spread across different gates.
+Keep in mind that, when ``differentiable`` is set to ``False``, all the gradients of the ``QuantumModel`` with respect to the inputs :math:`x` are going to automatically set to ``None`` in the differentiation step.
 
 Trainable encoding layers
 =========================
