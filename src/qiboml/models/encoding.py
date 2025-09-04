@@ -1,7 +1,6 @@
 import inspect
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from functools import cached_property
 from typing import Optional
 
 import numpy as np
@@ -35,20 +34,6 @@ class QuantumEncoding(ABC):
             tuple(range(self.nqubits)) if self.qubits is None else tuple(self.qubits)
         )
         self._circuit = Circuit(self.nqubits, density_matrix=self.density_matrix)
-
-    @cached_property
-    def _data_to_gate(self):
-        """
-        Mapping between the index of the input and the indices of the gates in the
-        produced encoding circuit queue, where the input is encoded to.
-        For instance, {0: [0,2], 1: [2]}, represents an encoding where the element
-        0 of the inputs enters the gates with indices 0 and 2 of the queue, whereas
-        the element 1 of the input affects only the the gate in position 2 of the
-        queue.
-        By deafult, the map reproduces a simple encoding where the
-        i-th component of the data is uploaded in the i-th gate of the queue.
-        """
-        return {f"{i}": [i] for i in range(len(self.qubits))}
 
     @abstractmethod
     def __call__(self, x: ndarray) -> Circuit:
@@ -133,7 +118,6 @@ class BinaryEncoding(QuantumEncoding):
                 f"Invalid input dimension {x.shape[-1]}, but the allocated qubits are {self.qubits}.",
             )
         circuit = self.circuit
-        # = x.ravel()
         if len(x.shape) > 1:
             x = x[0]
         for i, q in enumerate(self.qubits):

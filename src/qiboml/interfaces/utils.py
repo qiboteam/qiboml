@@ -48,7 +48,6 @@ def get_default_differentiation(decoding: QuantumDecoding, instructions: Dict):
         differentiation = PSR
     else:
         differentiation = instructions[backend_string]
-        # differentiation = diff if diff is not None else None
 
     return differentiation
 

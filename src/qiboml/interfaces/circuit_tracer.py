@@ -13,29 +13,43 @@ from qiboml.models.encoding import QuantumEncoding
 
 @dataclass
 class CircuitTracer(ABC):
+    """Wrapper to the circuit structure that takes care of tracing the circuit construction.
+    In particular, it computes both the Jacobian wrt the parameters and the inputs of the operations
+    that construct the circuits.
+    """
 
     circuit_structure: List[Union[Circuit, QuantumEncoding, Callable]]
     derivation_mode: str = "forward"
 
     @property
     @abstractmethod
-    def engine(self):
+    def engine(self):  # pragma: no cover
+        """The calculation engine used."""
         pass
 
     @staticmethod
     @abstractmethod
-    def jacfwd(f: Callable, argnums: Union[int, Tuple[int]]):
+    def jacfwd(f: Callable, argnums: Union[int, Tuple[int]]):  # pragma: no cover
+        """The jacobian functional in forward derivation mode."""
         pass
 
     @staticmethod
     @abstractmethod
-    def jacrev(f: Callable, argnums: Union[int, Tuple[int]]):
+    def jacrev(f: Callable, argnums: Union[int, Tuple[int]]):  # pragma: no cover
+        """The jacobian functional in reverse derivation mode."""
         pass
 
     def _compute_jacobian_functional(
         self, circuit: Union[QuantumEncoding, Callable]
     ) -> Callable:
+        """Compute the jacobian functional for the input function.
 
+        Args:
+            circuit (Callable): the input functions that build the circuit.
+
+        Returns:
+            (Callable) the jacobian functional
+        """
         _tmp_circuit = circuit
 
         def build(x):
@@ -64,6 +78,9 @@ class CircuitTracer(ABC):
     def jacobian_functionals(
         self,
     ) -> dict[int, Callable]:
+        """The dictionary containing the jacobian functionals of each element composing
+        circuit structure.
+        """
         jacobians = {}
         for circ in self.circuit_structure:
             if isinstance(circ, Circuit):
@@ -73,9 +90,16 @@ class CircuitTracer(ABC):
         return jacobians
 
     def nonzero(self, array: ndarray) -> ndarray:
+        """The numpy-like np.nonzero function of the current engine."""
         return self.engine.nonzero(array)
 
-    def _build_parameters_map(self, jacobian):
+    def _build_parameters_map(self, jacobian: ndarray) -> dict[int, Tuple[int]]:
+        """Construct the mapping between independent and dependent parameters.
+        In detail, the index of each independent parameter is mapped to the indices
+        of all the dependent parameters that originated from it. This is particularly
+        useful for the jacobian of encoders, as it provides a map from the inputs to
+        the actual gates where they are encoded in the circuit.
+        """
         par_map = {}
         for i, row in enumerate(jacobian):
             for j in self.nonzero(row):
@@ -86,7 +110,21 @@ class CircuitTracer(ABC):
                     par_map[j] = (i,)
         return par_map
 
-    def trace(self, f: Callable, params: ndarray):
+    def trace(
+        self, f: Union[Callable, QuantumEncoding], params: ndarray
+    ) -> Tuple[ndarray, dict[int, Tuple[int]]]:
+        """Trace the construction of a circuit through the function `f` with given
+        parameters `params`.
+
+        Args:
+            f (Callable): the function that builds the circuit, either a custom user-defined
+        function or an encoder.
+            params (ndarray): the parameters assigned to the built circuit.
+
+        Returns:
+            (Tuple(ndarray, dict)) the computed jacobian and the mapping between the independent
+        and dependent parameters of `f`.
+        """
         # we always assume the input is a 1-dim array, even for encodings
         # thus the jacobian is always a matrix
         jac = self.engine.reshape(
@@ -97,6 +135,7 @@ class CircuitTracer(ABC):
 
     @cached_property
     def is_encoding_differentiable(self) -> bool:
+        """Check if all the encoders in the circuit structure are differentiable."""
         diff_encodings = [
             circ.differentiable
             for circ in self.circuit_structure
@@ -109,12 +148,25 @@ class CircuitTracer(ABC):
         return all(diff_encodings)
 
     @abstractmethod
-    def requires_gradient(self, x: ndarray) -> bool:
+    def requires_gradient(self, x: ndarray) -> bool:  # pragma: no cover
+        """Check whether the input array needs gradients to be calculated for it."""
         pass
 
     def _build_from_encoding(
         self, encoding: QuantumEncoding, x: ndarray, trace: bool = True
-    ):
+    ) -> Circuit:
+        """Build the circuit starting from an encoder.
+
+        Args:
+            encoding (QuantumEncoding): the encoder.
+            x (ndarray): the input data.
+            trace (bool): whether to trace the construction and thus also
+            calculate the jacobian. Defaults to ``True``.
+
+        Returns:
+            (Circuit | Tuple(ndarray, dict, Circuit)) the built circuit or the
+        tuple: jacobian wrt inputs, input to gate map and circuit.
+        """
         circuit = encoding(x)
         if trace:
             if self.is_encoding_differentiable and self.requires_gradient(x):
@@ -126,7 +178,20 @@ class CircuitTracer(ABC):
 
     def _build_from_circuit(
         self, circuit: Circuit, params: ndarray, trace: bool = True
-    ):
+    ) -> Circuit:
+        """Build the circuit starting from a circuit. In practice the given
+        parameters `params` are set into the circuit only.
+
+        Args:
+            circuit (Circuit): the circuit.
+            params (ndarray): the parameters to set.
+            trace (bool): whether to trace the construction and thus also
+            calculate the jacobian. Defaults to ``True``.
+
+        Returns:
+            (Circuit | Tuple(ndarray, dict, Circuit)) the built circuit or the
+        tuple: jacobian wrt parameters, input to gate map and circuit.
+        """
         circuit.set_parameters(params)
         if trace:
             jacobian = self.identity(
@@ -139,7 +204,21 @@ class CircuitTracer(ABC):
             return jacobian, par_map, circuit
         return circuit
 
-    def _build_from_callable(self, f: Callable, params: ndarray, trace: bool = True):
+    def _build_from_callable(
+        self, f: Callable, params: ndarray, trace: bool = True
+    ) -> Circuit:
+        """Build the circuit starting from a custom callable.
+
+        Args:
+            f (Callable): the custom callable which builds the circuit.
+            params (ndarray): the parameters used for construction.
+            trace (bool): whether to trace the construction and thus also
+            calculate the jacobian. Defaults to ``True``.
+
+        Returns:
+            (Circuit | Tuple(ndarray, dict, Circuit)) the built circuit or the
+        tuple: jacobian wrt parameters, input to gate map and circuit.
+        """
         circuit = f(*params)
         if trace:
             return *self.trace(f, params), circuit
@@ -147,18 +226,24 @@ class CircuitTracer(ABC):
 
     @staticmethod
     def _get_device(array: ndarray):
+        """Extract the device of the input array."""
         return array.device
 
     @staticmethod
     def _get_dtype(array: ndarray):
+        """Extract the dtype of the input array."""
         return array.dtype
 
     @abstractmethod
-    def identity(self, dim: int, dtype, device) -> ndarray:
+    def identity(self, dim: int, dtype, device) -> ndarray:  # pragma: no cover
+        """The numpy-like np.eye function of the current engine."""
         pass
 
     @abstractmethod
-    def zeros(self, shape: Union[int, Tuple[int]], dtype, device) -> ndarray:
+    def zeros(
+        self, shape: Union[int, Tuple[int]], dtype, device
+    ) -> ndarray:  # pragma: no cover
+        """The numpy-like np.zeros function of the current engine."""
         pass
 
     def fill_jacobian(
@@ -168,13 +253,36 @@ class CircuitTracer(ABC):
         col_span: Tuple[int, int],
         values: ndarray,
     ) -> ndarray:
+        """Fill the input jacobian in the span defined by (row_span, col_span) with
+        the given values. This is mostly here to be overwritten by engines that do not
+        allow for direct item assignment.
+
+        Args:
+            jacobian (ndarray): the jacobian to fill.
+            row_span (Tuple[int, int]): the span of row indices.
+            col_span (Tuple[int, int]): the span of column indices.
+            values (ndarray): the values to insert.
+
+        Returns:
+            (ndarray) the filled jacobian.
+        """
         jacobian[row_span[0] : row_span[1], col_span[0] : col_span[1]] = values
         return jacobian
 
     def __call__(
         self, params: ndarray, x: Optional[ndarray] = None
     ) -> Tuple[Circuit, Optional[ndarray], ndarray, Optional[dict]]:
+        """Construct the circuit defined by the internal ``circuit_structure`` and compute
+        the jacobian wrt to the parameters `params` and inputs `x` of the construction process.
 
+        Args:
+            params (ndarray): the parameters to construct the circuit with.
+            x (ndarray, optional): the inputs to construct the circuit with.
+
+        Returns:
+            (Tuple(Circuit, ndarray, ndarray, dict)) the constructed circuit, jacobian wrt inputs,
+        jacobian wrt parameters and mapping of inputs ``x`` to the corresponding gate in the built circuit.
+        """
         if (
             any(isinstance(circ, QuantumEncoding) for circ in self.circuit_structure)
             and x is None
@@ -256,6 +364,16 @@ class CircuitTracer(ABC):
         return circuit, jacobians_wrt_inputs, J, input_to_gate_map
 
     def build_circuit(self, params: ndarray, x: Optional[ndarray] = None) -> Circuit:
+        """Construct the circuit defined by the internal ``circuit_structure`` without
+        worrying about tracing the operations.
+
+        Args:
+            params (ndarray): the parameters to construct the circuit with.
+            x (ndarray, optional): the inputs to construct the circuit with.
+
+        Returns:
+            (Circuit) the constructed circuit.
+        """
         circuit = None
 
         index = 0

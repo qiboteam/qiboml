@@ -64,9 +64,10 @@ class PSR(Differentiation):
         Evaluate the gradient of the quantum circuit w.r.t its parameters, i.e. its rotation angles.
         Args:
             parameters (List[ndarray]): the parameters at which to evaluate the model, and thus the derivative.
-            wrt_inputs (bool): whether to calculate the derivate with respect to inputs or not, by default ``False``.
+            wrt_inputs (bool): whether to calculate the derivative with respect to, also, inputs (i.e. encoding angles)
+        or not, by default ``False``.
         Returns:
-            (ndarray): the calculated gradients.
+            (ndarray): the calculated jacobian.
         """
 
         circuits = []
@@ -261,6 +262,8 @@ class Jax(Differentiation):
         i.e. the parameterized gates in the circuit.
         Args:
             parameters (list[ndarray]): the parameters at which to evaluate the circuit, and thus the derivatives.
+            wrt_inputs (bool): whether to calculate the derivative with respect to, also, inputs (i.e. encoding angles)
+        or not, by default ``False``.
         Returns:
             (ndarray): the calculated jacobian.
         """

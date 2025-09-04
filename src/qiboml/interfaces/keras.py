@@ -6,6 +6,7 @@
 import string
 from dataclasses import dataclass
 from functools import reduce
+from logging import warning
 from typing import Callable, List, Optional, Tuple, Union
 
 import keras
@@ -13,7 +14,6 @@ import numpy as np
 import tensorflow as tf  # pylint: disable=import-error
 from qibo import Circuit
 from qibo.backends import Backend
-from qibo.config import raise_error
 
 from qiboml.interfaces import utils
 from qiboml.interfaces.circuit_tracer import CircuitTracer
@@ -39,7 +39,7 @@ class KerasCircuitTracer(CircuitTracer):
     def jacrev(f: Callable, argnums: Union[int, Tuple[int]]) -> Callable:
 
         @tf.function
-        def jac_functional(x):
+        def jac_functional(x):  # pragma: no cover
             with tf.GradientTape() as tape:
                 tape.watch(x)
                 y = f(x)
@@ -49,7 +49,9 @@ class KerasCircuitTracer(CircuitTracer):
 
     @staticmethod
     def jacfwd(f: Callable, argnums: Union[int, Tuple[int]]) -> Callable:
-        # no available implementation of forward differentiation in tensorflow
+        warning(
+            "No available implementation of forward differentiation in tensorflow, falling back to reverse mode differentiation."
+        )
         return KerasCircuitTracer.jacrev(f, argnums)
 
     def nonzero(self, array: tf.Tensor) -> tf.Tensor:
@@ -81,26 +83,6 @@ class KerasCircuitTracer(CircuitTracer):
         return keras.ops.slice_update(jacobian, (row_span[0], col_span[0]), values)
 
     def requires_gradient(self, x: tf.Tensor) -> bool:
-        """
-        for circ in self.circuit_structure:
-            if isinstance(circ, QuantumEncoding):
-                with tf.GradientTape() as tape:
-                    tape.watch(x)
-                    y = circ(x)
-                    y = tf.stack([
-                        p
-                        for pars in y.get_parameters(
-                                include_not_trainable=True
-                        )
-                        for p in pars
-                    ])
-                grad = tape.gradient(y, x)
-
-                #grad = self.jacobian_functionals[id(circ)](x)
-                if grad is not None:
-                    return True
-                break
-        """
         if tf.is_symbolic_tensor(x):
             return hasattr(x, "op") and len(x.op.inputs) > 0
         return True
@@ -112,7 +94,7 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
     The Keras interface to qiboml models.
 
     Args:
-        circuit_structure (Union[List[QuantumEncoding, Circuit], Circuit]):
+        circuit_structure (Union[List[QuantumEncoding, Circuit, Callable], Circuit]):
             a list of Qibo circuits and Qiboml encoding layers, which defines
             the complete structure of the model. The whole circuit will be mounted
             by sequentially stacking the elements of the given list. It is also possible
@@ -120,9 +102,10 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
         decoding (QuantumDecoding): the decoding layer.
         differentiation (Differentiation, optional): the differentiation engine,
             if not provided a default one will be picked following what described in the :ref:`docs <_differentiation_engine>`.
+        circuit_tracer (CircuitTracer, optional): tracer used to build the circuit and trace the operations performed upon construction. Defaults to ``KerasCircuitTracer``.
     """
 
-    circuit_structure: Union[Circuit, List[Union[Circuit, QuantumEncoding]]]
+    circuit_structure: Union[Circuit, List[Union[Circuit, QuantumEncoding, Callable]]]
     decoding: QuantumDecoding
     differentiation: Optional[Differentiation] = None
     circuit_tracer: Optional[CircuitTracer] = None
@@ -136,7 +119,6 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
         params = utils.get_params_from_circuit_structure(self.circuit_structure)
         params = keras.ops.cast(
             self.backend.to_numpy(params),
-            # params,
             "float64",
         )  # pylint: disable=no-member
         self.circuit_parameters = self.add_weight(
@@ -153,15 +135,6 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
                 decoding=self.decoding,
                 instructions=DEFAULT_DIFFERENTIATION,
             )
-        """
-        if self.differentiation is not None:
-            self.custom_gradient = QuantumModelCustomGradient(
-                self.circuit_structure,
-                self.decoding,
-                self.backend,
-                self.differentiation,
-            )
-        """
         self.custom_gradient = None
 
     def compute_output_shape(self, input_shape):
@@ -241,17 +214,6 @@ class QuantumModelCustomGradient:
 
     @tf.custom_gradient
     def evaluate(self, x, params):
-        """
-        x_is_not_None = x.shape[0] != 0
-
-        # check whether we have to derive wrt inputs
-        if x_is_not_None and tf.is_symbolic_tensor(x):
-
-            self.wrt_inputs = (
-                self.circuit_tracer.is_encoding_differentiable
-                and self.circuit_tracer.requires_gradient(x)
-            )
-        """
         if x.shape[0] == 0:
             x = None
         circuit, jacobian_wrt_inputs, jacobian, input_to_gate_map = self.circuit_tracer(
@@ -276,9 +238,6 @@ class QuantumModelCustomGradient:
             return y
 
         y = tf.numpy_function(func=forward, inp=[angles], Tout=tf.float64)
-        # check output shape of decoding layers, their returned tensor
-        # shape should match the output_shape attribute and this should
-        # not be necessary (only useful for symbolic execution)!!
         y = keras.ops.reshape(y, self.decoding.output_shape)
 
         def jacobian_wrt_angles(angles):
@@ -309,11 +268,6 @@ class QuantumModelCustomGradient:
                 for indices in contraction
             )
             # contraction to combine with the gradients coming from outside
-            """
-            indices = tuple(range(len(dy.shape)))
-            lhs = "".join(string.ascii_letters[i] for i in indices)
-            rhs = string.ascii_letters[len(indices)] + lhs
-            """
             rhs = "".join(
                 string.ascii_letters[i] for i in tuple(range(1, len(dy.shape) + 1))
             )
@@ -361,31 +315,17 @@ class QuantumModelCustomGradient:
                     jacobian_wrt_inputs,
                     d_encoding_angles,
                 )
-                # tmp = lhs + "".join(
-                #    string.ascii_letters[i] for i in range(len(indices), len(d_x.shape))
-                # )
-                # d_x = keras.ops.einsum(f"{lhs},{tmp}", d_x, dy)
                 d_x = keras.ops.einsum(f"{lhs},{rhs}", d_x, dy)
                 d_x = keras.ops.reshape(d_x, x.shape)
             else:
                 if tf.is_symbolic_tensor(d_angles):
-                    # breakpoint()
                     d_angles = keras.ops.reshape(
                         d_angles, (jacobian.shape[0],) + out_shape
                     )
                 d_x = None
 
-            """
-            if x_is_not_None:
-                # double check this
-                # the reshape here should be needed for symbolic execution only
-                d_x = keras.ops.reshape(d_x, dy.shape + x.shape)
-            """
             d_params = keras.ops.einsum(contraction, jacobian, d_angles)
-            # d_params = keras.ops.reshape(d_params, tuple(params.shape) + dy.shape)
             d_params = keras.ops.einsum(f"{lhs},{rhs}", d_params, dy)
-            # if not tf.is_symbolic_tensor(d_params):
-            #    breakpoint()
             return d_x, d_params
 
         return y, grad

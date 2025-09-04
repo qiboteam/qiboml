@@ -21,10 +21,11 @@ def test_probabilities_layer(backend):
     )
 
 
-def test_state_layer(backend):
+@pytest.mark.parametrize("density_matrix", [True, False])
+def test_state_layer(backend, density_matrix):
     nqubits = 5
-    layer = dec.State(nqubits, backend=backend)
-    c = random_clifford(nqubits, backend=backend)
+    layer = dec.State(nqubits, density_matrix=density_matrix, backend=backend)
+    c = random_clifford(nqubits, density_matrix=density_matrix, backend=backend)
     real, im = layer(c)
     backend.assert_allclose(
         (real + 1j * im).ravel(), backend.execute_circuit(c).state().ravel()

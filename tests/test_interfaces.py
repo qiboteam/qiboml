@@ -268,9 +268,7 @@ def get_parameters(frontend, model, return_array=False):
 
 def set_device(frontend):
     if frontend.__name__ == "qiboml.interfaces.pytorch":
-        # frontend.torch.set_default_device(
-        #    "cuda:0" if frontend.torch.cuda.is_available() else "cpu"
-        # )
+        # uses the torch.default_device automatically
         pass
     elif frontend.__name__ == "qiboml.interfaces.keras":
         # tf should automatically use GPU by default when available
@@ -406,19 +404,6 @@ def test_decoding(backend, frontend, layer, seed):
 
     data = random_tensor(frontend, (100, dim))
     target = prepare_targets(frontend, q_model, data)
-
-    """
-    if layer is dec.Samples:
-        error = (
-            NotImplementedError
-            if frontend.__name__ != "qiboml.interfaces.keras"
-            else frontend.tf.errors.UnimplementedError
-        )
-        with pytest.raises(error):
-            _ = backprop_test(frontend, q_model, data, target)
-        assert q_model(data[0][None, :]).shape == (kwargs["nshots"], nqubits)
-    else:
-    """
     backprop_test(frontend, q_model, data, target)
 
 
@@ -584,28 +569,10 @@ def test_qibolab(frontend):
         nshots=1000,
     )
 
-    activation = build_activation(
-        frontend, binary=encoding_layer.__class__.__name__ == "BinaryEncoding"
-    )
     model = frontend.QuantumModel(
         circuit_structure=[encoding_layer, training_layer],
         decoding=decoding_layer,
     )
-    """
-    build_sequential_model(
-        frontend,
-        [
-            build_linear_layer(frontend, 1, nqubits),
-            activation,
-            frontend.QuantumModel(
-                circuit_structure=[encoding_layer, training_layer],
-                decoding=decoding_layer,
-            ),
-            build_linear_layer(frontend, decoding_layer.output_shape[-1], 1),
-        ],
-    )
-    setattr(model, "decoding", decoding_layer)
-    """
 
     data = random_tensor(frontend, (10, 1))
     target = prepare_targets(frontend, model, data)

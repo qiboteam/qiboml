@@ -3,7 +3,7 @@ Building your first Quantum Model
 
 In order to build a Quantum Model you need to define two fundamental ingredients:
 
-* the ``circuit_structure``: a general quantum circuit can be composed of encoding Unitaries and trainable Unitaries. In practice, in Qiboml, we use the ``Encoder`` class to build the encoding layers of our quantum circuits (namely, the operations where we encode external input data), while we leave the user the freedom of constructing any trainable layer using Qibo's ``Circuit`` interface. The set of elements composing the circuit structure can then be provided as a list to the Qiboml quantum models.
+* the ``circuit_structure``: a general quantum circuit can be composed of encoding Unitaries and trainable Unitaries. In practice, in Qiboml, we use the ``Encoder`` class to build the encoding layers of our quantum circuits (namely, the operations where we encode external input data), while we leave the user the freedom of constructing any trainable layer using Qibo's ``Circuit`` interface or by defining custom functions of independent parameters that are combined to produce a ``Circuit``. The set of elements composing the circuit structure can then be provided as a list to the Qiboml quantum models.
 * a ``Decoder`` in charge of decoding the quantum information contained in the final state we get once executing the whole circuit structure.
 
 In the following picture, we showcase a full quantum machine learning pipeline:
