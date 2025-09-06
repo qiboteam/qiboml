@@ -102,19 +102,28 @@ class TensorflowBackend(NumpyBackend):
     def compile(self, func):
         return self.tf.function(func)
 
-    def zero_state(self, nqubits):
-        idx = self.tf.constant([[0]], dtype="int32")
-        state = self.tf.zeros((2**nqubits,), dtype=self.dtype)
-        update = self.tf.constant([1], dtype=self.dtype)
+    def zero_state(self, nqubits, density_matrix: bool = False, dtype=None):
+        if dtype is None:
+            dtype = self.dtype
+
+        shape = [[0, 0]] if density_matrix else [[0]]
+        idx = self.tf.constant(shape, dtype="int32")
+
+        shape = 2 * (2**nqubits,) if density_matrix else (2**nqubits,)
+        state = self.tf.zeros(shape, dtype=dtype)
+
+        update = self.tf.constant([1], dtype=dtype)
+
         state = self.tf.tensor_scatter_nd_update(state, idx, update)
+
         return state
 
-    def zero_density_matrix(self, nqubits):
-        idx = self.tf.constant([[0, 0]], dtype="int32")
-        state = self.tf.zeros(2 * (2**nqubits,), dtype=self.dtype)
-        update = self.tf.constant([1], dtype=self.dtype)
-        state = self.tf.tensor_scatter_nd_update(state, idx, update)
-        return state
+    # def zero_density_matrix(self, nqubits):
+    #     idx = self.tf.constant([[0, 0]], dtype="int32")
+    #     state = self.tf.zeros(2 * (2**nqubits,), dtype=self.dtype)
+    #     update = self.tf.constant([1], dtype=self.dtype)
+    #     state = self.tf.tensor_scatter_nd_update(state, idx, update)
+    #     return state
 
     def matrix(self, gate):
         npmatrix = super().matrix(gate)
