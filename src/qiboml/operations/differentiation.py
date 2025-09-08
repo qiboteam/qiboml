@@ -12,7 +12,6 @@ from qibo.config import raise_error
 from qiboml import ndarray
 from qiboml.backends.jax import JaxBackend
 from qiboml.models.decoding import Expectation, QuantumDecoding
-from qiboml.models.encoding import QuantumEncoding
 
 
 @dataclass
@@ -145,7 +144,9 @@ class PSR(Differentiation):
 
 class Adjoint(Differentiation):
     """
-    The Adjoint differentiator.
+    Adjoint differentiation following Algorithm 1 from https://arxiv.org/abs/2009.02823.
+    Only :class:`qiboml.models.decoding.Expectation`. as decoding is supported and all parametrized_gates
+    must have a gradient method returning the gradient of the single gate.
     """
 
     def evaluate(self, parameters: ndarray, wrt_inputs: bool = False):
@@ -159,7 +160,7 @@ class Adjoint(Differentiation):
         """
         assert isinstance(
             self.decoding, Expectation
-        ), "Adjoint diff supported only for Expectation."
+        ), "Adjoint differentation supported only for Expectation."
         gradients = []
         lam = self.backend.execute_circuit(self.circuit).state()
         nqubits = self.circuit.nqubits
@@ -174,7 +175,9 @@ class Adjoint(Differentiation):
             phi = self.backend.apply_gate(gate.dagger(), phi, nqubits=nqubits)
             if gate in gate_list:
                 mu = phi
-                mu = self.backend.apply_gate(gate.gradient(), mu, nqubits=nqubits)
+                mu = self.backend.apply_gate(
+                    gate.gradient(backend=self.backend), mu, nqubits=nqubits
+                )
                 gradients.append(
                     2 * self.backend.np.real(self.backend.np.vdot(lam, mu))
                 )
