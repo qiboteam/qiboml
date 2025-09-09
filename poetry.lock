@@ -3877,7 +3877,7 @@ qulacs = ["qulacs (>=0.6.4,<0.7.0) ; python_version < \"3.13\""]
 type = "git"
 url = "https://github.com/qiboteam/qibo"
 reference = "gradient"
-resolved_reference = "3246bc1b71a274dc0fc39446ae4967dcb8a984ba"
+resolved_reference = "72940c1e8bc27b06299b63811dd3e335f5912cf0"
 
 [[package]]
 name = "qibojit"
@@ -3928,7 +3928,7 @@ qrng = ["pyserial (>=3.5,<4.0)"]
 type = "git"
 url = "https://github.com/qiboteam/qibolab"
 reference = "HEAD"
-resolved_reference = "1697f00a471752582e424dbce2a72d5211d5c103"
+resolved_reference = "53b3336605088f6886a4aa7f6db9e512ea6a56c3"
 
 [[package]]
 name = "qutip"
