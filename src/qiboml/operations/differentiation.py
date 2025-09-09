@@ -161,16 +161,19 @@ class Adjoint(Differentiation):
         assert isinstance(
             self.decoding, Expectation
         ), "Adjoint differentation supported only for Expectation."
-        gradients = []
-        lam = self.backend.execute_circuit(self.circuit).state()
-        nqubits = self.circuit.nqubits
-        phi = lam
-        lam = self.decoding.observable @ lam  # pylint: disable=E1101
         gate_list = (
             self.circuit.trainable_gates
             if not wrt_inputs
             else self.circuit.parametrized_gates
         )
+        for g, p in zip(gate_list, parameters):
+            g.parameters = p
+
+        gradients = []
+        lam = self.backend.execute_circuit(self.circuit).state()
+        nqubits = self.circuit.nqubits
+        phi = lam
+        lam = self.decoding.observable @ lam  # pylint: disable=E1101
         for gate in reversed(self.circuit.queue):
             phi = self.backend.apply_gate(gate.dagger(), phi, nqubits=nqubits)
             if gate in gate_list:

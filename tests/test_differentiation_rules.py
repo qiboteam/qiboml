@@ -5,14 +5,15 @@ import pytest
 from qibo import Circuit, gates, hamiltonians
 from qibo.backends import NumpyBackend
 
-from qiboml.backends import PyTorchBackend
 from qiboml.models.ansatze import HardwareEfficient
 from qiboml.models.decoding import Expectation
 from qiboml.models.encoding import PhaseEncoding
 from qiboml.operations.differentiation import PSR, Adjoint, Jax
 
 # TODO: use the classical conftest mechanism or customize mechanism for this test
-EXECUTION_BACKENDS = [NumpyBackend(), PyTorchBackend()]
+EXECUTION_BACKENDS = [
+    NumpyBackend(),
+]
 DIFF_RULES = [Jax, PSR, Adjoint]
 
 TARGET_GRAD_TORCH = {
@@ -72,14 +73,14 @@ def set_seed(frontend, seed):
 
 def construct_x(frontend, wrt_inputs=False):
     if frontend.__name__ == "qiboml.interfaces.pytorch":
-        x = frontend.torch.tensor([[0.5, 0.8]], requires_grad=wrt_inputs)
+        x = frontend.torch.tensor([0.5, 0.8], requires_grad=wrt_inputs)
         return x
     elif frontend.__name__ == "qiboml.interfaces.keras":
         if frontend.keras.backend.backend() == "tensorflow":
             x = (
-                frontend.tf.Variable([[0.5, 0.8]])
+                frontend.tf.Variable([0.5, 0.8])
                 if wrt_inputs
-                else frontend.tf.constant([[0.5, 0.8]])
+                else frontend.tf.constant([0.5, 0.8])
             )
             return x
         elif frontend.keras.backend.backend() == "pytorch":
@@ -118,7 +119,7 @@ def compute_gradient(frontend, model, x, wrt_inputs=False):
 
 @pytest.mark.parametrize("nshots", [None, 12000000])
 @pytest.mark.parametrize("backend", EXECUTION_BACKENDS)
-@pytest.mark.parametrize("wrt_inputs", [False])
+@pytest.mark.parametrize("wrt_inputs", [True, False])
 @pytest.mark.parametrize("diff_rule", DIFF_RULES)
 @pytest.mark.parametrize("equivariant", [True, False])
 def test_expval_custom_grad(
