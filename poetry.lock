@@ -3876,8 +3876,8 @@ qulacs = ["qulacs (>=0.6.4,<0.7.0) ; python_version < \"3.13\""]
 [package.source]
 type = "git"
 url = "https://github.com/qiboteam/qibo"
-reference = "gradient"
-resolved_reference = "72940c1e8bc27b06299b63811dd3e335f5912cf0"
+reference = "HEAD"
+resolved_reference = "79fbb2d4901ffbecff6ee8c8700109fed9e28115"
 
 [[package]]
 name = "qibojit"
@@ -5382,4 +5382,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.13"
-content-hash = "3f95745d7cf63e9731da62fa48478b9cd2f45bd1e27894eb5e1d26d6163363d3"
+content-hash = "2765b3c3599a1580f1cd8653f4c3818d843f903a047939ba267b1915e6c9ccf2"
