@@ -11,7 +11,7 @@ from qibo.config import raise_error
 
 from qiboml import ndarray
 from qiboml.backends.jax import JaxBackend
-from qiboml.models.decoding import QuantumDecoding
+from qiboml.models.decoding import Expectation, QuantumDecoding
 
 
 @dataclass
@@ -89,6 +89,7 @@ class PSR(Differentiation):
         eigvals = self.backend.np.reshape(
             self.backend.cast(eigvals, dtype=parameters.dtype), forwards.shape
         )
+
         return (forwards - backwards) * eigvals
 
     def one_parameter_shift(
@@ -141,8 +142,55 @@ class PSR(Differentiation):
         return parameters
 
 
-class Jax(Differentiation):
+class Adjoint(Differentiation):
+    """
+    Adjoint differentiation following Algorithm 1 from https://arxiv.org/abs/2009.02823.
+    Only :class:`qiboml.models.decoding.Expectation`. as decoding is supported and all parametrized_gates
+    must have a gradient method returning the gradient of the single gate.
+    """
 
+    def evaluate(self, parameters: ndarray, wrt_inputs: bool = False):
+        """
+        Evaluate the gradient of the quantum circuit w.r.t its parameters, i.e. its rotation angles.
+        Args:
+            parameters (List[ndarray]): the parameters at which to evaluate the model, and thus the derivative.
+            wrt_inputs (bool): whether to calculate the derivate with respect to inputs or not, by default ``False``.
+        Returns:
+            (ndarray): the calculated gradients.
+        """
+        assert isinstance(
+            self.decoding, Expectation
+        ), "Adjoint differentation supported only for Expectation."
+        gate_list = (
+            self.circuit.trainable_gates
+            if not wrt_inputs
+            else self.circuit.parametrized_gates
+        )
+        for g, p in zip(gate_list, parameters):
+            g.parameters = p
+
+        gradients = []
+        lam = self.backend.execute_circuit(self.circuit).state()
+        nqubits = self.circuit.nqubits
+        phi = lam
+        lam = self.decoding.observable @ lam  # pylint: disable=E1101
+        for gate in reversed(self.circuit.queue):
+            phi = self.backend.apply_gate(gate.dagger(), phi, nqubits=nqubits)
+            if gate in gate_list:
+                mu = phi
+                mu = self.backend.apply_gate(
+                    gate.gradient(backend=self.backend), mu, nqubits=nqubits
+                )
+                gradients.append(
+                    2 * self.backend.np.real(self.backend.np.vdot(lam, mu))
+                )
+            lam = self.backend.apply_gate(gate.dagger(), lam, nqubits=nqubits)
+        return self.backend.cast(gradients[::-1], dtype=parameters.dtype).reshape(
+            -1, *self.decoding.output_shape
+        )
+
+
+class Jax(Differentiation):
     def __init__(self, circuit: Circuit, decoding: QuantumDecoding):
         self._jax: Backend = JaxBackend()
         self._circuit = circuit
