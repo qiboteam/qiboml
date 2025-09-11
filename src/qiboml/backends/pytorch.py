@@ -4,8 +4,8 @@ from typing import Union
 
 import numpy as np
 from qibo import __version__
+from qibo.backends.abstract import Backend
 from qibo.backends.npmatrices import NumpyMatrices
-from qibo.backends.numpy import NumpyBackend
 
 
 class TorchMatrices(NumpyMatrices):
@@ -39,7 +39,7 @@ class TorchMatrices(NumpyMatrices):
         return self._cast(u, dtype=self.dtype, device=self.device)
 
 
-class PyTorchBackend(NumpyBackend):
+class PyTorchBackend(Backend):
     def __init__(self):
         super().__init__()
         import torch  # pylint: disable=import-outside-toplevel  # type: ignore
@@ -277,7 +277,7 @@ class PyTorchBackend(NumpyBackend):
             return self.np.linalg.eigh(matrix)  # pylint: disable=not-callable
         return self.np.linalg.eig(matrix)  # pylint: disable=not-callable
 
-    def calculate_matrix_exp(
+    def matrix_exp(
         self,
         matrix,
         phase: Union[float, int, complex] = 1,
@@ -294,7 +294,7 @@ class PyTorchBackend(NumpyBackend):
 
         return (eigenvectors * expd) @ ud
 
-    def calculate_matrix_power(
+    def matrix_power(
         self,
         matrix,
         power: Union[float, int],
@@ -302,10 +302,10 @@ class PyTorchBackend(NumpyBackend):
     ):
         copied = self.cast(matrix, copy=True)
         copied = self.to_numpy(copied) if power >= 0.0 else copied.detach()
-        copied = super().calculate_matrix_power(copied, power, precision_singularity)
+        copied = super().matrix_power(copied, power, precision_singularity)
         return self.cast(copied, dtype=copied.dtype)
 
-    def calculate_jacobian_matrix(
+    def jacobian(
         self, circuit, parameters=None, initial_state=None, return_complex: bool = True
     ):
         copied = circuit.copy(deep=True)

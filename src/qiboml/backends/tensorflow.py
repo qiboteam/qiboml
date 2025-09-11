@@ -28,7 +28,7 @@ class TensorflowMatrices(NumpyMatrices):
         return self._cast(u, dtype=self.dtype)
 
 
-class TensorflowBackend(NumpyBackend):
+class TensorflowBackend(Backend):
     def __init__(self):
         super().__init__()
         self.name = "qiboml"
@@ -217,27 +217,27 @@ class TensorflowBackend(NumpyBackend):
         )
         return frequencies
 
-    def calculate_vector_norm(self, state, order=2):
+    def vector_norm(self, state, order=2):
         state = self.cast(state)
         return self.tf.norm(state, ord=order)
 
-    def calculate_matrix_norm(self, state, order="nuc"):
+    def matrix_norm(self, state, order="nuc"):
         state = self.cast(state)
         if order == "nuc":
             return self.np.trace(state)
         return self.tf.norm(state, ord=order)
 
-    def calculate_eigenvalues(self, matrix, k: int = 6, hermitian: bool = True):
+    def eigenvalues(self, matrix, k: int = 6, hermitian: bool = True):
         if hermitian:
             return self.tf.linalg.eigvalsh(matrix)
         return self.tf.linalg.eigvals(matrix)
 
-    def calculate_eigenvectors(self, matrix, k: int = 6, hermitian: bool = True):
+    def eigenvectors(self, matrix, k: int = 6, hermitian: bool = True):
         if hermitian:
             return self.tf.linalg.eigh(matrix)
         return self.tf.linalg.eig(matrix)
 
-    def calculate_matrix_exp(
+    def matrix_exp(
         self,
         matrix,
         phase: Union[float, int, complex] = 1,
@@ -246,9 +246,9 @@ class TensorflowBackend(NumpyBackend):
     ):
         if eigenvectors is None or self.is_sparse(matrix):
             return self.tf.linalg.expm(phase * matrix)
-        return super().calculate_matrix_exp(matrix, phase, eigenvectors, eigenvalues)
+        return super().matrix_exp(matrix, phase, eigenvectors, eigenvalues)
 
-    def calculate_matrix_power(
+    def matrix_power(
         self,
         matrix,
         power: Union[float, int],
@@ -268,7 +268,7 @@ class TensorflowBackend(NumpyBackend):
                     matrix, power, precision_singularity, self.tf, self
                 )
 
-        return super().calculate_matrix_power(matrix, power, precision_singularity)
+        return super().matrix_power(matrix, power, precision_singularity)
 
     def calculate_singular_value_decomposition(self, matrix):
         # needed to unify order of return
