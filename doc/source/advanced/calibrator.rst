@@ -60,11 +60,11 @@ Now we can collect our protocols into the `Runcard` object and pass it to the
             runcard=runcard,
             backend = get_backend(),
             path = Path("report_test"),
-            trigger_shots = 10,
+            calibrator_frequency = 10,
         )
 
 Finally, we can pass the `Calibrator` to the `Expectation` decoder as an additional argument.
-Every `trigger_shots` time the calibration protocols are
+Every `calibrator_frequency` time the calibration protocols are
 executed, and the results are dumped into the `path`.
 
 .. code::

@@ -21,7 +21,7 @@ try:
         """Folder to dump the protocol's data and results."""
         backend: Backend
         """Qibo backend."""
-        trigger_shots: int = 100
+        calibrator_frequency: int = 100
         """Number of Expectation calls to trigger :meth:`qiboml.models.utils.Calibrator.execute_experiments`"""
         _history: list[History] = field(default_factory=list)
         _counter: int = 0
@@ -32,7 +32,7 @@ try:
 
         def __call__(self):
             self._counter += 1
-            if self._counter % self.trigger_shots == 0:
+            if self._counter % self.calibrator_frequency == 0:
                 self.execute_experiments()
 
         def execute_experiments(self):

@@ -81,7 +81,7 @@ def test_calibrator():
         runcard=runcard,
         backend=backend,
         path=Path(tempfile.gettempdir() + "/report_test"),
-        trigger_shots=10,
+        calibrator_frequency=10,
     )
     dec = Expectation(
         nqubits=NQUBITS,
