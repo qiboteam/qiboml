@@ -44,7 +44,7 @@ This is achieved in `Qibocal` through the classification experiment and the `all
         )
 
 The `id` is a user-chosen name to identify the specific protocol execution, whereas
-the `operation` and `parameters` are the name of the protocol in `Qibocal` and
+`operation` and `parameters` are the name of the protocol in `Qibocal` and
 its parameter, respectively.
 
 Now we can collect our protocols into the `Runcard` object and pass it to the
