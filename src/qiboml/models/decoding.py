@@ -2,7 +2,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Union
 
-from qibo import Circuit, gates, transpiler
+from qibo import Circuit, gates, get_transpiler, transpiler
 from qibo.backends import Backend, NumpyBackend, _check_backend
 from qibo.config import log, raise_error
 from qibo.hamiltonians import Hamiltonian, SymbolicHamiltonian, Z
@@ -13,6 +13,7 @@ from qibo.result import CircuitResult, MeasurementOutcomes, QuantumState
 from qibo.transpiler import Passes
 
 from qiboml import ndarray
+from qiboml.models.calibrator import Calibrator
 from qiboml.models.utils import Mitigator
 
 
@@ -260,6 +261,7 @@ class Expectation(QuantumDecoding):
 
     observable: Union[ndarray, Hamiltonian] = None
     mitigation_config: Optional[Dict[str, Any]] = None
+    calibrator: Optional[Calibrator] = None
 
     def __post_init__(self):
         """Ancillary post initialization operations."""
@@ -315,6 +317,9 @@ class Expectation(QuantumDecoding):
                 self.mitigator(expval),
                 dtype=self.backend.np.float64,
             )
+
+        if self.calibrator is not None:
+            self.calibrator()
 
         return self.backend.np.reshape(expval, (1, 1))
 
