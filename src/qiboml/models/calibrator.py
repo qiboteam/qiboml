@@ -63,5 +63,5 @@ try:
             """
             return self._history[execution_number][id][0].results
 
-except ImportError:
-    Calibrator = None
+except ImportError:  # pragma: no cover
+    Calibrator = None  # pragma: no cover

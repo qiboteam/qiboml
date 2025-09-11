@@ -100,5 +100,7 @@ def test_calibrator():
         cost.backward()
         optimizer.step()
 
-    assert list(dec.calibrator._history[0]._tasks.keys()) == ["sgle_shot", "allxy"]
+    assert list(dec.calibrator.history[0]._tasks.keys()) == ["sgle_shot", "allxy"]
+    assert dec.calibrator.data("allxy", 0).beta_param == None
+    assert dec.calibrator.results("sgle_shot", 0).names == ["qubit_fit"]
     assert dec.calibrator._history != None
