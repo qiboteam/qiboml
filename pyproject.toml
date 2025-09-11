@@ -20,8 +20,8 @@ keras = { version = "^3.11.0", optional = true }
 tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux' or sys_platform == 'darwin'", optional = true }
 # TODO: the marker is a temporary solution due to the lack of the tensorflow-io 0.32.0's wheels for Windows, this package is one of
 # the tensorflow requirements
-torch = { version = "^2.7.0", optional = true}
-qibo = {git="https://github.com/qiboteam/qibo"}
+torch = { version = "^2.7.0", optional = true }
+qibo = { git = "https://github.com/qiboteam/qibo" }
 jax = "^0.4.25"
 jaxlib = "^0.4.25"
 
@@ -40,8 +40,8 @@ setuptools = "^78.1.1"
 ipykernel = "^6.29.5"
 torchmetrics = "^1.7.0"
 keras = { version = "^3.11.0" }
-tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux' or sys_platform == 'darwin'"}
-torch = { version = "^2.7.0"}
+tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux' or sys_platform == 'darwin'" }
+torch = { version = "^2.7.0" }
 
 [tool.poetry.group.dev]
 optional = true
@@ -60,21 +60,21 @@ pytest-cov = "4.0.0"
 qibojit = "^0.1.7"
 matplotlib = "^3.7.0"
 keras = "^3.11.0"
-tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux' or sys_platform == 'darwin'"}
-torch = { version = "^2.7.0"}
-qibolab = { git="https://github.com/qiboteam/qibolab", extras=["emulator"] }
+tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux' or sys_platform == 'darwin'" }
+torch = { version = "^2.7.0" }
+qibolab = { git = "https://github.com/qiboteam/qibolab", extras = ["emulator"] }
 
 [tool.poetry.group.cuda11]
 optional = true
 
 [tool.poetry.group.cuda11.dependencies]
-jax = {extras = ["cuda11"], version = "^0.4.25"}
+jax = { extras = ["cuda11"], version = "^0.4.25" }
 
 [tool.poetry.group.cuda12]
 optional = true
 
 [tool.poetry.group.cuda12.dependencies]
-jax = {extras = ["cuda12"], version = "^0.4.25"}
+jax = { extras = ["cuda12"], version = "^0.4.25" }
 
 [tool.poe.tasks]
 test = "pytest"
