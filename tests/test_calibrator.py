@@ -85,15 +85,13 @@ def test_calibrator():
     )
     dec = Expectation(
         nqubits=NQUBITS,
-        nshots=1024,
+        nshots=100,
         density_matrix=False,
         wire_names=wire_names,
         transpiler=transpiler,
         calibrator=calibrator,
     )
-    model = QuantumModel(
-        circuit_structure=vqe_circ, decoding=dec, differentiation=PSR()
-    )
+    model = QuantumModel(circuit_structure=vqe_circ, decoding=dec, differentiation=PSR)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.1)
 
     for epoch in range(epochs):
@@ -102,4 +100,5 @@ def test_calibrator():
         cost.backward()
         optimizer.step()
 
+    assert list(dec.calibrator._history[0]._tasks.keys()) == ["sgle_shot", "allxy"]
     assert dec.calibrator._history != None
