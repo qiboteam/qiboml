@@ -80,6 +80,13 @@ class ExactGeodesicTransportCG:
         self.x = self.angles_to_amplitudes(self.angles)
         self.v = self.tangent_vector()
         self.u = self.backend.cast(self.v, dtype=self.v.dtype, copy=True)
+        # Power method learning rate
+        norm_u = self.backend.np.sqrt(self.sphere_inner_product(self.u, self.u, self.x))
+        loss_prev = self.loss()
+        self.eta = (
+            (1 / norm_u)
+            * self.backend.np.arccos((1 + (norm_u / (2 * loss_prev)) ** 2) ** -0.5)
+        ) * self.multiplicative_factor
 
         # Power method learning rate
         norm_u = self.backend.sqrt(self.sphere_inner_product(self.u, self.u, self.x))
@@ -151,6 +158,12 @@ class ExactGeodesicTransportCG:
         return self.hamiltonian.expectation_from_state(state)
 
     def gradient(self, epsilon=1e-8):  # pragma: no cover
+
+        expval = self.hamiltonian.expectation(state)
+
+        return expval
+
+    def gradient(self, epsilon=1e-8):
         """Numerically compute gradient of loss wrt angles.
 
         Returns:
@@ -203,6 +216,17 @@ class ExactGeodesicTransportCG:
             else:
                 grad[idx] = update
 
+            angles_forward = self.angles.copy()
+            angles_backward = self.angles.copy()
+            angles_forward[idx] += epsilon
+            angles_backward[idx] -= epsilon
+            loss_forward = self.__class__(
+                self.nqubits, self.weight, self.hamiltonian, angles_forward
+            ).loss()
+            loss_backward = self.__class__(
+                self.nqubits, self.weight, self.hamiltonian, angles_backward
+            ).loss()
+            grad[idx] = (loss_forward - loss_backward) / (2 * epsilon)
         return grad
 
     def amplitudes_to_full_state(
@@ -272,6 +296,15 @@ class ExactGeodesicTransportCG:
                 reduced_params[0] += math.pi / 2
 
             sins = self.backend.prod(self.backend.sin(self.angles[:j]))
+        jacob = self.backend.np.zeros((dim + 1, dim), dtype=self.backend.np.float64)
+
+        for j in range(dim):
+            reduced_params = self.backend.np.array(
+                self.angles[j:], dtype=self.backend.np.float64, copy=True
+            )
+            reduced_params[0] += self.backend.np.pi / 2
+
+            sins = self.backend.np.prod(self.backend.np.sin(self.angles[:j]))
             amps = self.angles_to_amplitudes(reduced_params)
 
             updates = self.backend.real(sins * amps)
@@ -297,6 +330,7 @@ class ExactGeodesicTransportCG:
         """
         g_diag = [
             self.backend.prod(self.backend.sin(self.angles[:k]) ** 2)
+            self.backend.np.prod(self.backend.np.sin(self.angles[:k]) ** 2)
             for k in range(len(self.angles))
         ]
         return self.backend.cast(g_diag, dtype=self.backend.float64)
@@ -485,6 +519,9 @@ class ExactGeodesicTransportCG:
             float: Inner product value.
         """
         return u @ v - (x @ u) * (x @ v)
+        return self.backend.np.dot(u, v) - self.backend.np.dot(
+            x, u
+        ) * self.backend.np.dot(x, v)
 
     def beta_dy(
         self, v_next: ArrayLike, x_next: ArrayLike, transported_u: ArrayLike, st
@@ -575,6 +612,7 @@ class ExactGeodesicTransportCG:
             self.eta = (
                 (1 / norm_u)
                 * self.backend.arccos((1 + (norm_u / (2 * loss_prev)) ** 2) ** -0.5)
+                * self.backend.np.arccos((1 + (norm_u / (2 * loss_prev)) ** 2) ** -0.5)
                 * self.multiplicative_factor
             )
 
