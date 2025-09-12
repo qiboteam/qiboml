@@ -39,7 +39,7 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
             by sequentially stacking the elements of the given list. It is also possible
             to pass a single circuit, in the case a sequential structure is not needed.
         decoding (QuantumDecoding): the decoding layer.
-        parameteres_initialization (Union[keras.initializers.Initializer, np.ndarray]]): if an initialiser is provided it will be used
+        parameters_initialization (Union[keras.initializers.Initializer, np.ndarray]]): if an initialiser is provided it will be used
         either as the parameters or to sample the parameters of the model.
         differentiation (Differentiation, optional): the differentiation engine,
             if not provided a default one will be picked following what described in the :ref:`docs <_differentiation_engine>`.
@@ -47,7 +47,7 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
 
     circuit_structure: Union[Circuit, List[Union[Circuit, QuantumEncoding]]]
     decoding: QuantumDecoding
-    parameteres_initialization: Optional[
+    parameters_initialization: Optional[
         Union[keras.initializers.Initializer, np.ndarray]
     ] = None
     differentiation: Optional[Differentiation] = None
@@ -66,24 +66,24 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
         )  # pylint: disable=no-member
 
         initializer = "zeros"
-        if self.parameteres_initialization is not None:
-            if isinstance(self.parameteres_initialization, keras.initializers.Initializer):
-                intializer = parameteres_initialization
-            elif isinstance(self.parameteres_initialization, np.ndarray | tf.Tensor):
-                if self.parameteres_initialization.shape != params.shape:
+        if self.parameters_initialization is not None:
+            if isinstance(self.parameters_initialization, keras.initializers.Initializer):
+                intializer = parameters_initialization
+            elif isinstance(self.parameters_initialization, np.ndarray | tf.Tensor):
+                if self.parameters_initialization.shape != params.shape:
                     raise_error(
                         ValueError,
-                        f"Shape not valid for `parameteres_initialization`. The shape should be {params.shape}.",
+                        f"Shape not valid for `parameters_initialization`. The shape should be {params.shape}.",
                     )
-                params = parameteres_initialization
+                params = parameters_initialization
             else:
-                raise_error(ValueError, "`parameteres_initialization` should be a `np.ndarray` or `keras.initializers.Initializer`.")
+                raise_error(ValueError, "`parameters_initialization` should be a `np.ndarray` or `keras.initializers.Initializer`.")
         self.circuit_parameters = self.add_weight(
             shape=params.shape,
             initializer=initializer,
             trainable=True,
         )
-        if not isinstance(self.parameteres_initialization, keras.initializers.Initializer):
+        if not isinstance(self.parameters_initialization, keras.initializers.Initializer):
             self.set_weights([params])
 
         if self.differentiation is None:
