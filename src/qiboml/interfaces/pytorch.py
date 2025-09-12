@@ -34,7 +34,7 @@ class QuantumModel(torch.nn.Module):
             by sequentially stacking the elements of the given list. It is also possible
             to pass a single circuit, in the case a sequential structure is not needed.
         decoding (QuantumDecoding): the decoding layer.
-        angles_initialisation (Union[keras.initializers.Initializer, np.ndarray]]): if an initialiser is provided it will be used
+        parameteres_initialization (Union[keras.initializers.Initializer, np.ndarray]]): if an initialiser is provided it will be used
         either as the parameters or to sample the parameters of the model.
         differentiation (Differentiation, optional): the differentiation engine,
             if not provided a default one will be picked following what described in the :ref:`docs <_differentiation_engine>`.
@@ -42,7 +42,7 @@ class QuantumModel(torch.nn.Module):
 
     circuit_structure: Union[Circuit, List[Union[Circuit, QuantumEncoding]]]
     decoding: QuantumDecoding
-    angles_initialisation: Optional[Union[np.ndarray, callable]] = None
+    parameteres_initialization: Optional[Union[np.ndarray, callable]] = None
     differentiation: Optional[Differentiation] = None
 
     def __post_init__(
@@ -57,19 +57,19 @@ class QuantumModel(torch.nn.Module):
         params = utils.get_params_from_circuit_structure(self.circuit_structure)
         params = torch.as_tensor(self.backend.to_numpy(x=params)).ravel()
 
-        if self.angles_initialisation is not None:
-            if callable(self.angles_initialisation):
+        if self.parameteres_initialization is not None:
+            if callable(self.parameteres_initialization):
                 params = torch.empty(params.shape, dtype=params.dtype, requires_grad=True)
-                params = self.angles_initialisation(params))
-            elif isinstance(self.angles_initialisation, np.ndarray | torch.Tensor):
-                if self.angles_initialisation.shape != params.shape:
+                params = self.parameteres_initialization(params)
+            elif isinstance(self.parameteres_initialization, np.ndarray | torch.Tensor):
+                if self.parameteres_initialization.shape != params.shape:
                     raise_error(
                         ValueError,
-                        f"Shape not valid for `angles_initialisation`. The shape should be {params.shape}.",
+                        f"Shape not valid for `parameteres_initialization`. The shape should be {params.shape}.",
                     )
-                params = torch.as_tensor(self.angles_initialisation).ravel()
+                params = torch.as_tensor(self.parameteres_initialization).ravel()
             else:
-                raise_error(ValueError, "`angles_initialisation` should be a `np.ndarray` or `torch.nn.init`.")
+                raise_error(ValueError, "`parameteres_initialization` should be a `np.ndarray` or `torch.nn.init`.")
         params.requires_grad = True
         self.circuit_parameters = torch.nn.Parameter(params)
 
