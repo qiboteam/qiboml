@@ -137,6 +137,15 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
 
         return fig
 
+    def get_parameters(self) -> tf.Tensor:
+        """
+        Get the trainable parameters of the model.
+
+        Returns:
+            (tf.Tensor): the trainable parameters.
+        """
+        return self.circuit_parameters
+    
     @property
     def output_shape(
         self,
