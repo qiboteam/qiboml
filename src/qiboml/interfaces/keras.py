@@ -65,36 +65,26 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
             self.backend.to_numpy(params), "float64"
         )  # pylint: disable=no-member
 
-        if self.angles_initialisation is None:
-            self.circuit_parameters = self.add_weight(
-                shape=params.shape,
-                initializer="zeros",
-                trainable=True,
-            )
-            self.set_weights([params])
-
-        else:
+        initializer = "zeros"
+        if self.angles_initialisation is not None:
             if isinstance(self.angles_initialisation, keras.initializers.Initializer):
-                self.circuit_parameters = self.add_weight(
-                    shape=params.shape,
-                    initializer=self.angles_initialisation,
-                    trainable=True,
-                )
-
-            elif isinstance(self.angles_initialisation, np.ndarray):
+                intializer = angles_initialisation
+            elif isinstance(self.angles_initialisation, np.ndarray | tf.Tensor):
                 if self.angles_initialisation.shape != params.shape:
                     raise_error(
                         ValueError,
                         f"Shape not valid for `angles_initialisation`. The shape should be {params.shape}.",
                     )
-                self.circuit_parameters = self.add_weight(
-                    shape=params.shape,
-                    initializer="zeros",
-                    trainable=True,
-                )
-                self.circuit_parameters.assign(self.angles_initialisation)
+                params = angles_initialisation
             else:
                 raise_error(ValueError, "`angles_initialisation` should be a `np.ndarray` or `keras.initializers.Initializer`.")
+        self.circuit_parameters = self.add_weight(
+            shape=params.shape,
+            initializer=initializer,
+            trainable=True,
+        )
+        if not isinstance(self.angles_initialisation, keras.initializers.Initializer):
+            self.set_weights([params])
 
         if self.differentiation is None:
             self.differentiation = utils.get_default_differentiation(
