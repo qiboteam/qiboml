@@ -47,7 +47,6 @@ def build_linear_layer(frontend, input_dim, output_dim):
     else:
         raise_error(RuntimeError, f"Unknown frontend {frontend}.")
 
-    
 
 def build_sequential_model(frontend, layers):
     if frontend.__name__ == "qiboml.interfaces.pytorch":
@@ -308,23 +307,20 @@ def backprop_test(frontend, model, data, target):
     # specific (rare) cases
 
 
-@pytest.mark.parametrize("with_initializer", [False, True, "numpy_array", "error_check_numpy", "error_check_keras_torch"])
-@pytest.mark.parametrize("layer,seed", zip(ENCODING_LAYERS, [2]))
-def test_encoding(backend, frontend, layer, seed, with_initializer):
+@pytest.mark.parametrize("layer,seed", zip(ENCODING_LAYERS, [5, 5]))
+def test_encoding(backend, frontend, layer, seed):
     set_device(frontend)
     set_seed(frontend, seed)
+    backend.set_seed(seed)
 
     nqubits = 2
     dim = 2
-    density_matrix = False
 
-    training_layer = ans.HardwareEfficient(
-        nqubits, random_subset(nqubits, dim), density_matrix=density_matrix
-    )
+    training_layer = ans.HardwareEfficient(nqubits, random_subset(nqubits, dim))
 
     decoding_qubits = random_subset(nqubits, dim)
     observable = hamiltonians.SymbolicHamiltonian(
-        sum([Z(int(i)) for i in decoding_qubits]),
+        1 + np.prod([Z(int(i)) for i in decoding_qubits]),
         nqubits=nqubits,
         backend=backend,
     )
@@ -335,70 +331,27 @@ def test_encoding(backend, frontend, layer, seed, with_initializer):
         backend=backend,
     )
 
-    encoding_layer = layer(
-        nqubits, random_subset(nqubits, dim), density_matrix=density_matrix
-    )
+    encoding_layer = layer(nqubits, random_subset(nqubits, dim))
     circuit_structure = [encoding_layer, training_layer]
 
     binary = True if encoding_layer.__class__.__name__ == "BinaryEncoding" else False
     activation = build_activation(frontend, binary)
-
-    def final_steps(q_model, decoding_layer, dim):
-        setattr(q_model, "decoding", decoding_layer)
-        data = random_tensor(frontend, (100, dim), binary)
-        target = prepare_targets(frontend, q_model, data)
-        backprop_test(frontend, q_model, data, target)
-
-
-    if with_initializer == True:
-        if frontend.__name__ == "qiboml.interfaces.keras":
-            initializer = frontend.tf.keras.initializers.RandomNormal(mean=0.0, stddev=0.05)
-        elif frontend.__name__ == "qiboml.interfaces.pytorch":
-            initializer = lambda p: frontend.torch.nn.init.normal_(p, mean=0, std=0.5)
-        else:
-            raise_error(RuntimeError, f"Unknown frontend {frontend}.")
-
-        q_model = build_sequential_model(frontend, [
-                activation,
-                frontend.QuantumModel(
+    q_model = build_sequential_model(
+        frontend,
+        [
+            activation,
+            frontend.QuantumModel(
                 circuit_structure=circuit_structure,
-                angles_initialisation=initializer,
-                decoding=decoding_layer)
-                ])
-        final_steps(q_model, decoding_layer, dim)
-    elif with_initializer == False:
-        q_model = build_sequential_model(frontend, [
-                activation,
-                frontend.QuantumModel(
-                circuit_structure=circuit_structure,
-                decoding=decoding_layer)
-                ])
-        final_steps(q_model, decoding_layer, dim)
-    elif with_initializer == "numpy_array":
-        initializer = np.array([0.5, 0.6, 0.7, 0.8])
-        q_model = build_sequential_model(frontend, [
-                activation,
-                frontend.QuantumModel(
-                circuit_structure=circuit_structure,
-                angles_initialisation=initializer,
-                decoding=decoding_layer)
-                ])
-        final_steps(q_model, decoding_layer, dim)
-    elif with_initializer == "error_check_keras_torch":
-        with pytest.raises(ValueError):
-            dummy_input = 1
-            q_model = frontend.QuantumModel(
-                circuit_structure=circuit_structure,
-                angles_initialisation=dummy_input,
                 decoding=decoding_layer,
-            )
-    else:
-        with pytest.raises(ValueError):
-            q_model = frontend.QuantumModel(
-                circuit_structure=circuit_structure,
-                angles_initialisation=np.array([0.5, 0.6, 0.7, 0.8, 0.9, 0.7, 0.8, 0.9]),
-                decoding=decoding_layer,
-            )
+            ),
+        ],
+    )
+    setattr(q_model, "decoding", decoding_layer)
+
+    data = random_tensor(frontend, (100, dim), binary)
+    target = prepare_targets(frontend, q_model, data)
+
+    backprop_test(frontend, q_model, data, target)
 
  
 @pytest.mark.parametrize("layer,seed", zip(DECODING_LAYERS, [1, 3, 1, 26]))
@@ -637,3 +590,93 @@ def test_qibolab(frontend):
     train_model(frontend, model, data, target, max_epochs=1)
     _, loss_trained = eval_model(frontend, model, data, target)
     assert loss_untrained > loss_trained
+
+
+
+@pytest.mark.parametrize("with_initializer", [False, True, "numpy_array", "error_check_numpy", "error_check_keras_torch"])
+def test_parameters_initialization(backend, frontend, with_initializer):
+    set_device(frontend)
+
+    nqubits = 2
+
+    circuit_structure = [
+        enc.PhaseEncoding(nqubits=nqubits),
+        ans.HardwareEfficient(nqubits)
+    ]
+
+    # Function to create the model
+    def q_model(nqubits, initializer, circuit_structure):
+        return frontend.QuantumModel(
+            circuit_structure=circuit_structure,
+            parameters_initialization=initializer,
+            decoding=dec.Expectation(
+            nqubits=nqubits,
+            backend=backend,
+            )
+        )
+    
+    # Function to check the parameters
+    def assert_check(model_params, initializer):
+        if frontend.__name__ == "qiboml.interfaces.keras":
+            # assert np.all(np.equal(model_params.numpy(), initializer))
+            assert np.allclose(model_params.numpy(), initializer, rtol=1e-7, atol=1e-10)
+        elif frontend.__name__ == "qiboml.interfaces.pytorch":
+            assert np.all(np.equal(model_params.detach().numpy(), initializer))
+
+    # Initializer: "tf.keras.initializers" or "torch.nn.init"
+    if with_initializer == True:
+        if frontend.__name__ == "qiboml.interfaces.keras":
+            frontend.tf.random.set_seed(1)
+            initializer = frontend.tf.keras.initializers.RandomNormal(mean=0.0, stddev=0.05)
+    
+            model = q_model(nqubits, initializer, circuit_structure)
+            model_params = model.get_parameters()
+            values = initializer(shape=model_params.shape)
+            assert_check(model_params, values)
+
+        elif frontend.__name__ == "qiboml.interfaces.pytorch":
+            frontend.torch.manual_seed(1)
+            initializer = lambda p: frontend.torch.nn.init.normal_(p, mean=0, std=0.05)
+
+            model = q_model(nqubits, initializer, circuit_structure)
+            model_params = model.get_parameters()
+
+            frontend.torch.manual_seed(1)
+            ref = frontend.torch.empty_like(frontend.torch.tensor(model_params))
+            values = initializer(ref).detach().numpy()
+
+            assert_check(model_params, values)
+        else:
+            raise_error(RuntimeError, f"Unknown frontend {frontend}.")
+
+        
+    # No initializer
+    elif with_initializer == False:
+        initializer = None
+        model = q_model(nqubits, initializer, circuit_structure)
+  
+    # Numpy array initializer
+    elif with_initializer == "numpy_array":
+        initializer = np.array([0.5, 0.6, 0.7, 0.8])
+        model = q_model(nqubits, initializer, circuit_structure)
+        model_params = model.get_parameters()
+
+        assert_check(model_params, initializer)
+
+    # Error check keras and torch
+    elif with_initializer == "error_check_keras_torch":
+        with pytest.raises(ValueError):
+            initializer = 1
+            model = q_model(nqubits, initializer, circuit_structure)
+            model_params = model.get_parameters()
+
+            assert_check(model_params, initializer)
+
+    # Error check numpy array
+    else:
+        with pytest.raises(ValueError):
+            initializer = np.array([0.5, 0.6, 0.7, 0.8, 0.9, 0.7, 0.8, 0.9])
+            model = q_model(nqubits, initializer, circuit_structure)
+            model_params = model.get_parameters()
+
+            assert_check(model_params, initializer)
