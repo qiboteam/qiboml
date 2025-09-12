@@ -68,14 +68,14 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
         initializer = "zeros"
         if self.parameters_initialization is not None:
             if isinstance(self.parameters_initialization, keras.initializers.Initializer):
-                intializer = parameters_initialization
+                initializer = self.parameters_initialization
             elif isinstance(self.parameters_initialization, np.ndarray | tf.Tensor):
                 if self.parameters_initialization.shape != params.shape:
                     raise_error(
                         ValueError,
                         f"Shape not valid for `parameters_initialization`. The shape should be {params.shape}.",
                     )
-                params = parameters_initialization
+                params = self.parameters_initialization
             else:
                 raise_error(ValueError, "`parameters_initialization` should be a `np.ndarray` or `keras.initializers.Initializer`.")
         self.circuit_parameters = self.add_weight(
