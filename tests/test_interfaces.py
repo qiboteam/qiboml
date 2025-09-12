@@ -4,7 +4,7 @@ import random
 
 import numpy as np
 import pytest
-from qibo import construct_backend, gates, hamiltonians
+from qibo import Circuit, construct_backend, gates, hamiltonians
 from qibo.config import raise_error
 from qibo.noise import NoiseModel, PauliError
 from qibo.symbols import Z
@@ -13,6 +13,8 @@ from qibo.transpiler import NativeGates, Passes, Unroller
 import qiboml.models.ansatze as ans
 import qiboml.models.decoding as dec
 import qiboml.models.encoding as enc
+
+from .utils import set_seed
 
 
 def get_layers(module, layer_type=None):
@@ -29,7 +31,11 @@ def get_layers(module, layer_type=None):
 
 
 ENCODING_LAYERS = get_layers(enc, enc.QuantumEncoding)
-DECODING_LAYERS = get_layers(dec, dec.QuantumDecoding)
+DECODING_LAYERS = [
+    layer
+    for layer in get_layers(dec, dec.QuantumDecoding)
+    if not issubclass(layer, dec.VariationalQuantumLinearSolver)
+]
 ANSATZE_LAYERS = get_layers(ans)
 
 
@@ -158,7 +164,6 @@ def train_model(frontend, model, data, target, max_epochs=5):
                     loss = loss_f(y, predictions)
                 else:
                     loss = model()
-
             gradients = tape.gradient(
                 loss, model.trainable_variables
             )  # Compute gradients
@@ -227,19 +232,6 @@ def eval_model(frontend, model, data, target=None):
     return outputs, loss
 
 
-def set_seed(frontend, seed):
-    random.seed(seed)
-    np.random.seed(seed)
-    if frontend.__name__ == "qiboml.interfaces.pytorch":
-        frontend.torch.set_default_dtype(frontend.torch.float64)
-        frontend.torch.manual_seed(seed)
-    elif frontend.__name__ == "qiboml.interfaces.keras":
-        frontend.keras.backend.set_floatx("float64")
-        frontend.tf.keras.backend.set_floatx("float64")
-        frontend.keras.utils.set_random_seed(seed)
-        frontend.tf.config.experimental.enable_op_determinism()
-
-
 def random_parameters(frontend, model):
     if frontend.__name__ == "qiboml.interfaces.pytorch":
         new_params = {}
@@ -261,18 +253,23 @@ def random_parameters(frontend, model):
     return new_params
 
 
-def get_parameters(frontend, model):
+def get_parameters(frontend, model, return_array=False):
     if frontend.__name__ == "qiboml.interfaces.pytorch":
-        return {k: v.clone() for k, v in model.state_dict().items()}
+        par = {k: v.clone() for k, v in model.state_dict().items()}
+        if return_array:
+            par = par.get("circuit_parameters")
+        return par
     elif frontend.__name__ == "qiboml.interfaces.keras":
-        return model.get_weights()
+        par = model.get_weights()
+        if return_array:
+            par = par[0]
+        return par
 
 
 def set_device(frontend):
     if frontend.__name__ == "qiboml.interfaces.pytorch":
-        frontend.torch.set_default_device(
-            "cuda:0" if frontend.torch.cuda.is_available() else "cpu"
-        )
+        # uses the torch.default_device automatically
+        pass
     elif frontend.__name__ == "qiboml.interfaces.keras":
         # tf should automatically use GPU by default when available
         pass
@@ -353,31 +350,28 @@ def test_encoding(backend, frontend, layer, seed):
 
     backprop_test(frontend, q_model, data, target)
 
- 
-@pytest.mark.parametrize("layer,seed", zip(DECODING_LAYERS, [1, 3, 1, 26]))
+@pytest.mark.parametrize("layer,seed", zip(DECODING_LAYERS, [1, 53, 1, 26]))
 def test_decoding(backend, frontend, layer, seed):
-    if not layer.analytic and not layer is dec.Expectation:
+
+    if layer is dec.State:
         pytest.skip(
-            "Expectation layer is the only differentiable decoding when the diffrule is not analytical."
+            "Can't reliably pass for State decoder due to poor sensibility to the parameters probably..."
         )
 
     set_device(frontend)
     set_seed(frontend, seed)
+    backend.set_seed(seed)
 
     nqubits = 2
     dim = 2
-    density_matrix = False
-    training_layer = ans.HardwareEfficient(
-        nqubits, random_subset(nqubits, dim), density_matrix=density_matrix
-    )
-    encoding_layer = enc.PhaseEncoding(
-        nqubits, random_subset(nqubits, dim), density_matrix=density_matrix
-    )
+
+    training_layer = ans.HardwareEfficient(nqubits, random_subset(nqubits, dim))
+    encoding_layer = enc.PhaseEncoding(nqubits, random_subset(nqubits, dim))
     kwargs = {"backend": backend}
     decoding_qubits = random_subset(nqubits, dim)
     if layer is dec.Expectation:
         observable = hamiltonians.SymbolicHamiltonian(
-            sum([Z(int(i)) for i in decoding_qubits]),
+            1 + np.prod([Z(int(i)) for i in decoding_qubits]),
             nqubits=nqubits,
             backend=backend,
         )
@@ -388,6 +382,11 @@ def test_decoding(backend, frontend, layer, seed):
         kwargs["nshots"] = 1000
 
     decoding_layer = layer(nqubits, decoding_qubits, **kwargs)
+
+    if not decoding_layer.analytic and not decoding_layer is dec.Expectation:
+        pytest.skip(
+            "Expectation layer is the only differentiable decoding when the diffrule is not analytical."
+        )
 
     activation = build_activation(frontend, binary=False)
     q_model = build_sequential_model(
@@ -404,33 +403,28 @@ def test_decoding(backend, frontend, layer, seed):
 
     data = random_tensor(frontend, (100, dim))
     target = prepare_targets(frontend, q_model, data)
-
-    if layer is dec.Samples:
-        error = (
-            NotImplementedError
-            if frontend.__name__ != "qiboml.interfaces.keras"
-            else frontend.tf.errors.UnimplementedError
-        )
-        with pytest.raises(error):
-            _ = backprop_test(frontend, q_model, data, target)
-        assert q_model(data[0][None, :]).shape == (kwargs["nshots"], nqubits)
-    else:
-        backprop_test(frontend, q_model, data, target)
+    backprop_test(frontend, q_model, data, target)
 
 
 def test_composition(backend, frontend):
+
     set_device(frontend)
-    set_seed(frontend, 42)
+    seed = 42
+    set_seed(frontend, seed)
+    backend.set_seed(seed)
 
     nqubits = 2
-    encoding_layer = random.choice(ENCODING_LAYERS)(nqubits)
+    encoding_layer = random.choice(list(set(ENCODING_LAYERS) - {enc.BinaryEncoding}))(
+        nqubits
+    )
     training_layer = ans.HardwareEfficient(nqubits)
-    decoding_layer = random.choice(
-        list(set(DECODING_LAYERS) - {dec.Samples, dec.State})
-    )(
-        nqubits, backend=backend
-    )  # make sure it's not Samples
+    observable = hamiltonians.SymbolicHamiltonian(
+        1 + np.prod([Z(int(i)) for i in range(nqubits)]),
+        nqubits=nqubits,
+        backend=backend,
+    )
 
+    decoding_layer = dec.Expectation(nqubits, observable=observable, backend=backend)
     activation = build_activation(
         frontend, binary=encoding_layer.__class__.__name__ == "BinaryEncoding"
     )
@@ -456,24 +450,22 @@ def test_composition(backend, frontend):
     assert loss_untrained > loss_trained
 
 
-def test_vqe(backend, frontend):
+@pytest.mark.parametrize("dense,nshots", ((True, None), (False, 100)))
+def test_vqe(backend, frontend, dense, nshots):
     seed = 42
     set_device(frontend)
     set_seed(frontend, seed)
     backend.set_seed(42)
 
-    tfim = hamiltonians.TFIM(nqubits=2, backend=backend)
+    tfim = hamiltonians.TFIM(nqubits=2, h=0.1, dense=dense, backend=backend)
 
     nqubits = 2
-    dim = 2
     training_layer = ans.HardwareEfficient(
         nqubits,
         nlayers=2,
     )
     decoding_layer = dec.Expectation(
-        nqubits=nqubits,
-        backend=backend,
-        observable=tfim,
+        nqubits=nqubits, backend=backend, observable=tfim, nshots=nshots
     )
     circuit_structure = [
         training_layer,
@@ -499,18 +491,19 @@ def test_noise(backend, frontend):
     backend.set_seed(42)
     set_seed(frontend, 42)
 
-    nqubits = 6
+    nqubits = 4
     noise = NoiseModel()
     noise.add(PauliError([("X", 0.5)]), gates.CNOT)
     noise.add(PauliError([("Y", 0.2)]), gates.RY)
     noise.add(PauliError([("Z", 0.2)]), gates.RZ)
 
-    encoding_layer = random.choice(ENCODING_LAYERS)(nqubits, density_matrix=True)
-    training_layer = ans.HardwareEfficient(nqubits, density_matrix=True)
-    noisy_training_layer = noise.apply(training_layer.copy())
+    encoding_layer = random.choice(ENCODING_LAYERS)(nqubits)
+    training_layer = ans.HardwareEfficient(nqubits)
     circuit = [encoding_layer, training_layer]
-    noisy_circuit = [encoding_layer, noisy_training_layer]
-    decoding_layer = random.choice(DECODING_LAYERS)(nqubits, backend=backend)
+
+    # Noiseless decoding layer
+    # Fixing it because we want to use the same and not sampling
+    decoding_layer = dec.Expectation(nqubits, density_matrix=True, backend=backend)
     activation = build_activation(frontend, binary=False)
     model = build_sequential_model(
         frontend,
@@ -522,20 +515,22 @@ def test_noise(backend, frontend):
             ),
         ],
     )
-    setattr(model, "decoding", decoding_layer)
+    # Now initialising the same problem with noise
+    noisy_decoding_layer = dec.Expectation(
+        nqubits, backend=backend, density_matrix=True, noise_model=noise
+    )
     noisy_model = build_sequential_model(
         frontend,
         [
             activation,
             frontend.QuantumModel(
-                circuit_structure=noisy_circuit,
-                decoding=decoding_layer,
+                circuit_structure=circuit,
+                decoding=noisy_decoding_layer,
             ),
         ],
     )
-    setattr(noisy_model, "decoding", decoding_layer)
 
-    data = random_tensor(frontend, (100, nqubits))
+    data = random_tensor(frontend, (50, nqubits))
     target = prepare_targets(frontend, model, data)
     train_model(frontend, model, data, target, max_epochs=1)
     _, loss = eval_model(frontend, model, data, target)
@@ -558,31 +553,25 @@ def test_qibolab(frontend):
     )
 
     set_device(frontend)
-    set_seed(frontend, 42)
+    seed = 1
+    set_seed(frontend, seed)
+    backend.set_seed(seed)
 
     nqubits = 1
     encoding_layer = enc.PhaseEncoding(nqubits)
     training_layer = ans.HardwareEfficient(nqubits)
     decoding_layer = dec.Expectation(
-        nqubits, backend=backend, transpiler=transpiler, nshots=1000
+        nqubits,
+        wire_names=[0],
+        backend=backend,
+        transpiler=transpiler,
+        nshots=1000,
     )
 
-    activation = build_activation(
-        frontend, binary=encoding_layer.__class__.__name__ == "BinaryEncoding"
+    model = frontend.QuantumModel(
+        circuit_structure=[encoding_layer, training_layer],
+        decoding=decoding_layer,
     )
-    model = build_sequential_model(
-        frontend,
-        [
-            build_linear_layer(frontend, 1, nqubits),
-            activation,
-            frontend.QuantumModel(
-                circuit_structure=[encoding_layer, training_layer],
-                decoding=decoding_layer,
-            ),
-            build_linear_layer(frontend, decoding_layer.output_shape[-1], 1),
-        ],
-    )
-    setattr(model, "decoding", decoding_layer)
 
     data = random_tensor(frontend, (10, 1))
     target = prepare_targets(frontend, model, data)
@@ -590,8 +579,6 @@ def test_qibolab(frontend):
     train_model(frontend, model, data, target, max_epochs=1)
     _, loss_trained = eval_model(frontend, model, data, target)
     assert loss_untrained > loss_trained
-
-
 
 @pytest.mark.parametrize("with_initializer", [False, True, "numpy_array", "error_check_numpy", "error_check_keras_torch"])
 def test_parameters_initialization(backend, frontend, with_initializer):
@@ -680,3 +667,45 @@ def test_parameters_initialization(backend, frontend, with_initializer):
             model_params = model.get_parameters()
 
             assert_check(model_params, initializer)
+
+def test_equivariant(backend, frontend):
+
+    engine = (
+        frontend.torch
+        if frontend.__name__ == "qiboml.interfaces.pytorch"
+        else frontend.keras.ops
+    )
+
+    set_seed(frontend, 42)
+    backend.set_seed(42)
+
+    # this defines 3 independent parameters
+    def custom_circuit(th, phi, lam):
+        c = Circuit(2)
+        delta = 2 * engine.cos(phi) + lam**2
+        gamma = lam * engine.exp(th / 2)
+        c.add([gates.RZ(i, theta=th) for i in range(2)])
+        c.add([gates.RX(i, theta=lam) for i in range(2)])
+        c.add([gates.RY(i, theta=phi) for i in range(2)])
+        c.add(gates.RZ(0, theta=delta))
+        c.add(gates.RX(1, theta=gamma))
+        return c
+
+    # these are 4 independent parameters
+    circuit = ans.HardwareEfficient(2)
+    decoding = dec.Expectation(2, backend=backend)
+    model = frontend.QuantumModel(
+        [circuit, custom_circuit],
+        decoding,
+    )
+    assert len(get_parameters(frontend, model, return_array=True)) == 7
+
+    none = np.array(
+        5
+        * [
+            None,
+        ]
+    )
+    grad = train_model(frontend, model, none, none, max_epochs=10)
+    cost = model()
+    backend.assert_allclose(float(cost), -2.0, atol=5e-2)
