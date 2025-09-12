@@ -57,26 +57,21 @@ class QuantumModel(torch.nn.Module):
         params = utils.get_params_from_circuit_structure(self.circuit_structure)
         params = torch.as_tensor(self.backend.to_numpy(x=params)).ravel()
 
-        if self.angles_initialisation is None:
-            params.requires_grad = True
-            self.circuit_parameters = torch.nn.Parameter(params)
-        else:
+        if self.angles_initialisation is not None:
             if callable(self.angles_initialisation):
-                self.circuit_parameters = torch.empty(params.shape, dtype=torch.float64, requires_grad = True)
-                self.circuit_parameters = torch.nn.Parameter(self.angles_initialisation(self.circuit_parameters))
-            elif isinstance(self.angles_initialisation, np.ndarray):
+                params = torch.empty(params.shape, dtype=params.dtype, requires_grad=True)
+                params = self.angles_initialisation(params))
+            elif isinstance(self.angles_initialisation, np.ndarray | torch.Tensor):
                 if self.angles_initialisation.shape != params.shape:
                     raise_error(
                         ValueError,
                         f"Shape not valid for `angles_initialisation`. The shape should be {params.shape}.",
                     )
-                parameters = torch.as_tensor(
-                    self.backend.to_numpy(x=self.angles_initialisation)
-                ).ravel()
-                parameters.requires_grad = True
-                self.circuit_parameters = torch.nn.Parameter(parameters)
+                params = torch.as_tensor(self.angles_initialisation).ravel()
             else:
                 raise_error(ValueError, "`angles_initialisation` should be a `np.ndarray` or `torch.nn.init`.")
+        params.requires_grad = True
+        self.circuit_parameters = torch.nn.Parameter(params)
 
 
         if self.differentiation is None:
