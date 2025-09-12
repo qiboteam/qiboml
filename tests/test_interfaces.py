@@ -13,7 +13,6 @@ from qibo.transpiler import NativeGates, Passes, Unroller
 import qiboml.models.ansatze as ans
 import qiboml.models.decoding as dec
 import qiboml.models.encoding as enc
-from qiboml.backends.tensorflow import TensorflowBackend
 
 
 def get_layers(module, layer_type=None):
