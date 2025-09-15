@@ -198,8 +198,9 @@ class QuantumModelAutoGrad(torch.autograd.Function):
         circuit_tracer: TorchCircuitTracer,
         *parameters: List[torch.nn.Parameter],
     ):
-        parameters = torch.stack(parameters)
-
+        parameters = (
+            torch.stack(parameters) if len(parameters) > 0 else torch.tensor(parameters)
+        )
         # it would be maybe better to perform the tracing in the backward only
         # this way the jacobians are calculated only if the backward is called
         circuit, jacobian_wrt_inputs, jacobian, input_to_gate_map = circuit_tracer(
@@ -247,12 +248,19 @@ class QuantumModelAutoGrad(torch.autograd.Function):
         params = ctx.angles
         # get the jacobian of the output wrt each angle of the circuit
         # (i.e. each rotation gate)
+        if jacobian is not None:
+            dtype = jacobian.dtype
+            device = jacobian.device
+        else:
+            dtype = jacobian_wrt_inputs.dtype
+            device = jacobian_wrt_inputs.device
+
         jacobian_wrt_angles = torch.as_tensor(
             backend.to_numpy(
                 ctx.differentiation.evaluate(params, wrt_inputs=ctx.wrt_inputs)
             ),
-            dtype=jacobian.dtype,
-            device=jacobian.device,
+            dtype=dtype,
+            device=device,
         )
 
         out_shape = ctx.differentiation.decoding.output_shape
@@ -277,13 +285,22 @@ class QuantumModelAutoGrad(torch.autograd.Function):
             # discard the elements corresponding to encoding gates
             # to obtain only the part wrt the model's parameters
             indices_to_discard = reduce(tuple.__add__, ctx.input_to_gate_map.values())
-            jacobian_wrt_angles = torch.vstack(
-                [
-                    row
-                    for i, row in enumerate(jacobian_wrt_angles)
-                    if i not in indices_to_discard
-                ]
-            ).reshape(-1, *out_shape)
+            rows = [
+                row
+                for i, row in enumerate(jacobian_wrt_angles)
+                if i not in indices_to_discard
+            ]
+
+            if len(rows) > 0:
+                jacobian_wrt_angles = torch.vstack(
+                    [
+                        row
+                        for i, row in enumerate(jacobian_wrt_angles)
+                        if i not in indices_to_discard
+                    ]
+                ).reshape(-1, *out_shape)
+            else:
+                jacobian_wrt_angles = torch.tensor(rows)
             # combine the jacobians wrt inputs with those
             # wrt the circuit angles
             grad_input = torch.einsum(
@@ -298,13 +315,19 @@ class QuantumModelAutoGrad(torch.autograd.Function):
         else:
             grad_input = None
 
-        # combine the jacobians wrt parameters with those
-        # wrt the circuit angles
-        gradient = torch.einsum(
-            jacobian, contraction[0], jacobian_wrt_angles, contraction[1]
-        )
-        # combine with the gradients coming from outside
-        gradient = torch.einsum(gradient, left_indices, grad_output, right_indices)
+        if jacobian is not None:
+            # combine the jacobians wrt parameters with those
+            # wrt the circuit angles
+            gradient = torch.einsum(
+                jacobian, contraction[0], jacobian_wrt_angles, contraction[1]
+            )
+            # combine with the gradients coming from outside
+            gradient = torch.einsum(gradient, left_indices, grad_output, right_indices)
+        else:
+            gradient = [
+                None,
+            ]
+
         return (
             grad_input,
             None,
