@@ -164,16 +164,6 @@ class QuantumModel(torch.nn.Module):
 
         return fig
 
-
-    def get_parameters(self) -> torch.Tensor:
-        """
-        Get the trainable parameters of the model.
-
-        Returns:
-            (torch.Tensor): the trainable parameters.
-        """
-        return self.circuit_parameters
-
 class QuantumModelAutoGrad(torch.autograd.Function):
     """
     Custom Autograd to enable the autodifferentiation of the QuantumModel for
