@@ -59,7 +59,7 @@ class PyTorchBackend(NumpyBackend):
         self.dtype = self._torch_dtype(self.dtype)
         # Default data type used for the real gate parameters is float64
         self.parameter_dtype = self._torch_dtype("float64")
-        self.device = self.np.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.device = self.np.get_default_device()
         self.matrices = TorchMatrices(self.dtype, self.device)
         self.nthreads = 0
         self.tensor_types = (self.np.Tensor, np.ndarray)
@@ -74,25 +74,13 @@ class PyTorchBackend(NumpyBackend):
         self.np.sign = self.np.sgn
         self.np.flatnonzero = lambda x: self.np.nonzero(x).flatten()
 
-        # These functions are device dependent
-        torch_zeros = self.np.zeros
-
-        def zeros(shape, dtype=None, device=None):
-            if dtype is None:
-                dtype = self.dtype
-            if device is None:
-                device = self.device
-            return torch_zeros(shape, dtype=dtype, device=device)
-
-        setattr(self.np, "zeros", zeros)
-
     def _torch_dtype(self, dtype):
         if dtype == "float":
             dtype += "32"
         return getattr(self.np, dtype)
 
     def set_device(self, device):  # pragma: no cover
-        self.device = device
+        self.device = "cpu" if "CPU" in device else device
 
     def cast(
         self,
@@ -289,14 +277,22 @@ class PyTorchBackend(NumpyBackend):
             return self.np.linalg.eigh(matrix)  # pylint: disable=not-callable
         return self.np.linalg.eig(matrix)  # pylint: disable=not-callable
 
-    def calculate_matrix_exp(self, a, matrix, eigenvectors=None, eigenvalues=None):
+    def calculate_matrix_exp(
+        self,
+        matrix,
+        phase: Union[float, int, complex] = 1,
+        eigenvectors=None,
+        eigenvalues=None,
+    ):
         if eigenvectors is None or self.is_sparse(matrix):
             return self.np.linalg.matrix_exp(  # pylint: disable=not-callable
-                -1j * a * matrix
+                phase * matrix
             )
-        expd = self.np.diag(self.np.exp(-1j * a * eigenvalues))
+
+        expd = self.np.exp(phase * eigenvalues)
         ud = self.np.conj(eigenvectors).T
-        return self.np.matmul(eigenvectors, self.np.matmul(expd, ud))
+
+        return (eigenvectors * expd) @ ud
 
     def calculate_matrix_power(
         self,

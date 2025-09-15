@@ -8,18 +8,23 @@ from qibo import __version__
 from qibo.backends import einsum_utils
 from qibo.backends.npmatrices import NumpyMatrices
 from qibo.backends.numpy import NumpyBackend
-from qibo.config import raise_error
 
 
-class JaxMatrices(NumpyMatrices):
+@partial(jax.jit, static_argnums=(0, 1))
+def zero_state(nqubits, dtype):
+    state = jnp.zeros(2**nqubits, dtype=dtype).at[0].set(1)
+    return state
 
-    def __init__(self, dtype):
-        super().__init__(dtype)
-        self.np = jnp
-        self.dtype = dtype
 
-    def _cast(self, x, dtype):
-        return jnp.asarray(x, dtype=dtype)
+@partial(jax.jit, static_argnums=(0, 1))
+def zero_density_matrix(nqubits, dtype):
+    matrix = jnp.zeros(2 * (2**nqubits,), dtype=dtype).at[0, 0].set(1)
+    return matrix
+
+
+@partial(jax.jit, static_argnames={"dtype"})
+def cast_matrix(x, dtype):
+    return jnp.asarray(x, dtype=dtype)
 
 
 @partial(jax.jit, static_argnums=(2, 3))
@@ -54,6 +59,17 @@ def _apply_gate_controlled(
     return jnp.reshape(state, (2**nqubits,))
 
 
+class JaxMatrices(NumpyMatrices):
+
+    def __init__(self, dtype):
+        super().__init__(dtype)
+        self.np = jnp
+        self.dtype = dtype
+
+    def _cast(self, x, dtype):
+        return cast_matrix(x, dtype)
+
+
 class JaxBackend(NumpyBackend):
     def __init__(self):
         super().__init__()
@@ -71,29 +87,19 @@ class JaxBackend(NumpyBackend):
         self.numpy = numpy
 
         self.np = jnp
-        self.tensor_types = (jnp.ndarray, numpy.ndarray)
+        self.tensor_types = (jnp.ndarray,)
         self.matrices = JaxMatrices(self.dtype)
-
-    def set_precision(self, precision):
-        if precision != self.precision:
-            if precision == "single":
-                self.precision = precision
-                self.dtype = self.np.complex64
-            elif precision == "double":
-                self.precision = precision
-                self.dtype = self.np.complex128
-            else:
-                raise_error(ValueError, f"Unknown precision {precision}.")
-            if self.matrices:
-                self.matrices = self.matrices.__class__(self.dtype)
 
     def cast(self, x, dtype=None, copy=False):
         if dtype is None:
             dtype = self.dtype
+
         if isinstance(x, self.tensor_types):
             return x.astype(dtype)
-        elif self.is_sparse(x):
+
+        if self.is_sparse(x):
             return x.astype(dtype)
+
         return self.np.array(x, dtype=dtype, copy=copy)
 
     def to_numpy(self, x):
@@ -148,14 +154,10 @@ class JaxBackend(NumpyBackend):
         return matrix
 
     def zero_state(self, nqubits):
-        state = self.np.zeros(2**nqubits, dtype=self.dtype)
-        state = state.at[0].set(1)
-        return state
+        return zero_state(nqubits, self.dtype)
 
     def zero_density_matrix(self, nqubits):
-        state = self.np.zeros(2 * (2**nqubits,), dtype=self.dtype)
-        state = state.at[0, 0].set(1)
-        return state
+        return zero_density_matrix(nqubits, self.dtype)
 
     def plus_state(self, nqubits):
         state = self.np.ones(2**nqubits, dtype=self.dtype)

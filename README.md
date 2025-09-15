@@ -52,10 +52,10 @@ import qiboml.interfaces.keras as ks
 tf.keras.backend.set_floatx('float64') # set the dtype to float64, which is qibo's default
 
 ks_model = ks.QuantumModel(circuit_structure=[circuit,], decoding=decoding)
-optimizer = keras.optimizers.Adam(lr=0.05)
+optimizer = keras.optimizers.Adam(learning_rate=0.05)
 for iteration in range(100):
     with tf.GradientTape() as tape:
-        cost = ks_model(x)
+        cost = ks_model()
     gradients = tape.gradient(
         cost, ks_model.trainable_variables
     )
