@@ -619,18 +619,16 @@ def test_parameters_initialization(backend, frontend, with_initializer):
     def assert_check(model_params, initializer):
         if frontend.__name__ == "qiboml.interfaces.keras":
             # assert np.all(np.equal(model_params.numpy(), initializer))
-            assert np.allclose(model_params.numpy(), initializer, rtol=1e-7, atol=1e-10)
+            assert np.allclose(model.circuit_parameters, initializer, rtol=1e-7, atol=1e-10)
         elif frontend.__name__ == "qiboml.interfaces.pytorch":
-            assert np.all(np.equal(model_params.detach().numpy(), initializer))
-
-    # Initializer: "tf.keras.initializers" or "torch.nn.init"
+            assert np.all(np.equal(model.circuit_parameters.detach().numpy(), initializer))
     if with_initializer == True:
         if frontend.__name__ == "qiboml.interfaces.keras":
             frontend.tf.random.set_seed(1)
             initializer = frontend.tf.keras.initializers.RandomNormal(mean=0.0, stddev=0.05)
     
             model = q_model(nqubits, initializer, circuit_structure)
-            model_params = model.get_parameters()
+            model_params = model.circuit_parameters
             values = initializer(shape=model_params.shape)
             assert_check(model_params, values)
 
@@ -639,7 +637,7 @@ def test_parameters_initialization(backend, frontend, with_initializer):
             initializer = lambda p: frontend.torch.nn.init.normal_(p, mean=0, std=0.05)
 
             model = q_model(nqubits, initializer, circuit_structure)
-            model_params = model.get_parameters()
+            model_params = model.circuit_parameters
 
             frontend.torch.manual_seed(1)
             ref = frontend.torch.empty_like(frontend.torch.tensor(model_params))
@@ -659,8 +657,8 @@ def test_parameters_initialization(backend, frontend, with_initializer):
     elif with_initializer == "numpy_array":
         initializer = np.array([0.5, 0.6, 0.7, 0.8])
         model = q_model(nqubits, initializer, circuit_structure)
-        model_params = model.get_parameters()
-
+        model_params = model.circuit_parameters
+        
         assert_check(model_params, initializer)
 
     # Error check keras and torch
@@ -668,7 +666,7 @@ def test_parameters_initialization(backend, frontend, with_initializer):
         with pytest.raises(ValueError):
             initializer = 1
             model = q_model(nqubits, initializer, circuit_structure)
-            model_params = model.get_parameters()
+            model_params = model.circuit_parameters
 
             assert_check(model_params, initializer)
 
@@ -677,6 +675,6 @@ def test_parameters_initialization(backend, frontend, with_initializer):
         with pytest.raises(ValueError):
             initializer = np.array([0.5, 0.6, 0.7, 0.8, 0.9, 0.7, 0.8, 0.9])
             model = q_model(nqubits, initializer, circuit_structure)
-            model_params = model.get_parameters()
+            model_params = model.circuit_parameters
 
             assert_check(model_params, initializer)
