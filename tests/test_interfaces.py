@@ -605,7 +605,6 @@ def test_parameters_initialization(backend, frontend, with_initializer):
     # Function to check the parameters
     def assert_check(model_params, initializer):
         if frontend.__name__ == "qiboml.interfaces.keras":
-            # assert np.all(np.equal(model_params.numpy(), initializer))
             assert np.allclose(model.circuit_parameters, initializer, rtol=1e-7, atol=1e-10)
         elif frontend.__name__ == "qiboml.interfaces.pytorch":
             assert np.all(np.equal(model.circuit_parameters.detach().numpy(), initializer))
@@ -634,11 +633,6 @@ def test_parameters_initialization(backend, frontend, with_initializer):
         else:
             raise_error(RuntimeError, f"Unknown frontend {frontend}.")
 
-        
-    # No initializer
-    elif with_initializer == False:
-        initializer = None
-        model = q_model(nqubits, initializer, circuit_structure)
   
     # Numpy array initializer
     elif with_initializer == "numpy_array":
