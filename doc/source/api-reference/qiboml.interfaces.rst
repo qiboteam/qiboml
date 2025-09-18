@@ -24,3 +24,11 @@ qiboml.interfaces.keras
    :members:
    :undoc-members:
    :show-inheritance:
+
+qiboml.interfaces.circuit_tracer
+--------------------------------
+
+.. automodule:: qiboml.interfaces.circuit_tracer
+   :members:
+   :undoc-members:
+   :show-inheritance:

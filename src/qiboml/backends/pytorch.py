@@ -59,7 +59,7 @@ class PyTorchBackend(NumpyBackend):
         self.dtype = self._torch_dtype(self.dtype)
         # Default data type used for the real gate parameters is float64
         self.parameter_dtype = self._torch_dtype("float64")
-        self.device = self.np.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.device = self.np.get_default_device()
         self.matrices = TorchMatrices(self.dtype, self.device)
         self.nthreads = 0
         self.tensor_types = (self.np.Tensor, np.ndarray)
@@ -73,18 +73,6 @@ class PyTorchBackend(NumpyBackend):
         self.np.right_shift = self.np.bitwise_right_shift
         self.np.sign = self.np.sgn
         self.np.flatnonzero = lambda x: self.np.nonzero(x).flatten()
-
-        # These functions are device dependent
-        torch_zeros = self.np.zeros
-
-        def zeros(shape, dtype=None, device=None):
-            if dtype is None:
-                dtype = self.dtype
-            if device is None:
-                device = self.device
-            return torch_zeros(shape, dtype=dtype, device=device)
-
-        setattr(self.np, "zeros", zeros)
 
     def _torch_dtype(self, dtype):
         if dtype == "float":
