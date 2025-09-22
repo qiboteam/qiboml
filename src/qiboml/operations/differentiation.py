@@ -6,7 +6,7 @@ from typing import Callable, Tuple
 import jax
 import numpy as np
 from qibo import Circuit
-from qibo.backends import Backend
+from qibo.backends import Backend, construct_backend
 from qibo.config import raise_error
 
 from qiboml import ndarray
@@ -301,3 +301,11 @@ class Jax(Differentiation):
             self._cast_non_trainable_parameters(self._jax, self.backend)
         # transform back to the backend native array
         return backend.cast(self._jax.to_numpy(jacobian).tolist(), backend.np.float64)
+
+
+class QuimbJax(Jax):
+
+    def __init__(self, circuit: Circuit, decoding: QuantumDecoding):
+        super().__init__(circuit, decoding)
+        self._jax = construct_backend("qibotn", platform="quimb")
+        self._jax.setup_backend_specifics(qimb_backend="jax", optimizer="auto-hq")
