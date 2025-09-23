@@ -155,6 +155,7 @@ class Mitigator:
                     observable=observable,
                     noise_model=noise_model,
                     full_output=True,
+                    backend=self.backend,
                     **self._mitigation_method_kwargs,
                 )
             )
@@ -165,6 +166,7 @@ class Mitigator:
                 observable=observable,
                 noise_model=noise_model,
                 full_output=True,
+                backend=self.backend,
                 **self._mitigation_method_kwargs,
             )
 
