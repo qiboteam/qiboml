@@ -20,8 +20,8 @@ keras = { version = "^3.11.0", optional = true }
 tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux' or sys_platform == 'darwin'", optional = true }
 # TODO: the marker is a temporary solution due to the lack of the tensorflow-io 0.32.0's wheels for Windows, this package is one of
 # the tensorflow requirements
-torch = { version = "^2.7.0", optional = true}
-qibo = {git="https://github.com/qiboteam/qibo", branch = "error_mitigation_clifford"}
+torch = { version = "^2.7.0", optional = true }
+qibo = { git = "https://github.com/qiboteam/qibo" }
 jax = "^0.4.25"
 jaxlib = "^0.4.25"
 qibocal = {version="^0.2.2", optional=true}
