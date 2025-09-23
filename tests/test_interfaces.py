@@ -313,7 +313,7 @@ def test_encoding(backend, frontend, layer, seed):
     nqubits = 2
     dim = 2
 
-    training_layer = ans.HardwareEfficient(nqubits, random_subset(nqubits, dim))
+    training_layer = ans.HardwareEfficient(nqubits)
 
     decoding_qubits = random_subset(nqubits, dim)
     observable = hamiltonians.SymbolicHamiltonian(
@@ -366,7 +366,7 @@ def test_decoding(backend, frontend, layer, seed):
     nqubits = 2
     dim = 2
 
-    training_layer = ans.HardwareEfficient(nqubits, random_subset(nqubits, dim))
+    training_layer = ans.HardwareEfficient(nqubits)
     encoding_layer = enc.PhaseEncoding(nqubits, random_subset(nqubits, dim))
     kwargs = {"backend": backend}
     decoding_qubits = random_subset(nqubits, dim)

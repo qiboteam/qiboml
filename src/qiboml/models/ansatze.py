@@ -8,8 +8,8 @@ from scipy.special import binom
 
 def HardwareEfficient(
     nqubits,
-    nlayers,
-    single_block,
+    nlayers=1,
+    single_block=None,
     entangling_block=None,
     entangling_gate="CNOT",
     architecture="diagonal",
@@ -21,8 +21,8 @@ def HardwareEfficient(
 
     Args:
         nqubits (int): Number of qubits in the ansatz.
-        nlayers (int): Number of layers (single-qubit + entangling per layer).
-        single_block (Circuit): 1-qubit Circuit applied to each qubit.
+        nlayers (int, optional): Number of layers (single-qubit + entangling per layer). Defaults to 1.
+        single_block (Circuit, optional): 1-qubit Circuit applied to each qubit. Defaults to a block with :class:`qibo.gates.RY` and :class:`qibo.gates.RZ` gates.
         entangling_block (Circuit, optional): full n-qubit entangling circuit. Defaults to ``None``.
         entangling_gate (str or :class:`qibo.gates.Gate`, optional): Only used if ``entangling_block`` is None. Two-qubit gate to be used
             in the entangling layer if ``entangling_block`` is not provided. If ``entangling_gate`` is a parametrized gate,
@@ -42,6 +42,11 @@ def HardwareEfficient(
         qibo.models.Circuit: Constructed hardware-efficient ansatz.
     """
     circ = Circuit(nqubits, **kwargs)
+
+    if single_block is None:
+        single_block = Circuit(1)
+        single_block.add(gates.RY(0,0))
+        single_block.add(gates.RZ(0,0))
 
     for _ in range(nlayers):
         for q in range(nqubits):
