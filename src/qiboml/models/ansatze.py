@@ -1,6 +1,4 @@
-import random
 from copy import deepcopy
-from typing import Optional
 
 import numpy as np
 from qibo import Circuit, gates
@@ -9,24 +7,59 @@ from scipy.special import binom
 
 
 def HardwareEfficient(
-    nqubits: int,
-    qubits: Optional[tuple[int]] = None,
-    nlayers: int = 1,
-) -> Circuit:
-    if qubits is None:
-        qubits = list(range(nqubits))
-    circuit = Circuit(nqubits)
+    nqubits,
+    nlayers,
+    single_block,
+    entangling_block=None,
+    entangling_gate="CNOT",
+    architecture="diagonal",
+    closed_boundary=False,
+    **kwargs,
+):
+    """
+    Create a Hardware-efficient ansatz with custom single-qubit and entangling blocks.
+
+    Args:
+        nqubits (int): Number of qubits in the ansatz.
+        nlayers (int): Number of layers (single-qubit + entangling per layer).
+        single_block (Circuit): 1-qubit Circuit applied to each qubit.
+        entangling_block (Circuit, optional): full n-qubit entangling circuit. Defaults to ``None``.
+        entangling_gate (str or :class:`qibo.gates.Gate`, optional): Only used if ``entangling_block`` is None. Two-qubit gate to be used
+            in the entangling layer if ``entangling_block`` is not provided. If ``entangling_gate`` is a parametrized gate,
+            all phases are initialized as :math:`0.0`. Defaults to  ``"CNOT"``.
+        architecture (str, optional): Only used if ``entangling_block`` is None. Architecture of the entangling layer.
+            In alphabetical order, options are ``"diagonal"``, ``"even_layer"``,
+            ``"next_nearest"``, ``"odd_layer"``, ``"pyramid"``, ``"shifted"``,
+            ``"v"``, and ``"x"``. The ``"x"`` architecture is only defined for an even number
+            of qubits. Defaults to ``"diagonal"``.
+        closed_boundary (bool, optional): Only used if ``entangling_block`` is None. If ``True`` and ``architecture not in
+            ["pyramid", "v", "x"]``, adds a closed-boundary condition to the entangling layer.
+            Defaults to ``False``.
+        kwargs (dict, optional): Additional arguments used to initialize a Circuit object.
+            For details, see the documentation of :class:`qibo.models.circuit.Circuit`.
+
+    Returns:
+        qibo.models.Circuit: Constructed hardware-efficient ansatz.
+    """
+    circ = Circuit(nqubits, **kwargs)
 
     for _ in range(nlayers):
-        for q in qubits:
-            circuit.add(gates.RY(q, theta=random.random() * np.pi, trainable=True))
-            circuit.add(gates.RZ(q, theta=random.random() * np.pi, trainable=True))
-        if nqubits > 1:
-            for i, q in enumerate(qubits[:-2]):
-                circuit.add(gates.CNOT(q0=q, q1=qubits[i + 1]))
-            circuit.add(gates.CNOT(q0=qubits[-1], q1=qubits[0]))
+        for q in range(nqubits):
+            circ.add(single_block.on_qubits(q))
 
-    return circuit
+        if entangling_block is None:
+            entangling_block = entangling_layer(
+                nqubits=nqubits,
+                architecture=architecture,
+                entangling_gate=entangling_gate,
+                closed_boundary=closed_boundary,
+            )
+        elif entangling_block.nqubits != nqubits:
+            raise ValueError(f"Entangling layer circuit must have {nqubits} qubits.")
+
+        circ += entangling_block
+
+    return circ
 
 
 def brickwork_givens(nqubits: int, weight: int, full_hwp: bool = False, **kwargs):
@@ -72,7 +105,7 @@ def brickwork_givens(nqubits: int, weight: int, full_hwp: bool = False, **kwargs
             architecture="shifted",
             entangling_gate=gates.GIVENS,
             closed_boundary=False,
-            **kwargs
+            **kwargs,
         )
 
     ngates = len(circuit.gates_of_type(gates.GIVENS))
@@ -83,7 +116,7 @@ def brickwork_givens(nqubits: int, weight: int, full_hwp: bool = False, **kwargs
         architecture="shifted",
         entangling_gate=gates.GIVENS,
         closed_boundary=False,
-        **kwargs
+        **kwargs,
     ).queue
 
     circuit.add(deepcopy(queue[elem % len(queue)]) for elem in range(nmissing))
