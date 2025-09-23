@@ -1,4 +1,5 @@
 from copy import deepcopy
+import random
 
 import numpy as np
 from qibo import Circuit, gates
@@ -45,8 +46,8 @@ def HardwareEfficient(
 
     if single_block is None:
         single_block = Circuit(1)
-        single_block.add(gates.RY(0,0))
-        single_block.add(gates.RZ(0,0))
+        single_block.add(gates.RY(0, theta=random.random() * np.pi, trainable=True))
+        single_block.add(gates.RZ(0, theta=random.random() * np.pi, trainable=True))
 
     for _ in range(nlayers):
         for q in range(nqubits):
