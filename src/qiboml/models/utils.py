@@ -46,7 +46,7 @@ class Mitigator:
         else:
             custom_map = self._mitigation_method_kwargs.get("model")
             if custom_map is not None:
-                if not callable(custom_map):
+                if not callable(custom_map):  # pragma: no cover
                     raise ValueError("Noise map model must be a callable")
                 self._mitigation_map = custom_map
 
