@@ -98,9 +98,6 @@ def test_rtqem(frontend, backend, mitigation_method):
         "method_kwargs": {"n_training_samples": 50},
     }
 
-    if mitigation_method == "CDR":
-        mitigation_config["method_kwargs"]["model"] = lambda x, a=1, b=0: a * x + b
-
     # Then we build a decoding with error mitigation
     mit_decoding = Expectation(
         nqubits=nqubits,
@@ -139,6 +136,7 @@ def test_custom_map(frontend):
         "method": "CDR",
         "method_kwargs": {
             "n_training_samples": 70,
+            "model": lambda x, a, b: a * x + b,
         },
     }
 
