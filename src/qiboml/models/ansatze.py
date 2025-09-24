@@ -50,6 +50,10 @@ def HardwareEfficient(
 
     if qubits is None:
         qubits = list(range(nqubits))
+    elif len(qubits) > nqubits:
+        raise ValueError(
+            f"Number of specified qubits ({len(qubits)}) cannot exceed the total number of qubits in the circuit ({nqubits})."
+        )
 
     if single_block is None:
         single_block = Circuit(1)

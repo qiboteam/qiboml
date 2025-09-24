@@ -4,7 +4,20 @@ from qibo import Circuit, gates
 from qibo.quantum_info import random_statevector
 from scipy.special import binom
 
-from qiboml.models.ansatze import brickwork_givens
+from qiboml.models.ansatze import HardwareEfficient, brickwork_givens
+
+
+@pytest.mark.parametrize("nqubits", [4, 6])
+def test_HardwareEfficient(backend, nqubits):
+
+    entangling_block = Circuit(nqubits)
+    entangling_block.add(gates.CNOT(0, 1))
+
+    qubits_map = [4, 3, 2, 1, 0]
+    with pytest.raises(ValueError):
+        HardwareEfficient(
+            nqubits=nqubits, qubits=qubits_map, entangling_block=entangling_block
+        )
 
 
 @pytest.mark.parametrize("density_matrix", [False, True])
