@@ -1,5 +1,6 @@
-from copy import deepcopy
 import random
+from copy import deepcopy
+from typing import Optional
 
 import numpy as np
 from qibo import Circuit, gates
@@ -8,13 +9,14 @@ from scipy.special import binom
 
 
 def HardwareEfficient(
-    nqubits,
-    nlayers=1,
-    single_block=None,
-    entangling_block=None,
-    entangling_gate="CNOT",
-    architecture="diagonal",
-    closed_boundary=False,
+    nqubits: int,
+    qubits: Optional[tuple[int]] = None,
+    nlayers: int = 1,
+    single_block: Optional[Circuit] = None,
+    entangling_block: Optional[Circuit] = None,
+    entangling_gate: str = "CNOT",
+    architecture: str = "diagonal",
+    closed_boundary: bool = True,
     **kwargs,
 ):
     """
@@ -22,6 +24,8 @@ def HardwareEfficient(
 
     Args:
         nqubits (int): Number of qubits in the ansatz.
+        qubits (tuple[int], optional): Qubit indices to apply the ansatz to. If ``None``, the ansatz is applied to all qubits
+            from ``0`` to ``nqubits-1``. Defaults to ``None``.
         nlayers (int, optional): Number of layers (single-qubit + entangling per layer). Defaults to 1.
         single_block (Circuit, optional): 1-qubit Circuit applied to each qubit. Defaults to a block with :class:`qibo.gates.RY` and :class:`qibo.gates.RZ` gates.
         entangling_block (Circuit, optional): full n-qubit entangling circuit. Defaults to ``None``.
@@ -35,7 +39,7 @@ def HardwareEfficient(
             of qubits. Defaults to ``"diagonal"``.
         closed_boundary (bool, optional): Only used if ``entangling_block`` is None. If ``True`` and ``architecture not in
             ["pyramid", "v", "x"]``, adds a closed-boundary condition to the entangling layer.
-            Defaults to ``False``.
+            Defaults to ``True``.
         kwargs (dict, optional): Additional arguments used to initialize a Circuit object.
             For details, see the documentation of :class:`qibo.models.circuit.Circuit`.
 
@@ -44,26 +48,31 @@ def HardwareEfficient(
     """
     circ = Circuit(nqubits, **kwargs)
 
+    if qubits is None:
+        qubits = list(range(nqubits))
+
     if single_block is None:
         single_block = Circuit(1)
         single_block.add(gates.RY(0, theta=random.random() * np.pi, trainable=True))
         single_block.add(gates.RZ(0, theta=random.random() * np.pi, trainable=True))
 
     for _ in range(nlayers):
-        for q in range(nqubits):
+        for q in qubits:
             circ.add(single_block.on_qubits(q))
 
         if entangling_block is None:
             entangling_block = entangling_layer(
-                nqubits=nqubits,
+                nqubits=len(qubits),
                 architecture=architecture,
                 entangling_gate=entangling_gate,
                 closed_boundary=closed_boundary,
             )
-        elif entangling_block.nqubits != nqubits:
-            raise ValueError(f"Entangling layer circuit must have {nqubits} qubits.")
+        elif entangling_block.nqubits != len(qubits):
+            raise ValueError(
+                f"Entangling layer circuit must have {len(qubits)} qubits."
+            )
 
-        circ += entangling_block
+        circ.add(entangling_block.on_qubits(*qubits))
 
     return circ
 
