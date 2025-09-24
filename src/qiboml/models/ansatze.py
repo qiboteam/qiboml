@@ -18,7 +18,7 @@ def HardwareEfficient(
     architecture: str = "diagonal",
     closed_boundary: bool = True,
     **kwargs,
-):
+) -> Circuit:
     """
     Create a Hardware-efficient ansatz with custom single-qubit and entangling blocks.
 
