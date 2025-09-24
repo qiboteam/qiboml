@@ -60,19 +60,20 @@ def HardwareEfficient(
         for q in qubits:
             circ.add(single_block.on_qubits(q))
 
-        if entangling_block is None:
-            entangling_block = entangling_layer(
-                nqubits=len(qubits),
-                architecture=architecture,
-                entangling_gate=entangling_gate,
-                closed_boundary=closed_boundary,
-            )
-        elif entangling_block.nqubits != len(qubits):
-            raise ValueError(
-                f"Entangling layer circuit must have {len(qubits)} qubits."
-            )
+        if len(qubits) != 1:
+            if entangling_block is None:
+                entangling_block = entangling_layer(
+                    nqubits=len(qubits),
+                    architecture=architecture,
+                    entangling_gate=entangling_gate,
+                    closed_boundary=closed_boundary,
+                )
+            elif entangling_block.nqubits != len(qubits):
+                raise ValueError(
+                    f"Entangling layer circuit must have {len(qubits)} qubits."
+                )
 
-        circ.add(entangling_block.on_qubits(*qubits))
+            circ.add(entangling_block.on_qubits(*qubits))
 
     return circ
 
