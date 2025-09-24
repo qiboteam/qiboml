@@ -9,6 +9,7 @@ import torch
 from qibo import Circuit
 from qibo.backends import Backend
 
+from qiboml.backends.pytorch import PyTorchBackend
 from qiboml.interfaces import utils
 from qiboml.interfaces.circuit_tracer import CircuitTracer
 from qiboml.models.decoding import QuantumDecoding
@@ -92,10 +93,13 @@ class QuantumModel(torch.nn.Module):
         self.circuit_tracer = self.circuit_tracer(self.circuit_structure)
 
         if self.differentiation is None:
-            self.differentiation = utils.get_default_differentiation(
-                decoding=self.decoding,
-                instructions=DEFAULT_DIFFERENTIATION,
-            )
+            if issubclass(type(self.backend), PyTorchBackend):
+                self.differentiation = None
+            else:
+                self.differentiation = utils.get_default_differentiation(
+                    decoding=self.decoding,
+                    instructions=DEFAULT_DIFFERENTIATION,
+                )
 
     def forward(self, x: Optional[torch.Tensor] = None):
         """
