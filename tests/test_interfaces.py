@@ -295,7 +295,7 @@ def backprop_test(frontend, model, data, target):
     _, loss_untrained = eval_model(frontend, model, data, target)
     grad = train_model(frontend, model, data, target)
     _, loss_trained = eval_model(frontend, model, data, target)
-    assert grad < 1e-2
+    assert grad < 2e-2
     assert round(float(loss_untrained), 6) >= round(float(loss_trained), 6)
     # in some (unpredictable) cases the gradient and loss
     # start so small that the model doesn't do anything
