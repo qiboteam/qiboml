@@ -89,7 +89,7 @@ def test_rtqem(frontend, backend, mitigation_method):
         frontend=frontend,
         backend=backend,
         model=noisy_model,
-        epochs=30,
+        epochs=50,
     )
 
     mitigation_config = {
@@ -119,7 +119,7 @@ def test_rtqem(frontend, backend, mitigation_method):
         frontend=frontend,
         backend=backend,
         model=mit_model,
-        epochs=30,
+        epochs=50,
     )
 
     assert mit_result < noisy_result
