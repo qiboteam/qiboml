@@ -4,6 +4,7 @@ from typing import Optional
 
 import numpy as np
 from qibo import Circuit, gates
+from qibo.config import raise_error
 from qibo.models.encodings import entangling_layer
 from scipy.special import binom
 
