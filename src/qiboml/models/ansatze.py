@@ -21,38 +21,43 @@ def HardwareEfficient(
     **kwargs,
 ) -> Circuit:
     """
-    Create a Hardware-efficient ansatz with custom single-qubit and entangling blocks.
+    Create a hardware-efficient ansatz with custom single-qubit layers and entangling blocks.
 
     Args:
         nqubits (int): Number of qubits in the ansatz.
-        qubits (tuple[int], optional): Qubit indices to apply the ansatz to. If ``None``, the ansatz is applied to all qubits
-            from ``0`` to ``nqubits-1``. Defaults to ``None``.
-        nlayers (int, optional): Number of layers (single-qubit + entangling per layer). Defaults to 1.
-        single_block (Circuit, optional): 1-qubit Circuit applied to each qubit. Defaults to a block with :class:`qibo.gates.RY` and :class:`qibo.gates.RZ` gates.
-        entangling_block (Circuit, optional): full n-qubit entangling circuit. Defaults to ``None``.
-        entangling_gate (str or :class:`qibo.gates.Gate`, optional): Only used if ``entangling_block`` is None. Two-qubit gate to be used
-            in the entangling layer if ``entangling_block`` is not provided. If ``entangling_gate`` is a parametrized gate,
-            all phases are initialized as :math:`0.0`. Defaults to  ``"CNOT"``.
-        architecture (str, optional): Only used if ``entangling_block`` is None. Architecture of the entangling layer.
-            In alphabetical order, options are ``"diagonal"``, ``"even_layer"``,
-            ``"next_nearest"``, ``"odd_layer"``, ``"pyramid"``, ``"shifted"``,
-            ``"v"``, and ``"x"``. The ``"x"`` architecture is only defined for an even number
-            of qubits. Defaults to ``"diagonal"``.
-        closed_boundary (bool, optional): Only used if ``entangling_block`` is None. If ``True`` and ``architecture not in
-            ["pyramid", "v", "x"]``, adds a closed-boundary condition to the entangling layer.
-            Defaults to ``True``.
+        qubits (tuple[int], optional): Qubit indexes to apply the ansatz to. If ``None``, 
+            the ansatz is applied to all qubits from :math:`0` to :math:`nqubits-1`. 
+            Defaults to ``None``.
+        nlayers (int, optional): Number of layers (single-qubit + entangling per layer). Defaults to :math:`1`.
+        single_block (Circuit, optional): :math:`1`-qubit circuit applied to each qubit. 
+        If ``None``, defaults to a block with :class:`qibo.gates.RY` and 
+        :class:`qibo.gates.RZ` gates. Defaults to ``None``.
+        entangling_block (Circuit, optional): :math:`n`-qubit entangling circuit. Defaults to ``None``.
+        entangling_gate (str or :class:`qibo.gates.Gate`, optional): Only used if ``entangling_block``
+            is ``None``. Two-qubit gate to be used in the entangling layer if ``entangling_block`` is not
+            provided. If ``entangling_gate`` is a parametrized gate, all phases are initialized as 
+            :math:`0.0`. Defaults to  ``"CNOT"``.
+        architecture (str, optional): Only used if ``entangling_block`` is ``None``. 
+            Architecture of the entangling layer. In alphabetical order, options are:
+            ``"diagonal"``, ``"even_layer"``, ``"next_nearest"``, ``"odd_layer"``,
+            ``"pyramid"``, ``"shifted"``, ``"v"``, and ``"x"``. The ``"x"`` architecture
+            is only defined for an even number of qubits. Defaults to ``"diagonal"``.
+        closed_boundary (bool, optional): Only used if ``entangling_block`` is ``None``.
+            If ``True`` and ``architecture not in ["pyramid", "v", "x"]``, adds a 
+            closed-boundary condition to the entangling layer. Defaults to ``True``.
         kwargs (dict, optional): Additional arguments used to initialize a Circuit object.
             For details, see the documentation of :class:`qibo.models.circuit.Circuit`.
 
     Returns:
-        qibo.models.Circuit: Constructed hardware-efficient ansatz.
+        :class:`qibo.models.circuit.Circuit`: Constructed hardware-efficient ansatz.
     """
     circ = Circuit(nqubits, **kwargs)
 
     if qubits is None:
         qubits = list(range(nqubits))
     elif len(qubits) > nqubits:
-        raise ValueError(
+        raise_error(
+            ValueError,
             f"Number of specified qubits ({len(qubits)}) cannot exceed the total number of qubits in the circuit ({nqubits})."
         )
 
