@@ -24,7 +24,7 @@ def HardwareEfficient(
     Create a hardware-efficient ansatz with custom single-qubit layers and entangling blocks.
 
     Args:
-        nqubits (int): Number of qubits in the ansatz.
+        nqubits (int): Number of qubits :math:`n` in the ansatz.
         qubits (tuple[int], optional): Qubit indexes to apply the ansatz to. If ``None``, 
             the ansatz is applied to all qubits from :math:`0` to :math:`nqubits-1`. 
             Defaults to ``None``.
