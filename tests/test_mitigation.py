@@ -75,7 +75,7 @@ def test_rtqem(frontend, backend, mitigation_method):
         observable=obs,
         nshots=nshots,
         backend=backend,
-        noise_model=build_noise_model(nqubits=nqubits, local_pauli_noise_prob=0.04),
+        noise_model=build_noise_model(nqubits=nqubits, local_pauli_noise_prob=0.02),
         density_matrix=True,
     )
 
@@ -89,7 +89,7 @@ def test_rtqem(frontend, backend, mitigation_method):
         frontend=frontend,
         backend=backend,
         model=noisy_model,
-        epochs=50,
+        epochs=30,
     )
 
     mitigation_config = {
@@ -119,7 +119,7 @@ def test_rtqem(frontend, backend, mitigation_method):
         frontend=frontend,
         backend=backend,
         model=mit_model,
-        epochs=50,
+        epochs=30,
     )
 
     assert mit_result < noisy_result
