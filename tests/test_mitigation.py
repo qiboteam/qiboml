@@ -63,7 +63,7 @@ def train_vqe(frontend, backend, model, epochs):
 @pytest.mark.parametrize("mitigation_method", ["ICS", "CDR"])
 def test_rtqem(frontend, backend, mitigation_method):
     nqubits = 1
-    nlayers = 2
+    nlayers = 3
     nshots = 10000
     set_seed(frontend=frontend, seed=42)
 
