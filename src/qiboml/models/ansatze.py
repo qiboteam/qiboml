@@ -9,7 +9,7 @@ from qibo.models.encodings import entangling_layer
 from scipy.special import binom
 
 
-def HardwareEfficient(
+def hardware_efficient(
     nqubits: int,
     qubits: Optional[tuple[int]] = None,
     nlayers: int = 1,
@@ -63,8 +63,8 @@ def HardwareEfficient(
 
     if single_block is None:
         single_block = Circuit(1)
-        single_block.add(gates.RY(0, theta=random.random() * np.pi, trainable=True))
-        single_block.add(gates.RZ(0, theta=random.random() * np.pi, trainable=True))
+        single_block.add(gates.RY(0, theta=0.0, trainable=True))
+        single_block.add(gates.RZ(0, theta=0.0, trainable=True))
 
     for _ in range(nlayers):
         for q in qubits:
@@ -79,9 +79,7 @@ def HardwareEfficient(
                     closed_boundary=closed_boundary,
                 )
             elif entangling_block.nqubits != len(qubits):
-                raise ValueError(
-                    f"Entangling layer circuit must have {len(qubits)} qubits."
-                )
+                raise_error(ValueError, f"Entangling layer circuit must have {len(qubits)} qubits.")
 
             circ.add(entangling_block.on_qubits(*qubits))
 

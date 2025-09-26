@@ -304,16 +304,19 @@ def backprop_test(frontend, model, data, target):
     # specific (rare) cases
 
 
-@pytest.mark.parametrize("layer,seed", zip(ENCODING_LAYERS, [5, 5]))
+@pytest.mark.parametrize("layer,seed", zip(ENCODING_LAYERS, [15, 15]))
 def test_encoding(backend, frontend, layer, seed):
     set_device(frontend)
     set_seed(frontend, seed)
     backend.set_seed(seed)
 
     nqubits = 2
+    nlayers = 1
     dim = 2
 
-    training_layer = ans.HardwareEfficient(nqubits, random_subset(nqubits, dim))
+    nparams = nlayers*nqubits*2
+    training_layer = ans.hardware_efficient(nqubits, random_subset(nqubits, dim), nlayers)
+    training_layer.set_parameters([random.random() for _ in range(nparams)])
 
     decoding_qubits = random_subset(nqubits, dim)
     observable = hamiltonians.SymbolicHamiltonian(
@@ -364,9 +367,12 @@ def test_decoding(backend, frontend, layer, seed):
     backend.set_seed(seed)
 
     nqubits = 2
+    nlayers = 1
     dim = 2
 
-    training_layer = ans.HardwareEfficient(nqubits, random_subset(nqubits, dim))
+    nparams = nlayers*nqubits*2
+    training_layer = ans.hardware_efficient(nqubits, random_subset(nqubits, dim), nlayers)
+    training_layer.set_parameters([random.random() for _ in range(nparams)])
     encoding_layer = enc.PhaseEncoding(nqubits, random_subset(nqubits, dim))
     kwargs = {"backend": backend}
     decoding_qubits = random_subset(nqubits, dim)
@@ -415,10 +421,13 @@ def test_composition(backend, frontend):
     backend.set_seed(seed)
 
     nqubits = 2
+    nlayers = 1
     encoding_layer = random.choice(list(set(ENCODING_LAYERS) - {enc.BinaryEncoding}))(
         nqubits
     )
-    training_layer = ans.HardwareEfficient(nqubits)
+    nparams = nlayers*nqubits*2
+    training_layer = ans.hardware_efficient(nqubits, nlayers=nlayers)
+    training_layer.set_parameters([random.random() for _ in range(nparams)])
     observable = hamiltonians.SymbolicHamiltonian(
         1 + np.prod([Z(int(i)) for i in range(nqubits)]),
         nqubits=nqubits,
@@ -461,10 +470,13 @@ def test_vqe(backend, frontend, dense, nshots):
     tfim = hamiltonians.TFIM(nqubits=2, h=0.1, dense=dense, backend=backend)
 
     nqubits = 2
-    training_layer = ans.HardwareEfficient(
+    nlayers = 2
+    nparams = nlayers*nqubits*2
+    training_layer = ans.hardware_efficient(
         nqubits,
-        nlayers=2,
+        nlayers=nlayers,
     )
+    training_layer.set_parameters([random.random() for _ in range(nparams)])
     decoding_layer = dec.Expectation(
         nqubits=nqubits, backend=backend, observable=tfim, nshots=nshots
     )
@@ -499,7 +511,10 @@ def test_noise(backend, frontend):
     noise.add(PauliError([("Z", 0.2)]), gates.RZ)
 
     encoding_layer = random.choice(ENCODING_LAYERS)(nqubits)
-    training_layer = ans.HardwareEfficient(nqubits)
+    nlayers = 1
+    nparams = nlayers*nqubits*2
+    training_layer = ans.hardware_efficient(nqubits, nlayers=nlayers)
+    training_layer.set_parameters([random.random() for _ in range(nparams)])
     circuit = [encoding_layer, training_layer]
 
     # Noiseless decoding layer
@@ -559,8 +574,12 @@ def test_qibolab(frontend):
     backend.set_seed(seed)
 
     nqubits = 1
+    nlayers = 1
+    nparams = nlayers*nqubits*2
     encoding_layer = enc.PhaseEncoding(nqubits)
-    training_layer = ans.HardwareEfficient(nqubits)
+    encoding_layer = enc.PhaseEncoding(nqubits)
+    training_layer = ans.hardware_efficient(nqubits, nlayers=nlayers)
+    training_layer.set_parameters([random.random() for _ in range(nparams)])
     decoding_layer = dec.Expectation(
         nqubits,
         wire_names=[0],
@@ -606,8 +625,12 @@ def test_equivariant(backend, frontend):
         return c
 
     # these are 4 independent parameters
-    circuit = ans.HardwareEfficient(2)
-    decoding = dec.Expectation(2, backend=backend)
+    nqubits = 2
+    nlayers = 1
+    nparams = nlayers*nqubits*2
+    circuit = ans.hardware_efficient(nqubits, nlayers=nlayers)
+    circuit.set_parameters([random.random() for _ in range(nparams)])
+    decoding = dec.Expectation(nqubits, backend=backend)
     model = frontend.QuantumModel(
         [circuit, custom_circuit],
         decoding,

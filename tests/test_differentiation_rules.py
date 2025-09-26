@@ -5,7 +5,7 @@ import pytest
 from qibo import Circuit, gates, hamiltonians
 from qibo.backends import NumpyBackend
 
-from qiboml.models.ansatze import HardwareEfficient
+from qiboml.models.ansatze import hardware_efficient
 from qiboml.models.decoding import Expectation
 from qiboml.models.encoding import PhaseEncoding
 from qiboml.operations.differentiation import PSR, Adjoint, Jax
@@ -28,20 +28,20 @@ TARGET_GRAD_TORCH = {
     "equivariant_no_inputs": (
         None,
         np.array(
-            [0.689824, -0.853396, 1.209229, -0.084614, -0.728471, 1.497605, -0.32177]
+            [0.190588, -1.027189,  0.972286, -0.177316, -0.968753,  1.293386, 0.456258]
         ),
     ),
     "equivariant_wrt_inputs": (
-        np.array([-0.77309231, -1.38568137]),
+        np.array([-1.248764, -0.668485]),
         np.array(
             [
-                -0.386546,
-                0.472073,
-                -0.692841,
-                -0.137853,
-                0.599248,
-                0.066366,
-                1.666458,
+                -0.624382,
+                0.558202,
+                -0.334243,
+                -0.173734,
+                0.914893,
+                0.443913,
+                2.184554,
             ]
         ),
     ),
@@ -49,7 +49,7 @@ TARGET_GRAD_TORCH = {
 TARGET_GRAD_TENSORFLOW = TARGET_GRAD_TORCH.copy()
 TARGET_GRAD_TENSORFLOW["equivariant_no_inputs"] = (
     None,
-    np.array([-0.138025, 0.131707, -1.074084, -0.159242, 0.210921, 0.131674, 0.691924]),
+    np.array([-0.028213, 0.229197, -0.232883, -0.20069, 0.19251, 0.276762, 0.64003]),
 )
 TARGET_GRAD_TENSORFLOW["no_inputs"] = (
     None,
@@ -145,11 +145,14 @@ def test_expval_custom_grad(
     x = construct_x(frontend, wrt_inputs=wrt_inputs)
 
     nqubits = 2
+    nlayers = 1
+    nparams = nlayers * nqubits * 2
 
     obs = hamiltonians.Z(nqubits=nqubits, backend=backend)
 
     encoding_layer = PhaseEncoding(nqubits=nqubits)
-    training_layer = HardwareEfficient(nqubits=nqubits, nlayers=1)
+    training_layer = hardware_efficient(nqubits=nqubits, nlayers=nlayers)
+    training_layer.set_parameters([random.random() for _ in range(nparams)])
 
     engine = (
         frontend.torch
