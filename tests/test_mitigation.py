@@ -1,3 +1,4 @@
+import random
 from copy import deepcopy
 
 import pytest
@@ -10,8 +11,6 @@ from qiboml.models.decoding import Expectation
 from qiboml.operations.differentiation import PSR
 
 from .utils import set_seed
-
-import random
 
 BACKENDS = [NumpyBackend()]
 
@@ -65,10 +64,13 @@ def test_rtqem(frontend, backend, mitigation_method):
     nqubits = 1
     nlayers = 3
     nshots = 10000
-    set_seed(frontend=frontend, seed=42)
+
+    seed = 42
+    set_seed(frontend, seed)
+    backend.set_seed(seed)
 
     # We build a trainable circuit
-    nparams = nlayers*nqubits*2
+    nparams = nlayers * nqubits * 2
     vqe = hardware_efficient(nqubits=nqubits, nlayers=nlayers)
     vqe.set_parameters([random.random() for _ in range(nparams)])
 
@@ -136,7 +138,7 @@ def test_custom_map(frontend):
     # We build a trainable circuit
     nqubits = 1
     nlayers = 2
-    nparams = nlayers*nqubits*2
+    nparams = nlayers * nqubits * 2
     vqe = hardware_efficient(nqubits=nqubits, nlayers=nlayers)
     vqe.set_parameters([random.random() for _ in range(nparams)])
 
