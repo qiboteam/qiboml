@@ -569,7 +569,7 @@ def test_qibolab(frontend):
     )
 
     set_device(frontend)
-    seed = 1
+    seed = 15
     set_seed(frontend, seed)
     backend.set_seed(seed)
 
