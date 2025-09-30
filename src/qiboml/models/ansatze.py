@@ -89,3 +89,83 @@ def brickwork_givens(nqubits: int, weight: int, full_hwp: bool = False, **kwargs
     circuit.add(deepcopy(queue[elem % len(queue)]) for elem in range(nmissing))
 
     return circuit
+
+
+def FloquetEcho(
+    nqubits: int,
+    nlayers: int = 2,
+    b: float = 0.4 * np.pi,
+    theta: float = 0.5 * np.pi,
+    decompose_rzz: bool = True,
+    target_qubit: int = None,
+) -> Circuit:
+    """Floquet echo ansatz:
+       U = H(target) · (FloquetLayer)^nlayers · RZ(target, theta) · (FloquetLayer^nlayers)†
+
+    Args:
+        nqubits: number of qubits.
+        nlayers: number of Floquet layers in the 'half-sandwich'.
+        b: RX angle used on both qubits of each pair inside each sublayer.
+        theta: central RZ angle on the target qubit.
+        target_qubit: qubit index for H and central RZ.
+        decompose_rzz: if True, decompose RZZ into CNOT–RZ–CNOT.
+
+    Returns:
+        Circuit implementing the Floquet echo.
+    """
+
+    def _decomposed_rzz(layer_circ: Circuit, q0: int, q1: int, angle: float):
+        layer_circ.add(gates.CNOT(q0, q1))
+        layer_circ.add(gates.RZ(q=q1, theta=angle))
+        layer_circ.add(gates.CNOT(q0, q1))
+
+    def _build_sublayer(nq: int, parity: str) -> Circuit:
+        sub = Circuit(nq)
+        if nq < 2:
+            return sub
+        if parity == "even":
+            pairs = range(0, nq - 1, 2)
+        elif parity == "odd":
+            pairs = range(1, nq - 1, 2)
+        else:
+            raise ValueError("parity must be 'even' or 'odd'.")
+
+        for q1 in pairs:
+            q2 = q1 + 1
+            sub.add(gates.RZ(q=q1, theta=0.25 * np.pi))
+            sub.add(gates.RX(q=q1, theta=b))
+            sub.add(gates.RZ(q=q2, theta=0.25 * np.pi))
+            sub.add(gates.RX(q=q2, theta=b))
+            if decompose_rzz:
+                _decomposed_rzz(sub, q1, q2, 0.5 * np.pi)
+            else:
+                sub.add(gates.RZZ(q0=q1, q1=q2, theta=0.5 * np.pi))
+        return sub
+
+    def _build_floquet_layer(nq: int) -> Circuit:
+        layer = Circuit(nq)
+        layer += _build_sublayer(nq, "even")
+        layer += _build_sublayer(nq, "odd")
+        return layer
+
+    if target_qubit is None:
+        target_qubit = int(nqubits / 2)
+
+    # --- build the circuit ---
+    circuit = Circuit(nqubits)
+    half_sandwich = Circuit(nqubits)
+
+    # build (FL)^nlayers
+    for _ in range(nlayers):
+        half_sandwich += _build_floquet_layer(nqubits)
+
+    # H on target
+    circuit.add(gates.H(target_qubit))
+    # forward half
+    circuit += half_sandwich
+    # central RZ on target
+    circuit.add(gates.RZ(q=target_qubit, theta=theta))
+    # inverse half
+    circuit += half_sandwich.invert()
+
+    return circuit
