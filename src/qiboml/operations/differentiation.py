@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import cached_property, partial
-from typing import Callable, Tuple
+from typing import Callable, Optional, Tuple
 
 import jax
 import numpy as np
@@ -20,8 +20,24 @@ class Differentiation(ABC):
     Abstract differentiator object.
     """
 
-    circuit: Circuit
-    decoding: QuantumDecoding
+    circuit: Optional[Circuit] = field(default=None, init=False, repr=False)
+    decoding: Optional[QuantumDecoding] = field(default=None, init=False, repr=False)
+    _is_built: bool = field(default=False, init=False, repr=False)
+
+    def build_differentiation(
+        self, circuit: Circuit, decoding: QuantumDecoding
+    ) -> "Differentiation":
+        """Attach model internals and prepare compiled artifacts."""
+        if self._is_built and self.circuit is circuit and self.decoding is decoding:
+            return self
+        self.circuit = circuit
+        self.decoding = decoding
+        self._on_build()
+        self._is_built = True
+        return self
+
+    def _on_build(self) -> None:
+        pass
 
     @abstractmethod
     def evaluate(
@@ -34,13 +50,16 @@ class Differentiation(ABC):
 
     @property
     def backend(self):
+        assert self.decoding is not None, "Differentiator not built yet."
         return self.decoding.backend
 
     @cached_property
     def non_trainable_gates(self):
+        assert self.circuit is not None, "Differentiator not built yet."
         return [g for g in self.circuit.parametrized_gates if not g.trainable]
 
     def nparams(self, wrt_inputs):
+        assert self.circuit is not None, "Differentiator not built yet."
         return len(self.circuit.get_parameters(include_not_trainable=wrt_inputs))
 
 
@@ -51,7 +70,7 @@ class PSR(Differentiation):
     derivative calculation which, thus, makes it hardware compatible.
     """
 
-    def __post_init__(self):
+    def _on_build(self):
         if np.prod(self.decoding.output_shape) != 1:
             raise_error(
                 RuntimeError,
@@ -68,6 +87,10 @@ class PSR(Differentiation):
         Returns:
             (ndarray): the calculated jacobian.
         """
+
+        assert (
+            self._is_built
+        ), "Call .build_differentiation(circuit, decoding) before evaluate()."
 
         circuits = []
         eigvals = []
@@ -158,6 +181,11 @@ class Adjoint(Differentiation):
         Returns:
             (ndarray): the calculated gradients.
         """
+
+        assert (
+            self._is_built
+        ), "Call .build_differentiation(circuit, decoding) before evaluate()."
+
         assert isinstance(
             self.decoding, Expectation
         ), "Adjoint differentation supported only for Expectation."
@@ -191,13 +219,12 @@ class Adjoint(Differentiation):
 
 
 class Jax(Differentiation):
-    def __init__(self, circuit: Circuit, decoding: QuantumDecoding):
-        self._jax: Backend = JaxBackend()
-        self._circuit = circuit
-        self._decoding = decoding
-        self.__post_init__()
 
-    def __post_init__(self):
+    def _on_build(self):
+        self._jax = JaxBackend()
+        self._compile_jacs()
+
+    def _compile_jacs(self):
         n_params = len(
             [
                 p
@@ -227,7 +254,6 @@ class Jax(Differentiation):
     def _run(circuit, decoding, *parameters):
         for g, p in zip(circuit.trainable_gates, parameters):
             g.parameters = p
-        # circuit.set_parameters(parameters)
         return decoding(circuit)
 
     @staticmethod
@@ -235,26 +261,7 @@ class Jax(Differentiation):
     def _run_with_inputs(circuit, decoding, *parameters):
         for g, p in zip(circuit.parametrized_gates, parameters):
             g.parameters = p
-        # circuit.set_parameters(parameters)
         return decoding(circuit)
-
-    @property
-    def circuit(self):
-        return self._circuit
-
-    @circuit.setter
-    def circuit(self, circ):
-        self._circuit = circ
-        self.__post_init__()
-
-    @property
-    def decoding(self):
-        return self._decoding
-
-    @decoding.setter
-    def decoding(self, dec):
-        self._decoding = dec
-        self.__post_init__()
 
     def _cast_non_trainable_parameters(self, src_backend, tgt_backend):
         for g in self.non_trainable_gates:
@@ -273,6 +280,11 @@ class Jax(Differentiation):
         Returns:
             (ndarray): the calculated jacobian.
         """
+
+        assert (
+            self._is_built
+        ), "Call .build_differentiation(circuit, decoding) before evaluate()."
+
         # backup the backend
         backend = self.decoding.backend
         # convert params to jax
@@ -305,21 +317,16 @@ class Jax(Differentiation):
 
 class QuimbJax(Jax):
 
-    def __init__(self, circuit: Circuit, decoding: QuantumDecoding):
-        super().__init__(circuit, decoding)
-        import cotengra as ctg
+    def __init__(self, tn_configuration: Optional[dict] = None):
+        super().__init__()
+        self._tn_configuration = tn_configuration or {}
 
-        ctg_opt = ctg.ReusableHyperOptimizer(
-            max_time=10,
-            minimize="combo",
-            slicing_opts=None,
-            parallel=True,
-            progbar=True,
-        )
+    def _on_build(self):
         self._jax = construct_backend(
             "qibotn",
             platform="quimb",
             quimb_backend="jax",
-            contraction_optimizer=ctg_opt,
+            contraction_optimizer="auto-hq",
         )
-        # self._jax.setup_backend_specifics(quimb_backend="jax", contractions_optimizer="auto-hq")
+        self._jax.configure_tn_simulation(**self._tn_configuration)
+        self._compile_jacs()
