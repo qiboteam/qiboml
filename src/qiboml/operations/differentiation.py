@@ -307,19 +307,61 @@ class QuimbJax(Jax):
 
     def __init__(self, circuit: Circuit, decoding: QuantumDecoding):
         super().__init__(circuit, decoding)
+
         import cotengra as ctg
 
-        ctg_opt = ctg.ReusableHyperOptimizer(
+        opt = ctg.ReusableHyperOptimizer(
             max_time=10,
             minimize="combo",
             slicing_opts=None,
             parallel=True,
             progbar=True,
         )
+
+        # opt = "auto-hq"
         self._jax = construct_backend(
             "qibotn",
             platform="quimb",
             quimb_backend="jax",
-            contraction_optimizer=ctg_opt,
+            contraction_optimizer=opt,
         )
-        # self._jax.setup_backend_specifics(quimb_backend="jax", contractions_optimizer="auto-hq")
+
+    def __post_init__(self):
+        n_params = len(
+            [
+                p
+                for params in self.circuit.get_parameters(include_not_trainable=False)
+                for p in params
+            ]
+        )
+        n_outputs = int(np.prod(self.decoding.output_shape))
+        jac = jax.jacfwd if n_params < n_outputs else jax.jacrev
+        self._jacobian: Callable = jac(self._run, tuple(range(2, n_params + 2)))
+
+        n_params = len(
+            [
+                p
+                for params in self.circuit.get_parameters(include_not_trainable=True)
+                for p in params
+            ]
+        )
+        jac = jax.jacfwd if n_params < n_outputs else jax.jacrev
+        self._jacobian_with_inputs: Callable = jac(
+            self._run_with_inputs, tuple(range(2, n_params + 2))
+        )
+
+    @staticmethod
+    # @partial(jax.jit, static_argnums=(0, 1))
+    def _run(circuit, decoding, *parameters):
+        for g, p in zip(circuit.trainable_gates, parameters):
+            g.parameters = p
+        # circuit.set_parameters(parameters)
+        return decoding(circuit)
+
+    @staticmethod
+    # @partial(jax.jit, static_argnums=(0, 1))
+    def _run_with_inputs(circuit, decoding, *parameters):
+        for g, p in zip(circuit.parametrized_gates, parameters):
+            g.parameters = p
+        # circuit.set_parameters(parameters)
+        return decoding(circuit)
