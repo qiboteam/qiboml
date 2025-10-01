@@ -326,7 +326,7 @@ class QuimbJax(Jax):
             contraction_optimizer=opt,
         )
         self._jax.configure_tn_simulation(
-            ansatz="mps", max_bond_dimension=1024, cutoff=1e-10
+            ansatz="mps", max_bond_dimension=1024, svd_cutoff=1e-10
         )
 
     def __post_init__(self):
