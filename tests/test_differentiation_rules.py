@@ -223,3 +223,112 @@ def test_expval_custom_grad(
     else:
         backend.assert_allclose(grad_wrt_input, input_target, atol=tol)
     backend.assert_allclose(grad_wrt_params, params_target, atol=tol)
+
+
+TARGET_GRAD_REUPLOADING = (
+    np.array([-0.38758182, -2.19518041]),
+    np.array(
+        [
+            0.57033945,
+            -0.62595108,
+            -0.19025455,
+            0.4120112,
+            -0.19025455,
+            0.87706655,
+            0.4120112,
+            -0.01386607,
+            -0.76484236,
+            0.52482627,
+            -1.3452889,
+        ]
+    ),
+)
+
+
+@pytest.mark.parametrize("nshots", [None, 12000000])
+@pytest.mark.parametrize("backend", EXECUTION_BACKENDS)
+@pytest.mark.parametrize("diff_rule", DIFF_RULES)
+def test_expval_custom_grad_reuploading(
+    frontend,
+    backend,
+    nshots,
+    diff_rule,
+):
+    """
+    Compute test gradient of < 0 | model^dag observable model | 0 > w.r.t model's
+    parameters. In this test the system size is fixed to two qubits and all the
+    parameters/data values are fixed.
+    """
+
+    if diff_rule is not None and diff_rule.__name__ == "Jax" and nshots is not None:
+        pytest.skip("Jax differentiation does not work with shots.")
+
+    set_seed(frontend, 42)
+    backend.set_seed(42)
+
+    x = construct_x(frontend, wrt_inputs=True)
+
+    nqubits = 2
+
+    obs = hamiltonians.Z(nqubits=nqubits, backend=backend)
+
+    encoding_layer = PhaseEncoding(nqubits=nqubits)
+    training_layer = HardwareEfficient(nqubits=nqubits, nlayers=1)
+
+    engine = (
+        frontend.torch
+        if frontend.__name__ == "qiboml.interfaces.pytorch"
+        else frontend.keras.ops
+    )
+
+    def equivariant_circuit(th, phi, lam):
+        c = Circuit(nqubits)
+        delta = 2 * engine.cos(phi) + lam**2
+        gamma = lam * engine.exp(th / 2)
+        c.add([gates.RZ(i, theta=th) for i in range(nqubits)])
+        c.add([gates.RX(i, theta=lam) for i in range(nqubits)])
+        c.add([gates.RY(i, theta=phi) for i in range(nqubits)])
+        c.add(gates.RZ(0, theta=delta))
+        c.add(gates.RX(1, theta=gamma))
+        return c
+
+    circuit_structure = [
+        encoding_layer,
+        training_layer,
+        encoding_layer,
+        training_layer.copy(deep=True),
+    ]
+    circuit_structure += [
+        equivariant_circuit,
+    ]
+
+    decoding_layer = Expectation(
+        nqubits=nqubits,
+        backend=backend,
+        observable=obs,
+        nshots=nshots,
+    )
+
+    nparams = len(training_layer.get_parameters())
+    initial_params = np.linspace(0.0, 2 * np.pi, nparams)
+    training_layer.set_parameters(
+        backend.cast(initial_params, dtype=backend.np.float64)
+    )
+
+    q_model = frontend.QuantumModel(
+        circuit_structure=circuit_structure,
+        decoding=decoding_layer,
+        differentiation=diff_rule,
+    )
+
+    input_target, params_target = TARGET_GRAD_REUPLOADING
+    grad_wrt_input, grad_wrt_params = compute_gradient(
+        frontend, q_model, x, wrt_inputs=True
+    )
+    grad_wrt_input = np.array(grad_wrt_input)
+    grad_wrt_params = np.array(grad_wrt_params)
+    print(grad_wrt_input)
+    print(grad_wrt_params)
+    tol = 1e-3 if nshots is None else 1e-1
+    backend.assert_allclose(grad_wrt_input, input_target, atol=tol)
+    backend.assert_allclose(grad_wrt_params, params_target, atol=tol)
