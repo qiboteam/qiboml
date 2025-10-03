@@ -225,7 +225,7 @@ def test_expval_custom_grad(
     backend.assert_allclose(grad_wrt_params, params_target, atol=tol)
 
 
-TARGET_GRAD_REUPLOADING_TORCH = {
+TARGET_GRAD_REUPLOADING = {
     "wrt_inputs": (
         np.array([1.668244, -0.350845]),
         np.array(
@@ -248,40 +248,21 @@ TARGET_GRAD_REUPLOADING_TORCH = {
         None,
         np.array(
             [
-                -0.489447,
-                0.836422,
-                -0.574386,
-                -0.18405,
-                -0.987074,
-                -0.270881,
-                -0.454861,
-                -0.003157,
-                0.040613,
-                -0.214696,
-                -0.164871,
+                0.182884,
+                0.226752,
+                -0.637248,
+                -0.270067,
+                0.315737,
+                0.653579,
+                0.899997,
+                -0.235639,
+                0.514433,
+                -0.488684,
+                1.068054,
             ]
         ),
     ),
 }
-TARGET_GRAD_REUPLOADING_KERAS = TARGET_GRAD_REUPLOADING_TORCH.copy()
-TARGET_GRAD_REUPLOADING_KERAS["no_inputs"] = (
-    None,
-    np.array(
-        [
-            0.182884,
-            0.226752,
-            -0.637248,
-            -0.270067,
-            0.315737,
-            0.653579,
-            0.899997,
-            -0.235639,
-            0.514433,
-            -0.488684,
-            1.068054,
-        ]
-    ),
-)
 
 
 @pytest.mark.parametrize("nshots", [None, 12000000])
@@ -300,13 +281,7 @@ def test_expval_custom_grad_reuploading(
     parameters. In this test the system size is fixed to two qubits and all the
     parameters/data values are fixed.
     """
-    """
-    import qiboml.interfaces.keras as frontend
-    from qiboml.backends import PyTorchBackend, TensorflowBackend
-    backend = TensorflowBackend() #PyTorchBackend()
-    diff_rule = None
-    nshots=None
-    """
+
     if diff_rule is not None and diff_rule.__name__ == "Jax" and nshots is not None:
         pytest.skip("Jax differentiation does not work with shots.")
 
@@ -371,11 +346,10 @@ def test_expval_custom_grad_reuploading(
     )
 
     TARGET_GRAD = (
-        TARGET_GRAD_REUPLOADING_TORCH
-        if frontend.__name__ == "qiboml.interfaces.pytorch"
-        else TARGET_GRAD_REUPLOADING_KERAS
+        TARGET_GRAD_REUPLOADING["wrt_inputs"]
+        if wrt_inputs
+        else TARGET_GRAD_REUPLOADING["no_inputs"]
     )
-    TARGET_GRAD = TARGET_GRAD["wrt_inputs"] if wrt_inputs else TARGET_GRAD["no_inputs"]
     input_target, params_target = TARGET_GRAD
     grad_wrt_input, grad_wrt_params = compute_gradient(
         frontend, q_model, x, wrt_inputs=wrt_inputs

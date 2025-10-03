@@ -296,7 +296,6 @@ class QuantumModelAutoGrad(torch.autograd.Function):
             )
         else:
             grad_input = None
-
         # combine the jacobians wrt parameters with those
         # wrt the circuit angles
         gradient = torch.einsum(
