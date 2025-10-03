@@ -22,10 +22,10 @@ from qiboml.models.encoding import QuantumEncoding
 from qiboml.operations.differentiation import PSR, Differentiation, Jax
 
 DEFAULT_DIFFERENTIATION = {
-    "qiboml-pytorch": Jax(),
+    "qiboml-pytorch": Jax,
     "qiboml-tensorflow": None,
-    "qiboml-jax": Jax(),
-    "numpy": Jax(),
+    "qiboml-jax": Jax,
+    "numpy": Jax,
 }
 
 
@@ -135,6 +135,8 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
                 decoding=self.decoding,
                 instructions=DEFAULT_DIFFERENTIATION,
             )()
+        elif isinstance(self.differentiation, type):
+            self.differentiation = self.differentiation()
         self.custom_gradient = None
 
     def compute_output_shape(self, input_shape):
@@ -150,7 +152,7 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
             output = self.decoding(circuit)
             return output[None, :]
         if not self.differentiation._is_built:
-            self.differentiation.build_differentiation(
+            self.differentiation.build(
                 self.circuit_tracer.build_circuit(1 * self.circuit_parameters, x=x),
                 self.decoding,
             )

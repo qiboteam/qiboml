@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from functools import cached_property, partial
 from typing import Callable, Optional, Tuple
 
@@ -20,21 +20,22 @@ class Differentiation(ABC):
     Abstract differentiator object.
     """
 
-    circuit: Optional[Circuit] = field(default=None, init=False, repr=False)
-    decoding: Optional[QuantumDecoding] = field(default=None, init=False, repr=False)
-    _is_built: bool = field(default=False, init=False, repr=False)
+    circuit: Optional[Circuit] = None
+    decoding: Optional[QuantumDecoding] = None
+    _is_built: bool = False
 
-    def build_differentiation(
-        self, circuit: Circuit, decoding: QuantumDecoding
-    ) -> "Differentiation":
+    def __post_init__(self):
+        if self.circuit is not None and self.decoding is not None:
+            self.build(self.circuit, self.decoding)
+
+    def build(self, circuit: Circuit, decoding: QuantumDecoding):
         """Attach model internals and prepare compiled artifacts."""
-        if self._is_built and self.circuit is circuit and self.decoding is decoding:
-            return self
+        if self._is_built:
+            return
         self.circuit = circuit
         self.decoding = decoding
         self._on_build()
         self._is_built = True
-        return self
 
     def _on_build(self) -> None:
         pass
@@ -88,9 +89,7 @@ class PSR(Differentiation):
             (ndarray): the calculated jacobian.
         """
 
-        assert (
-            self._is_built
-        ), "Call .build_differentiation(circuit, decoding) before evaluate()."
+        assert self._is_built, "Call .build(circuit, decoding) before evaluate()."
 
         circuits = []
         eigvals = []
@@ -220,11 +219,14 @@ class Adjoint(Differentiation):
 
 class Jax(Differentiation):
 
-    def _on_build(self):
+    def __post_init__(self):
+        super().__post_init__()
         self._jax = JaxBackend()
-        self._compile_jacs()
 
-    def _compile_jacs(self):
+    def _on_build(self):
+        self._compile_jacobians()
+
+    def _compile_jacobians(self):
         n_params = len(
             [
                 p
@@ -317,16 +319,17 @@ class Jax(Differentiation):
 
 class QuimbJax(Jax):
 
-    def __init__(self, tn_configuration: Optional[dict] = None):
+    def __init__(self, **kwargs):
         super().__init__()
-        self._tn_configuration = tn_configuration or {}
-
-    def _on_build(self):
         self._jax = construct_backend(
             "qibotn",
             platform="quimb",
-            quimb_backend="jax",
-            contraction_optimizer="auto-hq",
+            quimb_backend=kwargs.get("quimb_backend", "jax"),
+            contraction_optimizer=kwargs.get("contraction_optimizer", "auto-hq"),
         )
-        self._jax.configure_tn_simulation(**self._tn_configuration)
-        self._compile_jacs()
+        self._jax.configure_tn_simulation(
+            kwargs.get("ansatz", "mps"),
+            kwargs.get("max_bond_dimension", None),
+            kwargs.get("svd_cutoff", 1e-10),
+            kwargs.get("n_most_frequent_states", 100),
+        )

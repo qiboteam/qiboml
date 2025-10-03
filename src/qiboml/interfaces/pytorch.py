@@ -18,9 +18,9 @@ from qiboml.operations.differentiation import PSR, Differentiation, Jax
 
 DEFAULT_DIFFERENTIATION = {
     "qiboml-pytorch": None,
-    "qiboml-tensorflow": Jax(),
-    "qiboml-jax": Jax(),
-    "numpy": Jax(),
+    "qiboml-tensorflow": Jax,
+    "qiboml-jax": Jax,
+    "numpy": Jax,
 }
 
 
@@ -102,6 +102,8 @@ class QuantumModel(torch.nn.Module):
                     decoding=self.decoding,
                     instructions=DEFAULT_DIFFERENTIATION,
                 )()
+        elif isinstance(self.differentiation, type):
+            self.differentiation = self.differentiation()
 
     def forward(self, x: Optional[torch.Tensor] = None):
         """
@@ -121,7 +123,7 @@ class QuantumModel(torch.nn.Module):
             x = self.decoding(circuit)
         else:
             if not self.differentiation._is_built:
-                self.differentiation.build_differentiation(
+                self.differentiation.build(
                     self.circuit_tracer.build_circuit(list(self.parameters())[0], x=x),
                     self.decoding,
                 )
