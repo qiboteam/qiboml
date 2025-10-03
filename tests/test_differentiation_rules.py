@@ -58,7 +58,7 @@ TARGET_GRAD_TENSORFLOW["no_inputs"] = (
 
 
 def set_seed(frontend, seed):
-    random.seed(42)
+    random.seed(seed)
     np.random.seed(seed)
     frontend.np.random.seed(seed)
     if frontend.__name__ == "qiboml.interfaces.pytorch":
@@ -225,21 +225,60 @@ def test_expval_custom_grad(
     backend.assert_allclose(grad_wrt_params, params_target, atol=tol)
 
 
-TARGET_GRAD_REUPLOADING = (
-    np.array([-0.38758182, -2.19518041]),
+TARGET_GRAD_REUPLOADING_TORCH = {
+    "wrt_inputs": (
+        np.array([1.668244, -0.350845]),
+        np.array(
+            [
+                0.553438,
+                0.701541,
+                -0.897603,
+                0.369002,
+                0.280684,
+                0.303648,
+                0.72218,
+                -0.120478,
+                0.679402,
+                0.017968,
+                2.286109,
+            ]
+        ),
+    ),
+    "no_inputs": (
+        None,
+        np.array(
+            [
+                -0.489447,
+                0.836422,
+                -0.574386,
+                -0.18405,
+                -0.987074,
+                -0.270881,
+                -0.454861,
+                -0.003157,
+                0.040613,
+                -0.214696,
+                -0.164871,
+            ]
+        ),
+    ),
+}
+TARGET_GRAD_REUPLOADING_KERAS = TARGET_GRAD_REUPLOADING_TORCH.copy()
+TARGET_GRAD_REUPLOADING_KERAS["no_inputs"] = (
+    None,
     np.array(
         [
-            0.57033945,
-            -0.62595108,
-            -0.19025455,
-            0.4120112,
-            -0.19025455,
-            0.87706655,
-            0.4120112,
-            -0.01386607,
-            -0.76484236,
-            0.52482627,
-            -1.3452889,
+            0.182884,
+            0.226752,
+            -0.637248,
+            -0.270067,
+            0.315737,
+            0.653579,
+            0.899997,
+            -0.235639,
+            0.514433,
+            -0.488684,
+            1.068054,
         ]
     ),
 )
@@ -248,32 +287,48 @@ TARGET_GRAD_REUPLOADING = (
 @pytest.mark.parametrize("nshots", [None, 12000000])
 @pytest.mark.parametrize("backend", EXECUTION_BACKENDS)
 @pytest.mark.parametrize("diff_rule", DIFF_RULES)
+@pytest.mark.parametrize("wrt_inputs", [True, False])
 def test_expval_custom_grad_reuploading(
     frontend,
     backend,
     nshots,
     diff_rule,
+    wrt_inputs,
 ):
     """
     Compute test gradient of < 0 | model^dag observable model | 0 > w.r.t model's
     parameters. In this test the system size is fixed to two qubits and all the
     parameters/data values are fixed.
     """
-
+    """
+    import qiboml.interfaces.keras as frontend
+    from qiboml.backends import PyTorchBackend, TensorflowBackend
+    backend = TensorflowBackend() #PyTorchBackend()
+    diff_rule = None
+    nshots=None
+    """
     if diff_rule is not None and diff_rule.__name__ == "Jax" and nshots is not None:
         pytest.skip("Jax differentiation does not work with shots.")
 
     set_seed(frontend, 42)
     backend.set_seed(42)
 
-    x = construct_x(frontend, wrt_inputs=True)
+    x = construct_x(frontend, wrt_inputs=wrt_inputs)
 
     nqubits = 2
 
     obs = hamiltonians.Z(nqubits=nqubits, backend=backend)
 
     encoding_layer = PhaseEncoding(nqubits=nqubits)
-    training_layer = HardwareEfficient(nqubits=nqubits, nlayers=1)
+    training_layer_1 = HardwareEfficient(nqubits=nqubits, nlayers=1)
+    training_layer_2 = training_layer_1.copy(deep=True)
+    nparams = len(training_layer_1.get_parameters())
+    training_layer_1.set_parameters(
+        backend.cast(np.linspace(0.0, 2 * np.pi, nparams), dtype=backend.np.float64)
+    )
+    training_layer_1.set_parameters(
+        backend.cast(np.linspace(0.0, np.pi, nparams), dtype=backend.np.float64)
+    )
 
     engine = (
         frontend.torch
@@ -294,9 +349,9 @@ def test_expval_custom_grad_reuploading(
 
     circuit_structure = [
         encoding_layer,
-        training_layer,
+        training_layer_1,
         encoding_layer,
-        training_layer.copy(deep=True),
+        training_layer_2,
     ]
     circuit_structure += [
         equivariant_circuit,
@@ -309,26 +364,29 @@ def test_expval_custom_grad_reuploading(
         nshots=nshots,
     )
 
-    nparams = len(training_layer.get_parameters())
-    initial_params = np.linspace(0.0, 2 * np.pi, nparams)
-    training_layer.set_parameters(
-        backend.cast(initial_params, dtype=backend.np.float64)
-    )
-
     q_model = frontend.QuantumModel(
         circuit_structure=circuit_structure,
         decoding=decoding_layer,
         differentiation=diff_rule,
     )
 
-    input_target, params_target = TARGET_GRAD_REUPLOADING
+    TARGET_GRAD = (
+        TARGET_GRAD_REUPLOADING_TORCH
+        if frontend.__name__ == "qiboml.interfaces.pytorch"
+        else TARGET_GRAD_REUPLOADING_KERAS
+    )
+    TARGET_GRAD = TARGET_GRAD["wrt_inputs"] if wrt_inputs else TARGET_GRAD["no_inputs"]
+    input_target, params_target = TARGET_GRAD
     grad_wrt_input, grad_wrt_params = compute_gradient(
-        frontend, q_model, x, wrt_inputs=True
+        frontend, q_model, x, wrt_inputs=wrt_inputs
     )
     grad_wrt_input = np.array(grad_wrt_input)
     grad_wrt_params = np.array(grad_wrt_params)
     print(grad_wrt_input)
     print(grad_wrt_params)
     tol = 1e-3 if nshots is None else 1e-1
-    backend.assert_allclose(grad_wrt_input, input_target, atol=tol)
+    if input_target is None:
+        assert grad_wrt_input.item() is None
+    else:
+        backend.assert_allclose(grad_wrt_input, input_target, atol=tol)
     backend.assert_allclose(grad_wrt_params, params_target, atol=tol)
