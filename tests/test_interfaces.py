@@ -304,7 +304,7 @@ def backprop_test(frontend, model, data, target):
     # specific (rare) cases
 
 
-@pytest.mark.parametrize("layer,seed", zip(ENCODING_LAYERS, [15, 15]))
+@pytest.mark.parametrize("layer,seed", zip(ENCODING_LAYERS, [5, 5]))
 def test_encoding(backend, frontend, layer, seed):
     set_device(frontend)
     set_seed(frontend, seed)
@@ -314,9 +314,9 @@ def test_encoding(backend, frontend, layer, seed):
     nlayers = 1
     dim = 2
 
-    nparams = nlayers*nqubits*2
-    training_layer = ans.hardware_efficient(nqubits, random_subset(nqubits, dim), nlayers)
-    training_layer.set_parameters([random.random() for _ in range(nparams)])
+    training_layer = ans.hardware_efficient(
+        nqubits, random_subset(nqubits, dim), nlayers, seed=seed
+    )
 
     decoding_qubits = random_subset(nqubits, dim)
     observable = hamiltonians.SymbolicHamiltonian(
@@ -370,9 +370,9 @@ def test_decoding(backend, frontend, layer, seed):
     nlayers = 1
     dim = 2
 
-    nparams = nlayers*nqubits*2
-    training_layer = ans.hardware_efficient(nqubits, random_subset(nqubits, dim), nlayers)
-    training_layer.set_parameters([random.random() for _ in range(nparams)])
+    training_layer = ans.hardware_efficient(
+        nqubits, random_subset(nqubits, dim), nlayers, seed=seed
+    )
     encoding_layer = enc.PhaseEncoding(nqubits, random_subset(nqubits, dim))
     kwargs = {"backend": backend}
     decoding_qubits = random_subset(nqubits, dim)
@@ -416,7 +416,7 @@ def test_decoding(backend, frontend, layer, seed):
 def test_composition(backend, frontend):
 
     set_device(frontend)
-    seed = 42
+    seed = 40
     set_seed(frontend, seed)
     backend.set_seed(seed)
 
@@ -425,9 +425,7 @@ def test_composition(backend, frontend):
     encoding_layer = random.choice(list(set(ENCODING_LAYERS) - {enc.BinaryEncoding}))(
         nqubits
     )
-    nparams = nlayers*nqubits*2
-    training_layer = ans.hardware_efficient(nqubits, nlayers=nlayers)
-    training_layer.set_parameters([random.random() for _ in range(nparams)])
+    training_layer = ans.hardware_efficient(nqubits, nlayers=nlayers, seed=seed)
     observable = hamiltonians.SymbolicHamiltonian(
         1 + np.prod([Z(int(i)) for i in range(nqubits)]),
         nqubits=nqubits,
@@ -471,12 +469,11 @@ def test_vqe(backend, frontend, dense, nshots):
 
     nqubits = 2
     nlayers = 2
-    nparams = nlayers*nqubits*2
     training_layer = ans.hardware_efficient(
         nqubits,
         nlayers=nlayers,
+        seed=seed,
     )
-    training_layer.set_parameters([random.random() for _ in range(nparams)])
     decoding_layer = dec.Expectation(
         nqubits=nqubits, backend=backend, observable=tfim, nshots=nshots
     )
@@ -501,8 +498,9 @@ def test_vqe(backend, frontend, dense, nshots):
 
 def test_noise(backend, frontend):
     set_device(frontend)
-    backend.set_seed(42)
-    set_seed(frontend, 42)
+    seed = 40
+    backend.set_seed(seed)
+    set_seed(frontend, seed)
 
     nqubits = 4
     noise = NoiseModel()
@@ -512,9 +510,7 @@ def test_noise(backend, frontend):
 
     encoding_layer = random.choice(ENCODING_LAYERS)(nqubits)
     nlayers = 1
-    nparams = nlayers*nqubits*2
-    training_layer = ans.hardware_efficient(nqubits, nlayers=nlayers)
-    training_layer.set_parameters([random.random() for _ in range(nparams)])
+    training_layer = ans.hardware_efficient(nqubits, nlayers=nlayers, seed=seed)
     circuit = [encoding_layer, training_layer]
 
     # Noiseless decoding layer
@@ -575,11 +571,9 @@ def test_qibolab(frontend):
 
     nqubits = 1
     nlayers = 1
-    nparams = nlayers*nqubits*2
     encoding_layer = enc.PhaseEncoding(nqubits)
     encoding_layer = enc.PhaseEncoding(nqubits)
-    training_layer = ans.hardware_efficient(nqubits, nlayers=nlayers)
-    training_layer.set_parameters([random.random() for _ in range(nparams)])
+    training_layer = ans.hardware_efficient(nqubits, nlayers=nlayers, seed=seed)
     decoding_layer = dec.Expectation(
         nqubits,
         wire_names=[0],
@@ -609,8 +603,9 @@ def test_equivariant(backend, frontend):
         else frontend.keras.ops
     )
 
-    set_seed(frontend, 42)
-    backend.set_seed(42)
+    seed = 42
+    set_seed(frontend, seed)
+    backend.set_seed(seed)
 
     # this defines 3 independent parameters
     def custom_circuit(th, phi, lam):
@@ -627,9 +622,7 @@ def test_equivariant(backend, frontend):
     # these are 4 independent parameters
     nqubits = 2
     nlayers = 1
-    nparams = nlayers*nqubits*2
-    circuit = ans.hardware_efficient(nqubits, nlayers=nlayers)
-    circuit.set_parameters([random.random() for _ in range(nparams)])
+    circuit = ans.hardware_efficient(nqubits, nlayers=nlayers, seed=seed)
     decoding = dec.Expectation(nqubits, backend=backend)
     model = frontend.QuantumModel(
         [circuit, custom_circuit],

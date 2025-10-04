@@ -28,20 +28,20 @@ TARGET_GRAD_TORCH = {
     "equivariant_no_inputs": (
         None,
         np.array(
-            [0.190588, -1.027189,  0.972286, -0.177316, -0.968753,  1.293386, 0.456258]
+            [0.458944, -0.524178, 1.215674, -0.241529, -0.723649, 1.270768, 0.162932]
         ),
     ),
     "equivariant_wrt_inputs": (
-        np.array([-1.248764, -0.668485]),
+        np.array([0.911852, -1.561822]),
         np.array(
             [
-                -0.624382,
-                0.558202,
-                -0.334243,
-                -0.173734,
-                0.914893,
-                0.443913,
-                2.184554,
+                0.455926,
+                0.387572,
+                -0.780911,
+                -0.046471,
+                0.401802,
+                -0.474724,
+                0.323378,
             ]
         ),
     ),
@@ -49,7 +49,7 @@ TARGET_GRAD_TORCH = {
 TARGET_GRAD_TENSORFLOW = TARGET_GRAD_TORCH.copy()
 TARGET_GRAD_TENSORFLOW["equivariant_no_inputs"] = (
     None,
-    np.array([-0.028213, 0.229197, -0.232883, -0.20069, 0.19251, 0.276762, 0.64003]),
+    np.array([0.090865, 0.119032, -1.786733, -0.053682, 0.141452, -0.043953, 0.389409]),
 )
 TARGET_GRAD_TENSORFLOW["no_inputs"] = (
     None,
@@ -139,20 +139,19 @@ def test_expval_custom_grad(
     if diff_rule is not None and diff_rule.__name__ == "Jax" and nshots is not None:
         pytest.skip("Jax differentiation does not work with shots.")
 
-    set_seed(frontend, 42)
-    backend.set_seed(42)
+    seed = 42
+    set_seed(frontend, seed)
+    backend.set_seed(seed)
 
     x = construct_x(frontend, wrt_inputs=wrt_inputs)
 
     nqubits = 2
     nlayers = 1
-    nparams = nlayers * nqubits * 2
 
     obs = hamiltonians.Z(nqubits=nqubits, backend=backend)
 
     encoding_layer = PhaseEncoding(nqubits=nqubits)
-    training_layer = hardware_efficient(nqubits=nqubits, nlayers=nlayers)
-    training_layer.set_parameters([random.random() for _ in range(nparams)])
+    training_layer = hardware_efficient(nqubits=nqubits, nlayers=nlayers, seed=seed)
 
     engine = (
         frontend.torch

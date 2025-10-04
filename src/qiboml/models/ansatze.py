@@ -1,9 +1,9 @@
-import random
 from copy import deepcopy
 from typing import Optional
 
 import numpy as np
 from qibo import Circuit, gates
+from qibo.backends import _check_backend
 from qibo.config import raise_error
 from qibo.models.encodings import entangling_layer
 from scipy.special import binom
@@ -18,6 +18,8 @@ def hardware_efficient(
     entangling_gate: str = "CNOT",
     architecture: str = "diagonal",
     closed_boundary: bool = True,
+    seed: Optional[int | np.random.Generator] = None,
+    backend=None,
     **kwargs,
 ) -> Circuit:
     """
@@ -25,26 +27,32 @@ def hardware_efficient(
 
     Args:
         nqubits (int): Number of qubits :math:`n` in the ansatz.
-        qubits (tuple[int], optional): Qubit indexes to apply the ansatz to. If ``None``, 
-            the ansatz is applied to all qubits from :math:`0` to :math:`nqubits-1`. 
+        qubits (tuple[int], optional): Qubit indexes to apply the ansatz to. If ``None``,
+            the ansatz is applied to all qubits from :math:`0` to :math:`nqubits-1`.
             Defaults to ``None``.
         nlayers (int, optional): Number of layers (single-qubit + entangling per layer). Defaults to :math:`1`.
-        single_block (Circuit, optional): :math:`1`-qubit circuit applied to each qubit. 
-        If ``None``, defaults to a block with :class:`qibo.gates.RY` and 
-        :class:`qibo.gates.RZ` gates. Defaults to ``None``.
+        single_block (Circuit, optional): :math:`1`-qubit circuit applied to each qubit.
+        If ``None``, defaults to a block with :class:`qibo.gates.RY` and
+        :class:`qibo.gates.RZ` gates with Haar-random sampled phases. Defaults to ``None``.
         entangling_block (Circuit, optional): :math:`n`-qubit entangling circuit. Defaults to ``None``.
         entangling_gate (str or :class:`qibo.gates.Gate`, optional): Only used if ``entangling_block``
             is ``None``. Two-qubit gate to be used in the entangling layer if ``entangling_block`` is not
-            provided. If ``entangling_gate`` is a parametrized gate, all phases are initialized as 
+            provided. If ``entangling_gate`` is a parametrized gate, all phases are initialized as
             :math:`0.0`. Defaults to  ``"CNOT"``.
-        architecture (str, optional): Only used if ``entangling_block`` is ``None``. 
+        architecture (str, optional): Only used if ``entangling_block`` is ``None``.
             Architecture of the entangling layer. In alphabetical order, options are:
             ``"diagonal"``, ``"even_layer"``, ``"next_nearest"``, ``"odd_layer"``,
             ``"pyramid"``, ``"shifted"``, ``"v"``, and ``"x"``. The ``"x"`` architecture
             is only defined for an even number of qubits. Defaults to ``"diagonal"``.
         closed_boundary (bool, optional): Only used if ``entangling_block`` is ``None``.
-            If ``True`` and ``architecture not in ["pyramid", "v", "x"]``, adds a 
+            If ``True`` and ``architecture not in ["pyramid", "v", "x"]``, adds a
             closed-boundary condition to the entangling layer. Defaults to ``True``.
+        seed (int or :class:`numpy.random.Generator`, optional): Either a generator of random
+            numbers or a fixed seed to initialize a generator. If ``None``, initializes
+            a generator with a random seed. Default: ``None``.
+        backend (:class:`qibo.backends.abstract.Backend`, optional): backend to be used
+            in the execution. If ``None``, it uses the current backend.
+            Defaults to ``None``.
         kwargs (dict, optional): Additional arguments used to initialize a Circuit object.
             For details, see the documentation of :class:`qibo.models.circuit.Circuit`.
 
@@ -58,13 +66,18 @@ def hardware_efficient(
     elif len(qubits) > nqubits:
         raise_error(
             ValueError,
-            f"Number of specified qubits ({len(qubits)}) cannot exceed the total number of qubits in the circuit ({nqubits})."
+            f"Number of specified qubits ({len(qubits)}) cannot exceed the total number of qubits in the circuit ({nqubits}).",
         )
 
     if single_block is None:
+        from qibo.quantum_info.random_ensembles import uniform_sampling_U3
+
+        backend = _check_backend(backend)
+        phases = uniform_sampling_U3(1, seed, backend=backend)[0]
+        phases = backend.to_numpy(phases)
         single_block = Circuit(1)
-        single_block.add(gates.RY(0, theta=0.0, trainable=True))
-        single_block.add(gates.RZ(0, theta=0.0, trainable=True))
+        single_block.add(gates.RY(0, theta=phases[0], trainable=True))
+        single_block.add(gates.RZ(0, theta=phases[1], trainable=True))
 
     for _ in range(nlayers):
         for q in qubits:
@@ -79,7 +92,10 @@ def hardware_efficient(
                     closed_boundary=closed_boundary,
                 )
             elif entangling_block.nqubits != len(qubits):
-                raise_error(ValueError, f"Entangling layer circuit must have {len(qubits)} qubits.")
+                raise_error(
+                    ValueError,
+                    f"Entangling layer circuit must have {len(qubits)} qubits.",
+                )
 
             circ.add(entangling_block.on_qubits(*qubits))
 

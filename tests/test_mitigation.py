@@ -1,4 +1,3 @@
-import random
 from copy import deepcopy
 
 import pytest
@@ -70,9 +69,7 @@ def test_rtqem(frontend, backend, mitigation_method):
     backend.set_seed(seed)
 
     # We build a trainable circuit
-    nparams = nlayers * nqubits * 2
-    vqe = hardware_efficient(nqubits=nqubits, nlayers=nlayers)
-    vqe.set_parameters([random.random() for _ in range(nparams)])
+    vqe = hardware_efficient(nqubits=nqubits, nlayers=nlayers, seed=seed)
 
     obs = Z(nqubits, dense=False, backend=backend)
 
@@ -133,14 +130,13 @@ def test_rtqem(frontend, backend, mitigation_method):
 
 
 def test_custom_map(frontend):
-    set_seed(frontend=frontend, seed=42)
+    seed = 42
+    set_seed(frontend=frontend, seed=seed)
 
     # We build a trainable circuit
     nqubits = 1
     nlayers = 2
-    nparams = nlayers * nqubits * 2
-    vqe = hardware_efficient(nqubits=nqubits, nlayers=nlayers)
-    vqe.set_parameters([random.random() for _ in range(nparams)])
+    vqe = hardware_efficient(nqubits=nqubits, nlayers=nlayers, seed=seed)
 
     mitigation_config = {
         "real_time": True,
