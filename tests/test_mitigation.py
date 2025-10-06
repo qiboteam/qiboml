@@ -58,8 +58,8 @@ def train_vqe(frontend, backend, model, epochs):
 
 
 @pytest.mark.parametrize("backend", BACKENDS)
-@pytest.mark.parametrize("dense", [True, False])
-def test_rtqem(frontend, backend, dense):
+@pytest.mark.parametrize("mitigation_method", ["ICS", "CDR"])
+def test_rtqem(frontend, backend, mitigation_method):
     nqubits = 1
     nshots = 10000
     set_seed(frontend=frontend, seed=42)
@@ -67,7 +67,7 @@ def test_rtqem(frontend, backend, dense):
     # We build a trainable circuit
     vqe = HardwareEfficient(nqubits=nqubits, nlayers=3)
 
-    obs = Z(nqubits, dense=dense, backend=backend)
+    obs = Z(nqubits, dense=False, backend=backend)
 
     # First we build a model with noise and without mitigation
     noisy_decoding = Expectation(
@@ -94,7 +94,7 @@ def test_rtqem(frontend, backend, dense):
 
     mitigation_config = {
         "threshold": 3e-1,
-        "method": "CDR",
+        "method": mitigation_method,
         "method_kwargs": {"n_training_samples": 50},
     }
 
@@ -136,7 +136,7 @@ def test_custom_map(frontend):
         "method": "CDR",
         "method_kwargs": {
             "n_training_samples": 70,
-            "model": lambda x, a, b, c: a * x**2 + b * x + c,
+            "model": lambda x, a, b: a * x + b,
         },
     }
 
