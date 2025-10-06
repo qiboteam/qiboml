@@ -4530,9 +4530,9 @@ qmatchatea = ["qiskit (>=1.4.0,<2.0.0)", "qmatchatea (>=1.4.3,<2.0.0)", "qtealea
 
 [package.source]
 type = "git"
-url = "ssh://git@github.com/mattia-robbiano/qibotn.git"
-reference = "fixes"
-resolved_reference = "2787d45b415a0ee4828347b1be303cbbab81829f"
+url = "ssh://git@github.com/qiboteam/qibotn.git"
+reference = "expectation"
+resolved_reference = "9eeee4a95fd07827fe06ee465365e8d92a8c099d"
 
 [[package]]
 name = "quimb"
@@ -6114,4 +6114,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.13"
-content-hash = "931b4c6caab25efc6fac028ac0dc33985767f3bcab709b4a226802fc488564c7"
+content-hash = "ebc9f4f291ab32363cced6d08de495b4f987acbc07e03e7f4c9f7e57b278a2c7"
