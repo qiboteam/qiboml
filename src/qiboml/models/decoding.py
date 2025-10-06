@@ -288,13 +288,16 @@ class Expectation(QuantumDecoding):
         Returns:
             (ndarray): the calculated expectation value.
         """
-
         if self.mitigation_config is not None:
             # In this case it is required before the super.call
             self.align_circuits(x)
             x = self.transpile(x)
             _real_time_mitigation_check(self, x)
 
+        x = self.preprocessing(x.copy())
+
+        expval = self.observable.expectation(x, nshots=self.nshots)
+        """
         # run circuit
         if self.analytic:
             expval = self.observable.expectation(super().__call__(x).state())
@@ -310,7 +313,7 @@ class Expectation(QuantumDecoding):
                     super().__call__(x).frequencies(),
                     qubit_map=self.qubits,
                 )
-
+        """
         # apply mitigation if requested
         if self.mitigation_config is not None:
             expval = self.backend.cast(

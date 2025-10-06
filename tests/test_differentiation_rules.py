@@ -1,4 +1,5 @@
 import random
+import sys
 
 import numpy as np
 import pytest
@@ -8,13 +9,13 @@ from qibo.backends import NumpyBackend
 from qiboml.models.ansatze import HardwareEfficient
 from qiboml.models.decoding import Expectation
 from qiboml.models.encoding import PhaseEncoding
-from qiboml.operations.differentiation import PSR, Adjoint, Jax
+from qiboml.operations.differentiation import PSR, Adjoint, Jax, QuimbJax
 
 # TODO: use the classical conftest mechanism or customize mechanism for this test
 EXECUTION_BACKENDS = [
     NumpyBackend(),
 ]
-DIFF_RULES = [Jax, PSR, Adjoint]
+DIFF_RULES = [Jax, PSR, Adjoint, QuimbJax]
 
 TARGET_GRAD_TORCH = {
     "no_inputs": (
@@ -136,8 +137,18 @@ def test_expval_custom_grad(
     parameters/data values are fixed.
     """
 
-    if diff_rule is not None and diff_rule.__name__ == "Jax" and nshots is not None:
+    if (
+        diff_rule is not None
+        and diff_rule.__name__ in ("Jax", "QuimbJax")
+        and nshots is not None
+    ):
         pytest.skip("Jax differentiation does not work with shots.")
+    if (
+        diff_rule.__name__ == "QuimbJax"
+        and sys.version_info.major == 3
+        and sys.version_info.minor < 11
+    ):
+        pytest.skip("Qibotn works with python 3.11+.")
 
     set_seed(frontend, 42)
     backend.set_seed(42)
