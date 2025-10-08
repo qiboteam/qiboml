@@ -6,6 +6,7 @@ from qibo import Circuit, gates
 from qibo.backends import _check_backend
 from qibo.config import raise_error
 from qibo.models.encodings import entangling_layer
+from qibo.quantum_info.random_ensembles import uniform_sampling_U3
 from scipy.special import binom
 
 
@@ -70,8 +71,6 @@ def hardware_efficient(
         )
 
     if single_block is None:
-        from qibo.quantum_info.random_ensembles import uniform_sampling_U3
-
         backend = _check_backend(backend)
         phases = uniform_sampling_U3(1, seed, backend=backend)[0]
         phases = backend.to_numpy(phases)
