@@ -5,7 +5,7 @@ import pytest
 from qibo import Circuit, gates, hamiltonians
 from qibo.backends import NumpyBackend
 
-from qiboml.models.ansatze import HardwareEfficient
+from qiboml.models.ansatze import hardware_efficient
 from qiboml.models.decoding import Expectation
 from qiboml.models.encoding import PhaseEncoding
 from qiboml.operations.differentiation import PSR, Adjoint, Jax
@@ -28,20 +28,20 @@ TARGET_GRAD_TORCH = {
     "equivariant_no_inputs": (
         None,
         np.array(
-            [0.234591, 0.804684, -0.649351, -0.054586, 0.832667, 0.245524, 1.869807]
+            [0.458944, -0.524178, 1.215674, -0.241529, -0.723649, 1.270768, 0.162932]
         ),
     ),
     "equivariant_wrt_inputs": (
-        np.array([-0.12212556, 0.01635326]),
+        np.array([0.911852, -1.561822]),
         np.array(
             [
-                -0.06106278,
-                0.14663098,
-                0.00817663,
-                -0.13743929,
-                0.56005389,
-                -0.15179269,
-                1.77934261,
+                0.455926,
+                0.387572,
+                -0.780911,
+                -0.046471,
+                0.401802,
+                -0.474724,
+                0.323378,
             ]
         ),
     ),
@@ -49,7 +49,7 @@ TARGET_GRAD_TORCH = {
 TARGET_GRAD_TENSORFLOW = TARGET_GRAD_TORCH.copy()
 TARGET_GRAD_TENSORFLOW["equivariant_no_inputs"] = (
     None,
-    np.array([-0.305541, -0.121983, -0.146646, -0.158764, 0.138767, -0.05346, 0.70204]),
+    np.array([0.090865, 0.119032, -1.786733, -0.053682, 0.141452, -0.043953, 0.389409]),
 )
 TARGET_GRAD_TENSORFLOW["no_inputs"] = (
     None,
@@ -139,17 +139,19 @@ def test_expval_custom_grad(
     if diff_rule is not None and diff_rule.__name__ == "Jax" and nshots is not None:
         pytest.skip("Jax differentiation does not work with shots.")
 
-    set_seed(frontend, 42)
-    backend.set_seed(42)
+    seed = 42
+    set_seed(frontend, seed)
+    backend.set_seed(seed)
 
     x = construct_x(frontend, wrt_inputs=wrt_inputs)
 
     nqubits = 2
+    nlayers = 1
 
     obs = hamiltonians.Z(nqubits=nqubits, backend=backend)
 
     encoding_layer = PhaseEncoding(nqubits=nqubits)
-    training_layer = HardwareEfficient(nqubits=nqubits, nlayers=1)
+    training_layer = hardware_efficient(nqubits=nqubits, nlayers=nlayers, seed=seed)
 
     engine = (
         frontend.torch

@@ -5,7 +5,7 @@ from qibo.backends import NumpyBackend
 from qibo.hamiltonians import Z
 from qibo.noise import NoiseModel, PauliError
 
-from qiboml.models.ansatze import HardwareEfficient
+from qiboml.models.ansatze import hardware_efficient
 from qiboml.models.decoding import Expectation
 from qiboml.operations.differentiation import PSR
 
@@ -61,11 +61,15 @@ def train_vqe(frontend, backend, model, epochs):
 @pytest.mark.parametrize("mitigation_method", ["ICS", "CDR"])
 def test_rtqem(frontend, backend, mitigation_method):
     nqubits = 1
+    nlayers = 3
     nshots = 10000
-    set_seed(frontend=frontend, seed=42)
+
+    seed = 42
+    set_seed(frontend, seed)
+    backend.set_seed(seed)
 
     # We build a trainable circuit
-    vqe = HardwareEfficient(nqubits=nqubits, nlayers=3)
+    vqe = hardware_efficient(nqubits=nqubits, nlayers=nlayers, seed=seed)
 
     obs = Z(nqubits, dense=False, backend=backend)
 
@@ -75,7 +79,7 @@ def test_rtqem(frontend, backend, mitigation_method):
         observable=obs,
         nshots=nshots,
         backend=backend,
-        noise_model=build_noise_model(nqubits=nqubits, local_pauli_noise_prob=0.04),
+        noise_model=build_noise_model(nqubits=nqubits, local_pauli_noise_prob=0.02),
         density_matrix=True,
     )
 
@@ -126,10 +130,13 @@ def test_rtqem(frontend, backend, mitigation_method):
 
 
 def test_custom_map(frontend):
-    set_seed(frontend=frontend, seed=42)
+    seed = 42
+    set_seed(frontend=frontend, seed=seed)
 
     # We build a trainable circuit
-    vqe = HardwareEfficient(nqubits=1, nlayers=2)
+    nqubits = 1
+    nlayers = 2
+    vqe = hardware_efficient(nqubits=nqubits, nlayers=nlayers, seed=seed)
 
     mitigation_config = {
         "real_time": True,

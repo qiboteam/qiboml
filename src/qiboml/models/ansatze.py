@@ -1,32 +1,107 @@
-import random
 from copy import deepcopy
 from typing import Optional
 
 import numpy as np
 from qibo import Circuit, gates
+from qibo.backends import _check_backend
+from qibo.config import raise_error
 from qibo.models.encodings import entangling_layer
+from qibo.quantum_info.random_ensembles import uniform_sampling_U3
 from scipy.special import binom
 
 
-def HardwareEfficient(
+def hardware_efficient(
     nqubits: int,
     qubits: Optional[tuple[int]] = None,
     nlayers: int = 1,
+    single_block: Optional[Circuit] = None,
+    entangling_block: Optional[Circuit] = None,
+    entangling_gate: str = "CNOT",
+    architecture: str = "diagonal",
+    closed_boundary: bool = True,
+    seed: Optional[int | np.random.Generator] = None,
+    backend=None,
+    **kwargs,
 ) -> Circuit:
+    """
+    Create a hardware-efficient ansatz with custom single-qubit layers and entangling blocks.
+
+    Args:
+        nqubits (int): Number of qubits :math:`n` in the ansatz.
+        qubits (tuple[int], optional): Qubit indexes to apply the ansatz to. If ``None``,
+            the ansatz is applied to all qubits from :math:`0` to :math:`nqubits-1`.
+            Defaults to ``None``.
+        nlayers (int, optional): Number of layers (single-qubit + entangling per layer). Defaults to :math:`1`.
+        single_block (Circuit, optional): :math:`1`-qubit circuit applied to each qubit.
+        If ``None``, defaults to a block with :class:`qibo.gates.RY` and
+        :class:`qibo.gates.RZ` gates with Haar-random sampled phases. Defaults to ``None``.
+        entangling_block (Circuit, optional): :math:`n`-qubit entangling circuit. Defaults to ``None``.
+        entangling_gate (str or :class:`qibo.gates.Gate`, optional): Only used if ``entangling_block``
+            is ``None``. Two-qubit gate to be used in the entangling layer if ``entangling_block`` is not
+            provided. If ``entangling_gate`` is a parametrized gate, all phases are initialized as
+            :math:`0.0`. Defaults to  ``"CNOT"``.
+        architecture (str, optional): Only used if ``entangling_block`` is ``None``.
+            Architecture of the entangling layer. In alphabetical order, options are:
+            ``"diagonal"``, ``"even_layer"``, ``"next_nearest"``, ``"odd_layer"``,
+            ``"pyramid"``, ``"shifted"``, ``"v"``, and ``"x"``. The ``"x"`` architecture
+            is only defined for an even number of qubits. Defaults to ``"diagonal"``.
+        closed_boundary (bool, optional): Only used if ``entangling_block`` is ``None``.
+            If ``True`` and ``architecture not in ["pyramid", "v", "x"]``, adds a
+            closed-boundary condition to the entangling layer. Defaults to ``True``.
+        seed (int or :class:`numpy.random.Generator`, optional): Either a generator of random
+            numbers or a fixed seed to initialize a generator. If ``None``, initializes
+            a generator with a random seed. Default: ``None``.
+        backend (:class:`qibo.backends.abstract.Backend`, optional): backend to be used
+            in the execution. If ``None``, it uses the current backend.
+            Defaults to ``None``.
+        kwargs (dict, optional): Additional arguments used to initialize a Circuit object.
+            For details, see the documentation of :class:`qibo.models.circuit.Circuit`.
+
+    Returns:
+        :class:`qibo.models.circuit.Circuit`: Constructed hardware-efficient ansatz.
+    """
+    circ = Circuit(nqubits, **kwargs)
+
     if qubits is None:
         qubits = list(range(nqubits))
-    circuit = Circuit(nqubits)
+    elif len(qubits) > nqubits:
+        raise_error(
+            ValueError,
+            f"Number of specified qubits ({len(qubits)}) cannot exceed the total number of qubits in the circuit ({nqubits}).",
+        )
+
+    if single_block is None:
+        backend = _check_backend(backend)
+        phases = uniform_sampling_U3(1, seed, backend=backend)[0]
+        phases = backend.to_numpy(phases)
+        single_block = Circuit(1)
+        single_block.add(gates.RY(0, theta=phases[0], trainable=True))
+        single_block.add(gates.RZ(0, theta=phases[1], trainable=True))
 
     for _ in range(nlayers):
         for q in qubits:
-            circuit.add(gates.RY(q, theta=random.random() * np.pi, trainable=True))
-            circuit.add(gates.RZ(q, theta=random.random() * np.pi, trainable=True))
-        if nqubits > 1:
-            for i, q in enumerate(qubits[:-2]):
-                circuit.add(gates.CNOT(q0=q, q1=qubits[i + 1]))
-            circuit.add(gates.CNOT(q0=qubits[-1], q1=qubits[0]))
+            circ.add(single_block.on_qubits(q))
 
-    return circuit
+        if len(qubits) != 1:
+            if entangling_block is None:
+                entangling_block = entangling_layer(
+                    nqubits=len(qubits),
+                    architecture=architecture,
+                    entangling_gate=entangling_gate,
+                    closed_boundary=closed_boundary,
+                )
+            elif entangling_block.nqubits != len(qubits):
+                raise_error(
+                    ValueError,
+                    f"Entangling layer circuit must have {len(qubits)} qubits.",
+                )
+
+            circ.add(entangling_block.on_qubits(*qubits))
+
+    return circ
+
+
+HardwareEfficient = hardware_efficient
 
 
 def brickwork_givens(nqubits: int, weight: int, full_hwp: bool = False, **kwargs):
@@ -72,7 +147,7 @@ def brickwork_givens(nqubits: int, weight: int, full_hwp: bool = False, **kwargs
             architecture="shifted",
             entangling_gate=gates.GIVENS,
             closed_boundary=False,
-            **kwargs
+            **kwargs,
         )
 
     ngates = len(circuit.gates_of_type(gates.GIVENS))
@@ -83,7 +158,7 @@ def brickwork_givens(nqubits: int, weight: int, full_hwp: bool = False, **kwargs
         architecture="shifted",
         entangling_gate=gates.GIVENS,
         closed_boundary=False,
-        **kwargs
+        **kwargs,
     ).queue
 
     circuit.add(deepcopy(queue[elem % len(queue)]) for elem in range(nmissing))
