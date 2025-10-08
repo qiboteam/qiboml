@@ -1,7 +1,11 @@
-from typing import Dict, List, Optional, Union
+import random
+from inspect import signature
+from typing import Callable, Dict, List, Union
 
 import numpy as np
 from qibo import Circuit
+from qibo.backends import _check_backend
+from qibo.backends.abstract import Backend
 from qibo.ui.mpldrawer import plot_circuit
 
 from qiboml import ndarray
@@ -10,7 +14,7 @@ from qiboml.models.encoding import QuantumEncoding
 
 
 def get_params_from_circuit_structure(
-    circuit_structure: Union[Circuit, List[Union[Circuit, QuantumEncoding]]]
+    circuit_structure: List[Union[Circuit, QuantumEncoding, Callable]],
 ):
     """
     Helper function to retrieve the list of trainable parameters of a circuit
@@ -18,38 +22,13 @@ def get_params_from_circuit_structure(
     """
     params = []
     for circ in circuit_structure:
-        if not isinstance(circ, QuantumEncoding):
+        if isinstance(circ, Circuit):
             params.extend([p for param in circ.get_parameters() for p in param])
+        elif not isinstance(circ, QuantumEncoding) and isinstance(circ, Callable):
+            params.extend(
+                random.random() for _ in range(len(signature(circ).parameters))
+            )
     return params
-
-
-def circuit_from_structure(
-    circuit_structure,
-    x: Optional[ndarray],
-):
-    """
-    Helper function to reconstruct the whole circuit from a circuit structure.
-    In the case the circuit structure involves encodings, the encoding data has
-    to be provided as well.
-    """
-
-    if (
-        any(isinstance(circ, QuantumEncoding) for circ in circuit_structure)
-        and x is None
-    ):
-        raise ValueError(
-            "x cannot be None when encoding layers are present in the circuit structure."
-        )
-
-    circuit = Circuit(
-        circuit_structure[0].nqubits,
-        density_matrix=circuit_structure[0].density_matrix,
-    )
-    for circ in circuit_structure:
-        if isinstance(circ, QuantumEncoding):
-            circ = circ(x)
-        circuit += circ
-    return circuit
 
 
 def get_default_differentiation(decoding: QuantumDecoding, instructions: Dict):
@@ -66,15 +45,14 @@ def get_default_differentiation(decoding: QuantumDecoding, instructions: Dict):
     if not decoding.analytic or backend_string not in instructions.keys():
         from qiboml.operations.differentiation import PSR
 
-        differentiation = PSR()
+        differentiation = PSR
     else:
-        diff = instructions[backend_string]
-        differentiation = diff() if diff is not None else None
+        differentiation = instructions[backend_string]
 
     return differentiation
 
 
-def draw_circuit(circuit_structure, backend, plt_drawing=True, **plt_kwargs):
+def draw_circuit(model, plt_drawing=True, **plt_kwargs):
     """
     Draw the full circuit structure.
 
@@ -84,7 +62,8 @@ def draw_circuit(circuit_structure, backend, plt_drawing=True, **plt_kwargs):
         plt_kwargs (dict): extra arguments which can be set to customize the
             `qibo.ui.plot_circuit` function.
     """
-
+    circuit_structure = model.circuit_structure
+    backend = model.backend
     encoding_layer = next(
         (circ for circ in circuit_structure if isinstance(circ, QuantumEncoding)),
         None,
@@ -94,20 +73,16 @@ def draw_circuit(circuit_structure, backend, plt_drawing=True, **plt_kwargs):
         if encoding_layer is not None
         else None
     )
-    circuit = circuit_from_structure(circuit_structure, dummy_data)
+    dummy_params = []
+    for circ in circuit_structure:
+        if isinstance(circ, Circuit):
+            dummy_params.extend(len(circ.get_parameters()) * [0.0])
+        elif not isinstance(circ, QuantumEncoding) and isinstance(circ, Callable):
+            dummy_params.extend((len(signature(circ).parameters)) * [0.0])
+    circuit = model.circuit_tracer.build_circuit(params=dummy_params, x=dummy_data)
     if plt_drawing:
         _, fig = plot_circuit(circuit, **plt_kwargs)
         return fig
     else:
         circuit.draw()
         return str(circuit)
-
-
-def _uniform_circuit_structure(circuit_structure):
-    """
-    Align the ``density_matrix`` attribute of all circuits composing the circuit structure.
-    Namely, setting their ``density_matrix=True`` if at least one component of the circuit has ``density_matrix==True``.
-    """
-    density_matrix = any(circ.density_matrix for circ in circuit_structure)
-    for circ in circuit_structure:
-        circ.density_matrix = density_matrix

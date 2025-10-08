@@ -87,7 +87,7 @@ class JaxBackend(NumpyBackend):
         self.numpy = numpy
 
         self.np = jnp
-        self.tensor_types = (jnp.ndarray, numpy.ndarray)
+        self.tensor_types = (jnp.ndarray,)
         self.matrices = JaxMatrices(self.dtype)
 
     def cast(self, x, dtype=None, copy=False):

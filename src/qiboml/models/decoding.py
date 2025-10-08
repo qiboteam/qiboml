@@ -2,16 +2,18 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Union
 
-from qibo import Circuit, gates, transpiler
+from qibo import Circuit, gates, get_transpiler, transpiler
 from qibo.backends import Backend, NumpyBackend, _check_backend
 from qibo.config import log, raise_error
-from qibo.hamiltonians import Hamiltonian, Z
+from qibo.hamiltonians import Hamiltonian, SymbolicHamiltonian, Z
 from qibo.models.error_mitigation import error_sensitive_circuit
 from qibo.noise import NoiseModel
+from qibo.quantum_info.metrics import infidelity
 from qibo.result import CircuitResult, MeasurementOutcomes, QuantumState
 from qibo.transpiler import Passes
 
 from qiboml import ndarray
+from qiboml.models.calibrator import Calibrator
 from qiboml.models.utils import Mitigator
 
 
@@ -84,19 +86,34 @@ class QuantumDecoding:
         Returns:
             (CircuitResult | QuantumState | MeasurementOutcomes): the execution ``qibo.result`` object.
         """
+        x = self.preprocessing(x)
+
+        return self.backend.execute_circuit(x + self._circuit, nshots=self.nshots)
+
+    def preprocessing(self, x: Circuit) -> Circuit:
+        """Perform some preprocessing on the input circuit to run with the settings specified by the decoder. In detail, transpilation and noise application on the input circuit is performed."""
+        self.align_circuits(x)
+        x = self.transpile(x)
+        x = self.apply_noise(x)
+        return x
+
+    def align_circuits(self, x: Circuit):
+        """Align some attributes of the input circuit with the internal one, e.g. sets the density_matrix and wire_names."""
         # Standardize the density matrix attribute
         self._align_density_matrix(x)
         self._align_wire_names(x)
 
+    def transpile(self, x: Circuit) -> Circuit:
+        """Transpile a given circuit ``x`` using the instructions provided by the ``transpiler`` attribute."""
         if self.transpiler is not None:
             x, _ = self.transpiler(x)
+        return x
 
+    def apply_noise(self, x: Circuit) -> Circuit:
+        """Apply the decoder ``noise_model`` to the target circuit."""
         if self.noise_model is not None:
-            executable_circuit = self.noise_model.apply(x + self._circuit)
-        else:
-            executable_circuit = x + self._circuit
-
-        return self.backend.execute_circuit(executable_circuit, nshots=self.nshots)
+            x = self.noise_model.apply(x)
+        return x
 
     @property
     def circuit(
@@ -179,7 +196,9 @@ class Probabilities(QuantumDecoding):
         Returns:
             (ndarray): the final probabilities.
         """
-        return super().__call__(x).probabilities(self.qubits)
+        return self.backend.np.reshape(
+            super().__call__(x).probabilities(self.qubits), self.output_shape
+        )
 
     @property
     def output_shape(self) -> tuple[int, int]:
@@ -188,7 +207,8 @@ class Probabilities(QuantumDecoding):
         Returns:
             (tuple[int, int]): a ``(1, 2**nqubits)`` shape.
         """
-        return (1, 2**self.nqubits)
+        n = 2 ** len(self.qubits)
+        return (1, n)
 
     @property
     def analytic(self) -> bool:
@@ -241,11 +261,13 @@ class Expectation(QuantumDecoding):
 
     observable: Union[ndarray, Hamiltonian] = None
     mitigation_config: Optional[Dict[str, Any]] = None
+    calibrator: Optional[Calibrator] = None
 
     def __post_init__(self):
         """Ancillary post initialization operations."""
+        super().__post_init__()
         if self.observable is None:
-            self.observable = Z(self.nqubits, dense=True, backend=self.backend)
+            self.observable = Z(len(self.qubits), dense=False, backend=self.backend)
 
         # If mitigation is requested
         if self.mitigation_config is not None:
@@ -254,8 +276,6 @@ class Expectation(QuantumDecoding):
                 mitigation_config=self.mitigation_config,
                 backend=self.backend,
             )
-
-        super().__post_init__()
 
     def __call__(self, x: Circuit) -> ndarray:
         """
@@ -271,18 +291,25 @@ class Expectation(QuantumDecoding):
 
         if self.mitigation_config is not None:
             # In this case it is required before the super.call
-            self._align_density_matrix(x)
-            self._align_wire_names(x)
+            self.align_circuits(x)
+            x = self.transpile(x)
             _real_time_mitigation_check(self, x)
 
         # run circuit
         if self.analytic:
             expval = self.observable.expectation(super().__call__(x).state())
         else:
-            freqs = super().__call__(x).frequencies()
-            expval = self.observable.expectation_from_samples(
-                freqs, qubit_map=self.qubits
-            )
+            if isinstance(self.observable, SymbolicHamiltonian):
+                x = self.preprocessing(x)
+                expval = self.observable.expectation_from_circuit(
+                    x,
+                    nshots=self.nshots,
+                )
+            else:
+                expval = self.observable.expectation_from_samples(
+                    super().__call__(x).frequencies(),
+                    qubit_map=self.qubits,
+                )
 
         # apply mitigation if requested
         if self.mitigation_config is not None:
@@ -291,7 +318,10 @@ class Expectation(QuantumDecoding):
                 dtype=self.backend.np.float64,
             )
 
-        return expval.reshape(1, 1)
+        if self.calibrator is not None:
+            self.calibrator()
+
+        return self.backend.np.reshape(expval, (1, 1))
 
     @property
     def output_shape(self) -> tuple[int, int]:
@@ -352,7 +382,10 @@ class State(QuantumDecoding):
         Returns:
             (tuple[int, int, int]): a ``(2, 1, 2**nqubits)`` shape.
         """
-        return (2, 1, 2**self.nqubits)
+        n = 2 ** len(self.qubits)
+        if self.density_matrix:
+            return (2, n, n)
+        return (2, 1, n)
 
     @property
     def analytic(self) -> bool:
@@ -372,9 +405,9 @@ class Samples(QuantumDecoding):
             x (Circuit): input Circuit.
 
         Returns:
-            (ndarray): the generated samples.
+            ndarray: Generated samples.
         """
-        return self.backend.cast(super().__call__(x).samples(), self.backend.precision)
+        return self.backend.cast(super().__call__(x).samples(), self.backend.np.float64)
 
     @property
     def output_shape(self) -> tuple[int, int]:
@@ -388,6 +421,49 @@ class Samples(QuantumDecoding):
     @property
     def analytic(self) -> bool:  # pragma: no cover
         return False
+
+
+@dataclass(kw_only=True)
+class VariationalQuantumLinearSolver(QuantumDecoding):
+    """Decoder for the Variational Quantum Linear Solver (VQLS).
+
+    Args:
+        target_state (ndarray): Target solution vector :math:`\\ket{b}`.
+        A (ndarray): The matrix ``A`` in the linear system :math:`A \\, \\ket{x} = \\ket{b}`.
+
+    Reference:
+        C. Bravo-Prieto, R. LaRose, M. Cerezo, Y. Subasi, L. Cincio, and P. J. Coles,
+        *Variational quantum linear solver*,
+        `Quantum 7, 1188 (2023) <https://doi.org/10.22331/q-2023-11-22-1188>`_.
+    """
+
+    target_state: ndarray
+    A: ndarray
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.target_state = self.backend.cast(
+            self.target_state, dtype=self.backend.np.complex128
+        )
+        self.A = self.backend.cast(self.A, dtype=self.backend.np.complex128)
+
+    def __call__(self, circuit: Circuit):
+        result = super().__call__(circuit)
+        state = result.state()
+        final_state = self.A @ state
+        normalized = final_state / self.backend.calculate_vector_norm(final_state)
+        cost = infidelity(normalized, self.target_state, backend=self.backend)
+        return self.backend.cast(
+            self.backend.np.real(cost), dtype=self.backend.np.float64
+        )
+
+    @property
+    def output_shape(self) -> tuple[int, int]:
+        return (1, 1)
+
+    @property
+    def analytic(self) -> bool:
+        return True
 
 
 def _real_time_mitigation_check(decoder: Expectation, x: Circuit):

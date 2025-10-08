@@ -2,9 +2,9 @@ from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional, Union
 
 from qibo import Circuit
-from qibo.backends import Backend, NumpyBackend, _check_backend
+from qibo.backends import Backend, CliffordBackend, _check_backend
 from qibo.config import log
-from qibo.hamiltonians import Hamiltonian
+from qibo.hamiltonians import Hamiltonian, SymbolicHamiltonian
 from qibo.models import error_mitigation
 from qibo.noise import NoiseModel
 
@@ -29,6 +29,7 @@ class Mitigator:
     backend: Optional[Backend] = None
 
     def __post_init__(self):
+
         self.backend = _check_backend(self.backend)
         self._mitigation_map: Callable[..., ndarray] = lambda x, a=1, b=0: a * x + b
 
@@ -36,15 +37,18 @@ class Mitigator:
         self._threshold = cfg.get("threshold", 1e-1)
         self._min_iterations = cfg.get("min_iterations", 100)
         self._iteration_counter = 0
-        self._mitigation_method = cfg.get("method", "cdr")
+        self._mitigation_method = cfg.get("method", "CDR")
         self._mitigation_method_kwargs = cfg.get("method_kwargs", {})
         self._nshots = self._mitigation_method_kwargs.get("nshots", 10000)
 
-        custom_map = self._mitigation_method_kwargs.get("model")
-        if custom_map is not None:
-            if not callable(custom_map):
-                raise ValueError("Noise map model must be a callable")
-            self._mitigation_map = custom_map
+        if self._mitigation_method == "ICS":
+            self._mitigation_map = lambda x, a: a * x
+        else:
+            custom_map = self._mitigation_method_kwargs.get("model")
+            if custom_map is not None:
+                if not callable(custom_map):  # pragma: no cover
+                    raise ValueError("Noise map model must be a callable")
+                self._mitigation_map = custom_map
 
         n_params = self._mitigation_map.__code__.co_argcount - 1
         defaults = self._mitigation_map.__defaults__ or tuple(
@@ -53,10 +57,10 @@ class Mitigator:
         self._mitigation_map_initial_popt = self.backend.cast(defaults, dtype="double")
         self._mitigation_map_popt = self.backend.cast(defaults, dtype="double")
         self._mitigation_function = getattr(error_mitigation, self._mitigation_method)
-        # TODO: replace with Clifford backend once the Unitary bug is fixed
-        self._simulation_backend = NumpyBackend()
+        self._simulation_backend = CliffordBackend(engine="numpy")
         self._reference_circuit = None
         self._reference_value = None
+        self._training_data = None
 
         self._n_checks = 0
         self._n_maps_computed = 0
@@ -74,8 +78,23 @@ class Mitigator:
         circuit: Circuit,
     ):
         """Construct reference error sensitive circuit."""
+        # Ensuring the observable backend is the simulation one
+        if isinstance(observable, SymbolicHamiltonian):
+            observable = SymbolicHamiltonian(
+                observable.form,
+                nqubits=observable.nqubits,
+                backend=self._simulation_backend,
+            )
+        else:
+            matrix = observable.backend.to_numpy(observable.matrix)
+            observable = Hamiltonian(
+                nqubits=circuit.nqubits,
+                matrix=self._simulation_backend.cast(matrix),
+                backend=self._simulation_backend,
+            )
+
         self._reference_circuit = error_mitigation.error_sensitive_circuit(
-            circuit=circuit, observable=observable
+            circuit=circuit, observable=observable, backend=self._simulation_backend
         )[0]
         # Execute the reference circuit
         reference_state = self._simulation_backend.execute_circuit(
@@ -129,13 +148,27 @@ class Mitigator:
         Perform data regression on noisy and exact data.
         """
 
-        _, _, popt, _ = self._mitigation_function(
-            circuit=circuit,
-            observable=observable,
-            noise_model=noise_model,
-            full_output=True,
-            **self._mitigation_method_kwargs,
-        )
+        if self._mitigation_method == "ICS":
+            _, _, dep_param, dep_param_std, _, self._training_data = (
+                self._mitigation_function(
+                    circuit=circuit,
+                    observable=observable,
+                    noise_model=noise_model,
+                    full_output=True,
+                    backend=self.backend,
+                    **self._mitigation_method_kwargs,
+                )
+            )
+            popt = [(1 - dep_param) / ((1 - dep_param) ** 2 + dep_param_std**2)]
+        else:
+            _, _, popt, self._training_data = self._mitigation_function(
+                circuit=circuit,
+                observable=observable,
+                noise_model=noise_model,
+                full_output=True,
+                backend=self.backend,
+                **self._mitigation_method_kwargs,
+            )
 
         self._mitigation_map.__defaults__ = tuple(popt)
         self._mitigation_map_popt = self.backend.cast(popt, dtype="double")

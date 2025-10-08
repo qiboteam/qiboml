@@ -16,14 +16,15 @@ packages = [{ include = "qiboml", from = "src" }]
 [tool.poetry.dependencies]
 python = ">=3.10,<3.13"
 numpy = "^2.0.0"
-keras = { version = "^3.0.0", optional = true }
+keras = { version = "^3.11.0", optional = true }
 tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux' or sys_platform == 'darwin'", optional = true }
 # TODO: the marker is a temporary solution due to the lack of the tensorflow-io 0.32.0's wheels for Windows, this package is one of
 # the tensorflow requirements
-torch = { version = "^2.7.0", optional = true}
-qibo = "^0.2.17"
+torch = { version = "^2.7.0", optional = true }
+qibo = { git = "https://github.com/qiboteam/qibo" }
 jax = "^0.4.25"
 jaxlib = "^0.4.25"
+qibocal = {version="^0.2.2", optional=true}
 
 [tool.poetry.group.docs]
 optional = true
@@ -39,9 +40,9 @@ nbsphinx = "^0.9.6"
 setuptools = "^78.1.1"
 ipykernel = "^6.29.5"
 torchmetrics = "^1.7.0"
-keras = { version = "^3.0.0" }
-tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux' or sys_platform == 'darwin'"}
-torch = { version = "^2.7.0"}
+keras = { version = "^3.11.0" }
+tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux' or sys_platform == 'darwin'" }
+torch = { version = "^2.7.0" }
 
 [tool.poetry.group.dev]
 optional = true
@@ -59,22 +60,29 @@ pylint = "3.1.0"
 pytest-cov = "4.0.0"
 qibojit = "^0.1.7"
 matplotlib = "^3.7.0"
-keras = "^3.0.0"
-tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux' or sys_platform == 'darwin'"}
-torch = { version = "^2.7.0"}
-qibolab = { git="https://github.com/qiboteam/qibolab", extras=["emulator"] }
+keras = "^3.11.0"
+qibocal = "^0.2.2"
+tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux' or sys_platform == 'darwin'" }
+torch = { version = "^2.7.0" }
+qibolab = { git = "https://github.com/qiboteam/qibolab", extras = ["emulator"] }
 
 [tool.poetry.group.cuda11]
 optional = true
 
 [tool.poetry.group.cuda11.dependencies]
-jax = {extras = ["cuda11"], version = "^0.4.25"}
+jax = { extras = ["cuda11"], version = "^0.4.25" }
 
 [tool.poetry.group.cuda12]
 optional = true
 
 [tool.poetry.group.cuda12.dependencies]
-jax = {extras = ["cuda12"], version = "^0.4.25"}
+jax = { extras = ["cuda12"], version = "^0.4.25" }
+
+[tool.poetry.group.qibocal]
+optional = true
+
+[tool.poetry.group.qibocal.dependencies]
+qibocal = "^0.2.2"
 
 [tool.poe.tasks]
 test = "pytest"
