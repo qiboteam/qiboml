@@ -102,6 +102,9 @@ def hardware_efficient(
     return circ
 
 
+HardwareEfficient = hardware_efficient
+
+
 def brickwork_givens(nqubits: int, weight: int, full_hwp: bool = False, **kwargs):
     """Create a Hamming-weight-preserving circuit based on brickwork layers of two-qubit Givens rotations.
 
