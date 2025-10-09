@@ -14,6 +14,7 @@ import numpy as np
 import tensorflow as tf  # pylint: disable=import-error
 from qibo import Circuit
 from qibo.backends import Backend
+from qibo.config import raise_error
 
 from qiboml.interfaces import utils
 from qiboml.interfaces.circuit_tracer import CircuitTracer
@@ -100,6 +101,8 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
             by sequentially stacking the elements of the given list. It is also possible
             to pass a single circuit, in the case a sequential structure is not needed.
         decoding (QuantumDecoding): the decoding layer.
+        parameters_initialization (Union[keras.initializers.Initializer, np.ndarray]]): if an initialiser is provided it will be used
+        either as the parameters or to sample the parameters of the model.
         differentiation (Differentiation, optional): the differentiation engine,
             if not provided a default one will be picked following what described in the :ref:`docs <_differentiation_engine>`.
         circuit_tracer (CircuitTracer, optional): tracer used to build the circuit and trace the operations performed upon construction. Defaults to ``KerasCircuitTracer``.
@@ -107,8 +110,12 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
 
     circuit_structure: Union[Circuit, List[Union[Circuit, QuantumEncoding, Callable]]]
     decoding: QuantumDecoding
+    parameters_initialization: Optional[
+        Union[keras.initializers.Initializer, np.ndarray]
+    ] = None
     differentiation: Optional[Differentiation] = None
     circuit_tracer: Optional[CircuitTracer] = None
+
 
     def __post_init__(self):
         super().__init__()
@@ -121,10 +128,28 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
             self.backend.to_numpy(params),
             "float64",
         )  # pylint: disable=no-member
+
+        initializer = "zeros"
+        if self.parameters_initialization is not None:
+            if isinstance(self.parameters_initialization, keras.initializers.Initializer):
+                initializer = self.parameters_initialization
+            elif isinstance(self.parameters_initialization, np.ndarray | tf.Tensor):
+                if self.parameters_initialization.shape != params.shape:
+                    raise_error(
+                        ValueError,
+                        f"Shape not valid for `parameters_initialization`. The shape should be {params.shape}.",
+                    )
+                params = self.parameters_initialization
+            else:
+                raise_error(ValueError, "`parameters_initialization` should be a `np.ndarray` or `keras.initializers.Initializer`.")
         self.circuit_parameters = self.add_weight(
-            shape=params.shape, initializer="zeros", trainable=True, dtype="float64"
+            shape=params.shape,
+            initializer=initializer,
+            trainable=True,
+
         )
-        self.set_weights([params])
+        if not isinstance(self.parameters_initialization, keras.initializers.Initializer):
+            self.set_weights([params])
 
         if self.circuit_tracer is None:
             self.circuit_tracer = KerasCircuitTracer
@@ -182,6 +207,7 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
 
         return fig
 
+    
     @property
     def output_shape(
         self,
