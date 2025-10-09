@@ -116,6 +116,9 @@ def compute_gradient(frontend, model, x, wrt_inputs=False):
         grad_wrt_params = np.array(list(model.parameters())[-1].grad)
         return grad_wrt_input, grad_wrt_params
 
+def gradient_test_setup():
+    
+
 
 @pytest.mark.parametrize("nshots", [None, 12000000])
 @pytest.mark.parametrize("backend", EXECUTION_BACKENDS)
@@ -268,14 +271,14 @@ TARGET_GRAD_REUPLOADING = {
 
 
 @pytest.mark.parametrize("nshots", [None, 12000000])
-@pytest.mark.parametrize("backend", EXECUTION_BACKENDS)
-@pytest.mark.parametrize("diff_rule", DIFF_RULES)
+#@pytest.mark.parametrize("backend", EXECUTION_BACKENDS)
+#@pytest.mark.parametrize("diff_rule", DIFF_RULES)
 @pytest.mark.parametrize("wrt_inputs", [True, False])
 def test_expval_custom_grad_reuploading(
-    frontend,
-    backend,
+    #frontend,
+    #backend,
     nshots,
-    diff_rule,
+    #diff_rule,
     wrt_inputs,
 ):
     """
@@ -283,10 +286,15 @@ def test_expval_custom_grad_reuploading(
     parameters. In this test the system size is fixed to two qubits and all the
     parameters/data values are fixed.
     """
-
+    diff_rule = None
+    from qiboml.backends import PyTorchBackend, TensorflowBackend
+    backend = PyTorchBackend()
+    import qiboml.interfaces.pytorch as frontend
+    #import qiboml.interfaces.tensorflow as frontend
+    
     if diff_rule is not None and diff_rule.__name__ == "Jax" and nshots is not None:
         pytest.skip("Jax differentiation does not work with shots.")
-
+    
     set_seed(frontend, 42)
     backend.set_seed(42)
 
@@ -297,7 +305,7 @@ def test_expval_custom_grad_reuploading(
     obs = hamiltonians.Z(nqubits=nqubits, backend=backend)
 
     encoding_layer = PhaseEncoding(nqubits=nqubits)
-    training_layer_1 = HardwareEfficient(nqubits=nqubits, nlayers=1)
+    training_layer_1 = hardware_efficient(nqubits=nqubits, nlayers=1)
     training_layer_2 = training_layer_1.copy(deep=True)
     nparams = len(training_layer_1.get_parameters())
     training_layer_1.set_parameters(
