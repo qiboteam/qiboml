@@ -27,4 +27,4 @@ In this case you can also specify the extra dependencies as:
 
 .. code-block:: bash
 
-   pip install -e .[torch,tensorflow]
+   pip install -e .[torch,keras]

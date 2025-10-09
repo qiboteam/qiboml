@@ -104,4 +104,4 @@ addopts = [
 
 [tool.poetry.extras]
 torch = ["torch"]
-tf = ["tensorflow", "keras"]
+keras = ["tensorflow", "keras"]
