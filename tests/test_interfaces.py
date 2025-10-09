@@ -353,7 +353,6 @@ def test_encoding(backend, frontend, layer, seed):
 
     backprop_test(frontend, q_model, data, target)
 
-
 @pytest.mark.parametrize("layer,seed", zip(DECODING_LAYERS, [1, 53, 1, 26]))
 def test_decoding(backend, frontend, layer, seed):
 
@@ -594,6 +593,85 @@ def test_qibolab(frontend):
     _, loss_trained = eval_model(frontend, model, data, target)
     assert loss_untrained > loss_trained
 
+@pytest.mark.parametrize("with_initializer", [False, True, "numpy_array", "error_check_numpy", "error_check_keras_torch"])
+def test_parameters_initialization(backend, frontend, with_initializer):
+    set_device(frontend)
+
+    nqubits = 2
+
+    circuit_structure = [
+        enc.PhaseEncoding(nqubits=nqubits),
+        ans.HardwareEfficient(nqubits)
+    ]
+
+    # Function to create the model
+    def q_model(nqubits, initializer, circuit_structure):
+        return frontend.QuantumModel(
+            circuit_structure=circuit_structure,
+            parameters_initialization=initializer,
+            decoding=dec.Expectation(
+            nqubits=nqubits,
+            backend=backend,
+            )
+        )
+    
+    # Function to check the parameters
+    def assert_check(model_params, initializer):
+        if frontend.__name__ == "qiboml.interfaces.keras":
+            assert np.allclose(model.circuit_parameters, initializer, rtol=1e-7, atol=1e-10)
+        elif frontend.__name__ == "qiboml.interfaces.pytorch":
+            assert np.all(np.equal(model.circuit_parameters.detach().numpy(), initializer))
+    if with_initializer == True:
+        if frontend.__name__ == "qiboml.interfaces.keras":
+            frontend.tf.random.set_seed(1)
+            initializer = frontend.tf.keras.initializers.RandomNormal(mean=0.0, stddev=0.05)
+    
+            model = q_model(nqubits, initializer, circuit_structure)
+            model_params = model.circuit_parameters
+            values = initializer(shape=model_params.shape)
+            assert_check(model_params, values)
+
+        elif frontend.__name__ == "qiboml.interfaces.pytorch":
+            frontend.torch.manual_seed(1)
+            initializer = lambda p: frontend.torch.nn.init.normal_(p, mean=0, std=0.05)
+
+            model = q_model(nqubits, initializer, circuit_structure)
+            model_params = model.circuit_parameters
+
+            frontend.torch.manual_seed(1)
+            ref = frontend.torch.empty_like(frontend.torch.tensor(model_params))
+            values = initializer(ref).detach().numpy()
+
+            assert_check(model_params, values)
+        else:
+            raise_error(RuntimeError, f"Unknown frontend {frontend}.")
+
+  
+    # Numpy array initializer
+    elif with_initializer == "numpy_array":
+        initializer = np.array([0.5, 0.6, 0.7, 0.8])
+        model = q_model(nqubits, initializer, circuit_structure)
+        model_params = model.circuit_parameters
+        
+        assert_check(model_params, initializer)
+
+    # Error check keras and torch
+    elif with_initializer == "error_check_keras_torch":
+        with pytest.raises(ValueError):
+            initializer = 1
+            model = q_model(nqubits, initializer, circuit_structure)
+            model_params = model.circuit_parameters
+
+            assert_check(model_params, initializer)
+
+    # Error check numpy array
+    else:
+        with pytest.raises(ValueError):
+            initializer = np.array([0.5, 0.6, 0.7, 0.8, 0.9, 0.7, 0.8, 0.9])
+            model = q_model(nqubits, initializer, circuit_structure)
+            model_params = model.circuit_parameters
+
+            assert_check(model_params, initializer)
 
 def test_equivariant(backend, frontend):
 
