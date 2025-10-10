@@ -4,9 +4,10 @@ from typing import Union
 
 import numpy as np
 from qibo import __version__
+from qibo.backends import Backend
 from qibo.backends.npmatrices import NumpyMatrices
-from qibo.backends.numpy import NumpyBackend, _calculate_negative_power_singular_matrix
 from qibo.config import TF_LOG_LEVEL, log, raise_error
+from qibo.result import CircuitResult, QuantumState
 
 
 class TensorflowMatrices(NumpyMatrices):
@@ -17,18 +18,17 @@ class TensorflowMatrices(NumpyMatrices):
         import tensorflow as tf  # pylint: disable=import-error
         import tensorflow.experimental.numpy as tnp  # pylint: disable=import-error  # type: ignore
 
-        self.tf = tf
+        self.engine = tf
         self.np = tnp
-        self.np.linalg = tf.linalg
 
     def _cast(self, x, dtype):
-        return self.tf.cast(x, dtype=dtype)
+        return self.engine.cast(x, dtype=dtype)
 
     def Unitary(self, u):
         return self._cast(u, dtype=self.dtype)
 
 
-class TensorflowBackend(NumpyBackend):
+class TensorflowBackend(Backend):
     def __init__(self):
         super().__init__()
         self.name = "qiboml"
@@ -42,7 +42,7 @@ class TensorflowBackend(NumpyBackend):
             tf.get_logger().setLevel("ERROR")
 
         tnp.experimental_enable_numpy_behavior()
-        self.tf = tf
+        self.engine = tf
         self.np = tnp
         self.np.flatnonzero = np.flatnonzero
         self.np.copy = np.copy
@@ -88,44 +88,49 @@ class TensorflowBackend(NumpyBackend):
     def cast(self, x, dtype=None, copy=False):
         if dtype is None:
             dtype = self.dtype
-        x = self.tf.cast(x, dtype=dtype)
+        x = self.engine.cast(x, dtype=dtype)
         if copy:
-            return self.tf.identity(x)
+            return self.engine.identity(x)
         return x
 
     def is_sparse(self, x):
-        return isinstance(x, self.tf.sparse.SparseTensor)
+        return isinstance(x, self.engine.sparse.SparseTensor)
 
     def to_numpy(self, x):
         return np.array(x)
 
     def compile(self, func):
-        return self.tf.function(func)
+        return self.engine.function(func)
 
-    def zero_state(self, nqubits):
-        idx = self.tf.constant([[0]], dtype="int32")
-        state = self.tf.zeros((2**nqubits,), dtype=self.dtype)
-        update = self.tf.constant([1], dtype=self.dtype)
-        state = self.tf.tensor_scatter_nd_update(state, idx, update)
-        return state
+    def real(self, array):
+        return self.engine.math.real(array)
 
-    def zero_density_matrix(self, nqubits):
-        idx = self.tf.constant([[0, 0]], dtype="int32")
-        state = self.tf.zeros(2 * (2**nqubits,), dtype=self.dtype)
-        update = self.tf.constant([1], dtype=self.dtype)
-        state = self.tf.tensor_scatter_nd_update(state, idx, update)
+    def zero_state(self, nqubits, density_matrix: bool = False, dtype=None):
+        if dtype is None:
+            dtype = self.dtype
+
+        shape = [[0, 0]] if density_matrix else [[0]]
+        idx = self.engine.constant(shape, dtype="int32")
+
+        shape = 2 * (2**nqubits,) if density_matrix else (2**nqubits,)
+        state = self.zeros(shape, dtype=dtype)
+
+        update = self.engine.constant([1], dtype=dtype)
+
+        state = self.engine.tensor_scatter_nd_update(state, idx, update)
+
         return state
 
     def matrix(self, gate):
         npmatrix = super().matrix(gate)
         # delete cached matrix if it's symbolic
-        if self.tf.is_symbolic_tensor(npmatrix):
+        if self.engine.is_symbolic_tensor(npmatrix):
             delattr(self.matrices, gate.__class__.__name__)
         return npmatrix
 
     def matrix_parametrized(self, gate):
         npmatrix = super().matrix_parametrized(gate)
-        return self.tf.cast(npmatrix, dtype=self.dtype)
+        return self.cast(npmatrix, dtype=self.dtype)
 
     def matrix_fused(self, fgate):
         rank = len(fgate.target_qubits)
@@ -142,7 +147,7 @@ class TensorflowBackend(NumpyBackend):
             # the ``Gate.controlled_by`` method
             num_controls = len(gate.control_qubits)
             if num_controls > 0:
-                gmatrix = self.tf.linalg.LinearOperatorBlockDiag(
+                gmatrix = self.engine.linalg.LinearOperatorBlockDiag(
                     self.np.eye(2 ** len(gate.qubits) - len(gmatrix)), gmatrix
                 )
             # Kronecker product with identity is needed to make the
@@ -162,36 +167,36 @@ class TensorflowBackend(NumpyBackend):
             gmatrix = self.np.reshape(gmatrix, original_shape)
             # fuse the individual gate matrix to the total ``FusedGate`` matrix
             # we are using sparse matrices to improve perfomances
-            matrix = self.tf.sparse.sparse_dense_matmul(
-                self.tf.sparse.from_dense(gmatrix), matrix
+            matrix = self.engine.sparse.sparse_dense_matmul(
+                self.engine.sparse.from_dense(gmatrix), matrix
             )
 
         return matrix
 
     def execute_circuit(self, circuit, initial_state=None, nshots=1000):
-        with self.tf.device(self.device):
+        with self.engine.device(self.device):
             return super().execute_circuit(circuit, initial_state, nshots)
 
     def execute_circuit_repeated(self, circuit, nshots, initial_state=None):
-        with self.tf.device(self.device):
+        with self.engine.device(self.device):
             return super().execute_circuit_repeated(circuit, nshots, initial_state)
 
     def sample_shots(self, probabilities, nshots):
         # redefining this because ``tnp.random.choice`` is not available
-        logits = self.tf.math.log(probabilities)[self.tf.newaxis]
-        samples = self.tf.random.categorical(logits, nshots)[0]
+        logits = self.log(probabilities)[self.engine.newaxis]
+        samples = self.engine.random.categorical(logits, nshots)[0]
         return samples
 
     def samples_to_binary(self, samples, nqubits):
         # redefining this because ``tnp.right_shift`` is not available
-        qrange = self.np.arange(nqubits - 1, -1, -1, dtype="int32")
-        samples = self.tf.cast(samples, dtype="int32")
-        samples = self.tf.bitwise.right_shift(samples[:, self.np.newaxis], qrange)
-        return self.tf.math.mod(samples, 2)
+        qrange = self.engine.arange(nqubits - 1, -1, -1, dtype="int32")
+        samples = self.cast(samples, dtype="int32")
+        samples = self.engine.bitwise.right_shift(samples[:, self.np.newaxis], qrange)
+        return self.mod(samples, 2)
 
     def calculate_frequencies(self, samples):
         # redefining this because ``tnp.unique`` is not available
-        res, _, counts = self.tf.unique_with_counts(samples, out_idx="int64")
+        res, _, counts = self.engine.unique_with_counts(samples, out_idx="int64")
         res, counts = self.np.array(res), self.np.array(counts)
         if res.dtype == "string":
             res = [r.numpy().decode("utf8") for r in res]
@@ -202,33 +207,33 @@ class TensorflowBackend(NumpyBackend):
     def update_frequencies(self, frequencies, probabilities, nsamples):
         # redefining this because ``tnp.unique`` and tensor update is not available
         samples = self.sample_shots(probabilities, nsamples)
-        res, _, counts = self.tf.unique_with_counts(samples, out_idx="int64")
-        frequencies = self.tf.tensor_scatter_nd_add(
-            frequencies, res[:, self.tf.newaxis], counts
+        res, _, counts = self.engine.unique_with_counts(samples, out_idx="int64")
+        frequencies = self.engine.tensor_scatter_nd_add(
+            frequencies, res[:, self.engine.newaxis], counts
         )
         return frequencies
 
-    def calculate_vector_norm(self, state, order=2):
+    def vector_norm(self, state, order=2):
         state = self.cast(state)
-        return self.tf.norm(state, ord=order)
+        return self.engine.norm(state, ord=order)
 
-    def calculate_matrix_norm(self, state, order="nuc"):
+    def matrix_norm(self, state, order="nuc"):
         state = self.cast(state)
         if order == "nuc":
             return self.np.trace(state)
-        return self.tf.norm(state, ord=order)
+        return self.engine.norm(state, ord=order)
 
-    def calculate_eigenvalues(self, matrix, k: int = 6, hermitian: bool = True):
-        if hermitian:
-            return self.tf.linalg.eigvalsh(matrix)
-        return self.tf.linalg.eigvals(matrix)
+    # def eigenvalues(self, matrix, k: int = 6, hermitian: bool = True):
+    #     if hermitian:
+    #         return self.engine.linalg.eigvalsh(matrix)
+    #     return self.engine.linalg.eigvals(matrix)
 
-    def calculate_eigenvectors(self, matrix, k: int = 6, hermitian: bool = True):
-        if hermitian:
-            return self.tf.linalg.eigh(matrix)
-        return self.tf.linalg.eig(matrix)
+    # def eigenvectors(self, matrix, k: int = 6, hermitian: bool = True):
+    #     if hermitian:
+    #         return self.eigh(matrix)
+    #     return self.eig(matrix)
 
-    def calculate_matrix_exp(
+    def matrix_exp(
         self,
         matrix,
         phase: Union[float, int, complex] = 1,
@@ -237,9 +242,9 @@ class TensorflowBackend(NumpyBackend):
     ):
         if eigenvectors is None or self.is_sparse(matrix):
             return self.tf.linalg.expm(phase * matrix)
-        return super().calculate_matrix_exp(matrix, phase, eigenvectors, eigenvalues)
+        return super().matrix_exp(matrix, phase, eigenvectors, eigenvalues)
 
-    def calculate_matrix_power(
+    def matrix_power(
         self,
         matrix,
         power: Union[float, int],
@@ -255,11 +260,11 @@ class TensorflowBackend(NumpyBackend):
             # negative powers of singular matrices via SVD
             determinant = self.tf.linalg.det(matrix)
             if abs(determinant) < precision_singularity:
-                return _calculate_negative_power_singular_matrix(
+                return self._negative_power_singular_matrix(
                     matrix, power, precision_singularity, self.tf, self
                 )
 
-        return super().calculate_matrix_power(matrix, power, precision_singularity)
+        return super().matrix_power(matrix, power, precision_singularity)
 
     def calculate_singular_value_decomposition(self, matrix):
         # needed to unify order of return
@@ -285,6 +290,16 @@ class TensorflowBackend(NumpyBackend):
             return tape.jacobian(real, parameters), tape.jacobian(imag, parameters)
 
         return tape.jacobian(real, parameters)
+
+    def assert_allclose(
+        self, value, target, rtol: float = 1e-7, atol: float = 0.0
+    ):  # pragma: no cover
+        if isinstance(value, CircuitResult) or isinstance(value, QuantumState):
+            value = value.state()
+        if isinstance(target, CircuitResult) or isinstance(target, QuantumState):
+            target = target.state()
+
+        np.testing.assert_allclose(value, target, rtol=rtol, atol=atol)
 
     def _test_regressions(self, name):
         if name == "test_measurementresult_apply_bitflips":
