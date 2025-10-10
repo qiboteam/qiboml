@@ -1,3 +1,4 @@
+import copy
 import random
 
 import numpy as np
@@ -5,6 +6,7 @@ import pytest
 from qibo import Circuit, gates, hamiltonians
 from qibo.backends import NumpyBackend
 
+from qiboml.backends import PyTorchBackend, TensorflowBackend
 from qiboml.models.ansatze import hardware_efficient
 from qiboml.models.decoding import Expectation
 from qiboml.models.encoding import PhaseEncoding
@@ -58,7 +60,7 @@ TARGET_GRAD_TENSORFLOW["no_inputs"] = (
 
 
 def set_seed(frontend, seed):
-    random.seed(42)
+    random.seed(seed)
     np.random.seed(seed)
     frontend.np.random.seed(seed)
     if frontend.__name__ == "qiboml.interfaces.pytorch":
@@ -115,6 +117,27 @@ def compute_gradient(frontend, model, x, wrt_inputs=False):
         grad_wrt_input = np.array(x.grad)
         grad_wrt_params = np.array(list(model.parameters())[-1].grad)
         return grad_wrt_input, grad_wrt_params
+
+
+def gradient_test_setup(
+    circuit, x, nqubits, nshots, frontend, backend, diff_rule, wrt_inputs
+):
+    decoding_layer = Expectation(
+        nqubits=nqubits,
+        backend=backend,
+        nshots=nshots,
+    )
+
+    q_model = frontend.QuantumModel(
+        circuit_structure=circuit,
+        decoding=decoding_layer,
+        differentiation=diff_rule,
+    )
+
+    grad_wrt_input, grad_wrt_params = compute_gradient(
+        frontend, q_model, x, wrt_inputs=wrt_inputs
+    )
+    return np.array(grad_wrt_input), np.array(grad_wrt_params)
 
 
 @pytest.mark.parametrize("nshots", [None, 12000000])
@@ -225,3 +248,137 @@ def test_expval_custom_grad(
     else:
         backend.assert_allclose(grad_wrt_input, input_target, atol=tol)
     backend.assert_allclose(grad_wrt_params, params_target, atol=tol)
+
+
+TARGET_GRAD_REUPLOADING = {
+    "wrt_inputs": (
+        np.array([1.668244, -0.350845]),
+        np.array(
+            [
+                0.553438,
+                0.701541,
+                -0.897603,
+                0.369002,
+                0.280684,
+                0.303648,
+                0.72218,
+                -0.120478,
+                0.679402,
+                0.017968,
+                2.286109,
+            ]
+        ),
+    ),
+    "no_inputs": (
+        None,
+        np.array(
+            [
+                0.182884,
+                0.226752,
+                -0.637248,
+                -0.270067,
+                0.315737,
+                0.653579,
+                0.899997,
+                -0.235639,
+                0.514433,
+                -0.488684,
+                1.068054,
+            ]
+        ),
+    ),
+}
+
+
+@pytest.mark.parametrize("nshots", [None, 12000000])
+@pytest.mark.parametrize("backend", EXECUTION_BACKENDS)
+@pytest.mark.parametrize("diff_rule", DIFF_RULES)
+@pytest.mark.parametrize("wrt_inputs", [True, False])
+def test_expval_custom_grad_reuploading(
+    frontend,
+    backend,
+    nshots,
+    diff_rule,
+    wrt_inputs,
+):
+    """
+    Compute test gradient of < 0 | model^dag observable model | 0 > w.r.t model's
+    parameters. In this test the system size is fixed to two qubits and all the
+    parameters/data values are fixed.
+    """
+
+    if diff_rule is not None and diff_rule.__name__ == "Jax" and nshots is not None:
+        pytest.skip("Jax differentiation does not work with shots.")
+
+    native_backend = (
+        PyTorchBackend()
+        if frontend.__name__ == "qiboml.interfaces.pytorch"
+        else TensorflowBackend()
+    )
+    seed = 42
+    set_seed(frontend, seed)
+    backend.set_seed(seed)
+    native_backend.set_seed(seed)
+
+    x = construct_x(frontend, wrt_inputs=wrt_inputs)
+    x_native = construct_x(frontend, wrt_inputs=wrt_inputs)
+
+    nqubits = 2
+
+    encoding_layer = PhaseEncoding(nqubits=nqubits)
+    training_layer_1 = hardware_efficient(nqubits=nqubits, nlayers=1)
+    params = np.arange(len(training_layer_1.get_parameters())) * np.pi / 8
+    training_layer_1.set_parameters(params)
+    training_layer_2 = training_layer_1.copy(deep=True)
+
+    engine = (
+        frontend.torch
+        if frontend.__name__ == "qiboml.interfaces.pytorch"
+        else frontend.keras.ops
+    )
+
+    def equivariant_circuit(th, phi, lam):
+        c = Circuit(nqubits)
+        delta = 2 * engine.cos(phi) + lam**2
+        gamma = lam * engine.exp(th / 2)
+        c.add([gates.RZ(i, theta=th) for i in range(nqubits)])
+        c.add([gates.RX(i, theta=lam) for i in range(nqubits)])
+        c.add([gates.RY(i, theta=phi) for i in range(nqubits)])
+        c.add(gates.RZ(0, theta=delta))
+        c.add(gates.RX(1, theta=gamma))
+        return c
+
+    circuit_structure = [
+        encoding_layer,
+        training_layer_1,
+        encoding_layer,
+        # training_layer_2,
+    ]
+    circuit_structure_native = [copy.deepcopy(c) for c in circuit_structure]
+    """
+    circuit_structure += [
+        equivariant_circuit,
+    ]
+    circuit_structure_native += [
+        equivariant_circuit,
+    ]
+    """
+    custom_gradients = gradient_test_setup(
+        circuit_structure, x, nqubits, nshots, frontend, backend, diff_rule, wrt_inputs
+    )
+    native_gradients = gradient_test_setup(
+        circuit_structure_native,
+        x_native,
+        nqubits,
+        nshots,
+        frontend,
+        native_backend,
+        None,
+        wrt_inputs,
+    )
+    tol = 1e-3 if nshots is None else 1e-1
+    if wrt_inputs:
+        backend.assert_allclose(custom_gradients[0], native_gradients[0], atol=tol)
+    else:
+        assert custom_gradients[0].item() is None and native_gradients[0].item() is None
+    backend.assert_allclose(custom_gradients[1], native_gradients[1], atol=tol)
