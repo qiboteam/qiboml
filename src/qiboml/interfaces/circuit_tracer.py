@@ -293,71 +293,100 @@ class CircuitTracer(ABC):
 
         # the complete circuit
         circuit = None
-        # the jacobian for each sub-circuit
+        # the jacobian for each sub-circuit (wrt trainable parameters only)
         jacobians = []
+        # per-encoder jacobians wrt inputs (rows = encoder's angle rows)
         jacobians_wrt_inputs = []
+        # mapping input feature -> global angle-row indices in full circuit
         input_to_gate_map = {}
 
-        index = 0
+        index = 0  # offset in *trainable parameter vector* (for J)
+        angle_offset = 0  # offset in *global angle rows* (for PSR rows & encoders)
+
         for circ in self.circuit_structure:
             if isinstance(circ, QuantumEncoding):
-                # encoders do not have parameters
+                # encoders do not have trainable parameters
                 nparams = 0
-                jacobian, input_map, circ = self._build_from_encoding(
+                jacobian, input_map, enc_circ = self._build_from_encoding(
                     circ, x, trace=True
                 )
+
+                # Shift encoder local angle-row indices by the *global angle offset*
                 if input_map is not None:
-                    # update the input_map to the index of the global circuit
                     input_map = {
-                        inp: tuple(i + index for i in indices)
+                        inp: tuple(i + angle_offset for i in indices)
                         for inp, indices in input_map.items()
                     }
-                    # update the global map
+                    # merge preserving circuit order
                     for inp, indices in input_map.items():
                         if inp in input_to_gate_map:
                             input_to_gate_map[inp] += indices
                         else:
                             input_to_gate_map[inp] = indices
+
                 jacobians_wrt_inputs.append(jacobian)
+                piece_circuit = enc_circ
+
             elif isinstance(circ, Circuit):
                 nparams = len(circ.get_parameters())
-                jacobian, _, circ = self._build_from_circuit(
+                jacobian, _, sub_circ = self._build_from_circuit(
                     circ, params[index : index + nparams], trace=True
                 )
                 jacobians.append(jacobian)
+                piece_circuit = sub_circ
+
             else:
                 param_dict = signature(circ).parameters
                 nparams = len(param_dict)
-                jacobian, _, circ = self._build_from_callable(
+                jacobian, _, sub_circ = self._build_from_callable(
                     circ, params[index : index + nparams], trace=True
                 )
                 jacobians.append(jacobian)
+                piece_circuit = sub_circ
+
+            # Stitch piece into the global circuit
             index += nparams
             if circuit is None:
-                circuit = circ
+                circuit = piece_circuit
             else:
-                circuit += circ
+                circuit += piece_circuit
 
-        total_dim = tuple(sum(np.array(j.shape) for j in jacobians))
-        # build the global jacobian
-        J = self.zeros(
-            total_dim, dtype=self._get_dtype(params), device=self._get_device(params)
-        )
-        position = np.array([0, 0])
-        # insert each sub-jacobian in the total one
-        for j in jacobians:
-            shape = np.array(j.shape)
-            interval = tuple(zip(position, shape + position))
-            J = self.fill_jacobian(J, interval[0], interval[1], j)
-            # direct assignment works with torch/numpy only
-            # J[interval[0][0] : interval[0][1], interval[1][0] : interval[1][1]] = j
-            position += shape
+            # --- CRUCIAL: advance the global angle offset by the number of *angle rows*
+            # contributed by this piece, i.e., total parametrized scalars in circuit order.
+            n_angles_in_piece = sum(
+                len(pars)
+                for pars in piece_circuit.get_parameters(include_not_trainable=True)
+            )
+            angle_offset += n_angles_in_piece
+
+        # Build the global Jacobian wrt trainable parameters (block-diagonal assembly)
+        if len(jacobians) == 0:
+            total_dim = (0, 0)
+            J = self.zeros(
+                total_dim,
+                dtype=self._get_dtype(params),
+                device=self._get_device(params),
+            )
+        else:
+            total_dim = tuple(sum(np.array(j.shape) for j in jacobians))
+            J = self.zeros(
+                total_dim,
+                dtype=self._get_dtype(params),
+                device=self._get_device(params),
+            )
+            position = np.array([0, 0])
+            for j in jacobians:
+                shape = np.array(j.shape)
+                interval = tuple(zip(position, shape + position))
+                J = self.fill_jacobian(J, interval[0], interval[1], j)
+                position += shape
 
         jacobians_wrt_inputs = (
             None
             if len(jacobians_wrt_inputs) == 0 or jacobians_wrt_inputs[0] is None
             else self.engine.vstack(jacobians_wrt_inputs)
         )
+
         if len(input_to_gate_map) == 0:
             input_to_gate_map = None
 
