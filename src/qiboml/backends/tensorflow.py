@@ -189,10 +189,10 @@ class TensorflowBackend(Backend):
 
     def samples_to_binary(self, samples, nqubits):
         # redefining this because ``tnp.right_shift`` is not available
-        qrange = self.engine.arange(nqubits - 1, -1, -1, dtype="int32")
-        samples = self.cast(samples, dtype="int32")
+        qrange = self.engine.range(nqubits - 1, -1, -1, dtype=self.int32)
+        samples = self.cast(samples, dtype=self.int32)
         samples = self.engine.bitwise.right_shift(samples[:, self.np.newaxis], qrange)
-        return self.mod(samples, 2)
+        return samples % 2
 
     def calculate_frequencies(self, samples):
         # redefining this because ``tnp.unique`` is not available
@@ -207,7 +207,7 @@ class TensorflowBackend(Backend):
     def update_frequencies(self, frequencies, probabilities, nsamples):
         # redefining this because ``tnp.unique`` and tensor update is not available
         samples = self.sample_shots(probabilities, nsamples)
-        res, _, counts = self.engine.unique_with_counts(samples, out_idx="int64")
+        res, _, counts = self.engine.unique_with_counts(samples, out_idx=self.int64)
         frequencies = self.engine.tensor_scatter_nd_add(
             frequencies, res[:, self.engine.newaxis], counts
         )
