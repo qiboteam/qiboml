@@ -1,5 +1,5 @@
-import collections
 import os
+from collections import Counter
 from typing import Union
 
 import numpy as np
@@ -7,7 +7,6 @@ from qibo import __version__
 from qibo.backends import Backend
 from qibo.backends.npmatrices import NumpyMatrices
 from qibo.config import TF_LOG_LEVEL, log, raise_error
-from qibo.result import CircuitResult, QuantumState
 
 
 class TensorflowMatrices(NumpyMatrices):
@@ -19,7 +18,6 @@ class TensorflowMatrices(NumpyMatrices):
         import tensorflow.experimental.numpy as tnp  # pylint: disable=import-error  # type: ignore
 
         self.engine = tf
-        self.np = tnp
 
     def _cast(self, x, dtype):
         return self.engine.cast(x, dtype=dtype)
@@ -31,47 +29,56 @@ class TensorflowMatrices(NumpyMatrices):
 class TensorflowBackend(Backend):
     def __init__(self):
         super().__init__()
-        self.name = "qiboml"
-        self.platform = "tensorflow"
         os.environ["TF_CPP_MIN_LOG_LEVEL"] = str(TF_LOG_LEVEL)
 
         import tensorflow as tf  # pylint: disable=import-error
         import tensorflow.experimental.numpy as tnp  # pylint: disable=import-error  # type: ignore
+        from tensorflow.python.framework import (  # pylint: disable=E0611,import-error
+            errors_impl,
+        )
 
         if TF_LOG_LEVEL >= 2:
             tf.get_logger().setLevel("ERROR")
 
         tnp.experimental_enable_numpy_behavior()
         self.engine = tf
-        self.np = tnp
-        self.np.flatnonzero = np.flatnonzero
-        self.np.copy = np.copy
 
+        self.matrices = TensorflowMatrices(self.dtype)
+        self.name = "qiboml"
+        self.nthreads = 0
+        self.oom_error = errors_impl.ResourceExhaustedError
+        self.platform = "tensorflow"
+        self.tensor_types = (np.ndarray, tf.Tensor, tf.Variable)
         self.versions = {
             "qibo": __version__,
             "numpy": np.__version__,
             "tensorflow": tf.__version__,
         }
 
-        self.matrices = TensorflowMatrices(self.dtype)
-
-        from tensorflow.python.framework import (  # pylint: disable=E0611,import-error
-            errors_impl,
-        )
-
-        self.oom_error = errors_impl.ResourceExhaustedError
-
-        cpu_devices = tf.config.list_logical_devices("CPU")
-        gpu_devices = tf.config.list_logical_devices("GPU")
+        cpu_devices = self.engine.config.list_logical_devices("CPU")
+        gpu_devices = self.engine.config.list_logical_devices("GPU")
         if gpu_devices:  # pragma: no cover
             # CI does not use GPUs
             self.device = gpu_devices[0].name
         elif cpu_devices:
             self.device = cpu_devices[0].name
 
-        self.nthreads = 0
+    def cast(self, array, dtype=None, copy=False):
+        if dtype is None:
+            dtype = self.dtype
 
-        self.tensor_types = (np.ndarray, tf.Tensor, tf.Variable)
+        array = self.engine.cast(array, dtype=dtype)
+
+        if copy:
+            return self.copy(array)
+
+        return array
+
+    def compile(self, func):
+        return self.engine.function(func)
+
+    def is_sparse(self, x):
+        return isinstance(x, self.engine.sparse.SparseTensor)
 
     def set_device(self, device):  # pragma: no cover
         self.device = device
@@ -85,25 +92,35 @@ class TensorflowBackend(Backend):
             "to switch the number of threads."
         )
 
-    def cast(self, x, dtype=None, copy=False):
-        if dtype is None:
-            dtype = self.dtype
-        x = self.engine.cast(x, dtype=dtype)
-        if copy:
-            return self.engine.identity(x)
-        return x
-
-    def is_sparse(self, x):
-        return isinstance(x, self.engine.sparse.SparseTensor)
-
     def to_numpy(self, x):
         return np.array(x)
 
-    def compile(self, func):
-        return self.engine.function(func)
+    ########################################################################################
+    ######## Methods related to array manipulation                                  ########
+    ########################################################################################
+
+    def copy(self, array, **kwargs):
+        return self.engine.identity(array, **kwargs)
+
+    def flatnonzero(self, array):
+        return np.flatnonzero(array)
+
+    def matrix_norm(self, state, order="nuc"):
+        state = self.cast(state)
+        if order == "nuc":
+            return self.trace(state)
+        return self.engine.norm(state, ord=order)
 
     def real(self, array):
         return self.engine.math.real(array)
+
+    def vector_norm(self, state, order=2):
+        state = self.cast(state)
+        return self.engine.norm(state, ord=order)
+
+    ########################################################################################
+    ######## Methods related to linear algebra operations                           ########
+    ########################################################################################
 
     def zero_state(self, nqubits, density_matrix: bool = False, dtype=None):
         if dtype is None:
@@ -120,6 +137,10 @@ class TensorflowBackend(Backend):
         state = self.engine.tensor_scatter_nd_update(state, idx, update)
 
         return state
+
+    ########################################################################################
+    ######## Methods related to circuit execution                                   ########
+    ########################################################################################
 
     def matrix(self, gate):
         npmatrix = super().matrix(gate)
@@ -139,7 +160,7 @@ class TensorflowBackend(Backend):
         # at this point it is maybe better to just use dense arrays
         # from the tests no major performance difference emerged
         # with dense tensors, thus keeping sparse representation for now
-        matrix = self.np.eye(2**rank, dtype=self.dtype)
+        matrix = self.identity(2**rank, dtype=self.dtype)
 
         for gate in fgate.gates:
             gmatrix = gate.matrix(self)
@@ -148,23 +169,23 @@ class TensorflowBackend(Backend):
             num_controls = len(gate.control_qubits)
             if num_controls > 0:
                 gmatrix = self.engine.linalg.LinearOperatorBlockDiag(
-                    self.np.eye(2 ** len(gate.qubits) - len(gmatrix)), gmatrix
+                    self.identity(2 ** len(gate.qubits) - len(gmatrix)), gmatrix
                 )
             # Kronecker product with identity is needed to make the
             # original matrix have shape (2**rank x 2**rank)
-            eye = self.np.eye(2 ** (rank - len(gate.qubits)))
-            gmatrix = self.np.kron(gmatrix, eye)
+            eye = self.identity(2 ** (rank - len(gate.qubits)))
+            gmatrix = self.kron(gmatrix, eye)
             # Transpose the new matrix indices so that it targets the
             # target qubits of the original gate
             original_shape = gmatrix.shape
-            gmatrix = self.np.reshape(gmatrix, 2 * rank * (2,))
+            gmatrix = self.reshape(gmatrix, 2 * rank * (2,))
             qubits = list(gate.qubits)
             indices = qubits + [q for q in fgate.target_qubits if q not in qubits]
             indices = np.argsort(indices)
             transpose_indices = list(indices)
             transpose_indices.extend(indices + rank)
-            gmatrix = self.np.transpose(gmatrix, transpose_indices)
-            gmatrix = self.np.reshape(gmatrix, original_shape)
+            gmatrix = self.transpose(gmatrix, transpose_indices)
+            gmatrix = self.reshape(gmatrix, original_shape)
             # fuse the individual gate matrix to the total ``FusedGate`` matrix
             # we are using sparse matrices to improve perfomances
             matrix = self.engine.sparse.sparse_dense_matmul(
@@ -181,6 +202,20 @@ class TensorflowBackend(Backend):
         with self.engine.device(self.device):
             return super().execute_circuit_repeated(circuit, nshots, initial_state)
 
+    ########################################################################################
+    ######## Methods related to the execution and post-processing of measurements   ########
+    ########################################################################################
+
+    def calculate_frequencies(self, samples):
+        # redefining this because ``tnp.unique`` is not available
+        res, _, counts = self.engine.unique_with_counts(samples, out_idx="int64")
+        res, counts = np.array(res), np.array(counts)
+        if res.dtype == "string":
+            res = [r.numpy().decode("utf8") for r in res]
+        else:
+            res = [int(r) for r in res]
+        return Counter({k: int(v) for k, v in zip(res, counts)})
+
     def sample_shots(self, probabilities, nshots):
         # redefining this because ``tnp.random.choice`` is not available
         logits = self.log(probabilities)[self.engine.newaxis]
@@ -191,18 +226,8 @@ class TensorflowBackend(Backend):
         # redefining this because ``tnp.right_shift`` is not available
         qrange = self.engine.range(nqubits - 1, -1, -1, dtype=self.int32)
         samples = self.cast(samples, dtype=self.int32)
-        samples = self.engine.bitwise.right_shift(samples[:, self.np.newaxis], qrange)
+        samples = self.engine.bitwise.right_shift(samples[:, np.newaxis], qrange)
         return samples % 2
-
-    def calculate_frequencies(self, samples):
-        # redefining this because ``tnp.unique`` is not available
-        res, _, counts = self.engine.unique_with_counts(samples, out_idx="int64")
-        res, counts = self.np.array(res), self.np.array(counts)
-        if res.dtype == "string":
-            res = [r.numpy().decode("utf8") for r in res]
-        else:
-            res = [int(r) for r in res]
-        return collections.Counter({k: int(v) for k, v in zip(res, counts)})
 
     def update_frequencies(self, frequencies, probabilities, nsamples):
         # redefining this because ``tnp.unique`` and tensor update is not available
@@ -213,26 +238,6 @@ class TensorflowBackend(Backend):
         )
         return frequencies
 
-    def vector_norm(self, state, order=2):
-        state = self.cast(state)
-        return self.engine.norm(state, ord=order)
-
-    def matrix_norm(self, state, order="nuc"):
-        state = self.cast(state)
-        if order == "nuc":
-            return self.np.trace(state)
-        return self.engine.norm(state, ord=order)
-
-    # def eigenvalues(self, matrix, k: int = 6, hermitian: bool = True):
-    #     if hermitian:
-    #         return self.engine.linalg.eigvalsh(matrix)
-    #     return self.engine.linalg.eigvals(matrix)
-
-    # def eigenvectors(self, matrix, k: int = 6, hermitian: bool = True):
-    #     if hermitian:
-    #         return self.eigh(matrix)
-    #     return self.eig(matrix)
-
     def matrix_exp(
         self,
         matrix,
@@ -241,7 +246,7 @@ class TensorflowBackend(Backend):
         eigenvalues=None,
     ):
         if eigenvectors is None or self.is_sparse(matrix):
-            return self.tf.linalg.expm(phase * matrix)
+            return self.expm(phase * matrix)
         return super().matrix_exp(matrix, phase, eigenvectors, eigenvalues)
 
     def matrix_power(
@@ -258,7 +263,7 @@ class TensorflowBackend(Backend):
 
         if power < 0.0:
             # negative powers of singular matrices via SVD
-            determinant = self.tf.linalg.det(matrix)
+            determinant = self.det(matrix)
             if abs(determinant) < precision_singularity:
                 return self._negative_power_singular_matrix(
                     matrix, power, precision_singularity, self.tf, self
@@ -268,38 +273,28 @@ class TensorflowBackend(Backend):
 
     def calculate_singular_value_decomposition(self, matrix):
         # needed to unify order of return
-        S, U, V = self.tf.linalg.svd(matrix)
-        return U, S, self.np.conj(self.np.transpose(V))
+        S, U, V = self.engine.linalg.svd(matrix)
+        return U, S, self.conj(self.transpose(V))
 
-    def calculate_jacobian_matrix(
+    def jacobian(
         self, circuit, parameters=None, initial_state=None, return_complex: bool = True
     ):
         copied = circuit.copy(deep=True)
 
         # necessary for the tape to properly watch the variables
-        parameters = self.tf.Variable(parameters)
+        parameters = self.engine.Variable(parameters)
 
-        with self.tf.GradientTape(persistent=return_complex) as tape:
+        with self.engine.GradientTape(persistent=return_complex) as tape:
             copied.set_parameters(parameters)
             state = self.execute_circuit(copied, initial_state=initial_state).state()
-            real = self.np.real(state)
+            real = self.real(state)
             if return_complex:
-                imag = self.np.imag(state)
+                imag = self.imag(state)
 
         if return_complex:
             return tape.jacobian(real, parameters), tape.jacobian(imag, parameters)
 
         return tape.jacobian(real, parameters)
-
-    def assert_allclose(
-        self, value, target, rtol: float = 1e-7, atol: float = 0.0
-    ):  # pragma: no cover
-        if isinstance(value, CircuitResult) or isinstance(value, QuantumState):
-            value = value.state()
-        if isinstance(target, CircuitResult) or isinstance(target, QuantumState):
-            target = target.state()
-
-        np.testing.assert_allclose(value, target, rtol=rtol, atol=atol)
 
     def _test_regressions(self, name):
         if name == "test_measurementresult_apply_bitflips":
@@ -319,9 +314,9 @@ class TensorflowBackend(Backend):
                 return {0: 196, 1: 153, 2: 156, 3: 495}
             else:
                 return {0: 168, 1: 188, 2: 154, 3: 490}
-        elif name == "test_post_measurement_bitflips_on_circuit":
-            return [
-                {5: 30},
-                {5: 12, 7: 6, 4: 6, 1: 5, 6: 1},
-                {3: 7, 6: 4, 2: 4, 7: 4, 0: 4, 5: 3, 4: 2, 1: 2},
-            ]
+
+        return [
+            {5: 30},
+            {5: 12, 7: 6, 4: 6, 1: 5, 6: 1},
+            {3: 7, 6: 4, 2: 4, 7: 4, 0: 4, 5: 3, 4: 2, 1: 2},
+        ]
