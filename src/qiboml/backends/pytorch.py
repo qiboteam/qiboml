@@ -1,11 +1,12 @@
 """PyTorch backend."""
 
-from typing import List, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 from qibo import __version__
 from qibo.backends.abstract import Backend
 from qibo.backends.npmatrices import NumpyMatrices
+from qibo.config import raise_error
 
 
 class TorchMatrices(NumpyMatrices):
@@ -82,8 +83,7 @@ class PyTorchBackend(Backend):
         as for the :class:`qibo.backends.PyTorchBackend`.
 
         Args:
-            array (Union[torch.Tensor, list[torch.Tensor], np.ndarray, list[np.ndarray], int, float, complex]):
-                Input to be casted.
+            array: Input to be casted.
             dtype (Union[str, torch.dtype, np.dtype, type]): Target data type.
                 If ``None``, the default dtype of the backend is used.
                 Defaults to ``None``.
@@ -146,10 +146,23 @@ class PyTorchBackend(Backend):
         return self.engine.unsqueeze(array, axis)
 
     def expm(self, array) -> "ndarray":
-        return self.engine.linalg.matrix_exp(array)
+        return self.engine.linalg.matrix_exp(array)  # pylint: disable=not-callable
 
     def flatnonzero(self, array) -> "ndarray":
         return self.engine.nonzero(array).flatten()
+
+    def random_choice(
+        self,
+        array,
+        size: Optional[Union[int, Tuple[int, ...]]] = None,
+        replace: bool = True,
+        p=None,
+    ) -> "ndarray":
+        if size is None:
+            size = 1
+
+        indices = self.engine.multinomial(p, num_samples=size, replacement=replace)
+        return self.copy(array[indices])
 
     def transpose(
         self, array, axes: Union[Tuple[int, ...], List[int]] = None
@@ -268,38 +281,18 @@ class PyTorchBackend(Backend):
                 phi=gate.init_kwargs["phi"],
             )
             return _matrix
-        else:
-            new_parameters = []
-            for parameter in gate.parameters:
-                if not isinstance(parameter, self.engine.Tensor):
-                    parameter = self._cast_parameter(
-                        parameter, trainable=gate.trainable
-                    )
-                elif parameter.requires_grad:
-                    gate.trainable = True
-                new_parameters.append(parameter)
-            gate.parameters = tuple(new_parameters)
+
+        new_parameters = []
+        for parameter in gate.parameters:
+            if not isinstance(parameter, self.engine.Tensor):
+                parameter = self._cast_parameter(parameter, trainable=gate.trainable)
+            elif parameter.requires_grad:
+                gate.trainable = True
+            new_parameters.append(parameter)
+        gate.parameters = tuple(new_parameters)
         _matrix = _matrix(*gate.parameters)
+
         return _matrix
-
-    ########################################################################################
-    ######## Methods related to the execution and post-processing of measurements   ########
-    ########################################################################################
-
-    def calculate_probabilities(self, state, qubits, nqubits):
-        rtype = self.real(state).dtype
-        unmeasured_qubits = tuple(i for i in range(nqubits) if i not in qubits)
-        state = self.reshape(self.abs(state) ** 2, nqubits * (2,))
-        if len(unmeasured_qubits) == 0:
-            probs = self.cast(state, dtype=rtype)
-        else:
-            probs = self.sum(self.cast(state, dtype=rtype), axis=unmeasured_qubits)
-        return self._order_probabilities(probs, qubits, nqubits).ravel()
-
-    def sample_shots(self, probabilities, nshots):
-        return self.multinomial(
-            self.cast(probabilities, dtype="float"), nshots, replacement=True
-        )
 
     ########################################################################################
     ######## Helper methods                                                         ########
@@ -356,9 +349,8 @@ class PyTorchBackend(Backend):
                 return {0: 196, 1: 153, 2: 156, 3: 495}
             return {3: 492, 2: 176, 0: 168, 1: 164}
 
-        if name == "test_post_measurement_bitflips_on_circuit":
-            return [
-                {5: 30},
-                {5: 17, 4: 5, 7: 4, 1: 2, 6: 2},
-                {4: 9, 2: 5, 5: 5, 3: 4, 6: 4, 0: 1, 1: 1, 7: 1},
-            ]
+        return [
+            {5: 30},
+            {5: 17, 4: 5, 7: 4, 1: 2, 6: 2},
+            {4: 9, 2: 5, 5: 5, 3: 4, 6: 4, 0: 1, 1: 1, 7: 1},
+        ]
