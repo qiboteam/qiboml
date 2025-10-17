@@ -4456,8 +4456,8 @@ qrng = ["pyserial (>=3.5,<4.0)"]
 [package.source]
 type = "git"
 url = "https://github.com/qiboteam/qibolab"
-reference = "HEAD"
-resolved_reference = "2ca1ee13a86584b5fa3a4bd12765136187ca97a4"
+reference = "backends"
+resolved_reference = "6955e134460eb10fc164b835ca0cb76df8a9b845"
 
 [[package]]
 name = "qutip"
@@ -6063,4 +6063,4 @@ torch = ["torch"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.14"
-content-hash = "b298c55b0f5a17f60180d48da27a4c7615583832259465f30c1659075df52534"
+content-hash = "a8d857c2a5c691546a0ec4314f518a70ec1abe8696a0e43d34e156912f09cb3a"

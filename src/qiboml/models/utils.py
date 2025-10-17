@@ -113,7 +113,7 @@ class Mitigator:
         Returns:
             bool: ``True`` if the map is reliable, ``False`` if not.
         """
-        mitigated_ref_value = self.__call__(noisy_reference_value)
+        mitigated_ref_value = self(noisy_reference_value)
         if abs(mitigated_ref_value - self._reference_value) > self._threshold:
             return False
         return True
