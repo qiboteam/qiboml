@@ -39,7 +39,6 @@ def test_state_layer(backend, density_matrix):
 )
 def test_expectation_layer(backend, nshots, observable):
     backend.set_seed(42)
-    rng = np.random.default_rng(42)
     nqubits = 5
 
     c = comp_basis_encoder("1" * 5)
