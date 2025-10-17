@@ -22,17 +22,23 @@ Note that, since the pre-defined encoding, decoding and ansatz layers provided i
 
    from qiboml.models.encoding import BinaryEncoding
    from qiboml.models.decoding import Probabilities
-   from qiboml.models.ansatze import ReuploadingCircuit
+   from qiboml.models.ansatze import hardware_efficient
 
    # these are interface agnostic
    encoding = BinaryEncoding(2)
    decoding = Probabilities(2)
-   circuit = ReuploadingCircuit(2)
+   circuit = hardware_efficient(2)
 
    # build the torch model
-   torch_model = pt.QuantumModel(encoding, circuit, decoding)
+   torch_model = pt.QuantumModel(
+      circuit_structure=[encoding, circuit],
+      decoding=decoding,
+   )
    # build the keras model
-   keras_model = ks.QuantumModel(encoding, circuit, decoding)
+   keras_model = ks.QuantumModel(
+      circuit_structure=[encoding, circuit],
+      decoding=decoding,
+   )
 
 As it happens for ``torch``, the ``keras_model`` object can then be used in combination with the ``keras`` API, e.g. stacking layers through the ``keras.Sequential`` or training with the ``keras.optimizers``:
 
