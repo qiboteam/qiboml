@@ -1,3 +1,5 @@
+"""Module defining the TensorFlow backend."""
+
 import os
 from collections import Counter
 from typing import Union
@@ -14,8 +16,7 @@ class TensorflowMatrices(NumpyMatrices):
 
     def __init__(self, dtype):
         super().__init__(dtype)
-        import tensorflow as tf  # pylint: disable=import-error
-        import tensorflow.experimental.numpy as tnp  # pylint: disable=import-error  # type: ignore
+        import tensorflow as tf  # pylint: disable=import-error,C0415
 
         self.engine = tf
 
@@ -31,17 +32,15 @@ class TensorflowBackend(Backend):
         super().__init__()
         os.environ["TF_CPP_MIN_LOG_LEVEL"] = str(TF_LOG_LEVEL)
 
-        import tensorflow as tf  # pylint: disable=import-error
-        import tensorflow.experimental.numpy as tnp  # pylint: disable=import-error  # type: ignore
-        from tensorflow.python.framework import (  # pylint: disable=E0611,import-error
+        import tensorflow as tf  # pylint: disable=import-error,C0415
+        from tensorflow.python.framework import (  # pylint: disable=E0611,C0415,import-error
             errors_impl,
         )
 
-        if TF_LOG_LEVEL >= 2:
-            tf.get_logger().setLevel("ERROR")
-
-        tnp.experimental_enable_numpy_behavior()
         self.engine = tf
+
+        if TF_LOG_LEVEL >= 2:
+            self.engine.get_logger().setLevel("ERROR")
 
         self.matrices = TensorflowMatrices(self.dtype)
         self.name = "qiboml"
@@ -77,8 +76,8 @@ class TensorflowBackend(Backend):
     def compile(self, func):
         return self.engine.function(func)
 
-    def is_sparse(self, x):
-        return isinstance(x, self.engine.sparse.SparseTensor)
+    def is_sparse(self, array):
+        return isinstance(array, self.engine.sparse.SparseTensor)
 
     def set_device(self, device):  # pragma: no cover
         self.device = device
@@ -92,8 +91,8 @@ class TensorflowBackend(Backend):
             "to switch the number of threads."
         )
 
-    def to_numpy(self, x):
-        return np.array(x)
+    def to_numpy(self, array):
+        return np.array(array)
 
     ########################################################################################
     ######## Methods related to array manipulation                                  ########
@@ -105,17 +104,21 @@ class TensorflowBackend(Backend):
     def flatnonzero(self, array):
         return np.flatnonzero(array)
 
-    def matrix_norm(self, state, order="nuc"):
-        state = self.cast(state)
+    def matrix_norm(self, state, order: Union[int, float, str] = "nuc", **kwargs):
+        state = self.cast(state, dtype=state.dtype)
         if order == "nuc":
             return self.trace(state)
-        return self.engine.norm(state, ord=order)
+        return self.engine.norm(state, ord=order, **kwargs)
 
     def real(self, array):
         return self.engine.math.real(array)
 
-    def vector_norm(self, state, order=2):
-        state = self.cast(state)
+    def vector_norm(self, state, order: Union[int, float, str] = 2, dtype=None):
+        if dtype is None:
+            dtype = self.dtype
+
+        state = self.cast(state, dtype=dtype)
+
         return self.engine.norm(state, ord=order)
 
     ########################################################################################
@@ -254,6 +257,7 @@ class TensorflowBackend(Backend):
         matrix,
         power: Union[float, int],
         precision_singularity: float = 1e-14,
+        dtype=None,
     ):
         if not isinstance(power, (float, int)):
             raise_error(
@@ -261,20 +265,23 @@ class TensorflowBackend(Backend):
                 f"``power`` must be either float or int, but it is type {type(power)}.",
             )
 
+        if dtype is None:
+            dtype = self.dtype
+
         if power < 0.0:
             # negative powers of singular matrices via SVD
             determinant = self.det(matrix)
             if abs(determinant) < precision_singularity:
                 return self._negative_power_singular_matrix(
-                    matrix, power, precision_singularity, self.tf, self
+                    matrix, power, precision_singularity, dtype
                 )
 
         return super().matrix_power(matrix, power, precision_singularity)
 
     def calculate_singular_value_decomposition(self, matrix):
         # needed to unify order of return
-        S, U, V = self.engine.linalg.svd(matrix)
-        return U, S, self.conj(self.transpose(V))
+        s_matrix, u_matrix, v_matrix = self.engine.linalg.svd(matrix)
+        return u_matrix, s_matrix, self.conj(self.transpose(v_matrix))
 
     def jacobian(
         self, circuit, parameters=None, initial_state=None, return_complex: bool = True
@@ -304,16 +311,18 @@ class TensorflowBackend(Backend):
                 [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                 [0, 0, 0, 0, 0, 4, 0, 0, 0, 4],
             ]
-        elif name == "test_probabilistic_measurement":
+
+        if name == "test_probabilistic_measurement":
             if "GPU" in self.device:  # pragma: no cover
                 return {0: 273, 1: 233, 2: 242, 3: 252}
-            else:
-                return {0: 271, 1: 239, 2: 242, 3: 248}
-        elif name == "test_unbalanced_probabilistic_measurement":
+
+            return {0: 271, 1: 239, 2: 242, 3: 248}
+
+        if name == "test_unbalanced_probabilistic_measurement":
             if "GPU" in self.device:  # pragma: no cover
                 return {0: 196, 1: 153, 2: 156, 3: 495}
-            else:
-                return {0: 168, 1: 188, 2: 154, 3: 490}
+
+            return {0: 168, 1: 188, 2: 154, 3: 490}
 
         return [
             {5: 30},

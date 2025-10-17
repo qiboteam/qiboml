@@ -1,4 +1,4 @@
-"""PyTorch backend."""
+"""Module defining the PyTorch backend."""
 
 from typing import List, Optional, Tuple, Union
 

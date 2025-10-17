@@ -1,3 +1,5 @@
+"""Module defining the Jax backend."""
+
 from functools import partial
 
 import jax
