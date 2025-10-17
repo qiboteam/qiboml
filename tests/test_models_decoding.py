@@ -91,8 +91,8 @@ def test_vqls_solver_basic(backend):
     """Test the VariationalQuantumLinearSolver on a 1-qubit system."""
     nqubits = 1
 
-    A = backend.cast([[1.0, 0.2], [0.2, 1.0]], dtype=backend.np.complex128)
-    target_state = backend.cast([1.0, 0.0], dtype=backend.np.complex128)
+    A = backend.cast([[1.0, 0.2], [0.2, 1.0]], dtype=backend.complex128)
+    target_state = backend.cast([1.0, 0.0], dtype=backend.complex128)
     circuit = Circuit(nqubits)
 
     solver = dec.VariationalQuantumLinearSolver(

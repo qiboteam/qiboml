@@ -38,6 +38,7 @@ class TensorflowBackend(Backend):
         )
 
         self.engine = tf
+        self.engine.experimental.numpy.experimental_enable_numpy_behavior()
 
         if TF_LOG_LEVEL >= 2:
             self.engine.get_logger().setLevel("ERROR")
@@ -103,6 +104,9 @@ class TensorflowBackend(Backend):
 
     def flatnonzero(self, array):
         return np.flatnonzero(array)
+
+    def kron(self, array_1, array_2) -> "ndarray":
+        return self.engine.experimental.numpy.kron(array_1, array_2)
 
     def matrix_norm(self, state, order: Union[int, float, str] = "nuc", **kwargs):
         state = self.cast(state, dtype=state.dtype)

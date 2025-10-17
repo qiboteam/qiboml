@@ -255,7 +255,7 @@ class QuantumModelCustomGradient:
         )
 
         def forward(angles):
-            angles = self.backend.cast(angles, dtype=self.backend.np.float64)
+            angles = self.backend.cast(angles, dtype=self.backend.float64)
             for i, g in enumerate(self.differentiation.circuit.parametrized_gates):
                 g.parameters = angles[i]
             circuit = self.differentiation.circuit
@@ -267,13 +267,13 @@ class QuantumModelCustomGradient:
         y = keras.ops.reshape(y, self.decoding.output_shape)
 
         def jacobian_wrt_angles(angles):
-            angles = self.backend.cast(angles, dtype=self.backend.np.float64)
+            angles = self.backend.cast(angles, dtype=self.backend.float64)
             d_angles = self.differentiation.evaluate(
                 angles,
                 wrt_inputs=wrt_inputs,
             )
             d_angles = self.backend.to_numpy(
-                self.backend.cast(d_angles, dtype=self.backend.np.float64)
+                self.backend.cast(d_angles, dtype=self.backend.float64)
             )
             return d_angles
 

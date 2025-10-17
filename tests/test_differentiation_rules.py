@@ -189,7 +189,7 @@ def test_expval_custom_grad(
     nparams = len(training_layer.get_parameters())
     initial_params = np.linspace(0.0, 2 * np.pi, nparams)
     training_layer.set_parameters(
-        backend.cast(initial_params, dtype=backend.np.float64)
+        backend.cast(initial_params, dtype=backend.float64)
     )
 
     q_model = frontend.QuantumModel(

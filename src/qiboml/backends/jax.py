@@ -102,7 +102,7 @@ class JaxBackend(NumpyBackend):
         if self.is_sparse(x):
             return x.astype(dtype)
 
-        return self.np.array(x, dtype=dtype, copy=copy)
+        return self.engine.array(x, dtype=dtype, copy=copy)
 
     def to_numpy(self, x):
 
@@ -125,7 +125,7 @@ class JaxBackend(NumpyBackend):
         # jax only supports coo sparse arrays
         # however they are probably not as efficient as csr ones
         # indeed using dense arrays instead of coo ones proved to be significantly faster
-        matrix = self.np.eye(2**rank)
+        matrix = self.identity(2**rank)
 
         for gate in fgate.gates:
             gmatrix = gate.matrix(self)
@@ -134,23 +134,23 @@ class JaxBackend(NumpyBackend):
             num_controls = len(gate.control_qubits)
             if num_controls > 0:
                 gmatrix = self.jax.scipy.linalg.block_diag(
-                    self.np.eye(2 ** len(gate.qubits) - len(gmatrix)), gmatrix
+                    self.identity(2 ** len(gate.qubits) - len(gmatrix)), gmatrix
                 )
             # Kronecker product with identity is needed to make the
             # original matrix have shape (2**rank x 2**rank)
-            eye = self.np.eye(2 ** (rank - len(gate.qubits)))
-            gmatrix = self.np.kron(gmatrix, eye)
+            eye = self.identity(2 ** (rank - len(gate.qubits)))
+            gmatrix = self.kron(gmatrix, eye)
             # Transpose the new matrix indices so that it targets the
             # target qubits of the original gate
             original_shape = gmatrix.shape
-            gmatrix = self.np.reshape(gmatrix, 2 * rank * (2,))
+            gmatrix = self.eshape(gmatrix, 2 * rank * (2,))
             qubits = list(gate.qubits)
             indices = qubits + [q for q in fgate.target_qubits if q not in qubits]
             indices = np.argsort(indices)
             transpose_indices = list(indices)
             transpose_indices.extend(indices + rank)
-            gmatrix = self.np.transpose(gmatrix, transpose_indices)
-            gmatrix = self.np.reshape(gmatrix, original_shape)
+            gmatrix = self.transpose(gmatrix, transpose_indices)
+            gmatrix = self.reshape(gmatrix, original_shape)
             matrix = gmatrix @ matrix
 
         return matrix
@@ -162,18 +162,18 @@ class JaxBackend(NumpyBackend):
         return zero_density_matrix(nqubits, self.dtype)
 
     def plus_state(self, nqubits):
-        state = self.np.ones(2**nqubits, dtype=self.dtype)
-        state /= self.np.sqrt(2**nqubits)
+        state = self.ones(2**nqubits, dtype=self.dtype)
+        state /= self.sqrt(2**nqubits)
         return state
 
     def plus_density_matrix(self, nqubits):
-        state = self.np.ones(2 * (2**nqubits,), dtype=self.dtype)
+        state = self.ones(2 * (2**nqubits,), dtype=self.dtype)
         state /= 2**nqubits
         return state
 
     def update_frequencies(self, frequencies, probabilities, nsamples):
         samples = self.sample_shots(probabilities, nsamples)
-        res, counts = self.np.unique(samples, return_counts=True)
+        res, counts = self.unique(samples, return_counts=True)
         frequencies = frequencies.at[res].add(counts)
         return frequencies
 
@@ -199,47 +199,47 @@ class JaxBackend(NumpyBackend):
 
     def apply_gate_density_matrix(self, gate, state, nqubits):
         state = self.cast(state)
-        state = self.np.reshape(state, 2 * nqubits * (2,))
+        state = self.reshape(state, 2 * nqubits * (2,))
         matrix = gate.matrix(self)
         if gate.is_controlled_by:
-            matrix = self.np.reshape(matrix, 2 * len(gate.target_qubits) * (2,))
-            matrixc = self.np.conj(matrix)
+            matrix = self.reshape(matrix, 2 * len(gate.target_qubits) * (2,))
+            matrixc = self.conj(matrix)
             ncontrol = len(gate.control_qubits)
             nactive = nqubits - ncontrol
             n = 2**ncontrol
 
             order, targets = einsum_utils.control_order_density_matrix(gate, nqubits)
-            state = self.np.transpose(state, order)
-            state = self.np.reshape(state, 2 * (n,) + 2 * nactive * (2,))
+            state = self.transpose(state, order)
+            state = self.reshape(state, 2 * (n,) + 2 * nactive * (2,))
 
             leftc, rightc = einsum_utils.apply_gate_density_matrix_controlled_string(
                 targets, nactive
             )
             state01 = state[: n - 1, n - 1]
-            state01 = self.np.einsum(rightc, state01, matrixc)
+            state01 = self.einsum(rightc, state01, matrixc)
             state10 = state[n - 1, : n - 1]
-            state10 = self.np.einsum(leftc, state10, matrix)
+            state10 = self.einsum(leftc, state10, matrix)
 
             left, right = einsum_utils.apply_gate_density_matrix_string(
                 targets, nactive
             )
             state11 = state[n - 1, n - 1]
-            state11 = self.np.einsum(right, state11, matrixc)
-            state11 = self.np.einsum(left, state11, matrix)
+            state11 = self.einsum(right, state11, matrixc)
+            state11 = self.einsum(left, state11, matrix)
 
             state00 = state[: n - 1]
             state00 = state00[:, tuple(range(n - 1))]
-            state01 = self.np.concatenate([state00, state01[:, None]], axis=1)
-            state10 = self.np.concatenate([state10, state11[None]], axis=0)
-            state = self.np.concatenate([state01, state10[None]], axis=0)
-            state = self.np.reshape(state, 2 * nqubits * (2,))
-            state = self.np.transpose(state, einsum_utils.reverse_order(order))
+            state01 = self.concatenate([state00, state01[:, None]], axis=1)
+            state10 = self.concatenate([state10, state11[None]], axis=0)
+            state = self.concatenate([state01, state10[None]], axis=0)
+            state = self.reshape(state, 2 * nqubits * (2,))
+            state = self.transpose(state, einsum_utils.reverse_order(order))
         else:
-            matrix = self.np.reshape(matrix, 2 * len(gate.qubits) * (2,))
-            matrixc = self.np.conj(matrix)
+            matrix = self.reshape(matrix, 2 * len(gate.qubits) * (2,))
+            matrixc = self.conj(matrix)
             left, right = einsum_utils.apply_gate_density_matrix_string(
                 gate.qubits, nqubits
             )
-            state = self.np.einsum(right, state, matrixc)
-            state = self.np.einsum(left, state, matrix)
-        return self.np.reshape(state, 2 * (2**nqubits,))
+            state = self.einsum(right, state, matrixc)
+            state = self.einsum(left, state, matrix)
+        return self.reshape(state, 2 * (2**nqubits,))

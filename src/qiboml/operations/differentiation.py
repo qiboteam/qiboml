@@ -86,7 +86,7 @@ class PSR(Differentiation):
         )
         forwards = expvals[::2]
         backwards = expvals[1::2]
-        eigvals = self.backend.np.reshape(
+        eigvals = self.backend.reshape(
             self.backend.cast(eigvals, dtype=parameters.dtype), forwards.shape
         )
 
@@ -182,7 +182,7 @@ class Adjoint(Differentiation):
                     gate.gradient(backend=self.backend), mu, nqubits=nqubits
                 )
                 gradients.append(
-                    2 * self.backend.np.real(self.backend.np.vdot(lam, mu))
+                    2 * self.backend.real(self.backend.engine.vdot(lam, mu))
                 )
             lam = self.backend.apply_gate(gate.dagger(), lam, nqubits=nqubits)
         return self.backend.cast(gradients[::-1], dtype=parameters.dtype).reshape(
@@ -277,7 +277,7 @@ class Jax(Differentiation):
         backend = self.decoding.backend
         # convert params to jax
         params = np.array(backend.to_numpy(parameters))
-        params = self._jax.cast(params, dtype=self._jax.np.float64)
+        params = self._jax.cast(params, dtype=self._jax.engine.float64)
         if not wrt_inputs:
             self._cast_non_trainable_parameters(self.backend, self._jax)
         # set jax for running
@@ -300,4 +300,4 @@ class Jax(Differentiation):
         if not wrt_inputs:
             self._cast_non_trainable_parameters(self._jax, self.backend)
         # transform back to the backend native array
-        return backend.cast(self._jax.to_numpy(jacobian).tolist(), backend.np.float64)
+        return backend.cast(self._jax.to_numpy(jacobian).tolist(), backend.float64)

@@ -196,7 +196,7 @@ class Probabilities(QuantumDecoding):
         Returns:
             (ndarray): the final probabilities.
         """
-        return self.backend.np.reshape(
+        return self.backend.reshape(
             super().__call__(x).probabilities(self.qubits), self.output_shape
         )
 
@@ -315,13 +315,13 @@ class Expectation(QuantumDecoding):
         if self.mitigation_config is not None:
             expval = self.backend.cast(
                 self.mitigator(expval),
-                dtype=self.backend.np.float64,
+                dtype=self.backend.float64,
             )
 
         if self.calibrator is not None:
             self.calibrator()
 
-        return self.backend.np.reshape(expval, (1, 1))
+        return self.backend.reshape(expval, (1, 1))
 
     @property
     def output_shape(self) -> tuple[int, int]:
@@ -368,10 +368,10 @@ class State(QuantumDecoding):
             (ndarray): the final state.
         """
         state = super().__call__(x).state()
-        return self.backend.np.vstack(  # pylint: disable=no-member
+        return self.backend.vstack(  # pylint: disable=no-member
             (
-                self.backend.np.real(state),  # pylint: disable=no-member
-                self.backend.np.imag(state),  # pylint: disable=no-member
+                self.backend.real(state),  # pylint: disable=no-member
+                self.backend.imag(state),  # pylint: disable=no-member
             )
         ).reshape(self.output_shape)
 
@@ -407,7 +407,7 @@ class Samples(QuantumDecoding):
         Returns:
             ndarray: Generated samples.
         """
-        return self.backend.cast(super().__call__(x).samples(), self.backend.np.float64)
+        return self.backend.cast(super().__call__(x).samples(), self.backend.float64)
 
     @property
     def output_shape(self) -> tuple[int, int]:
@@ -443,9 +443,9 @@ class VariationalQuantumLinearSolver(QuantumDecoding):
     def __post_init__(self):
         super().__post_init__()
         self.target_state = self.backend.cast(
-            self.target_state, dtype=self.backend.np.complex128
+            self.target_state, dtype=self.backend.complex128
         )
-        self.A = self.backend.cast(self.A, dtype=self.backend.np.complex128)
+        self.A = self.backend.cast(self.A, dtype=self.backend.complex128)
 
     def __call__(self, circuit: Circuit):
         result = super().__call__(circuit)
@@ -454,7 +454,7 @@ class VariationalQuantumLinearSolver(QuantumDecoding):
         normalized = final_state / self.backend.calculate_vector_norm(final_state)
         cost = infidelity(normalized, self.target_state, backend=self.backend)
         return self.backend.cast(
-            self.backend.np.real(cost), dtype=self.backend.np.float64
+            self.backend.real(cost), dtype=self.backend.float64
         )
 
     @property

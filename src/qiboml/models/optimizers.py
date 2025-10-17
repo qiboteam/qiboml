@@ -76,9 +76,9 @@ class ExactGeodesicTransportCG:
         self.v = self.tangent_vector()
         self.u = self.v.copy()
         # Power method learning rate
-        norm_u = self.backend.np.sqrt(self.sphere_inner_product(self.u, self.u, self.x))
+        norm_u = self.backend.sqrt(self.sphere_inner_product(self.u, self.u, self.x))
         loss_prev = self.loss()
-        self.eta = ((1 / norm_u) * self.backend.np.arccos((1 + (norm_u / (2 * loss_prev)) ** 2) ** -0.5
+        self.eta = ((1 / norm_u) * self.backend.arccos((1 + (norm_u / (2 * loss_prev)) ** 2) ** -0.5
                     )) * self.multiplicative_factor
 
     def angles_to_amplitudes(self, angles):
@@ -91,11 +91,11 @@ class ExactGeodesicTransportCG:
             ndarray: Amplitudes calculated from the hyperspherical coordinates.
         """
         d = len(angles) + 1
-        amps = self.backend.np.zeros(d)
+        amps = self.backend.zeros(d)
         for k in range(d):
-            prod = self.backend.np.prod(self.backend.np.sin(angles[:k]))
+            prod = self.backend.prod(self.backend.sin(angles[:k]))
             if k < d - 1:
-                prod *= self.backend.np.cos(angles[k])
+                prod *= self.backend.cos(angles[k])
             amps[k] = prod
         return amps
 
@@ -143,7 +143,7 @@ class ExactGeodesicTransportCG:
         Returns:
             ndarray: Gradient of loss w.r.t. ``angles``. 
         """
-        grad = self.backend.np.zeros_like(self.angles)
+        grad = self.backend.zeros_like(self.angles)
         for idx in range(len(self.angles)):
             angles_forward = self.angles.copy()
             angles_backward = self.angles.copy()
@@ -173,7 +173,7 @@ class ExactGeodesicTransportCG:
             ndarray: Geometric gradient vector.
         """
         d = len(self.angles)
-        grad = self.backend.np.zeros(d)
+        grad = self.backend.zeros(d)
         l_psi = self.loss()
         jacobian = self.jacobian()
         g_diag = self.metric_tensor()
@@ -182,10 +182,10 @@ class ExactGeodesicTransportCG:
             varphi = g_diag[j] ** (-1 / 2) * jacobian[:, j]
             full_varphi = self.amplitudes_to_full_state(varphi)
             l_varphi = self.hamiltonian.expectation(full_varphi)
-            phi = (psi + varphi) / self.backend.np.sqrt(2)
+            phi = (psi + varphi) / self.backend.sqrt(2)
             full_phi = self.amplitudes_to_full_state(phi)
             l_phi = self.hamiltonian.expectation(full_phi)
-            grad[j] = self.backend.np.sqrt(g_diag[j]) * (2 * l_phi - l_varphi - l_psi)
+            grad[j] = self.backend.sqrt(g_diag[j]) * (2 * l_phi - l_varphi - l_psi)
         return grad
 
     def jacobian(self):
@@ -195,13 +195,13 @@ class ExactGeodesicTransportCG:
             ndarray: Jacobian matrix.
         """
         dim = len(self.angles) 
-        jacob = self.backend.np.zeros((dim + 1, dim), dtype=self.backend.np.float64)
+        jacob = self.backend.zeros((dim + 1, dim), dtype=self.backend.float64)
 
         for j in range(dim):
-            reduced_params = self.backend.np.array(self.angles[j:], dtype=self.backend.np.float64, copy=True)
-            reduced_params[0] += self.backend.np.pi / 2
+            reduced_params = self.backend.cast(self.angles[j:], dtype=self.backend.float64, copy=True)
+            reduced_params[0] += self.backend.engine.pi / 2
 
-            sins = self.backend.np.prod(self.backend.np.sin(self.angles[:j])) 
+            sins = self.backend.prod(self.backend.sin(self.angles[:j])) 
             amps = self.angles_to_amplitudes(reduced_params)
 
             jacob[j:, j] = sins * amps
@@ -216,7 +216,7 @@ class ExactGeodesicTransportCG:
         """
         angles = self.angles
         g_diag = [
-            self.backend.np.prod(self.backend.np.sin(self.angles[:k]) ** 2) for k in range(len(self.angles))
+            self.backend.prod(self.backend.sin(self.angles[:k]) ** 2) for k in range(len(self.angles))
         ]
         return self.backend.cast(g_diag, dtype="float64")
 
@@ -250,7 +250,7 @@ class ExactGeodesicTransportCG:
         backtrack_rate = self.backtrack_rate
         if backtrack_rate is None:
             backtrack_rate = 0.5
-        norm_u = self.backend.np.sqrt(self.sphere_inner_product(self.u, self.u, self.x))
+        norm_u = self.backend.sqrt(self.sphere_inner_product(self.u, self.u, self.x))
         eta = self.eta
         count = 0
 
@@ -311,10 +311,10 @@ class ExactGeodesicTransportCG:
         if eta is None:  # pragma: no cover
             eta = self.eta
 
-        norm_dir = self.backend.np.sqrt(
+        norm_dir = self.backend.sqrt(
             self.sphere_inner_product(direction, direction, self.x)
         )
-        return self.backend.np.cos(eta * norm_dir) * self.x + self.backend.np.sin(
+        return self.backend.cos(eta * norm_dir) * self.x + self.backend.sin(
             eta * norm_dir
         ) * (direction / norm_dir)
 
@@ -328,13 +328,13 @@ class ExactGeodesicTransportCG:
             ndarray: Corresponding angles.
         """
         d = len(x)
-        angles = self.backend.np.zeros(d - 1)
+        angles = self.backend.zeros(d - 1)
         for i in range(d - 2):
-            norm_tail = self.backend.np.linalg.norm(x[i:])
+            norm_tail = self.backend.vector_norm(x[i:])
             angles[i] = (
-                0.0 if norm_tail == 0 else self.backend.np.arccos(x[i] / norm_tail)
+                0.0 if norm_tail == 0 else self.backend.arccos(x[i] / norm_tail)
             )
-        angles[-1] = self.backend.np.arctan2(x[-1], x[-2])
+        angles[-1] = self.backend.arctan2(x[-1], x[-2])
         return angles
 
     def parallel_transport(self, u, v, a, eta=None):
@@ -352,12 +352,12 @@ class ExactGeodesicTransportCG:
         """
         if eta == None:
             eta = self.eta
-        norm_v = self.backend.np.linalg.norm(v)
-        vu_dot = self.backend.np.dot(v, u)
+        norm_v = self.backend.vector_norm(v)
+        vu_dot = self.backend.dot(v, u)
         transported = (
             u
-            - self.backend.np.sin(eta * norm_v) * (vu_dot / norm_v) * a
-            + (self.backend.np.cos(eta * norm_v) - 1) * (vu_dot / (norm_v**2)) * v
+            - self.backend.sin(eta * norm_v) * (vu_dot / norm_v) * a
+            + (self.backend.cos(eta * norm_v) - 1) * (vu_dot / (norm_v**2)) * v
         )
         return transported
 
@@ -372,7 +372,7 @@ class ExactGeodesicTransportCG:
         Returns:
             float: Inner product value.
         """
-        return self.backend.np.dot(u, v) - self.backend.np.dot(x, u) * self.backend.np.dot(x, v)
+        return self.backend.dot(u, v) - self.backend.dot(x, u) * self.backend.dot(x, v)
 
     def beta_dy(self, v_next, x_next, transported_u, st):
         """Compute Dai and Yuan Beta.
@@ -447,10 +447,10 @@ class ExactGeodesicTransportCG:
             u_prev = self.u.copy()
 
             # Power method eta
-            norm_u = self.backend.np.sqrt(
+            norm_u = self.backend.sqrt(
                 self.sphere_inner_product(self.u, self.u, self.x)
             )
-            self.eta = (1 / norm_u) * self.backend.np.arccos(
+            self.eta = (1 / norm_u) * self.backend.arccos(
                 (1 + (norm_u / (2 * loss_prev)) ** 2) ** -0.5
             ) * self.multiplicative_factor
 
@@ -463,16 +463,16 @@ class ExactGeodesicTransportCG:
             transported_u = self.parallel_transport(self.u, self.u, self.x)
             st = min(
                 1,
-                self.backend.np.sqrt(self.sphere_inner_product(self.u, self.u, self.x))
-                / self.backend.np.sqrt(
+                self.backend.sqrt(self.sphere_inner_product(self.u, self.u, self.x))
+                / self.backend.sqrt(
                     self.sphere_inner_product(transported_u, transported_u, x_new)
                 ),
             )
             transported_v = self.parallel_transport(self.v, self.v, self.x)
             lt = min(
                 1,
-                self.backend.np.sqrt(self.sphere_inner_product(self.v, self.v, self.x))
-                / self.backend.np.sqrt(
+                self.backend.sqrt(self.sphere_inner_product(self.v, self.v, self.x))
+                / self.backend.sqrt(
                     self.sphere_inner_product(transported_v, transported_v, x_new)
                 ),
             )
