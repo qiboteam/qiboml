@@ -3,7 +3,6 @@ from functools import partial
 import jax
 import jax.numpy as jnp  # pylint: disable=import-error
 import numpy as np
-from jax.experimental import sparse
 from qibo import __version__
 from qibo.backends import einsum_utils
 from qibo.backends.npmatrices import NumpyMatrices
@@ -117,19 +116,6 @@ class JaxBackend(NumpyBackend):
     def set_seed(self, seed):
         self.numpy.random.seed(seed)
         self.random_key = self.jax.random.PRNGKey(self.numpy.random.get_state()[1][0])
-
-    def set_precision(self, precision):
-        if precision != self.precision:
-            if precision == "single":
-                self.precision = precision
-                self.dtype = self.np.complex64
-            elif precision == "double":
-                self.precision = precision
-                self.dtype = self.np.complex128
-            else:
-                raise_error(ValueError, f"Unknown precision {precision}.")
-            if self.matrices:
-                self.matrices = self.matrices.__class__(self.dtype)
 
     def cast(self, x, dtype=None, copy=False):
         if dtype is None:
