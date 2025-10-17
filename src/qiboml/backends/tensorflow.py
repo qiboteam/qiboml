@@ -2,7 +2,7 @@
 
 import os
 from collections import Counter
-from typing import Optional, Union
+from typing import Optional, Union, Tuple
 
 import numpy as np
 from qibo import __version__
@@ -115,11 +115,30 @@ class TensorflowBackend(Backend):
     def kron(self, array_1, array_2) -> "ndarray":
         return self.engine.experimental.numpy.kron(array_1, array_2)
 
+    def log2(self, array, **kwargs) -> "ndarray":
+        return self.engine.math.log(array, **kwargs) / self.engine.math.log(2)
+
     def matrix_norm(self, state, order: Union[int, float, str] = "nuc", **kwargs):
         state = self.cast(state, dtype=state.dtype)
         if order == "nuc":
             return self.trace(state)
         return self.engine.norm(state, ord=order, **kwargs)
+
+    def random_uniform(
+        self,
+        low: Union[float, int] = 0.0,
+        high: Union[float, int] = 1.0,
+        size: Optional[Union[int, Tuple[int, ...]]] = None,
+        seed=None,
+    ):
+        shape = (size,) if isinstance(size, int) else size
+
+        if seed is not None:
+            local_state = self.default_rng(seed) if isinstance(seed, int) else seed
+
+            return local_state.uniform(shape=shape, minval=low, maxval=high)
+
+        return self.engine.random.uniform(shape=shape, minval=low, maxval=high)
 
     def real(self, array):
         return self.engine.math.real(array)
