@@ -451,7 +451,7 @@ class VariationalQuantumLinearSolver(QuantumDecoding):
         result = super().__call__(circuit)
         state = result.state()
         final_state = self.A @ state
-        normalized = final_state / self.backend.calculate_vector_norm(final_state)
+        normalized = final_state / self.backend.vector_norm(final_state)
         cost = infidelity(normalized, self.target_state, backend=self.backend)
         return self.backend.cast(
             self.backend.real(cost), dtype=self.backend.float64

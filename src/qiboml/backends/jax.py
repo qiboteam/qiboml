@@ -8,6 +8,7 @@ import numpy as np
 from qibo import __version__
 from qibo.backends import Backend, einsum_utils
 from qibo.backends.npmatrices import NumpyMatrices
+from qibo.result import CircuitResult, QuantumState
 
 
 @partial(jax.jit, static_argnums=(0, 1))
@@ -75,6 +76,7 @@ class JaxBackend(Backend):
         self.jax = jax
         self.jax.config.update("jax_enable_x64", True)
 
+        self.dtype = self.complex128
         self.matrices = JaxMatrices(self.dtype)
         self.name = "qiboml"
         self.numeric_types += (
@@ -184,6 +186,16 @@ class JaxBackend(Backend):
             )
 
         return _apply_gate(gate.matrix(self), state, gate.qubits, nqubits)
+
+    def assert_allclose(
+        self, value, target, rtol: float = 1e-7, atol: float = 0.0
+    ):  # pragma: no cover
+        if isinstance(value, (CircuitResult, QuantumState)):
+            value = value.state()
+        if isinstance(target, (CircuitResult, QuantumState)):
+            target = target.state()
+
+        np.testing.assert_allclose(value, target, rtol=rtol, atol=atol)
 
     def _apply_gate_density_matrix(self, gate, state, nqubits: int):
         state = self.cast(state)
