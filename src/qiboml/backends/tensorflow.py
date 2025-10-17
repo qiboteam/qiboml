@@ -2,13 +2,14 @@
 
 import os
 from collections import Counter
-from typing import Union
+from typing import Optional, Union
 
 import numpy as np
 from qibo import __version__
 from qibo.backends import Backend
 from qibo.backends.npmatrices import NumpyMatrices
 from qibo.config import TF_LOG_LEVEL, log, raise_error
+from qibo.result import CircuitResult, QuantumState
 
 
 class TensorflowMatrices(NumpyMatrices):
@@ -101,6 +102,12 @@ class TensorflowBackend(Backend):
 
     def copy(self, array, **kwargs):
         return self.engine.identity(array, **kwargs)
+
+    def default_rng(self, seed: Optional[int] = None):
+        if seed is None:
+            return self.engine.random.Generator.from_non_deterministic_state()
+
+        return self.engine.random.Generator.from_seed(seed)
 
     def flatnonzero(self, array):
         return np.flatnonzero(array)
@@ -306,6 +313,16 @@ class TensorflowBackend(Backend):
             frequencies, res[:, self.engine.newaxis], counts
         )
         return frequencies
+
+    def assert_allclose(
+        self, value, target, rtol: float = 1e-7, atol: float = 0.0
+    ):  # pragma: no cover
+        if isinstance(value, (CircuitResult, QuantumState)):
+            value = value.state()
+        if isinstance(target, (CircuitResult, QuantumState)):
+            target = target.state()
+
+        np.testing.assert_allclose(value, target, rtol=rtol, atol=atol)
 
     def _test_regressions(self, name):
         if name == "test_measurementresult_apply_bitflips":

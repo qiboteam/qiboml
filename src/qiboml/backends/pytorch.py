@@ -56,6 +56,7 @@ class PyTorchBackend(Backend):
         }
 
         self.device = self.engine.get_default_device()
+        self.dtype = self.complex128
         self.matrices = TorchMatrices(self.dtype, self.device)
         self.nthreads = 0
         self.numeric_types += (

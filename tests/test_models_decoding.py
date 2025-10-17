@@ -15,9 +15,9 @@ def test_probabilities_layer(backend):
     nqubits = 5
     qubits = np.random.choice(range(nqubits), size=(4,), replace=False)
     layer = dec.Probabilities(nqubits, qubits=qubits, backend=backend)
-    c = random_clifford(nqubits, backend=backend)
+    circuit = random_clifford(nqubits, backend=backend)
     backend.assert_allclose(
-        layer(c).ravel(), backend.execute_circuit(c).probabilities(qubits)
+        layer(circuit).ravel(), backend.execute_circuit(circuit).probabilities(qubits)
     )
 
 
@@ -25,10 +25,10 @@ def test_probabilities_layer(backend):
 def test_state_layer(backend, density_matrix):
     nqubits = 5
     layer = dec.State(nqubits, density_matrix=density_matrix, backend=backend)
-    c = random_clifford(nqubits, density_matrix=density_matrix, backend=backend)
-    real, im = layer(c)
+    circuit = random_clifford(nqubits, density_matrix=density_matrix, backend=backend)
+    real, im = layer(circuit)
     backend.assert_allclose(
-        (real + 1j * im).ravel(), backend.execute_circuit(c).state().ravel()
+        (real + 1j * im).ravel(), backend.execute_circuit(circuit).state().ravel()
     )
 
 
