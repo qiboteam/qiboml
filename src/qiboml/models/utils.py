@@ -57,7 +57,7 @@ class Mitigator:
         self._mitigation_map_initial_popt = self.backend.cast(defaults, dtype="double")
         self._mitigation_map_popt = self.backend.cast(defaults, dtype="double")
         self._mitigation_function = getattr(error_mitigation, self._mitigation_method)
-        self._simulation_backend = CliffordBackend(engine="numpy")
+        self._simulation_backend = CliffordBackend(platform="numpy")
         self._reference_circuit = None
         self._reference_value = None
         self._training_data = None
