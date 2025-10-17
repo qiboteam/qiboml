@@ -143,6 +143,18 @@ class PyTorchBackend(Backend):
     def copy(self, array, **kwargs) -> "ndarray":
         return self.engine.clone(array, **kwargs)
 
+    def default_rng(self, seed = None):
+        if seed is not None:
+            if isinstance(seed, int):
+                default_rng = self.engine.Generator()
+                default_rng.manual_seed(seed)
+            else:
+                default_rng = seed
+        else:
+            default_rng = self.engine.Generator()
+
+        return default_rng
+
     def expand_dims(self, array, axis: Union[int, Tuple[int, ...]]) -> "ndarray":
         return self.engine.unsqueeze(array, axis)
 
