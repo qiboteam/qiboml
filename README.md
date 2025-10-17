@@ -64,6 +64,8 @@ for iteration in range(100):
 
 
 ### Citation policy
+[![arXiv](https://img.shields.io/badge/arXiv-2510.11773-b31b1b.svg)](https://arxiv.org/abs/2510.11773)
+[![DOI](https://zenodo.org/badge/759801297.svg)](https://doi.org/10.5281/zenodo.17310378)
 
 If you use the package please refer to [the documentation](https://qibo.science/qibo/stable/appendix/citing-qibo.html#publications) for citation instructions.
 
