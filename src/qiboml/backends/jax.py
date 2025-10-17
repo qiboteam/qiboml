@@ -5,23 +5,18 @@ from functools import partial
 import jax
 import jax.numpy as jnp  # pylint: disable=import-error
 import numpy as np
-from jax.experimental import sparse
 from qibo import __version__
-from qibo.backends import einsum_utils
+from qibo.backends import Backend, einsum_utils
 from qibo.backends.npmatrices import NumpyMatrices
-from qibo.backends.numpy import NumpyBackend
 
 
 @partial(jax.jit, static_argnums=(0, 1))
-def zero_state(nqubits, dtype):
-    state = jnp.zeros(2**nqubits, dtype=dtype).at[0].set(1)
+def zero_state(nqubits, density_matrix, dtype):
+    if density_matrix:
+        state = jnp.zeros(2 * (2**nqubits,), dtype=dtype).at[0, 0].set(1)
+    else:
+        state = jnp.zeros(2**nqubits, dtype=dtype).at[0].set(1)
     return state
-
-
-@partial(jax.jit, static_argnums=(0, 1))
-def zero_density_matrix(nqubits, dtype):
-    matrix = jnp.zeros(2 * (2**nqubits,), dtype=dtype).at[0, 0].set(1)
-    return matrix
 
 
 @partial(jax.jit, static_argnames={"dtype"})
@@ -72,53 +67,50 @@ class JaxMatrices(NumpyMatrices):
         return cast_matrix(x, dtype)
 
 
-class JaxBackend(NumpyBackend):
+class JaxBackend(Backend):
     def __init__(self):
         super().__init__()
 
-        self.name = "qiboml"
-        self.platform = "jax"
-
-        import jax
-        import jax.numpy as jnp  # pylint: disable=import-error
-        import numpy
-
-        jax.config.update("jax_enable_x64", True)
-
+        self.engine = jnp
         self.jax = jax
-        self.numpy = numpy
+        self.jax.config.update("jax_enable_x64", True)
 
-        self.np = jnp
-        self.tensor_types = (jnp.ndarray,)
         self.matrices = JaxMatrices(self.dtype)
+        self.name = "qiboml"
+        self.numeric_types += (
+            self.int8,
+            self.int32,
+            self.int64,
+            self.float32,
+            self.float64,
+            self.complex64,
+            self.complex128,
+        )
+        self.platform = "jax"
+        self.tensor_types = (self.engine.ndarray,)
 
-    def cast(self, x, dtype=None, copy=False):
+    def cast(self, array, dtype=None, copy=False):
         if dtype is None:
             dtype = self.dtype
 
-        if isinstance(x, self.tensor_types):
-            return x.astype(dtype)
+        if isinstance(array, self.tensor_types):
+            return array.astype(dtype)
 
-        if self.is_sparse(x):
-            return x.astype(dtype)
+        if self.is_sparse(array):
+            return array.astype(dtype)
 
-        return self.engine.array(x, dtype=dtype, copy=copy)
+        return self.engine.array(array, dtype=dtype, copy=copy)
 
-    def to_numpy(self, x):
+    def to_numpy(self, array):
 
-        if isinstance(x, list) or isinstance(x, tuple):
-            return self.numpy.asarray([self.to_numpy(i) for i in x])
+        if isinstance(array, (list, tuple)):
+            return np.asarray([self.to_numpy(elem) for elem in array])
 
-        return self.numpy.asarray(x)
+        return np.asarray(array)
 
     # TODO: using numpy's rng for now. Shall we use Jax's?
     def set_seed(self, seed):
-        self.numpy.random.seed(seed)
-
-    def sample_shots(self, probabilities, nshots):
-        return self.numpy.random.choice(
-            range(len(probabilities)), size=nshots, p=probabilities
-        )
+        np.random.seed(seed)
 
     def matrix_fused(self, fgate):
         rank = len(fgate.target_qubits)
@@ -143,7 +135,7 @@ class JaxBackend(NumpyBackend):
             # Transpose the new matrix indices so that it targets the
             # target qubits of the original gate
             original_shape = gmatrix.shape
-            gmatrix = self.eshape(gmatrix, 2 * rank * (2,))
+            gmatrix = self.reshape(gmatrix, 2 * rank * (2,))
             qubits = list(gate.qubits)
             indices = qubits + [q for q in fgate.target_qubits if q not in qubits]
             indices = np.argsort(indices)
@@ -155,21 +147,11 @@ class JaxBackend(NumpyBackend):
 
         return matrix
 
-    def zero_state(self, nqubits):
-        return zero_state(nqubits, self.dtype)
+    def zero_state(self, nqubits: int, density_matrix: bool = False, dtype=None):
+        if dtype is None:
+            dtype = self.dtype
 
-    def zero_density_matrix(self, nqubits):
-        return zero_density_matrix(nqubits, self.dtype)
-
-    def plus_state(self, nqubits):
-        state = self.ones(2**nqubits, dtype=self.dtype)
-        state /= self.sqrt(2**nqubits)
-        return state
-
-    def plus_density_matrix(self, nqubits):
-        state = self.ones(2 * (2**nqubits,), dtype=self.dtype)
-        state /= 2**nqubits
-        return state
+        return zero_state(nqubits, density_matrix, dtype)
 
     def update_frequencies(self, frequencies, probabilities, nsamples):
         samples = self.sample_shots(probabilities, nsamples)
@@ -184,6 +166,11 @@ class JaxBackend(NumpyBackend):
         return matrix
 
     def apply_gate(self, gate, state, nqubits):
+        density_matrix = bool(len(state.shape) == 2)
+
+        if density_matrix:
+            return self._apply_gate_density_matrix(gate, state, nqubits)
+
         if gate.is_controlled_by:
             order, targets = einsum_utils.control_order(gate, nqubits)
             return _apply_gate_controlled(
@@ -195,9 +182,10 @@ class JaxBackend(NumpyBackend):
                 gate.target_qubits,
                 nqubits,
             )
+
         return _apply_gate(gate.matrix(self), state, gate.qubits, nqubits)
 
-    def apply_gate_density_matrix(self, gate, state, nqubits):
+    def _apply_gate_density_matrix(self, gate, state, nqubits: int):
         state = self.cast(state)
         state = self.reshape(state, 2 * nqubits * (2,))
         matrix = gate.matrix(self)

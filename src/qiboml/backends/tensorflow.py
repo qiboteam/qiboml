@@ -129,6 +129,68 @@ class TensorflowBackend(Backend):
     ######## Methods related to linear algebra operations                           ########
     ########################################################################################
 
+    def matrix_exp(
+        self,
+        matrix,
+        phase: Union[float, int, complex] = 1,
+        eigenvectors=None,
+        eigenvalues=None,
+    ):
+        if eigenvectors is None or self.is_sparse(matrix):
+            return self.expm(phase * matrix)
+        return super().matrix_exp(matrix, phase, eigenvectors, eigenvalues)
+
+    def matrix_power(
+        self,
+        matrix,
+        power: Union[float, int],
+        precision_singularity: float = 1e-14,
+        dtype=None,
+    ):
+        if not isinstance(power, (float, int)):
+            raise_error(
+                TypeError,
+                f"``power`` must be either float or int, but it is type {type(power)}.",
+            )
+
+        if dtype is None:
+            dtype = self.dtype
+
+        if power < 0.0:
+            # negative powers of singular matrices via SVD
+            determinant = self.det(matrix)
+            if abs(determinant) < precision_singularity:
+                return self._negative_power_singular_matrix(
+                    matrix, power, precision_singularity, dtype
+                )
+
+        return super().matrix_power(matrix, power, precision_singularity)
+
+    def singular_value_decomposition(self, array):
+        # needed to unify order of return
+        s_matrix, u_matrix, v_matrix = self.engine.linalg.svd(array)
+        return u_matrix, s_matrix, self.conj(self.transpose(v_matrix))
+
+    def jacobian(
+        self, circuit, parameters=None, initial_state=None, return_complex: bool = True
+    ):
+        copied = circuit.copy(deep=True)
+
+        # necessary for the tape to properly watch the variables
+        parameters = self.engine.Variable(parameters)
+
+        with self.engine.GradientTape(persistent=return_complex) as tape:
+            copied.set_parameters(parameters)
+            state = self.execute_circuit(copied, initial_state=initial_state).state()
+            real = self.real(state)
+            if return_complex:
+                imag = self.imag(state)
+
+        if return_complex:
+            return tape.jacobian(real, parameters), tape.jacobian(imag, parameters)
+
+        return tape.jacobian(real, parameters)
+
     def zero_state(self, nqubits, density_matrix: bool = False, dtype=None):
         if dtype is None:
             dtype = self.dtype
@@ -149,16 +211,20 @@ class TensorflowBackend(Backend):
     ######## Methods related to circuit execution                                   ########
     ########################################################################################
 
+    def execute_circuit(self, circuit, initial_state=None, nshots=1000):
+        with self.engine.device(self.device):
+            return super().execute_circuit(circuit, initial_state, nshots)
+
+    def execute_circuit_repeated(self, circuit, nshots, initial_state=None):
+        with self.engine.device(self.device):
+            return super().execute_circuit_repeated(circuit, nshots, initial_state)
+
     def matrix(self, gate):
         npmatrix = super().matrix(gate)
         # delete cached matrix if it's symbolic
         if self.engine.is_symbolic_tensor(npmatrix):
             delattr(self.matrices, gate.__class__.__name__)
         return npmatrix
-
-    def matrix_parametrized(self, gate):
-        npmatrix = super().matrix_parametrized(gate)
-        return self.cast(npmatrix, dtype=self.dtype)
 
     def matrix_fused(self, fgate):
         rank = len(fgate.target_qubits)
@@ -201,13 +267,9 @@ class TensorflowBackend(Backend):
 
         return matrix
 
-    def execute_circuit(self, circuit, initial_state=None, nshots=1000):
-        with self.engine.device(self.device):
-            return super().execute_circuit(circuit, initial_state, nshots)
-
-    def execute_circuit_repeated(self, circuit, nshots, initial_state=None):
-        with self.engine.device(self.device):
-            return super().execute_circuit_repeated(circuit, nshots, initial_state)
+    def matrix_parametrized(self, gate):
+        npmatrix = super().matrix_parametrized(gate)
+        return self.cast(npmatrix, dtype=self.dtype)
 
     ########################################################################################
     ######## Methods related to the execution and post-processing of measurements   ########
@@ -244,68 +306,6 @@ class TensorflowBackend(Backend):
             frequencies, res[:, self.engine.newaxis], counts
         )
         return frequencies
-
-    def matrix_exp(
-        self,
-        matrix,
-        phase: Union[float, int, complex] = 1,
-        eigenvectors=None,
-        eigenvalues=None,
-    ):
-        if eigenvectors is None or self.is_sparse(matrix):
-            return self.expm(phase * matrix)
-        return super().matrix_exp(matrix, phase, eigenvectors, eigenvalues)
-
-    def matrix_power(
-        self,
-        matrix,
-        power: Union[float, int],
-        precision_singularity: float = 1e-14,
-        dtype=None,
-    ):
-        if not isinstance(power, (float, int)):
-            raise_error(
-                TypeError,
-                f"``power`` must be either float or int, but it is type {type(power)}.",
-            )
-
-        if dtype is None:
-            dtype = self.dtype
-
-        if power < 0.0:
-            # negative powers of singular matrices via SVD
-            determinant = self.det(matrix)
-            if abs(determinant) < precision_singularity:
-                return self._negative_power_singular_matrix(
-                    matrix, power, precision_singularity, dtype
-                )
-
-        return super().matrix_power(matrix, power, precision_singularity)
-
-    def calculate_singular_value_decomposition(self, matrix):
-        # needed to unify order of return
-        s_matrix, u_matrix, v_matrix = self.engine.linalg.svd(matrix)
-        return u_matrix, s_matrix, self.conj(self.transpose(v_matrix))
-
-    def jacobian(
-        self, circuit, parameters=None, initial_state=None, return_complex: bool = True
-    ):
-        copied = circuit.copy(deep=True)
-
-        # necessary for the tape to properly watch the variables
-        parameters = self.engine.Variable(parameters)
-
-        with self.engine.GradientTape(persistent=return_complex) as tape:
-            copied.set_parameters(parameters)
-            state = self.execute_circuit(copied, initial_state=initial_state).state()
-            real = self.real(state)
-            if return_complex:
-                imag = self.imag(state)
-
-        if return_complex:
-            return tape.jacobian(real, parameters), tape.jacobian(imag, parameters)
-
-        return tape.jacobian(real, parameters)
 
     def _test_regressions(self, name):
         if name == "test_measurementresult_apply_bitflips":
