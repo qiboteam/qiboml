@@ -170,11 +170,20 @@ class PyTorchBackend(Backend):
         size: Optional[Union[int, Tuple[int, ...]]] = None,
         replace: bool = True,
         p=None,
+        seed=None,
     ) -> "ndarray":
         if size is None:
             size = 1
 
+        if seed is not None:
+            local_state = self.default_rng(seed) if isinstance(seed, int) else seed
+
+            indices = local_state.multinomial(p, num_samples=size, replacement=replace)
+    
+            return self.copy(array[indices])
+    
         indices = self.engine.multinomial(p, num_samples=size, replacement=replace)
+
         return self.copy(array[indices])
 
     def transpose(
