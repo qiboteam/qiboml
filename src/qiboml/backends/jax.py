@@ -1,6 +1,7 @@
 """Module defining the Jax backend."""
 
 from functools import partial
+from typing import Optional, Union, Tuple
 
 import jax
 import jax.numpy as jnp  # pylint: disable=import-error
@@ -11,7 +12,7 @@ from qibo.backends.npmatrices import NumpyMatrices
 from qibo.result import CircuitResult, QuantumState
 
 
-@partial(jax.jit, static_argnums=(0, 1))
+@partial(jax.jit, static_argnums=(0, 1, 2))
 def zero_state(nqubits, density_matrix, dtype):
     if density_matrix:
         state = jnp.zeros(2 * (2**nqubits,), dtype=dtype).at[0, 0].set(1)
@@ -113,6 +114,67 @@ class JaxBackend(Backend):
     # TODO: using numpy's rng for now. Shall we use Jax's?
     def set_seed(self, seed):
         np.random.seed(seed)
+
+    def default_rng(self, seed: Optional[int] = None) -> "ndarray":
+        return np.random.default_rng(seed)
+
+    def random_choice(
+        self,
+        array,
+        size: Optional[Union[int, Tuple[int, ...]]] = None,
+        replace: bool = True,
+        p=None,
+        seed=None,
+    ) -> "ndarray":
+        if seed is not None:
+            local_state = self.default_rng(seed) if isinstance(seed, int) else seed
+
+            return local_state.choice(array, size=size, replace=replace, p=p)
+
+        return np.random.choice(array, size=size, replace=replace, p=p)
+
+    def random_integers(
+        self,
+        low: int,
+        high: Optional[int] = None,
+        size: Optional[Union[int, Tuple[int, ...]]] = None,
+        seed=None,
+    ):
+        if high is None:
+            high = low
+            low = 0
+
+        if size is None:
+            size = 1
+
+        if seed is not None:
+            local_state = self.default_rng(seed) if isinstance(seed, int) else seed
+
+            return local_state.integers(low, high, size)
+
+        return np.random.randint(low, high, size)
+
+    def random_sample(self, size: int, seed=None):
+        if seed is not None:
+            local_state = self.default_rng(seed) if isinstance(seed, int) else seed
+
+            return local_state.random(size)
+
+        return np.random.random(size)
+
+    def random_uniform(
+        self,
+        low: Union[float, int] = 0.0,
+        high: Union[float, int] = 1.0,
+        size: Optional[Union[int, Tuple[int, ...]]] = None,
+        seed=None,
+    ) -> "ndarray":
+        if seed is not None:
+            local_state = self.default_rng(seed) if isinstance(seed, int) else seed
+
+            return local_state.uniform(low, high, size)
+
+        return np.random.uniform(low, high, size)
 
     def matrix_fused(self, fgate):
         rank = len(fgate.target_qubits)
