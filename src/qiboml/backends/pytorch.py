@@ -143,7 +143,7 @@ class PyTorchBackend(Backend):
     def copy(self, array, **kwargs) -> "ndarray":
         return self.engine.clone(array, **kwargs)
 
-    def default_rng(self, seed = None):
+    def default_rng(self, seed=None):
         if seed is not None:
             if isinstance(seed, int):
                 default_rng = self.engine.Generator()
@@ -178,13 +178,45 @@ class PyTorchBackend(Backend):
         if seed is not None:
             local_state = self.default_rng(seed) if isinstance(seed, int) else seed
 
-            indices = local_state.multinomial(p, num_samples=size, replacement=replace)
-    
+            indices = self.engine.multinomial(
+                p, num_samples=size, replacement=replace, generator=local_state
+            )
+
             return self.copy(array[indices])
-    
+
         indices = self.engine.multinomial(p, num_samples=size, replacement=replace)
 
         return self.copy(array[indices])
+
+    def random_integers(self, low, high=None, size=None, seed=None):
+        if seed is not None:
+            local_state = self.default_rng(seed) if isinstance(seed, int) else seed
+
+            return self.engine.randint(low, high, size, generator=local_state)
+
+        return self.engine.randint(low, high, size)
+
+    def random_sample(self, size: int, seed=None):
+        if seed is not None:
+            local_state = self.default_rng(seed) if isinstance(seed, int) else seed
+
+            return self.engine.rand(size, generator=local_state)
+
+        return self.engine.rand(size)
+
+    def random_uniform(
+        self,
+        low: Union[float, int] = 0.0,
+        high: Union[float, int] = 1.0,
+        size: Optional[Union[int, Tuple[int, ...]]] = None,
+        seed=None,
+    ):
+        if seed is not None:
+            local_state = self.default_rng(seed) if isinstance(seed, int) else seed
+
+            return low + (high - low) * self.engine.rand(size, generator=local_state)
+
+        return low + (high - low) * self.engine.rand(size)
 
     def transpose(
         self, array, axes: Union[Tuple[int, ...], List[int]] = None
