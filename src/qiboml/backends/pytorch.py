@@ -238,6 +238,11 @@ class PyTorchBackend(Backend):
     ) -> "ndarray":
         return self.engine.permute(array, axes)
 
+    def tril_indices(self, row: int, offset: int = 0, col: Optional[int] = None, **kwargs):
+        if col is None:
+            col = row
+        return self.engine.tril_indices(row, col, offset, **kwargs)
+
     ########################################################################################
     ######## Methods related to linear algebra operations                           ########
     ########################################################################################
