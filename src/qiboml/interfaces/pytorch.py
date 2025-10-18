@@ -87,7 +87,7 @@ class QuantumModel(torch.nn.Module):
         params = utils.get_params_from_circuit_structure(
             self.circuit_structure,
         )
-        params = torch.as_tensor(self.backend.to_numpy(x=params)).ravel()
+        params = torch.as_tensor(self.backend.to_numpy(params)).ravel()
 
         if self.parameters_initialization is not None:
             if callable(self.parameters_initialization):
@@ -231,7 +231,7 @@ class QuantumModelAutoGrad(torch.autograd.Function):
             ]
         )
         # convert the parameters to backend native arrays
-        dtype = getattr(decoding.backend.np, str(parameters.dtype).split(".")[-1])
+        dtype = getattr(decoding.backend.engine, str(parameters.dtype).split(".")[-1])
         angles = decoding.backend.cast(
             angles.detach().cpu().clone().numpy(), dtype=dtype
         )

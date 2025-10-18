@@ -57,7 +57,7 @@ class Mitigator:
         self._mitigation_map_initial_popt = self.backend.cast(defaults, dtype="double")
         self._mitigation_map_popt = self.backend.cast(defaults, dtype="double")
         self._mitigation_function = getattr(error_mitigation, self._mitigation_method)
-        self._simulation_backend = CliffordBackend(engine="numpy")
+        self._simulation_backend = CliffordBackend(platform="numpy")
         self._reference_circuit = None
         self._reference_value = None
         self._training_data = None
@@ -113,7 +113,7 @@ class Mitigator:
         Returns:
             bool: ``True`` if the map is reliable, ``False`` if not.
         """
-        mitigated_ref_value = self.__call__(noisy_reference_value)
+        mitigated_ref_value = self(noisy_reference_value)
         if abs(mitigated_ref_value - self._reference_value) > self._threshold:
             return False
         return True
