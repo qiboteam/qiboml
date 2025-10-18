@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 import torch
 from qibo import Circuit, gates, hamiltonians
+from qibo.backends import NumpyBackend
 from qibo.models.encodings import comp_basis_encoder
 from qibo.quantum_info import random_clifford
 from qibo.symbols import X, Z
@@ -15,7 +16,7 @@ def test_probabilities_layer(backend):
     nqubits = 5
     qubits = np.random.choice(range(nqubits), size=(4,), replace=False)
     layer = dec.Probabilities(nqubits, qubits=qubits, backend=backend)
-    circuit = random_clifford(nqubits, backend=backend)
+    circuit = random_clifford(nqubits, backend=NumpyBackend())
     backend.assert_allclose(
         layer(circuit).ravel(), backend.execute_circuit(circuit).probabilities(qubits)
     )
@@ -25,7 +26,9 @@ def test_probabilities_layer(backend):
 def test_state_layer(backend, density_matrix):
     nqubits = 5
     layer = dec.State(nqubits, density_matrix=density_matrix, backend=backend)
-    circuit = random_clifford(nqubits, density_matrix=density_matrix, backend=backend)
+    circuit = random_clifford(
+        nqubits, density_matrix=density_matrix, backend=NumpyBackend()
+    )
     real, im = layer(circuit)
     backend.assert_allclose(
         (real + 1j * im).ravel(), backend.execute_circuit(circuit).state().ravel()
@@ -42,7 +45,7 @@ def test_expectation_layer(backend, nshots, observable):
     rng = np.random.default_rng(42)
     nqubits = 5
 
-    c = comp_basis_encoder("1" * 5)
+    circuit = comp_basis_encoder("1" * 5)
 
     if observable is not None:
         observable = observable(nqubits, 0.1, False, backend)
@@ -52,13 +55,13 @@ def test_expectation_layer(backend, nshots, observable):
         nshots=nshots,
         backend=backend,
     )
-    layer_expv = layer(c)
+    layer_expv = layer(circuit)
     if observable is None:
         observable = hamiltonians.Z(nqubits, dense=False, backend=backend)
     expv = (
-        observable.expectation(backend.execute_circuit(c).state())
+        observable.expectation(backend.execute_circuit(circuit).state())
         if nshots is None
-        else observable.expectation_from_circuit(c, nshots=nshots)
+        else observable.expectation_from_circuit(circuit, nshots=nshots)
     )
     atol = 1e-8 if nshots is None else 1e-2
     backend.assert_allclose(layer_expv, expv, atol=atol)
