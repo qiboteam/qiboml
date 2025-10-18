@@ -188,10 +188,21 @@ class PyTorchBackend(Backend):
 
         return self.copy(array[indices])
 
-    def random_integers(self, low, high=None, size=None, seed=None):
+    def random_integers(
+        self,
+        low: int,
+        high: Optional[int] = None,
+        size: Optional[Union[int, Tuple[int, ...]]] = None,
+        seed=None,
+    ):
         if high is None:
             high = low
             low = 0
+
+        if size is None:
+            size = (1,)
+        elif isinstance(size, int):
+            size = (size,)
 
         if seed is not None:
             local_state = self.default_rng(seed) if isinstance(seed, int) else seed
@@ -200,7 +211,7 @@ class PyTorchBackend(Backend):
 
         return self.engine.randint(low, high, size)
 
-    def random_sample(self, size: int, seed=None):
+    def random_sample(self, size: Union[int, ], seed=None):
         if seed is not None:
             local_state = self.default_rng(seed) if isinstance(seed, int) else seed
 
