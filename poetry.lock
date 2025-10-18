@@ -4274,7 +4274,7 @@ qulacs = ["qulacs (>=0.6.4,<0.7.0) ; python_version < \"3.13\""]
 type = "git"
 url = "https://github.com/qiboteam/qibo"
 reference = "backends"
-resolved_reference = "0687b6d828895d809f3f73341d8a0c5cd68da3fd"
+resolved_reference = "d261b8e1d10c57d10b9cef76043f194fc2b0f003"
 
 [[package]]
 name = "qibocal"
