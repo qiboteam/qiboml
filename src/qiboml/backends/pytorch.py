@@ -7,6 +7,7 @@ from qibo import __version__
 from qibo.backends.abstract import Backend
 from qibo.backends.npmatrices import NumpyMatrices
 from qibo.config import raise_error
+from qibo.result import CircuitResult, QuantumState
 
 
 class TorchMatrices(NumpyMatrices):
@@ -367,6 +368,20 @@ class PyTorchBackend(Backend):
         _matrix = _matrix(*gate.parameters)
 
         return _matrix
+
+    ########################################################################################
+    ######## Helper methods for testing                                             ########
+    ########################################################################################
+
+    def assert_allclose(
+        self, value, target, rtol: float = 1e-7, atol: float = 0.0
+    ):  # pragma: no cover
+        if isinstance(value, (CircuitResult, QuantumState)):
+            value = value.state()
+        if isinstance(target, (CircuitResult, QuantumState)):
+            target = target.state()
+
+        self.engine.testing.assert_close(value, target, rtol=rtol, atol=atol)
 
     ########################################################################################
     ######## Helper methods                                                         ########
