@@ -20,7 +20,7 @@ from qiboml.interfaces import utils
 from qiboml.interfaces.circuit_tracer import CircuitTracer
 from qiboml.models.decoding import QuantumDecoding
 from qiboml.models.encoding import QuantumEncoding
-from qiboml.operations.differentiation import PSR, Differentiation, Jax
+from qiboml.operations import PSR, Differentiation, Jax
 
 DEFAULT_DIFFERENTIATION = {
     "qiboml-pytorch": Jax,
