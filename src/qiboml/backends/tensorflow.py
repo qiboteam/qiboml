@@ -166,7 +166,7 @@ class TensorflowBackend(Backend):
         return self.engine.math.reduce_sum(array, axis, **kwargs)
 
     def trace(self, array) -> Union[int, float]:
-        return self.engine.math.trace(array)
+        return self.engine.linalg.trace(array)
 
     def vector_norm(self, state, order: Union[int, float, str] = 2, dtype=None):
         if dtype is None:
