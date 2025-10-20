@@ -72,22 +72,22 @@ def test_expectation_layer(backend, nshots, observable):
 def test_decoding_with_transpiler(backend):
     rng = np.random.default_rng(42)
     backend.set_seed(42)
-    c = random_clifford(3, seed=rng, backend=backend)
+    circuit = random_clifford(3, seed=rng, backend=backend)
     transpiler = Passes(
         connectivity=[[0, 1], [0, 2]], passes=[Unroller(NativeGates.default(), Sabre())]
     )
     layer = dec.Probabilities(3, transpiler=transpiler, backend=backend)
     backend.assert_allclose(
-        backend.execute_circuit(c).probabilities(), layer(c).ravel()
+        backend.execute_circuit(circuit).probabilities(), layer(circuit).ravel()
     )
 
 
 def test_decoding_wire_names(backend):
-    c = Circuit(3)
+    circuit = Circuit(3)
     wire_names = ["a", "b", "c"]
     layer = dec.Probabilities(3, wire_names=wire_names, backend=backend)
-    layer(c)
-    assert c.wire_names == wire_names
+    layer(circuit)
+    assert circuit.wire_names == wire_names
     assert list(layer.wire_names) == wire_names
     assert layer.circuit.wire_names == wire_names
 

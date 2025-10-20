@@ -687,15 +687,15 @@ def test_equivariant(backend, frontend):
 
     # this defines 3 independent parameters
     def custom_circuit(th, phi, lam):
-        c = Circuit(2)
+        circuit = Circuit(2)
         delta = 2 * engine.cos(phi) + lam**2
         gamma = lam * engine.exp(th / 2)
-        c.add([gates.RZ(i, theta=th) for i in range(2)])
-        c.add([gates.RX(i, theta=lam) for i in range(2)])
-        c.add([gates.RY(i, theta=phi) for i in range(2)])
-        c.add(gates.RZ(0, theta=delta))
-        c.add(gates.RX(1, theta=gamma))
-        return c
+        circuit.add([gates.RZ(i, theta=th) for i in range(2)])
+        circuit.add([gates.RX(i, theta=lam) for i in range(2)])
+        circuit.add([gates.RY(i, theta=phi) for i in range(2)])
+        circuit.add(gates.RZ(0, theta=delta))
+        circuit.add(gates.RX(1, theta=gamma))
+        return circuit
 
     # these are 4 independent parameters
     nqubits = 2
