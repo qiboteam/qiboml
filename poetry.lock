@@ -4724,7 +4724,7 @@ description = "A tensor-network translation module for Qibo"
 optional = false
 python-versions = ">=3.11,<3.14"
 groups = ["tests"]
-markers = "(sys_platform == \"linux\" or sys_platform == \"darwin\" or sys_platform != \"linux\" and sys_platform != \"darwin\") and python_version >= \"3.11\""
+markers = "(sys_platform == \"linux\" or sys_platform == \"darwin\") and python_version >= \"3.11\""
 files = []
 develop = false
 
@@ -6419,4 +6419,4 @@ torch = ["torch"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.14"
-content-hash = "43204832fef477feeb131702ce0b5501dcde12d567d4dd7bc3fa5671fbf91a8e"
+content-hash = "7e3c79b96c8239de2a3edf5e8968b75795fe6a52dad4225cbc6181be6b4a6570"
