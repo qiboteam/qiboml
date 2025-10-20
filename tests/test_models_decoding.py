@@ -103,7 +103,7 @@ def test_vqls_solver_basic(backend):
     solver = dec.VariationalQuantumLinearSolver(
         nqubits=nqubits,
         target_state=target_state,
-        A=A,
+        a_matrix=A,
         backend=backend,
     )
 
