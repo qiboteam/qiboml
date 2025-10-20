@@ -4738,7 +4738,7 @@ qmatchatea = ["qiskit (>=1.4.0,<2.0.0)", "qmatchatea (>=1.4.3,<2.0.0)", "qtealea
 
 [package.source]
 type = "git"
-url = "ssh://git@github.com/qiboteam/qibotn.git"
+url = "https://github.com/qiboteam/qibotn"
 reference = "expectation"
 resolved_reference = "451470f1cb9f58370d9711e9cce269bdf1567e01"
 
@@ -6419,4 +6419,4 @@ torch = ["torch"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.14"
-content-hash = "7e3c79b96c8239de2a3edf5e8968b75795fe6a52dad4225cbc6181be6b4a6570"
+content-hash = "9b97fbcb74e3b345bb389910c2656bf0e55319435827667257f7b6b02e74db96"
