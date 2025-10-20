@@ -1,19 +1,21 @@
 """Module defining the Jax backend."""
 
 from functools import partial
-from typing import Optional, Union, Tuple
+from typing import List, Optional, Union, Tuple
 
 import jax  # pylint: disable=import-error
 import jax.numpy as jnp  # pylint: disable=import-error
 import numpy as np
+from numpy.typing import ArrayLike
 from qibo import __version__
 from qibo.backends import Backend, einsum_utils
 from qibo.backends.npmatrices import NumpyMatrices
+from qibo.gates.abstract import Gate
 from qibo.result import CircuitResult, QuantumState
 
 
 @partial(jax.jit, static_argnums=(0, 1, 2))
-def zero_state(nqubits, density_matrix, dtype):
+def zero_state(nqubits: int, density_matrix: bool, dtype) -> ArrayLike:
     if density_matrix:
         state = jnp.zeros(2 * (2**nqubits,), dtype=dtype).at[0, 0].set(1)
     else:
@@ -22,12 +24,17 @@ def zero_state(nqubits, density_matrix, dtype):
 
 
 @partial(jax.jit, static_argnames={"dtype"})
-def cast_matrix(x, dtype):
-    return jnp.asarray(x, dtype=dtype)
+def cast_matrix(array: ArrayLike, dtype) -> ArrayLike:
+    return jnp.asarray(array, dtype=dtype)
 
 
 @partial(jax.jit, static_argnums=(2, 3))
-def _apply_gate(matrix, state, qubits, nqubits):
+def _apply_gate(
+    matrix: ArrayLike,
+    state: ArrayLike,
+    qubits: Union[Tuple[int, ...], List[int]],
+    nqubits: int,
+) -> ArrayLike:
     state = jnp.reshape(state, nqubits * (2,))
     matrix = jnp.reshape(matrix, 2 * len(qubits) * (2,))
     opstring = einsum_utils.apply_gate_string(qubits, nqubits)
@@ -37,8 +44,14 @@ def _apply_gate(matrix, state, qubits, nqubits):
 
 @partial(jax.jit, static_argnums=(4, 5, 6))
 def _apply_gate_controlled(
-    matrix, state, order, targets, control_qubits, target_qubits, nqubits
-):
+    matrix: ArrayLike,
+    state: ArrayLike,
+    order: Tuple[int, ...],
+    targets: Tuple[int, ...],
+    control_qubits: Tuple[int, ...],
+    target_qubits: Tuple[int, ...],
+    nqubits: int,
+) -> ArrayLike:
     state = jnp.reshape(state, nqubits * (2,))
     matrix = jnp.reshape(matrix, 2 * len(target_qubits) * (2,))
     ncontrol = len(control_qubits)
@@ -65,8 +78,8 @@ class JaxMatrices(NumpyMatrices):
         self.np = jnp
         self.dtype = dtype
 
-    def _cast(self, x, dtype):
-        return cast_matrix(x, dtype)
+    def _cast(self, array: ArrayLike, dtype) -> ArrayLike:
+        return cast_matrix(array, dtype)
 
 
 class JaxBackend(Backend):
@@ -92,7 +105,7 @@ class JaxBackend(Backend):
         self.platform = "jax"
         self.tensor_types = (self.engine.ndarray,)
 
-    def cast(self, array, dtype=None, copy=False):
+    def cast(self, array: ArrayLike, dtype=None, copy: bool = False) -> ArrayLike:
         if dtype is None:
             dtype = self.dtype
 
@@ -104,7 +117,7 @@ class JaxBackend(Backend):
 
         return self.engine.array(array, dtype=dtype, copy=copy)
 
-    def to_numpy(self, array):
+    def to_numpy(self, array: ArrayLike) -> ArrayLike:
 
         if isinstance(array, (list, tuple)):
             return np.asarray([self.to_numpy(elem) for elem in array])
@@ -112,20 +125,20 @@ class JaxBackend(Backend):
         return np.asarray(array)
 
     # TODO: using numpy's rng for now. Shall we use Jax's?
-    def set_seed(self, seed):
+    def set_seed(self, seed: int) -> None:
         np.random.seed(seed)
 
-    def default_rng(self, seed: Optional[int] = None) -> "ndarray":
+    def default_rng(self, seed: Optional[int] = None) -> None:
         return np.random.default_rng(seed)
 
     def random_choice(
         self,
-        array,
+        array: ArrayLike,
         size: Optional[Union[int, Tuple[int, ...]]] = None,
         replace: bool = True,
-        p=None,
+        p: ArrayLike = None,
         seed=None,
-    ) -> "ndarray":
+    ) -> ArrayLike:
         if seed is not None:
             local_state = self.default_rng(seed) if isinstance(seed, int) else seed
 
@@ -139,7 +152,7 @@ class JaxBackend(Backend):
         high: Optional[int] = None,
         size: Optional[Union[int, Tuple[int, ...]]] = None,
         seed=None,
-    ):
+    ) -> ArrayLike:
         if high is None:
             high = low
             low = 0
@@ -154,7 +167,7 @@ class JaxBackend(Backend):
 
         return np.random.randint(low, high, size)
 
-    def random_sample(self, size: int, seed=None):
+    def random_sample(self, size: int, seed=None) -> ArrayLike:
         if seed is not None:
             local_state = self.default_rng(seed) if isinstance(seed, int) else seed
 
@@ -168,7 +181,7 @@ class JaxBackend(Backend):
         high: Union[float, int] = 1.0,
         size: Optional[Union[int, Tuple[int, ...]]] = None,
         seed=None,
-    ) -> "ndarray":
+    ) -> ArrayLike:
         if seed is not None:
             local_state = self.default_rng(seed) if isinstance(seed, int) else seed
 
@@ -176,7 +189,7 @@ class JaxBackend(Backend):
 
         return np.random.uniform(low, high, size)
 
-    def matrix_fused(self, fgate):
+    def matrix_fused(self, fgate: Gate) -> ArrayLike:
         rank = len(fgate.target_qubits)
         # jax only supports coo sparse arrays
         # however they are probably not as efficient as csr ones
@@ -211,25 +224,29 @@ class JaxBackend(Backend):
 
         return matrix
 
-    def zero_state(self, nqubits: int, density_matrix: bool = False, dtype=None):
+    def zero_state(
+        self, nqubits: int, density_matrix: bool = False, dtype=None
+    ) -> ArrayLike:
         if dtype is None:
             dtype = self.dtype
 
         return zero_state(nqubits, density_matrix, dtype)
 
-    def update_frequencies(self, frequencies, probabilities, nsamples):
+    def update_frequencies(
+        self, frequencies: ArrayLike, probabilities: ArrayLike, nsamples: int
+    ) -> ArrayLike:
         samples = self.sample_shots(probabilities, nsamples)
         res, counts = self.unique(samples, return_counts=True)
         frequencies = frequencies.at[res].add(counts)
         return frequencies
 
-    def matrix(self, gate):
+    def matrix(self, gate: Gate) -> ArrayLike:
         matrix = super().matrix(gate)
         if isinstance(matrix, self.jax.core.Tracer):
             delattr(self.matrices, gate.__class__.__name__)
         return matrix
 
-    def apply_gate(self, gate, state, nqubits):
+    def apply_gate(self, gate: Gate, state: ArrayLike, nqubits: int) -> ArrayLike:
         density_matrix = bool(len(state.shape) == 2)
 
         if density_matrix:
@@ -251,7 +268,7 @@ class JaxBackend(Backend):
 
     def assert_allclose(
         self, value, target, rtol: float = 1e-7, atol: float = 0.0
-    ):  # pragma: no cover
+    ) -> None:  # pragma: no cover
         if isinstance(value, (CircuitResult, QuantumState)):
             value = value.state()
         if isinstance(target, (CircuitResult, QuantumState)):
@@ -259,7 +276,9 @@ class JaxBackend(Backend):
 
         np.testing.assert_allclose(value, target, rtol=rtol, atol=atol)
 
-    def _apply_gate_density_matrix(self, gate, state, nqubits: int):
+    def _apply_gate_density_matrix(
+        self, gate: Gate, state: ArrayLike, nqubits: int
+    ) -> ArrayLike:
         state = self.cast(state)
         state = self.reshape(state, 2 * nqubits * (2,))
         matrix = gate.matrix(self)

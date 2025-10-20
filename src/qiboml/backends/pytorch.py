@@ -3,9 +3,11 @@
 from typing import List, Optional, Tuple, Union
 
 import numpy as np
-from qibo import __version__
+from numpy.typing import ArrayLike
+from qibo import Circuit, __version__
 from qibo.backends.abstract import Backend
 from qibo.backends.npmatrices import NumpyMatrices
+from qibo.gates.abstract import Gate
 from qibo.config import raise_error
 from qibo.result import CircuitResult, QuantumState
 
@@ -25,19 +27,22 @@ class TorchMatrices(NumpyMatrices):
         self.dtype = dtype
         self.device = device
 
-    def _cast(self, x, dtype, device=None):
+    def _cast(self, array: ArrayLike, dtype, device: Optional[str] = None):
         if device is None:
             device = self.device
-        flattened = [item for sublist in x for item in sublist]
-        tensor_list = [
-            self.engine.as_tensor(i, dtype=dtype, device=device) for i in flattened
-        ]
-        return self.engine.stack(tensor_list).reshape(len(x), len(x))
 
-    def I(self, n=2):
+        flattened = [item for sublist in array for item in sublist]
+        tensor_list = [
+            self.engine.as_tensor(elem, dtype=dtype, device=device)
+            for elem in flattened
+        ]
+
+        return self.engine.stack(tensor_list).reshape(len(array), len(array))
+
+    def I(self, n: int = 2):
         return self.engine.eye(n, dtype=self.dtype, device=self.device)
 
-    def Unitary(self, u):
+    def Unitary(self, u: ArrayLike):
         return self._cast(u, dtype=self.dtype, device=self.device)
 
 
@@ -74,11 +79,11 @@ class PyTorchBackend(Backend):
 
     def cast(
         self,
-        array,
+        array: ArrayLike,
         dtype=None,
         copy: bool = False,
-        device=None,
-    ):
+        device: Optional[str] = None,
+    ) -> ArrayLike:
         """Casts input as a Torch tensor of the specified dtype.
 
         This method supports casting of single tensors or lists of tensors
@@ -115,16 +120,16 @@ class PyTorchBackend(Backend):
 
         return array.to(device)
 
-    def is_sparse(self, array):
+    def is_sparse(self, array: ArrayLike) -> bool:
         if isinstance(array, self.engine.Tensor):
             return array.is_sparse
 
         return super().is_sparse(array)
 
-    def set_device(self, device):  # pragma: no cover
+    def set_device(self, device: str) -> None:  # pragma: no cover
         self.device = "cpu" if "CPU" in device else device
 
-    def set_seed(self, seed):
+    def set_seed(self, seed) -> None:
         self.engine.manual_seed(seed)
         np.random.seed(seed)
 
@@ -136,7 +141,7 @@ class PyTorchBackend(Backend):
         """
         self.engine.set_num_threads(nthreads)
 
-    def to_numpy(self, array):
+    def to_numpy(self, array: ArrayLike) -> ArrayLike:
         if isinstance(array, list):
             return np.asarray([self.to_numpy(i) for i in array])
 
@@ -149,10 +154,10 @@ class PyTorchBackend(Backend):
     ######## Methods related to array manipulation                                  ########
     ########################################################################################
 
-    def copy(self, array, **kwargs) -> "ndarray":
+    def copy(self, array: ArrayLike, **kwargs) -> ArrayLike:
         return self.engine.clone(array, **kwargs)
 
-    def default_rng(self, seed=None):
+    def default_rng(self, seed: Optional[int] = None):
         if seed is not None:
             if isinstance(seed, int):
                 default_rng = self.engine.Generator()
@@ -164,23 +169,25 @@ class PyTorchBackend(Backend):
 
         return default_rng
 
-    def expand_dims(self, array, axis: Union[int, Tuple[int, ...]]) -> "ndarray":
+    def expand_dims(
+        self, array: ArrayLike, axis: Union[int, Tuple[int, ...]]
+    ) -> ArrayLike:
         return self.engine.unsqueeze(array, axis)
 
-    def expm(self, array) -> "ndarray":
+    def expm(self, array: ArrayLike) -> ArrayLike:
         return self.engine.linalg.matrix_exp(array)  # pylint: disable=not-callable
 
-    def flatnonzero(self, array) -> "ndarray":
+    def flatnonzero(self, array: ArrayLike) -> ArrayLike:
         return self.engine.nonzero(array).flatten()
 
     def random_choice(
         self,
-        array,
+        array: ArrayLike,
         size: Optional[Union[int, Tuple[int, ...]]] = None,
         replace: bool = True,
-        p=None,
+        p: ArrayLike = None,
         seed=None,
-    ) -> "ndarray":
+    ) -> ArrayLike:
         if size is None:
             size = 1
 
@@ -203,7 +210,7 @@ class PyTorchBackend(Backend):
         high: Optional[int] = None,
         size: Optional[Union[int, Tuple[int, ...]]] = None,
         seed=None,
-    ):
+    ) -> ArrayLike:
         if high is None:
             high = low
             low = 0
@@ -220,7 +227,7 @@ class PyTorchBackend(Backend):
 
         return self.engine.randint(low, high, size)
 
-    def random_sample(self, size: Union[int, ], seed=None):
+    def random_sample(self, size: Union[int, Tuple[int, ...]], seed=None) -> ArrayLike:
         if seed is not None:
             local_state = self.default_rng(seed) if isinstance(seed, int) else seed
 
@@ -234,7 +241,7 @@ class PyTorchBackend(Backend):
         high: Union[float, int] = 1.0,
         size: Optional[Union[int, Tuple[int, ...]]] = None,
         seed=None,
-    ):
+    ) -> ArrayLike:
         if seed is not None:
             local_state = self.default_rng(seed) if isinstance(seed, int) else seed
 
@@ -243,11 +250,13 @@ class PyTorchBackend(Backend):
         return low + (high - low) * self.engine.rand(size)
 
     def transpose(
-        self, array, axes: Union[Tuple[int, ...], List[int]] = None
-    ) -> "ndarray":
+        self, array: ArrayLike, axes: Union[Tuple[int, ...], List[int]] = None
+    ) -> ArrayLike:
         return self.engine.permute(array, axes)
 
-    def tril_indices(self, row: int, offset: int = 0, col: Optional[int] = None, **kwargs):
+    def tril_indices(
+        self, row: int, offset: int = 0, col: Optional[int] = None, **kwargs
+    ) -> ArrayLike:
         if col is None:
             col = row
         return self.engine.tril_indices(row, col, offset, **kwargs)
@@ -256,19 +265,27 @@ class PyTorchBackend(Backend):
     ######## Methods related to linear algebra operations                           ########
     ########################################################################################
 
-    def eigenvalues(self, matrix, k: int = 6, hermitian: bool = True):
+    def eigenvalues(
+        self, matrix: ArrayLike, k: int = 6, hermitian: bool = True
+    ) -> ArrayLike:
         if hermitian:
             return self.eigvalsh(matrix)  # pylint: disable=not-callable
         return self.eigvals(matrix)  # pylint: disable=not-callable
 
-    def eigenvectors(self, matrix, k: int = 6, hermitian: int = True):
+    def eigenvectors(
+        self, matrix: ArrayLike, k: int = 6, hermitian: int = True
+    ) -> ArrayLike:
         if hermitian:
             return self.eigh(matrix)  # pylint: disable=not-callable
         return self.eig(matrix)  # pylint: disable=not-callable
 
     def jacobian(
-        self, circuit, parameters=None, initial_state=None, return_complex: bool = True
-    ):
+        self,
+        circuit: Circuit,
+        parameters: ArrayLike = None,
+        initial_state: ArrayLike = None,
+        return_complex: bool = True,
+    ) -> ArrayLike:
         copied = circuit.copy(deep=True)
 
         def func(parameters):
@@ -283,11 +300,11 @@ class PyTorchBackend(Backend):
 
     def matrix_power(
         self,
-        matrix,
+        matrix: ArrayLike,
         power: Union[float, int],
         precision_singularity: float = 1e-14,
         dtype=None,
-    ):
+    ) -> ArrayLike:
         if not isinstance(power, (float, int)):
             raise_error(
                 TypeError,
@@ -306,7 +323,7 @@ class PyTorchBackend(Backend):
     ######## Methods related to circuit execution                                   ########
     ########################################################################################
 
-    def matrix_fused(self, fgate):
+    def matrix_fused(self, fgate: Gate) -> ArrayLike:
         rank = len(fgate.target_qubits)
         matrix = self.identity(2**rank, dtype=self.dtype)
         if self.engine.backends.mkl.is_available():
@@ -346,7 +363,7 @@ class PyTorchBackend(Backend):
             return matrix.to_dense()
         return matrix
 
-    def matrix_parametrized(self, gate):
+    def matrix_parametrized(self, gate: Gate) -> ArrayLike:
         """Convert a parametrized gate to its matrix representation in the computational basis."""
         name = gate.__class__.__name__
         _matrix = getattr(self.matrices, name)
@@ -383,7 +400,7 @@ class PyTorchBackend(Backend):
 
     def assert_allclose(
         self, value, target, rtol: float = 1e-7, atol: float = 0.0
-    ):  # pragma: no cover
+    ) -> None:  # pragma: no cover
         if isinstance(value, (CircuitResult, QuantumState)):
             value = value.state()
         if isinstance(target, (CircuitResult, QuantumState)):
@@ -395,27 +412,33 @@ class PyTorchBackend(Backend):
     ######## Helper methods                                                         ########
     ########################################################################################
 
-    def _cast_parameter(self, x, trainable):
+    def _cast_parameter(
+        self, param: Union[ArrayLike, float, int], trainable: bool
+    ) -> ArrayLike:
         """Cast a gate parameter to a torch tensor.
 
         Args:
-            x (Union[int, float, complex]): Parameter to be casted.
+            array (Union[int, float, complex]): Parameter to be casted.
             trainable (bool): If ``True``, the tensor requires gradient.
         """
-        if isinstance(x, int) and trainable:
-            return self.engine.tensor(x, dtype=self.parameter_dtype, requires_grad=True)
-        if isinstance(x, float):
+        if isinstance(param, int) and trainable:
             return self.engine.tensor(
-                x,
+                param, dtype=self.parameter_dtype, requires_grad=True
+            )
+        if isinstance(param, float):
+            return self.engine.tensor(
+                param,
                 dtype=self.parameter_dtype,
                 requires_grad=trainable,
                 device=self.device,
             )
         return self.engine.tensor(
-            x, dtype=self.dtype, requires_grad=trainable, device=self.device
+            param, dtype=self.dtype, requires_grad=trainable, device=self.device
         )
 
-    def _order_probabilities(self, probs, qubits, nqubits):
+    def _order_probabilities(
+        self, probs: ArrayLike, qubits: Tuple[int, ...], nqubits: int
+    ) -> ArrayLike:
         """Arrange probabilities according to the given ``qubits`` ordering."""
         if probs.dim() == 0:  # pragma: no cover
             return probs

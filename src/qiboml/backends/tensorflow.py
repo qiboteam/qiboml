@@ -5,10 +5,12 @@ from collections import Counter
 from typing import Optional, Tuple, Union
 
 import numpy as np
-from qibo import __version__
+from numpy.typing import ArrayLike
+from qibo import Circuit, __version__
 from qibo.backends import Backend
 from qibo.backends.npmatrices import NumpyMatrices
 from qibo.config import TF_LOG_LEVEL, log, raise_error
+from qibo.gates.abstract import Gate
 from qibo.result import CircuitResult, QuantumState
 
 
@@ -21,10 +23,10 @@ class TensorflowMatrices(NumpyMatrices):
 
         self.engine = tf
 
-    def _cast(self, x, dtype):
-        return self.engine.cast(x, dtype=dtype)
+    def _cast(self, array, dtype) -> ArrayLike:
+        return self.engine.cast(array, dtype=dtype)
 
-    def Unitary(self, u):
+    def Unitary(self, u: ArrayLike) -> ArrayLike:
         return self._cast(u, dtype=self.dtype)
 
 
@@ -64,7 +66,7 @@ class TensorflowBackend(Backend):
         elif cpu_devices:
             self.device = cpu_devices[0].name
 
-    def cast(self, array, dtype=None, copy=False):
+    def cast(self, array: ArrayLike, dtype=None, copy: bool = False) -> ArrayLike:
         if dtype is None:
             dtype = self.dtype
 
@@ -78,17 +80,17 @@ class TensorflowBackend(Backend):
     def compile(self, func):
         return self.engine.function(func)
 
-    def is_sparse(self, array):
+    def is_sparse(self, array: ArrayLike) -> bool:
         return isinstance(array, self.engine.sparse.SparseTensor)
 
-    def set_device(self, device):  # pragma: no cover
+    def set_device(self, device: str) -> None:  # pragma: no cover
         self.device = device
 
     def set_seed(self, seed: Union[int, None]) -> None:
         """Set the seed of the random number generator. Works in-place."""
         self.engine.random.set_seed(seed)
 
-    def set_threads(self, nthreads):
+    def set_threads(self, nthreads: int) -> None:
         log.warning(
             "`set_threads` is not supported by the tensorflow "
             "backend. Please use tensorflow's thread setters: "
@@ -97,20 +99,20 @@ class TensorflowBackend(Backend):
             "to switch the number of threads."
         )
 
-    def to_numpy(self, array):
+    def to_numpy(self, array: ArrayLike) -> ArrayLike:
         return np.array(array)
 
     ########################################################################################
     ######## Methods related to array manipulation                                  ########
     ########################################################################################
 
-    def all(self, array, **kwargs) -> Union["ndarray", bool]:
+    def all(self, array: ArrayLike, **kwargs) -> Union[ArrayLike, bool]:
         return self.engine.reduce_all(array, **kwargs)
 
-    def conj(self, array) -> "ndarray":
+    def conj(self, array: ArrayLike) -> ArrayLike:
         return self.engine.math.conj(array)
 
-    def copy(self, array, **kwargs):
+    def copy(self, array: ArrayLike, **kwargs) -> ArrayLike:
         return self.engine.identity(array, **kwargs)
 
     def default_rng(self, seed: Optional[int] = None):
@@ -119,25 +121,27 @@ class TensorflowBackend(Backend):
 
         return self.engine.random.Generator.from_seed(seed)
 
-    def flatnonzero(self, array):
+    def flatnonzero(self, array: ArrayLike) -> ArrayLike:
         return np.flatnonzero(array)
 
-    def imag(self, array) -> Union[int, float, "ndarray"]:
+    def imag(self, array: ArrayLike) -> Union[int, float, ArrayLike]:
         return self.engine.math.imag(array)
 
-    def kron(self, array_1, array_2) -> "ndarray":
+    def kron(self, array_1: ArrayLike, array_2: ArrayLike) -> ArrayLike:
         return self.engine.experimental.numpy.kron(array_1, array_2)
 
-    def log(self, array, **kwargs) -> "ndarray":
+    def log(self, array: ArrayLike, **kwargs) -> ArrayLike:
         return self.engine.math.log(array, **kwargs)
 
-    def log2(self, array, **kwargs) -> "ndarray":
+    def log2(self, array: ArrayLike, **kwargs) -> ArrayLike:
         return self.engine.math.log(array, **kwargs) / self.engine.math.log(2)
 
-    def log10(self, array, **kwargs) -> "ndarray":
+    def log10(self, array: ArrayLike, **kwargs) -> ArrayLike:
         return self.engine.math.log(array, **kwargs) / self.engine.math.log(10)
 
-    def matrix_norm(self, state, order: Union[int, float, str] = "nuc", **kwargs):
+    def matrix_norm(
+        self, state: ArrayLike, order: Union[int, float, str] = "nuc", **kwargs
+    ) -> Union[ArrayLike, float, int]:
         state = self.cast(state, dtype=state.dtype)
         if order == "nuc":
             return self.trace(state)
@@ -149,7 +153,7 @@ class TensorflowBackend(Backend):
         high: Union[float, int] = 1.0,
         size: Optional[Union[int, Tuple[int, ...]]] = None,
         seed=None,
-    ):
+    ) -> ArrayLike:
         shape = (size,) if isinstance(size, int) else size
 
         if seed is not None:
@@ -159,16 +163,18 @@ class TensorflowBackend(Backend):
 
         return self.engine.random.uniform(shape=shape, minval=low, maxval=high)
 
-    def real(self, array):
+    def real(self, array: ArrayLike) -> ArrayLike:
         return self.engine.math.real(array)
 
-    def sum(self, array, axis=None, **kwargs) -> "ndarray":
+    def sum(self, array: ArrayLike, axis=None, **kwargs) -> ArrayLike:
         return self.engine.math.reduce_sum(array, axis, **kwargs)
 
-    def trace(self, array) -> Union[int, float]:
+    def trace(self, array: ArrayLike) -> Union[int, float]:
         return self.engine.linalg.trace(array)
 
-    def vector_norm(self, state, order: Union[int, float, str] = 2, dtype=None):
+    def vector_norm(
+        self, state: ArrayLike, order: Union[int, float, str] = 2, dtype=None
+    ) -> Union[ArrayLike, float, int]:
         if dtype is None:
             dtype = self.dtype
 
@@ -176,7 +182,7 @@ class TensorflowBackend(Backend):
 
         return self.engine.norm(state, ord=order)
 
-    def vstack(self, arrays, **kwargs) -> "ndarray":
+    def vstack(self, arrays: ArrayLike, **kwargs) -> ArrayLike:
         return self.engine.stack(arrays, axis=0, **kwargs)
 
     ########################################################################################
@@ -185,22 +191,22 @@ class TensorflowBackend(Backend):
 
     def matrix_exp(
         self,
-        matrix,
+        matrix: ArrayLike,
         phase: Union[float, int, complex] = 1,
         eigenvectors=None,
         eigenvalues=None,
-    ):
+    ) -> ArrayLike:
         if eigenvectors is None or self.is_sparse(matrix):
             return self.expm(phase * matrix)
         return super().matrix_exp(matrix, phase, eigenvectors, eigenvalues)
 
     def matrix_power(
         self,
-        matrix,
+        matrix: ArrayLike,
         power: Union[float, int],
         precision_singularity: float = 1e-14,
         dtype=None,
-    ):
+    ) -> ArrayLike:
         if not isinstance(power, (float, int)):
             raise_error(
                 TypeError,
@@ -220,14 +226,18 @@ class TensorflowBackend(Backend):
 
         return super().matrix_power(matrix, power, precision_singularity)
 
-    def singular_value_decomposition(self, array):
+    def singular_value_decomposition(self, array: ArrayLike) -> ArrayLike:
         # needed to unify order of return
         s_matrix, u_matrix, v_matrix = self.engine.linalg.svd(array)
         return u_matrix, s_matrix, self.conj(self.transpose(v_matrix))
 
     def jacobian(
-        self, circuit, parameters=None, initial_state=None, return_complex: bool = True
-    ):
+        self,
+        circuit: Circuit,
+        parameters: ArrayLike = None,
+        initial_state: ArrayLike = None,
+        return_complex: bool = True,
+    ) -> ArrayLike:
         copied = circuit.copy(deep=True)
 
         # necessary for the tape to properly watch the variables
@@ -245,7 +255,9 @@ class TensorflowBackend(Backend):
 
         return tape.jacobian(real, parameters)
 
-    def zero_state(self, nqubits, density_matrix: bool = False, dtype=None):
+    def zero_state(
+        self, nqubits: int, density_matrix: bool = False, dtype=None
+    ) -> ArrayLike:
         if dtype is None:
             dtype = self.dtype
 
@@ -265,22 +277,29 @@ class TensorflowBackend(Backend):
     ######## Methods related to circuit execution                                   ########
     ########################################################################################
 
-    def execute_circuit(self, circuit, initial_state=None, nshots=1000):
+    def execute_circuit(
+        self,
+        circuit: Circuit,
+        initial_state: Optional[ArrayLike] = None,
+        nshots: int = 1000,
+    ):
         with self.engine.device(self.device):
             return super().execute_circuit(circuit, initial_state, nshots)
 
-    def execute_circuit_repeated(self, circuit, nshots, initial_state=None):
+    def execute_circuit_repeated(
+        self, circuit: Circuit, nshots: int, initial_state: Optional[ArrayLike] = None
+    ):
         with self.engine.device(self.device):
             return super().execute_circuit_repeated(circuit, nshots, initial_state)
 
-    def matrix(self, gate):
+    def matrix(self, gate: Gate) -> ArrayLike:
         npmatrix = super().matrix(gate)
         # delete cached matrix if it's symbolic
         if self.engine.is_symbolic_tensor(npmatrix):
             delattr(self.matrices, gate.__class__.__name__)
         return npmatrix
 
-    def matrix_fused(self, fgate):
+    def matrix_fused(self, fgate: Gate) -> ArrayLike:
         rank = len(fgate.target_qubits)
         # tf only supports coo sparse arrays
         # however they are probably not as efficient as csr ones
@@ -321,7 +340,7 @@ class TensorflowBackend(Backend):
 
         return matrix
 
-    def matrix_parametrized(self, gate):
+    def matrix_parametrized(self, gate: Gate) -> ArrayLike:
         npmatrix = super().matrix_parametrized(gate)
         return self.cast(npmatrix, dtype=self.dtype)
 
@@ -329,7 +348,7 @@ class TensorflowBackend(Backend):
     ######## Methods related to the execution and post-processing of measurements   ########
     ########################################################################################
 
-    def calculate_frequencies(self, samples):
+    def calculate_frequencies(self, samples: ArrayLike) -> Counter:
         # redefining this because ``tnp.unique`` is not available
         res, _, counts = self.engine.unique_with_counts(samples, out_idx="int64")
         res, counts = np.array(res), np.array(counts)
@@ -339,20 +358,20 @@ class TensorflowBackend(Backend):
             res = [int(r) for r in res]
         return Counter({k: int(v) for k, v in zip(res, counts)})
 
-    def sample_shots(self, probabilities, nshots):
+    def sample_shots(self, probabilities: ArrayLike, nshots: int) -> ArrayLike:
         # redefining this because ``tnp.random.choice`` is not available
         logits = self.log(probabilities)[self.engine.newaxis]
         samples = self.engine.random.categorical(logits, nshots)[0]
         return samples
 
-    def samples_to_binary(self, samples, nqubits):
+    def samples_to_binary(self, samples: ArrayLike, nqubits: int) -> ArrayLike:
         # redefining this because ``tnp.right_shift`` is not available
         qrange = self.engine.range(nqubits - 1, -1, -1, dtype=self.int32)
         samples = self.cast(samples, dtype=self.int32)
         samples = self.engine.bitwise.right_shift(samples[:, np.newaxis], qrange)
         return samples % 2
 
-    def update_frequencies(self, frequencies, probabilities, nsamples):
+    def update_frequencies(self, frequencies: ArrayLike, probabilities: ArrayLike, nsamples: int) -> ArrayLike:
         # redefining this because ``tnp.unique`` and tensor update is not available
         samples = self.sample_shots(probabilities, nsamples)
         res, _, counts = self.engine.unique_with_counts(samples, out_idx=self.int64)
@@ -363,7 +382,7 @@ class TensorflowBackend(Backend):
 
     def assert_allclose(
         self, value, target, rtol: float = 1e-7, atol: float = 0.0
-    ):  # pragma: no cover
+    ) -> None:  # pragma: no cover
         if isinstance(value, (CircuitResult, QuantumState)):
             value = value.state()
         if isinstance(target, (CircuitResult, QuantumState)):
