@@ -15,7 +15,12 @@ from qiboml.operations.differentiation import PSR, Adjoint, Jax, QuimbJax
 EXECUTION_BACKENDS = [
     NumpyBackend(),
 ]
-DIFF_RULES = [Jax, PSR, Adjoint, QuimbJax]
+DIFF_RULES = [Jax, PSR, Adjoint]
+try:
+    QuimbJax()
+    DIFF_RULES += [QuimbJax]
+except:
+    pass
 
 TARGET_GRAD_TORCH = {
     "no_inputs": (
