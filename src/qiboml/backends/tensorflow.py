@@ -165,6 +165,9 @@ class TensorflowBackend(Backend):
     def sum(self, array, axis=None, **kwargs) -> "ndarray":
         return self.engine.math.reduce_sum(array, axis, **kwargs)
 
+    def trace(self, array) -> Union[int, float]:
+        return self.engine.math.trace(array)
+
     def vector_norm(self, state, order: Union[int, float, str] = 2, dtype=None):
         if dtype is None:
             dtype = self.dtype
