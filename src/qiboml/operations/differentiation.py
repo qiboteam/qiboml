@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from functools import cached_property, partial
 from typing import Callable, Tuple
 
-import jax
+import jax  # pylint: disable=import-error
 import numpy as np
 from qibo import Circuit
 from qibo.backends import Backend

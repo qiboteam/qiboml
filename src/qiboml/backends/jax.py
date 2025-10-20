@@ -3,7 +3,7 @@
 from functools import partial
 from typing import Optional, Union, Tuple
 
-import jax
+import jax  # pylint: disable=import-error
 import jax.numpy as jnp  # pylint: disable=import-error
 import numpy as np
 from qibo import __version__
