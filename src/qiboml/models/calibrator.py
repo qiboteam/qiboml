@@ -42,6 +42,7 @@ try:
             output_folder = self.path / datetime.datetime.now().strftime(
                 "%Y-%m-%d_%H-%M-%S"
             )
+            platform.connect()
             self._history.append(
                 self.runcard.run(
                     output=output_folder,
@@ -50,6 +51,7 @@ try:
                     update=False,
                 )
             )
+            platform.disconnect()
 
         def data(self, id: str, execution_number: int):
             """Return the data of the protocol with the specific `id` at its

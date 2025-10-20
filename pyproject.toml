@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "qiboml"
-version = "0.0.3"
+version = "0.1.1"
 description = "Quantum Machine Learning using Qibo"
 authors = ["Qiboteam"]
 readme = "README.md"
@@ -14,7 +14,7 @@ documentation = "https://qibo.science/docs/qiboml/stable"
 packages = [{ include = "qiboml", from = "src" }]
 
 [tool.poetry.dependencies]
-python = ">=3.10,<3.13"
+python = ">=3.10,<3.14"
 numpy = "^2.0.0"
 keras = { version = "^3.11.0", optional = true }
 tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux' or sys_platform == 'darwin'", optional = true }
@@ -105,3 +105,7 @@ addopts = [
   '--cov-report=html',
   '--durations=60',
 ]
+
+[tool.poetry.extras]
+torch = ["torch"]
+keras = ["tensorflow", "keras"]

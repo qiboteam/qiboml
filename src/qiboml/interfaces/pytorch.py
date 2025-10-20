@@ -8,6 +8,7 @@ import numpy as np
 import torch
 from qibo import Circuit
 from qibo.backends import Backend
+from qibo.config import raise_error
 
 from qiboml.backends.pytorch import PyTorchBackend
 from qiboml.interfaces import utils
@@ -64,6 +65,8 @@ class QuantumModel(torch.nn.Module):
             by sequentially stacking the elements of the given list. It is also possible
             to pass a single circuit, in the case a sequential structure is not needed.
         decoding (QuantumDecoding): the decoding layer.
+        parameters_initialization (Union[keras.initializers.Initializer, np.ndarray]]): if an initialiser is provided it will be used
+        either as the parameters or to sample the parameters of the model.
         differentiation (Differentiation, optional): the differentiation engine,
             if not provided a default one will be picked following what described in
             the :ref:`docs <_differentiation_engine>`.
@@ -73,6 +76,7 @@ class QuantumModel(torch.nn.Module):
 
     circuit_structure: Union[Circuit, List[Union[Circuit, QuantumEncoding, Callable]]]
     decoding: QuantumDecoding
+    parameters_initialization: Optional[Union[np.ndarray, callable]] = None
     differentiation: Optional[Differentiation] = None
     circuit_tracer: Optional[CircuitTracer] = None
 
@@ -87,6 +91,25 @@ class QuantumModel(torch.nn.Module):
             self.circuit_structure,
         )
         params = torch.as_tensor(self.backend.to_numpy(x=params)).ravel()
+
+        if self.parameters_initialization is not None:
+            if callable(self.parameters_initialization):
+                params = torch.empty(
+                    params.shape, dtype=params.dtype, requires_grad=True
+                )
+                params = self.parameters_initialization(params)
+            elif isinstance(self.parameters_initialization, np.ndarray | torch.Tensor):
+                if self.parameters_initialization.shape != params.shape:
+                    raise_error(
+                        ValueError,
+                        f"Shape not valid for `parameters_initialization`. The shape should be {params.shape}.",
+                    )
+                params = torch.as_tensor(self.parameters_initialization).ravel()
+            else:
+                raise_error(
+                    ValueError,
+                    "`parameters_initialization` should be a `np.ndarray` or `torch.nn.init`.",
+                )
         params.requires_grad = True
         self.circuit_parameters = torch.nn.Parameter(params)
 
