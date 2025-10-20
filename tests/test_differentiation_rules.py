@@ -8,7 +8,8 @@ from qibo.backends import NumpyBackend
 from qiboml.models.ansatze import hardware_efficient
 from qiboml.models.decoding import Expectation
 from qiboml.models.encoding import PhaseEncoding
-from qiboml.operations.differentiation import PSR, Adjoint, Jax
+from qiboml.operations.differentiation import PSR, Adjoint
+from qiboml.operations.differentiation_jax import Jax
 
 # TODO: use the classical conftest mechanism or customize mechanism for this test
 EXECUTION_BACKENDS = [

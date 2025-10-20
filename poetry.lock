@@ -1634,7 +1634,7 @@ version = "0.4.38"
 description = "Differentiate, compile, and transform Numpy code."
 optional = false
 python-versions = ">=3.10"
-groups = ["main", "cuda11", "cuda12"]
+groups = ["main", "cuda11", "cuda12", "tests"]
 markers = "sys_platform == \"linux\" or sys_platform == \"darwin\" or sys_platform != \"linux\" and sys_platform != \"darwin\""
 files = [
     {file = "jax-0.4.38-py3-none-any.whl", hash = "sha256:78987306f7041ea8500d99df1a17c33ed92620c2268c4c3677fb24e06712be64"},
@@ -1714,7 +1714,7 @@ version = "0.4.38"
 description = "XLA library for JAX"
 optional = false
 python-versions = ">=3.10"
-groups = ["main", "cuda11", "cuda12"]
+groups = ["main", "cuda11", "cuda12", "tests"]
 markers = "sys_platform == \"linux\" or sys_platform == \"darwin\" or sys_platform != \"linux\" and sys_platform != \"darwin\""
 files = [
     {file = "jaxlib-0.4.38-cp310-cp310-macosx_10_14_x86_64.whl", hash = "sha256:55c19b9d3f33a6fc59f644aa5a21fba02639ccdd776cb4a9b5526625f57839ff"},
@@ -3199,7 +3199,7 @@ files = [
     {file = "opt_einsum-3.4.0-py3-none-any.whl", hash = "sha256:69bb92469f86a1565195ece4ac0323943e83477171b91d24c35afe028a90d7cd"},
     {file = "opt_einsum-3.4.0.tar.gz", hash = "sha256:96ca72f1b886d148241348783498194c577fa30a8faac108586b14f1ba4473ac"},
 ]
-markers = {main = "sys_platform == \"linux\" or sys_platform == \"darwin\" or sys_platform != \"linux\" and sys_platform != \"darwin\"", cuda11 = "sys_platform == \"linux\" or sys_platform == \"darwin\" or sys_platform != \"linux\" and sys_platform != \"darwin\"", cuda12 = "sys_platform == \"linux\" or sys_platform == \"darwin\" or sys_platform != \"linux\" and sys_platform != \"darwin\"", docs = "sys_platform == \"linux\" or sys_platform == \"darwin\"", tests = "sys_platform == \"linux\" or sys_platform == \"darwin\""}
+markers = {main = "sys_platform == \"linux\" or sys_platform == \"darwin\" or sys_platform != \"linux\" and sys_platform != \"darwin\"", cuda11 = "sys_platform == \"linux\" or sys_platform == \"darwin\" or sys_platform != \"linux\" and sys_platform != \"darwin\"", cuda12 = "sys_platform == \"linux\" or sys_platform == \"darwin\" or sys_platform != \"linux\" and sys_platform != \"darwin\"", docs = "sys_platform == \"linux\" or sys_platform == \"darwin\"", tests = "sys_platform == \"linux\" or sys_platform == \"darwin\" or sys_platform != \"linux\" and sys_platform != \"darwin\""}
 
 [[package]]
 name = "optree"
@@ -6092,4 +6092,4 @@ torch = ["torch"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.14"
-content-hash = "0149e9258dcfc3d4cda402f7b5c46bd2d195753fdf384fa991e6777482683816"
+content-hash = "817f8e951be293cb1c86210e343868aae322466b69617126d8a166c59492fdd2"
