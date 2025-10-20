@@ -242,6 +242,9 @@ class PyTorchBackend(Backend):
         size: Optional[Union[int, Tuple[int, ...]]] = None,
         seed=None,
     ) -> ArrayLike:
+        # if isinstance(size, int):
+        #     size = (size,)
+
         if seed is not None:
             local_state = self.default_rng(seed) if isinstance(seed, int) else seed
 
