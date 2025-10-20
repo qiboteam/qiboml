@@ -59,7 +59,7 @@ class PyTorchBackend(Backend):
         self.device = self.engine.get_default_device()
         self.dtype = self.complex128
         self.matrices = TorchMatrices(self.dtype, self.device)
-        self.nthreads = 0
+        self.nthreads = 1
         self.numeric_types += (
             self.int8,
             self.int32,
@@ -128,6 +128,14 @@ class PyTorchBackend(Backend):
         self.engine.manual_seed(seed)
         np.random.seed(seed)
 
+    def set_threads(self, nthreads: int) -> None:  # pragma: no cover
+        """Set number of threads for CPU backend simulations that accept it. Works in-place.
+
+        Args:
+            nthreads (int): Number of threads.
+        """
+        self.engine.set_num_threads(nthreads)
+
     def to_numpy(self, array):
         if isinstance(array, list):
             return np.asarray([self.to_numpy(i) for i in array])
@@ -187,7 +195,7 @@ class PyTorchBackend(Backend):
 
         indices = self.engine.multinomial(p, num_samples=size, replacement=replace)
 
-        return self.copy(array[indices])
+        return self.copy(array[list(indices)])
 
     def random_integers(
         self,

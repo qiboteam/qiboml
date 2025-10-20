@@ -42,7 +42,6 @@ def test_state_layer(backend, density_matrix):
 )
 def test_expectation_layer(backend, nshots, observable):
     backend.set_seed(42)
-    rng = np.random.default_rng(42)
     nqubits = 5
 
     circuit = comp_basis_encoder("1" * 5)
@@ -64,6 +63,9 @@ def test_expectation_layer(backend, nshots, observable):
         else observable.expectation_from_circuit(circuit, nshots=nshots)
     )
     atol = 1e-8 if nshots is None else 1e-2
+
+    layer_expv = layer_expv[0, 0]
+
     backend.assert_allclose(layer_expv, expv, atol=atol)
 
 

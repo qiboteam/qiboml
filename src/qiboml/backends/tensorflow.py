@@ -2,7 +2,7 @@
 
 import os
 from collections import Counter
-from typing import Optional, Union, Tuple
+from typing import Optional, Tuple, Union
 
 import numpy as np
 from qibo import __version__
@@ -84,6 +84,10 @@ class TensorflowBackend(Backend):
     def set_device(self, device):  # pragma: no cover
         self.device = device
 
+    def set_seed(self, seed: Union[int, None]) -> None:
+        """Set the seed of the random number generator. Works in-place."""
+        self.engine.random.set_seed(seed)
+
     def set_threads(self, nthreads):
         log.warning(
             "`set_threads` is not supported by the tensorflow "
@@ -100,6 +104,12 @@ class TensorflowBackend(Backend):
     ######## Methods related to array manipulation                                  ########
     ########################################################################################
 
+    def all(self, array, **kwargs) -> Union["ndarray", bool]:
+        return self.engine.reduce_all(array, **kwargs)
+
+    def conj(self, array) -> "ndarray":
+        return self.engine.math.conj(array)
+
     def copy(self, array, **kwargs):
         return self.engine.identity(array, **kwargs)
 
@@ -112,11 +122,20 @@ class TensorflowBackend(Backend):
     def flatnonzero(self, array):
         return np.flatnonzero(array)
 
+    def imag(self, array) -> Union[int, float, "ndarray"]:
+        return self.engine.math.imag(array)
+
     def kron(self, array_1, array_2) -> "ndarray":
         return self.engine.experimental.numpy.kron(array_1, array_2)
 
+    def log(self, array, **kwargs) -> "ndarray":
+        return self.engine.math.log(array, **kwargs)
+
     def log2(self, array, **kwargs) -> "ndarray":
         return self.engine.math.log(array, **kwargs) / self.engine.math.log(2)
+
+    def log10(self, array, **kwargs) -> "ndarray":
+        return self.engine.math.log(array, **kwargs) / self.engine.math.log(10)
 
     def matrix_norm(self, state, order: Union[int, float, str] = "nuc", **kwargs):
         state = self.cast(state, dtype=state.dtype)
@@ -143,6 +162,9 @@ class TensorflowBackend(Backend):
     def real(self, array):
         return self.engine.math.real(array)
 
+    def sum(self, array, axis=None, **kwargs) -> "ndarray":
+        return self.engine.math.reduce_sum(array, axis, **kwargs)
+
     def vector_norm(self, state, order: Union[int, float, str] = 2, dtype=None):
         if dtype is None:
             dtype = self.dtype
@@ -150,6 +172,9 @@ class TensorflowBackend(Backend):
         state = self.cast(state, dtype=dtype)
 
         return self.engine.norm(state, ord=order)
+
+    def vstack(self, arrays, **kwargs) -> "ndarray":
+        return self.engine.stack(arrays, axis=0, **kwargs)
 
     ########################################################################################
     ######## Methods related to linear algebra operations                           ########
