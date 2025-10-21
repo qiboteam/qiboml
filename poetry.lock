@@ -4715,7 +4715,7 @@ qrng = ["pyserial (>=3.5,<4.0)"]
 type = "git"
 url = "https://github.com/qiboteam/qibolab"
 reference = "HEAD"
-resolved_reference = "1ac9742d18550412cec40bec20df6215777666d0"
+resolved_reference = "0f14b4fd50df8b4795b2e0f87d5639608ea6c722"
 
 [[package]]
 name = "qibotn"
@@ -6419,4 +6419,4 @@ torch = ["torch"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.14"
-content-hash = "9b97fbcb74e3b345bb389910c2656bf0e55319435827667257f7b6b02e74db96"
+content-hash = "1ee5c412f49c3f9c209e1cc1eaba18b9d69242b50746575f43ccf847732ac470"

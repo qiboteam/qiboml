@@ -65,7 +65,7 @@ qibocal = "^0.2.2"
 tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux' or sys_platform == 'darwin'" }
 torch = { version = "^2.7.0" }
 qibolab = { git = "https://github.com/qiboteam/qibolab", extras = ["emulator"] }
-qibotn = {git = "https://github.com/qiboteam/qibotn", markers = "python_version >= '3.11' and (sys_platform == 'linux' or sys_platform == 'darwin')", branch="expectation"}
+qibotn = {git = "https://github.com/qiboteam/qibotn", python = "^3.11", platform = "linux || darwin", branch="expectation"}
 quimb = "^1.11.2"
 cotengra = "^0.7.5"
 kahypar = "^1.3.5"
