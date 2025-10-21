@@ -118,7 +118,10 @@ class QuantumModel(torch.nn.Module):
         self.circuit_tracer = self.circuit_tracer(self.circuit_structure)
 
         if self.differentiation is None:
-            if issubclass(type(self.backend), PyTorchBackend):
+            if (
+                issubclass(type(self.backend), PyTorchBackend)
+                and self.decoding.analytic
+            ):
                 self.differentiation = None
             else:
                 self.differentiation = utils.get_default_differentiation(

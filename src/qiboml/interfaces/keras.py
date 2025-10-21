@@ -162,7 +162,10 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
         self.circuit_tracer = self.circuit_tracer(self.circuit_structure)
 
         if self.differentiation is None:
-            if issubclass(type(self.backend), TensorflowBackend):
+            if (
+                issubclass(type(self.backend), TensorflowBackend)
+                and self.decoding.analytic
+            ):
                 self.differentiation = None
             else:
                 self.differentiation = utils.get_default_differentiation(

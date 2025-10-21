@@ -73,7 +73,7 @@ class QuantumDecoding:
             self.nqubits, wire_names=wire_names, density_matrix=self.density_matrix
         )
         self.backend = _check_backend(self.backend)
-        self._circuit.add(gates.M(*self.qubits))
+        # self._circuit.add(gates.M(*self.qubits))
 
     def __call__(
         self, x: Circuit
@@ -114,6 +114,12 @@ class QuantumDecoding:
         if self.noise_model is not None:
             x = self.noise_model.apply(x)
         return x
+
+    def append_measurements(self, x: Optional[Circuit] = None):
+        if x is None:
+            self._circuit.add(gates.M(*self.qubits))
+        else:
+            x.add(gates.M(*self.qubits))
 
     @property
     def circuit(
@@ -384,6 +390,7 @@ class Samples(QuantumDecoding):
 
     def __post_init__(self):
         super().__post_init__()
+        self.append_measurements()
 
     def __call__(self, x: Circuit) -> ndarray:
         """Sample the final state of the circuit.
@@ -479,14 +486,17 @@ def _check_or_recompute_map(decoder: Expectation, x: Circuit):
     """Helper function to recompute the mitigation map."""
     # Compute the expectation value of the reference circuit
     with decoder._temporary_nshots(decoder.mitigator._nshots):
-        freqs = (
-            super(Expectation, decoder)
-            .__call__(decoder.mitigator._reference_circuit)
-            .frequencies()
+        # freqs = (
+        #    super(Expectation, decoder)
+        #    .__call__(decoder.mitigator._reference_circuit)
+        #    .frequencies()
+        # )
+        reference_expval = decoder.observable.expectation(
+            decoder.mitigator._reference_circuit, nshots=decoder.mitigator._nshots
         )
-        reference_expval = decoder.observable.expectation_from_samples(
-            freqs, qubit_map=decoder.qubits
-        )
+        # decoder.observable.expectation_from_samples(
+        #    freqs, qubit_map=decoder.qubits
+        # )
     # Check or update noise map
     decoder.mitigator.check_or_update_map(
         noisy_reference_value=reference_expval,
