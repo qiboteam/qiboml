@@ -16,6 +16,7 @@ from qibo import Circuit
 from qibo.backends import Backend
 from qibo.config import raise_error
 
+from qiboml.backends import TensorflowBackend
 from qiboml.interfaces import utils
 from qiboml.interfaces.circuit_tracer import CircuitTracer
 from qiboml.models.decoding import QuantumDecoding
@@ -161,10 +162,13 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
         self.circuit_tracer = self.circuit_tracer(self.circuit_structure)
 
         if self.differentiation is None:
-            self.differentiation = utils.get_default_differentiation(
-                decoding=self.decoding,
-                instructions=DEFAULT_DIFFERENTIATION,
-            )()
+            if issubclass(type(self.backend), TensorflowBackend):
+                self.differentiation = None
+            else:
+                self.differentiation = utils.get_default_differentiation(
+                    decoding=self.decoding,
+                    instructions=DEFAULT_DIFFERENTIATION,
+                )()
         elif isinstance(self.differentiation, type):
             self.differentiation = self.differentiation()
         self.custom_gradient = None
