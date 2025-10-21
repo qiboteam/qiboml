@@ -157,7 +157,7 @@ description = "Abstract your array operations."
 optional = false
 python-versions = ">=3.9"
 groups = ["tests"]
-markers = "sys_platform == \"linux\" or sys_platform == \"darwin\" or sys_platform != \"linux\" and sys_platform != \"darwin\""
+markers = "(sys_platform == \"linux\" or sys_platform == \"darwin\") and python_version >= \"3.11\""
 files = [
     {file = "autoray-0.8.0-py3-none-any.whl", hash = "sha256:fda5e20b072d41818ccdf26c251dfde4c49595e7c323b141dc2640e52f5889c9"},
     {file = "autoray-0.8.0.tar.gz", hash = "sha256:5d0d71da03cb02d5bc590a1af64e0ba58589352d628843a0ecbcfe90040dc520"},
@@ -740,7 +740,7 @@ description = "Hyper optimized contraction trees for large tensor networks and e
 optional = false
 python-versions = ">=3.8"
 groups = ["tests"]
-markers = "sys_platform == \"linux\" or sys_platform == \"darwin\" or sys_platform != \"linux\" and sys_platform != \"darwin\""
+markers = "(sys_platform == \"linux\" or sys_platform == \"darwin\") and python_version >= \"3.11\""
 files = [
     {file = "cotengra-0.7.5-py3-none-any.whl", hash = "sha256:0d269883ee87e4a08ce6c91ca38aafbd3d56e177a3b3b54d61e3fe314fe67e8b"},
     {file = "cotengra-0.7.5.tar.gz", hash = "sha256:f3cee6c0cd29fd239a1e9868c3b719c574cc56204dbf7e658ba10f3fd93dce98"},
@@ -887,7 +887,7 @@ description = "Cython implementation of Toolz: High performance functional utili
 optional = false
 python-versions = ">=3.9"
 groups = ["tests"]
-markers = "sys_platform == \"linux\" or sys_platform == \"darwin\" or sys_platform != \"linux\" and sys_platform != \"darwin\""
+markers = "(sys_platform == \"linux\" or sys_platform == \"darwin\") and python_version >= \"3.11\""
 files = [
     {file = "cytoolz-1.1.0-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:72d7043a88ea5e61ba9d17ea0d1c1eff10f645d7edfcc4e56a31ef78be287644"},
     {file = "cytoolz-1.1.0-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:d759e9ed421bacfeb456d47af8d734c057b9912b5f2441f95b27ca35e5efab07"},
@@ -2132,7 +2132,7 @@ description = "Python Inferface for the Karlsruhe Hypergraph Partitioning Framew
 optional = false
 python-versions = "*"
 groups = ["tests"]
-markers = "sys_platform == \"linux\" or sys_platform == \"darwin\" or sys_platform != \"linux\" and sys_platform != \"darwin\""
+markers = "(sys_platform == \"linux\" or sys_platform == \"darwin\") and python_version >= \"3.11\""
 files = [
     {file = "kahypar-1.3.5-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:9ee3520d83c7e808134041e13218f0507882203063e18cc72d8d82531561bc56"},
     {file = "kahypar-1.3.5-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:2218296b4197e1ee9b7be386e6d681cf6bf8f0b2d4d36971bb7c8c5561108b46"},
@@ -4749,7 +4749,7 @@ description = "Quantum information and many-body library."
 optional = false
 python-versions = ">=3.9"
 groups = ["tests"]
-markers = "sys_platform == \"linux\" or sys_platform == \"darwin\" or sys_platform != \"linux\" and sys_platform != \"darwin\""
+markers = "(sys_platform == \"linux\" or sys_platform == \"darwin\") and python_version >= \"3.11\""
 files = [
     {file = "quimb-1.11.2-py3-none-any.whl", hash = "sha256:5c8a66311f54f3894e39f23d83cef4537cc6d41011779733ca303f3e5f09c7b8"},
     {file = "quimb-1.11.2.tar.gz", hash = "sha256:12546651f714e4ff3adb53dc7b620b4c4eb3fd8d8aafad0f92ac4cc04f03440c"},
@@ -5950,7 +5950,7 @@ description = "List processing tools and functional utilities"
 optional = false
 python-versions = ">=3.9"
 groups = ["tests"]
-markers = "sys_platform == \"linux\" or sys_platform == \"darwin\" or sys_platform != \"linux\" and sys_platform != \"darwin\""
+markers = "(sys_platform == \"linux\" or sys_platform == \"darwin\") and python_version >= \"3.11\""
 files = [
     {file = "toolz-1.1.0-py3-none-any.whl", hash = "sha256:15ccc861ac51c53696de0a5d6d4607f99c210739caf987b5d2054f3efed429d8"},
     {file = "toolz-1.1.0.tar.gz", hash = "sha256:27a5c770d068c110d9ed9323f24f1543e83b2f300a687b7891c1a6d56b697b5b"},
@@ -6419,4 +6419,4 @@ torch = ["torch"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.14"
-content-hash = "1ee5c412f49c3f9c209e1cc1eaba18b9d69242b50746575f43ccf847732ac470"
+content-hash = "d30ffc473d7d80eb7cf959904b5995bf766234c5d5f3636197c8e33e633d0b80"
