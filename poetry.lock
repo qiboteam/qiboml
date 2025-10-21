@@ -4740,7 +4740,7 @@ qmatchatea = ["qiskit (>=1.4.0,<2.0.0)", "qmatchatea (>=1.4.3,<2.0.0)", "qtealea
 type = "git"
 url = "https://github.com/qiboteam/qibotn"
 reference = "expectation"
-resolved_reference = "451470f1cb9f58370d9711e9cce269bdf1567e01"
+resolved_reference = "b9fe8618484194d192f89be312e38855510e4e30"
 
 [[package]]
 name = "quimb"

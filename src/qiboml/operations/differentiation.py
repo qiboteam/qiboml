@@ -268,7 +268,8 @@ class Jax(Differentiation):
     def _cast_non_trainable_parameters(self, src_backend, tgt_backend):
         for g in self.non_trainable_gates:
             g.parameters = tgt_backend.cast(
-                np.array([src_backend.to_numpy(par) for par in g.parameters])
+                np.array([src_backend.to_numpy(par) for par in g.parameters]),
+                dtype=tgt_backend.np.float64,
             )
 
     def evaluate(self, parameters, wrt_inputs: bool = False):

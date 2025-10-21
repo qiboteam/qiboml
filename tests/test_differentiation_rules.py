@@ -164,7 +164,7 @@ def test_expval_custom_grad(
     nqubits = 2
     nlayers = 1
 
-    obs = hamiltonians.Z(nqubits=nqubits, backend=backend)
+    obs = hamiltonians.Z(nqubits=nqubits, dense=False, backend=backend)
 
     encoding_layer = PhaseEncoding(nqubits=nqubits)
     training_layer = hardware_efficient(nqubits=nqubits, nlayers=nlayers, seed=seed)
