@@ -4,11 +4,8 @@ from typing import Callable, Dict, List, Union
 
 import numpy as np
 from qibo import Circuit
-from qibo.backends import _check_backend
-from qibo.backends.abstract import Backend
 from qibo.ui.mpldrawer import plot_circuit
 
-from qiboml import ndarray
 from qiboml.models.decoding import QuantumDecoding
 from qiboml.models.encoding import QuantumEncoding
 

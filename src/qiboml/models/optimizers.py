@@ -91,12 +91,13 @@ class ExactGeodesicTransportCG:
             ndarray: Amplitudes calculated from the hyperspherical coordinates.
         """
         d = len(angles) + 1
-        amps = self.backend.zeros(d)
+        amps = []
         for k in range(d):
             prod = self.backend.prod(self.backend.sin(angles[:k]))
             if k < d - 1:
                 prod *= self.backend.cos(angles[k])
-            amps[k] = prod
+            amps.append(prod)
+        amps = self.backend.cast(amps, dtype=self.backend.float64)
         return amps
 
     def encoder(self):

@@ -2,6 +2,8 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Union
 
+from numpy.typing import ArrayLike
+
 from qibo import Circuit, gates
 from qibo.backends import Backend, _check_backend
 from qibo.config import log, raise_error
@@ -11,7 +13,6 @@ from qibo.quantum_info.metrics import infidelity
 from qibo.result import CircuitResult, MeasurementOutcomes, QuantumState
 from qibo.transpiler import Passes
 
-from qiboml import ndarray
 from qiboml.models.calibrator import Calibrator
 from qiboml.models.utils import Mitigator
 
@@ -196,7 +197,7 @@ class Probabilities(QuantumDecoding):
 
     # TODO: collapse on ExpectationDecoding if not analytic
 
-    def __call__(self, x: Circuit) -> ndarray:
+    def __call__(self, x: Circuit) -> ArrayLike:
         """Computes the final state probabilities.
 
         Args:
@@ -268,7 +269,7 @@ class Expectation(QuantumDecoding):
             with `nshots=10000`.
     """
 
-    observable: Union[ndarray, Hamiltonian] = None
+    observable: Union[ArrayLike, Hamiltonian] = None
     mitigation_config: Optional[Dict[str, Any]] = None
     calibrator: Optional[Calibrator] = None
 
@@ -286,7 +287,7 @@ class Expectation(QuantumDecoding):
                 backend=self.backend,
             )
 
-    def __call__(self, x: Circuit) -> ndarray:
+    def __call__(self, x: Circuit) -> ArrayLike:
         """
         Execute the input circuit and calculate the expectation value of
         the internal observable on the final state.
@@ -366,7 +367,7 @@ class Expectation(QuantumDecoding):
 class State(QuantumDecoding):
     """The state decoder."""
 
-    def __call__(self, x: Circuit) -> ndarray:
+    def __call__(self, x: Circuit) -> ArrayLike:
         """Compute the final state of the input circuit and separates it in its real and
         imaginary parts stacked on top of each other.
 
@@ -407,7 +408,7 @@ class Samples(QuantumDecoding):
     def __post_init__(self):
         super().__post_init__()
 
-    def __call__(self, x: Circuit) -> ndarray:
+    def __call__(self, x: Circuit) -> ArrayLike:
         """Sample the final state of the circuit.
 
         Args:
@@ -446,8 +447,8 @@ class VariationalQuantumLinearSolver(QuantumDecoding):
         `Quantum 7, 1188 (2023) <https://doi.org/10.22331/q-2023-11-22-1188>`_.
     """
 
-    target_state: ndarray
-    a_matrix: ndarray
+    target_state: ArrayLike
+    a_matrix: ArrayLike
 
     def __post_init__(self):
         super().__post_init__()

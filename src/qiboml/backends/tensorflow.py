@@ -109,6 +109,10 @@ class TensorflowBackend(Backend):
     def all(self, array: ArrayLike, **kwargs) -> Union[ArrayLike, bool]:
         return self.engine.reduce_all(array, **kwargs)
 
+    def arctan2(self, array_1, array_2, **kwargs) -> ArrayLike:
+        print(array_1, array_2)
+        return self.engine.math.atan2(array_1, array_2, **kwargs)
+
     def conj(self, array: ArrayLike) -> ArrayLike:
         return self.engine.math.conj(array)
 
@@ -146,6 +150,9 @@ class TensorflowBackend(Backend):
         if order == "nuc":
             return self.trace(state)
         return self.engine.norm(state, ord=order, **kwargs)
+
+    def prod(self, array, **kwargs) -> ArrayLike:
+        return self.engine.math.reduce_prod(array, **kwargs)
 
     def random_uniform(
         self,

@@ -4,10 +4,9 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 import numpy as np
+from numpy.typing import ArrayLike
 from qibo import Circuit, gates
 from qibo.config import raise_error
-
-from qiboml import ndarray
 
 
 @dataclass(eq=False)
@@ -36,7 +35,7 @@ class QuantumEncoding(ABC):
         self._circuit = Circuit(self.nqubits, density_matrix=self.density_matrix)
 
     @abstractmethod
-    def __call__(self, x: ndarray) -> Circuit:
+    def __call__(self, x: ArrayLike) -> Circuit:
         """Abstract call method."""
         pass
 
@@ -80,11 +79,11 @@ class PhaseEncoding(QuantumEncoding):
                 f"{self} currently support only gates with one parameter."
             )
 
-    def __call__(self, x: ndarray) -> Circuit:
+    def __call__(self, x: ArrayLike) -> Circuit:
         """Construct the circuit encoding the ``x`` data in the chosen encoding gate.
 
         Args:
-            x (ndarray): the input real data to encode in rotation angles.
+            x (ArrayLike): the input real data to encode in rotation angles.
 
         Returns:
             (Circuit): the constructed ``qibo.Circuit``.
@@ -102,12 +101,12 @@ class PhaseEncoding(QuantumEncoding):
 
 class BinaryEncoding(QuantumEncoding):
 
-    def __call__(self, x: ndarray) -> Circuit:
+    def __call__(self, x: ArrayLike) -> Circuit:
         r"""Construct the circuit encoding the ``x`` binary data in some ``RX`` rotation gates
         with angles either :math:`\pi` (for ones) or 0 (for zeros).
 
         Args:
-            x (ndarray): the input binary data.
+            x (ArrayLike): the input binary data.
 
         Returns:
             (Circuit): the constructed ``qibo.Circuit``.

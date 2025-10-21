@@ -3,12 +3,11 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import Tuple
 
-
 import numpy as np
+from numpy.typing import ArrayLike
 from qibo import Circuit
 from qibo.config import raise_error
 
-from qiboml import ndarray
 from qiboml.models.decoding import Expectation, QuantumDecoding
 
 
@@ -23,7 +22,7 @@ class Differentiation(ABC):
 
     @abstractmethod
     def evaluate(
-        self, parameters: ndarray, wrt_inputs: bool = False
+        self, parameters: ArrayLike, wrt_inputs: bool = False
     ):  # pragma: no cover
         """
         Evaluate the gradient of the quantum circuit w.r.t its parameters, i.e. its rotation angles.
@@ -56,15 +55,15 @@ class PSR(Differentiation):
                 "PSR differentiation works only for decoders with scalar outpus, i.e. expectation values.",
             )
 
-    def evaluate(self, parameters: ndarray, wrt_inputs: bool = False):
+    def evaluate(self, parameters: ArrayLike, wrt_inputs: bool = False):
         """
         Evaluate the gradient of the quantum circuit w.r.t its parameters, i.e. its rotation angles.
         Args:
-            parameters (List[ndarray]): the parameters at which to evaluate the model, and thus the derivative.
+            parameters (List[ArrayLike]): the parameters at which to evaluate the model, and thus the derivative.
             wrt_inputs (bool): whether to calculate the derivative with respect to, also, inputs (i.e. encoding angles)
         or not, by default ``False``.
         Returns:
-            (ndarray): the calculated jacobian.
+            (ArrayLike): the calculated jacobian.
         """
 
         circuits = []
@@ -91,7 +90,7 @@ class PSR(Differentiation):
         return (forwards - backwards) * eigvals
 
     def one_parameter_shift(
-        self, parameters: ndarray, parameter_index: int, wrt_inputs: bool = False
+        self, parameters: ArrayLike, parameter_index: int, wrt_inputs: bool = False
     ) -> Tuple[Circuit, Circuit, float]:
         """Compute one derivative of the decoding strategy w.r.t. a target parameter."""
         target_gates = (
@@ -133,12 +132,12 @@ class PSR(Differentiation):
             return backend.engine.stack(
                 [parameters[j] + int(i == j) * epsilon for j in range(len(parameters))]
             )
-        
+
         if backend.platform == "jax":
             parameters = parameters.at[i].set(parameters[i] + epsilon)
         else:
             parameters[i] = parameters[i] + epsilon
-        
+
         return parameters
 
 
@@ -149,14 +148,14 @@ class Adjoint(Differentiation):
     must have a gradient method returning the gradient of the single gate.
     """
 
-    def evaluate(self, parameters: ndarray, wrt_inputs: bool = False):
+    def evaluate(self, parameters: ArrayLike, wrt_inputs: bool = False):
         """
         Evaluate the gradient of the quantum circuit w.r.t its parameters, i.e. its rotation angles.
         Args:
-            parameters (List[ndarray]): the parameters at which to evaluate the model, and thus the derivative.
+            parameters (List[ArrayLike]): the parameters at which to evaluate the model, and thus the derivative.
             wrt_inputs (bool): whether to calculate the derivate with respect to inputs or not, by default ``False``.
         Returns:
-            (ndarray): the calculated gradients.
+            (ArrayLike): the calculated gradients.
         """
         assert isinstance(
             self.decoding, Expectation

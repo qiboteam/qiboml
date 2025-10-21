@@ -1,14 +1,13 @@
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional, Union
 
+from numpy.typing import ArrayLike
 from qibo import Circuit
 from qibo.backends import Backend, CliffordBackend, _check_backend
 from qibo.config import log
 from qibo.hamiltonians import Hamiltonian, SymbolicHamiltonian
 from qibo.models import error_mitigation
 from qibo.noise import NoiseModel
-
-from qiboml import ndarray
 
 REF_CIRCUIT_SEED = 42
 
@@ -31,7 +30,7 @@ class Mitigator:
     def __post_init__(self):
 
         self.backend = _check_backend(self.backend)
-        self._mitigation_map: Callable[..., ndarray] = lambda x, a=1, b=0: a * x + b
+        self._mitigation_map: Callable[..., ArrayLike] = lambda x, a=1, b=0: a * x + b
 
         cfg = self.mitigation_config or {}
         self._threshold = cfg.get("threshold", 1e-1)
@@ -74,7 +73,7 @@ class Mitigator:
 
     def calculate_reference_expval(
         self,
-        observable: Union[ndarray, Hamiltonian],
+        observable: Union[ArrayLike, Hamiltonian],
         circuit: Circuit,
     ):
         """Construct reference error sensitive circuit."""
@@ -102,7 +101,7 @@ class Mitigator:
         ).state()
         self._reference_value = observable.expectation(reference_state)
 
-    def map_is_reliable(self, noisy_reference_value: ndarray):
+    def map_is_reliable(self, noisy_reference_value: ArrayLike):
         """
         Check the distance between the reference value and the mitigated one.
 
@@ -120,9 +119,9 @@ class Mitigator:
 
     def check_or_update_map(
         self,
-        noisy_reference_value: ndarray,
+        noisy_reference_value: ArrayLike,
         circuit: Circuit,
-        observable: Union[ndarray, Hamiltonian],
+        observable: Union[ArrayLike, Hamiltonian],
         noise_model: NoiseModel,
     ):
         """
@@ -141,7 +140,7 @@ class Mitigator:
     def data_regression(
         self,
         circuit: Circuit,
-        observable: Union[ndarray, Hamiltonian],
+        observable: Union[ArrayLike, Hamiltonian],
         noise_model: NoiseModel,
     ):
         """
