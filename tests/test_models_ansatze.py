@@ -4,7 +4,7 @@ from qibo import Circuit, gates
 from qibo.quantum_info import random_statevector
 from scipy.special import binom
 
-from qiboml.models.ansatze import hardware_efficient, brickwork_givens
+from qiboml.models.ansatze import brickwork_givens, hardware_efficient
 
 
 @pytest.mark.parametrize("nqubits", [4, 6])
@@ -29,7 +29,7 @@ def test_brickwork_givens(backend, nqubits, weight, full_hwp, density_matrix):
 
     np.random.seed(10)
     params = 2 * np.pi * np.random.rand(n_choose_k - 1)
-    params = backend.cast(params, dtype="float64")
+    params = backend.cast(params, dtype=backend.float64)
 
     qubits = tuple(range(0, nqubits - 1, 2)) + tuple(range(1, nqubits - 1, 2))
     depth = n_choose_k // len(qubits)

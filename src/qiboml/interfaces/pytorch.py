@@ -14,7 +14,7 @@ from qiboml.interfaces import utils
 from qiboml.interfaces.circuit_tracer import CircuitTracer
 from qiboml.models.decoding import QuantumDecoding
 from qiboml.models.encoding import QuantumEncoding
-from qiboml.operations.differentiation import PSR, Differentiation, Jax
+from qiboml.operations import PSR, Differentiation, Jax
 
 DEFAULT_DIFFERENTIATION = {
     "qiboml-pytorch": None,
@@ -87,11 +87,13 @@ class QuantumModel(torch.nn.Module):
         params = utils.get_params_from_circuit_structure(
             self.circuit_structure,
         )
-        params = torch.as_tensor(self.backend.to_numpy(x=params)).ravel()
+        params = torch.as_tensor(self.backend.to_numpy(params)).ravel()
 
         if self.parameters_initialization is not None:
             if callable(self.parameters_initialization):
-                params = torch.empty(params.shape, dtype=params.dtype, requires_grad=True)
+                params = torch.empty(
+                    params.shape, dtype=params.dtype, requires_grad=True
+                )
                 params = self.parameters_initialization(params)
             elif isinstance(self.parameters_initialization, np.ndarray | torch.Tensor):
                 if self.parameters_initialization.shape != params.shape:
@@ -101,7 +103,10 @@ class QuantumModel(torch.nn.Module):
                     )
                 params = torch.as_tensor(self.parameters_initialization).ravel()
             else:
-                raise_error(ValueError, "`parameters_initialization` should be a `np.ndarray` or `torch.nn.init`.")
+                raise_error(
+                    ValueError,
+                    "`parameters_initialization` should be a `np.ndarray` or `torch.nn.init`.",
+                )
         params.requires_grad = True
         self.circuit_parameters = torch.nn.Parameter(params)
 
@@ -200,6 +205,7 @@ class QuantumModel(torch.nn.Module):
 
         return fig
 
+
 class QuantumModelAutoGrad(torch.autograd.Function):
     """
     Custom Autograd to enable the autodifferentiation of the QuantumModel for
@@ -231,7 +237,7 @@ class QuantumModelAutoGrad(torch.autograd.Function):
             ]
         )
         # convert the parameters to backend native arrays
-        dtype = getattr(decoding.backend.np, str(parameters.dtype).split(".")[-1])
+        dtype = getattr(decoding.backend.engine, str(parameters.dtype).split(".")[-1])
         angles = decoding.backend.cast(
             angles.detach().cpu().clone().numpy(), dtype=dtype
         )
