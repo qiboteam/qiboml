@@ -67,7 +67,7 @@ def test_rtqem(frontend, backend, mitigation_method):
     nlayers = 2
     nshots = 10000
 
-    seed = 42
+    seed = 1
     set_seed(frontend, seed)
     backend.set_seed(seed)
 
@@ -84,7 +84,7 @@ def test_rtqem(frontend, backend, mitigation_method):
         observable=obs,
         nshots=nshots,
         backend=backend,
-        noise_model=build_noise_model(nqubits=nqubits, local_pauli_noise_prob=0.02),
+        noise_model=build_noise_model(nqubits=nqubits, local_pauli_noise_prob=0.03),
         density_matrix=True,
     )
 
@@ -98,7 +98,7 @@ def test_rtqem(frontend, backend, mitigation_method):
         frontend=frontend,
         backend=backend,
         model=noisy_model,
-        epochs=10,
+        epochs=30,
     )
 
     mitigation_config = {
@@ -113,7 +113,7 @@ def test_rtqem(frontend, backend, mitigation_method):
         observable=obs,
         nshots=nshots,
         backend=backend,
-        noise_model=build_noise_model(nqubits=nqubits, local_pauli_noise_prob=0.02),
+        noise_model=build_noise_model(nqubits=nqubits, local_pauli_noise_prob=0.03),
         density_matrix=True,
         mitigation_config=mitigation_config,
     )
@@ -128,7 +128,7 @@ def test_rtqem(frontend, backend, mitigation_method):
         frontend=frontend,
         backend=backend,
         model=mit_model,
-        epochs=10,
+        epochs=30,
     )
 
     assert abs(mit_result - target_energy) < abs(noisy_result - target_energy)

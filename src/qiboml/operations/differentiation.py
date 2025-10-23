@@ -372,17 +372,13 @@ class QuimbJax(Jax):
         )
 
     @staticmethod
-    # @partial(jax.jit, static_argnums=(0, 1))
     def _run(circuit, decoding, *parameters):
         for g, p in zip(circuit.trainable_gates, parameters):
             g.parameters = p
-        # circuit.set_parameters(parameters)
         return decoding(circuit)
 
     @staticmethod
-    # @partial(jax.jit, static_argnums=(0, 1))
     def _run_with_inputs(circuit, decoding, *parameters):
         for g, p in zip(circuit.parametrized_gates, parameters):
             g.parameters = p
-        # circuit.set_parameters(parameters)
         return decoding(circuit)
