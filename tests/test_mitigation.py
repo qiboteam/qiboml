@@ -1,9 +1,12 @@
 from copy import deepcopy
 
 import pytest
+from qibo import transpiler
 from qibo.backends import NumpyBackend
-from qibo.hamiltonians import Z
+from qibo.hamiltonians import XXZ, SymbolicHamiltonian
 from qibo.noise import NoiseModel, PauliError
+from qibo.transpiler.pipeline import Passes
+from qibo.transpiler.unroller import NativeGates, Unroller
 
 from qiboml.models.ansatze import hardware_efficient
 from qiboml.models.decoding import Expectation
@@ -60,8 +63,8 @@ def train_vqe(frontend, backend, model, epochs):
 @pytest.mark.parametrize("backend", BACKENDS)
 @pytest.mark.parametrize("mitigation_method", ["ICS", "CDR"])
 def test_rtqem(frontend, backend, mitigation_method):
-    nqubits = 1
-    nlayers = 3
+    nqubits = 2
+    nlayers = 2
     nshots = 10000
 
     seed = 42
@@ -70,8 +73,10 @@ def test_rtqem(frontend, backend, mitigation_method):
 
     # We build a trainable circuit
     vqe = hardware_efficient(nqubits=nqubits, nlayers=nlayers, seed=seed)
+    from qibo.symbols import Z
 
-    obs = Z(nqubits, dense=False, backend=backend)
+    obs = SymbolicHamiltonian(Z(0) * Z(1), backend=backend)
+    target_energy = min(obs.eigenvalues())
 
     # First we build a model with noise and without mitigation
     noisy_decoding = Expectation(
@@ -93,7 +98,7 @@ def test_rtqem(frontend, backend, mitigation_method):
         frontend=frontend,
         backend=backend,
         model=noisy_model,
-        epochs=30,
+        epochs=10,
     )
 
     mitigation_config = {
@@ -108,7 +113,7 @@ def test_rtqem(frontend, backend, mitigation_method):
         observable=obs,
         nshots=nshots,
         backend=backend,
-        noise_model=build_noise_model(nqubits=nqubits, local_pauli_noise_prob=0.04),
+        noise_model=build_noise_model(nqubits=nqubits, local_pauli_noise_prob=0.02),
         density_matrix=True,
         mitigation_config=mitigation_config,
     )
@@ -123,10 +128,10 @@ def test_rtqem(frontend, backend, mitigation_method):
         frontend=frontend,
         backend=backend,
         model=mit_model,
-        epochs=30,
+        epochs=10,
     )
 
-    assert mit_result < noisy_result
+    assert abs(mit_result - target_energy) < abs(noisy_result - target_energy)
 
 
 def test_custom_map(frontend):

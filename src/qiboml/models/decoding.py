@@ -485,18 +485,9 @@ def _real_time_mitigation_check(decoder: Expectation, x: Circuit):
 def _check_or_recompute_map(decoder: Expectation, x: Circuit):
     """Helper function to recompute the mitigation map."""
     # Compute the expectation value of the reference circuit
-    with decoder._temporary_nshots(decoder.mitigator._nshots):
-        # freqs = (
-        #    super(Expectation, decoder)
-        #    .__call__(decoder.mitigator._reference_circuit)
-        #    .frequencies()
-        # )
-        reference_expval = decoder.observable.expectation(
-            decoder.mitigator._reference_circuit, nshots=decoder.mitigator._nshots
-        )
-        # decoder.observable.expectation_from_samples(
-        #    freqs, qubit_map=decoder.qubits
-        # )
+    reference_expval = decoder.observable.expectation(
+        decoder.mitigator._reference_circuit, nshots=decoder.mitigator._nshots
+    )
     # Check or update noise map
     decoder.mitigator.check_or_update_map(
         noisy_reference_value=reference_expval,
