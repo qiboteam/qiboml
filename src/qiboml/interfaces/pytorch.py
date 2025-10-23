@@ -1,11 +1,11 @@
 """Torch interface to qiboml layers"""
 
 from dataclasses import dataclass
-from functools import reduce
 from typing import Callable, List, Optional, Tuple, Union
 
 import numpy as np
 import torch
+from flask import ctx
 from qibo import Circuit
 from qibo.backends import Backend
 from qibo.config import raise_error
@@ -278,7 +278,6 @@ class QuantumModelAutoGrad(torch.autograd.Function):
             dtype=jacobian.dtype,
             device=jacobian.device,
         )
-        print(jacobian_wrt_angles)
         out_shape = ctx.differentiation.decoding.output_shape
         # contraction to combine jacobians wrt inputs/parameters with those
         # wrt the circuit angles
@@ -299,7 +298,9 @@ class QuantumModelAutoGrad(torch.autograd.Function):
             )
             # discard the elements corresponding to encoding gates
             # to obtain only the part wrt the model's parameters
-            indices_to_discard = reduce(tuple.__add__, ctx.input_to_gate_map.values())
+            indices_to_discard = tuple(
+                i for indices in ctx.input_to_gate_map.values() for i in indices
+            )
             jacobian_wrt_angles = torch.vstack(
                 [
                     row
