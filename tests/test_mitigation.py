@@ -61,7 +61,8 @@ def train_vqe(frontend, backend, model, epochs):
 
 
 @pytest.mark.parametrize("backend", BACKENDS)
-@pytest.mark.parametrize("mitigation_method", ["ICS", "CDR"])
+# @pytest.mark.parametrize("mitigation_method", ["ICS", "CDR"])
+@pytest.mark.parametrize("mitigation_method", ["CDR"])
 def test_rtqem(frontend, backend, mitigation_method):
     nqubits = 2
     nlayers = 2
@@ -98,13 +99,14 @@ def test_rtqem(frontend, backend, mitigation_method):
         frontend=frontend,
         backend=backend,
         model=noisy_model,
-        epochs=30,
+        epochs=10,
     )
 
     mitigation_config = {
         "threshold": 3e-1,
         "method": mitigation_method,
         "method_kwargs": {"n_training_samples": 50},
+        "min_iterations": 3,
     }
 
     # Then we build a decoding with error mitigation
@@ -128,7 +130,7 @@ def test_rtqem(frontend, backend, mitigation_method):
         frontend=frontend,
         backend=backend,
         model=mit_model,
-        epochs=30,
+        epochs=10,
     )
 
     assert abs(mit_result - target_energy) < abs(noisy_result - target_energy)

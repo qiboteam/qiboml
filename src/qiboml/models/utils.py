@@ -98,9 +98,13 @@ class Mitigator:
             circuit=circuit, observable=observable, backend=self._simulation_backend
         )[0]
         # Execute the reference circuit
-        self._reference_value = observable.expectation(
-            self._reference_circuit, nshots=None
-        )
+        reference_state = self._simulation_backend.execute_circuit(
+            self._reference_circuit,
+        ).state()
+        self._reference_value = observable.expectation(reference_state)
+        # self._reference_value = observable.expectation(
+        #    self._reference_circuit, nshots=None
+        # )
 
     def map_is_reliable(self, noisy_reference_value: ndarray):
         """
