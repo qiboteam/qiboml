@@ -324,7 +324,7 @@ class Expectation(QuantumDecoding):
                 self.mitigator(expval),
                 dtype=self.backend.np.float64,
             )
-            print(expval)
+            # print(expval)
 
         if self.calibrator is not None:
             self.calibrator()
@@ -511,6 +511,7 @@ def _check_or_recompute_map(decoder: Expectation, x: Circuit):
         reference_expval = decoder.observable.expectation_from_samples(
             freqs, qubit_map=decoder.qubits
         )
+    # breakpoint()
     # reference_expval = decoder.observable.expectation(
     #    decoder.mitigator._reference_circuit, nshots=decoder.mitigator._nshots
     # )

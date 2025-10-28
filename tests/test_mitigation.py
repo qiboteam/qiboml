@@ -41,10 +41,11 @@ def train_vqe(frontend, backend, model, epochs):
     """Implement training procedure given interface."""
 
     if frontend.__name__ == "qiboml.interfaces.pytorch":
-        optimizer = frontend.torch.optim.Adam(model.parameters(), lr=0.3)
+        optimizer = frontend.torch.optim.Adam(model.parameters(), lr=0.1)
         for _ in range(epochs):
             optimizer.zero_grad()
             cost = model()
+            print(cost)
             cost.backward()
             optimizer.step()
         return backend.cast(cost.item(), dtype="double")
@@ -65,7 +66,7 @@ def train_vqe(frontend, backend, model, epochs):
 @pytest.mark.parametrize("mitigation_method", ["CDR"])
 def test_rtqem(frontend, backend, mitigation_method):
     nqubits = 2
-    nlayers = 2
+    nlayers = 4
     nshots = 10000
 
     seed = 1
@@ -79,13 +80,15 @@ def test_rtqem(frontend, backend, mitigation_method):
     obs = SymbolicHamiltonian(Z(0) * Z(1), backend=backend)
     target_energy = min(obs.eigenvalues())
 
+    noise_model = build_noise_model(nqubits=nqubits, local_pauli_noise_prob=0.003)
+
     # First we build a model with noise and without mitigation
     noisy_decoding = Expectation(
         nqubits=nqubits,
         observable=obs,
         nshots=nshots,
         backend=backend,
-        noise_model=build_noise_model(nqubits=nqubits, local_pauli_noise_prob=0.03),
+        noise_model=noise_model,
         density_matrix=True,
     )
 
@@ -94,7 +97,7 @@ def test_rtqem(frontend, backend, mitigation_method):
         decoding=noisy_decoding,
         differentiation=PSR,
     )
-
+    print("-------> Noisy")
     noisy_result = train_vqe(
         frontend=frontend,
         backend=backend,
@@ -105,8 +108,8 @@ def test_rtqem(frontend, backend, mitigation_method):
     mitigation_config = {
         "threshold": 3e-1,
         "method": mitigation_method,
-        "method_kwargs": {"n_training_samples": 50},
-        "min_iterations": 3,
+        "method_kwargs": {"n_training_samples": 50, "nshots": 10000},
+        "min_iterations": 100,
     }
 
     # Then we build a decoding with error mitigation
@@ -115,7 +118,7 @@ def test_rtqem(frontend, backend, mitigation_method):
         observable=obs,
         nshots=nshots,
         backend=backend,
-        noise_model=build_noise_model(nqubits=nqubits, local_pauli_noise_prob=0.03),
+        noise_model=noise_model,
         density_matrix=True,
         mitigation_config=mitigation_config,
     )
@@ -125,7 +128,7 @@ def test_rtqem(frontend, backend, mitigation_method):
         decoding=mit_decoding,
         differentiation=PSR,
     )
-
+    print("-------> Noise-Mitigated")
     mit_result = train_vqe(
         frontend=frontend,
         backend=backend,
