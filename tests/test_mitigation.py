@@ -62,8 +62,8 @@ def train_vqe(frontend, backend, model, epochs):
 
 
 @pytest.mark.parametrize("backend", BACKENDS)
-# @pytest.mark.parametrize("mitigation_method", ["ICS", "CDR"])
-@pytest.mark.parametrize("mitigation_method", ["CDR"])
+@pytest.mark.parametrize("mitigation_method", ["ICS", "CDR"])
+# @pytest.mark.parametrize("mitigation_method", ["CDR"])
 def test_rtqem(frontend, backend, mitigation_method):
     nqubits = 2
     nlayers = 4
@@ -97,7 +97,6 @@ def test_rtqem(frontend, backend, mitigation_method):
         decoding=noisy_decoding,
         differentiation=PSR,
     )
-    print("-------> Noisy")
     noisy_result = train_vqe(
         frontend=frontend,
         backend=backend,
@@ -128,7 +127,6 @@ def test_rtqem(frontend, backend, mitigation_method):
         decoding=mit_decoding,
         differentiation=PSR,
     )
-    print("-------> Noise-Mitigated")
     mit_result = train_vqe(
         frontend=frontend,
         backend=backend,
