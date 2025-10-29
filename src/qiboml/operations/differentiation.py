@@ -256,6 +256,7 @@ class Jax(Differentiation):
     def _run(circuit, decoding, *parameters):
         for g, p in zip(circuit.trainable_gates, parameters):
             g.parameters = p
+        circuit._final_state = None
         return decoding(circuit)
 
     @staticmethod
@@ -263,6 +264,7 @@ class Jax(Differentiation):
     def _run_with_inputs(circuit, decoding, *parameters):
         for g, p in zip(circuit.parametrized_gates, parameters):
             g.parameters = p
+        circuit._final_state = None
         return decoding(circuit)
 
     def _cast_non_trainable_parameters(self, src_backend, tgt_backend):
@@ -375,10 +377,12 @@ class QuimbJax(Jax):
     def _run(circuit, decoding, *parameters):
         for g, p in zip(circuit.trainable_gates, parameters):
             g.parameters = p
+        circuit._final_state = None
         return decoding(circuit)
 
     @staticmethod
     def _run_with_inputs(circuit, decoding, *parameters):
         for g, p in zip(circuit.parametrized_gates, parameters):
             g.parameters = p
+        circuit._final_state = None
         return decoding(circuit)
