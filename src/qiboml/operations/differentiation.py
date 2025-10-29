@@ -137,6 +137,7 @@ class PSR(Differentiation):
         # forward.set_parameters(tmp_params)
         for g, p in zip(target_gates, tmp_params):
             g.parameters = p
+        forward._final_state = None
 
         tmp_params = self.backend.cast(parameters, copy=True, dtype=parameters[0].dtype)
         tmp_params = self.shift_parameter(tmp_params, parameter_index, -s, self.backend)
@@ -148,6 +149,7 @@ class PSR(Differentiation):
         # backward.set_parameters(tmp_params)
         for g, p in zip(target_gates, tmp_params):
             g.parameters = p
+        backward._final_state = None
 
         return forward, backward, generator_eigenval
 
@@ -195,6 +197,7 @@ class Adjoint(Differentiation):
         )
         for g, p in zip(gate_list, parameters):
             g.parameters = p
+        self.circuit._final_state = None
 
         gradients = []
         lam = self.backend.execute_circuit(self.circuit).state()
