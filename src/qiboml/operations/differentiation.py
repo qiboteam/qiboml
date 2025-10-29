@@ -316,6 +316,7 @@ class Jax(Differentiation):
             g.parameters = p
         if not wrt_inputs:
             self._cast_non_trainable_parameters(self._jax, self.backend)
+        self.circuit._final_state = None
         # transform back to the backend native array
         return backend.cast(self._jax.to_numpy(jacobian).tolist(), backend.np.float64)
 
