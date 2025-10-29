@@ -115,6 +115,12 @@ class QuantumDecoding:
             x = self.noise_model.apply(x)
         return x
 
+    def append_measurements(self, x: Optional[Circuit] = None):
+        if x is None:
+            self._circuit.add(gates.M(*self.qubits))
+        else:
+            x.add(gates.M(*self.qubits))
+
     @property
     def circuit(
         self,
@@ -288,28 +294,14 @@ class Expectation(QuantumDecoding):
         Returns:
             (ndarray): the calculated expectation value.
         """
-
         if self.mitigation_config is not None:
             # In this case it is required before the super.call
             self.align_circuits(x)
             x = self.transpile(x)
             _real_time_mitigation_check(self, x)
 
-        # run circuit
-        if self.analytic:
-            expval = self.observable.expectation(super().__call__(x).state())
-        else:
-            if isinstance(self.observable, SymbolicHamiltonian):
-                x = self.preprocessing(x)
-                expval = self.observable.expectation_from_circuit(
-                    x,
-                    nshots=self.nshots,
-                )
-            else:
-                expval = self.observable.expectation_from_samples(
-                    super().__call__(x).frequencies(),
-                    qubit_map=self.qubits,
-                )
+        x = self.preprocessing(x)
+        expval = self.observable.expectation(x, nshots=self.nshots)
 
         # apply mitigation if requested
         if self.mitigation_config is not None:
@@ -397,6 +389,7 @@ class Samples(QuantumDecoding):
 
     def __post_init__(self):
         super().__post_init__()
+        # self.append_measurements()
 
     def __call__(self, x: Circuit) -> ndarray:
         """Sample the final state of the circuit.
@@ -491,19 +484,13 @@ def _real_time_mitigation_check(decoder: Expectation, x: Circuit):
 def _check_or_recompute_map(decoder: Expectation, x: Circuit):
     """Helper function to recompute the mitigation map."""
     # Compute the expectation value of the reference circuit
-    with decoder._temporary_nshots(decoder.mitigator._nshots):
-        freqs = (
-            super(Expectation, decoder)
-            .__call__(decoder.mitigator._reference_circuit)
-            .frequencies()
-        )
-        reference_expval = decoder.observable.expectation_from_samples(
-            freqs, qubit_map=decoder.qubits
-        )
+    reference_expval = decoder.observable.expectation(
+        decoder.mitigator._reference_circuit, nshots=decoder.mitigator._nshots
+    )
     # Check or update noise map
     decoder.mitigator.check_or_update_map(
         noisy_reference_value=reference_expval,
-        circuit=x + decoder._circuit,
+        circuit=x,  # + decoder._circuit,
         observable=decoder.observable,
         noise_model=decoder.noise_model,
     )

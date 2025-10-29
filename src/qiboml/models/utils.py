@@ -2,11 +2,12 @@ from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional, Union
 
 from qibo import Circuit
-from qibo.backends import Backend, CliffordBackend, _check_backend
+from qibo.backends import Backend, CliffordBackend, _check_backend, get_transpiler
 from qibo.config import log
 from qibo.hamiltonians import Hamiltonian, SymbolicHamiltonian
 from qibo.models import error_mitigation
 from qibo.noise import NoiseModel
+from qibo.transpiler.pipeline import Passes
 
 from qiboml import ndarray
 
@@ -79,28 +80,16 @@ class Mitigator:
     ):
         """Construct reference error sensitive circuit."""
         # Ensuring the observable backend is the simulation one
-        if isinstance(observable, SymbolicHamiltonian):
-            observable = SymbolicHamiltonian(
-                observable.form,
-                nqubits=observable.nqubits,
-                backend=self._simulation_backend,
-            )
-        else:
-            matrix = observable.backend.to_numpy(observable.matrix)
-            observable = Hamiltonian(
-                nqubits=circuit.nqubits,
-                matrix=self._simulation_backend.cast(matrix),
-                backend=self._simulation_backend,
-            )
-
+        original_backend = observable.backend
+        observable.backend = self._simulation_backend
         self._reference_circuit = error_mitigation.error_sensitive_circuit(
             circuit=circuit, observable=observable, backend=self._simulation_backend
         )[0]
         # Execute the reference circuit
-        reference_state = self._simulation_backend.execute_circuit(
-            self._reference_circuit,
-        ).state()
-        self._reference_value = observable.expectation(reference_state)
+        self._reference_value = observable.expectation(
+            self._reference_circuit, nshots=None
+        )
+        observable.backend = original_backend
 
     def map_is_reliable(self, noisy_reference_value: ndarray):
         """
@@ -129,7 +118,7 @@ class Mitigator:
         Check if the mitigation map is reliable. If not, execute the
         error mitigation technique and recompute it.
         """
-        if not self.map_is_reliable(noisy_reference_value):
+        if not self.map_is_reliable(noisy_reference_value) or self._n_checks == 0:
             self.data_regression(
                 circuit=circuit,
                 observable=observable,

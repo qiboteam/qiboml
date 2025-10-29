@@ -16,6 +16,7 @@ from qibo import Circuit
 from qibo.backends import Backend
 from qibo.config import raise_error
 
+from qiboml.backends import TensorflowBackend
 from qiboml.interfaces import utils
 from qiboml.interfaces.circuit_tracer import CircuitTracer
 from qiboml.models.decoding import QuantumDecoding
@@ -116,7 +117,6 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
     differentiation: Optional[Differentiation] = None
     circuit_tracer: Optional[CircuitTracer] = None
 
-
     def __post_init__(self):
         super().__init__()
 
@@ -131,7 +131,9 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
 
         initializer = "zeros"
         if self.parameters_initialization is not None:
-            if isinstance(self.parameters_initialization, keras.initializers.Initializer):
+            if isinstance(
+                self.parameters_initialization, keras.initializers.Initializer
+            ):
                 initializer = self.parameters_initialization
             elif isinstance(self.parameters_initialization, np.ndarray | tf.Tensor):
                 if self.parameters_initialization.shape != params.shape:
@@ -141,14 +143,18 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
                     )
                 params = self.parameters_initialization
             else:
-                raise_error(ValueError, "`parameters_initialization` should be a `np.ndarray` or `keras.initializers.Initializer`.")
+                raise_error(
+                    ValueError,
+                    "`parameters_initialization` should be a `np.ndarray` or `keras.initializers.Initializer`.",
+                )
         self.circuit_parameters = self.add_weight(
             shape=params.shape,
             initializer=initializer,
             trainable=True,
-
         )
-        if not isinstance(self.parameters_initialization, keras.initializers.Initializer):
+        if not isinstance(
+            self.parameters_initialization, keras.initializers.Initializer
+        ):
             self.set_weights([params])
 
         if self.circuit_tracer is None:
@@ -156,10 +162,18 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
         self.circuit_tracer = self.circuit_tracer(self.circuit_structure)
 
         if self.differentiation is None:
-            self.differentiation = utils.get_default_differentiation(
-                decoding=self.decoding,
-                instructions=DEFAULT_DIFFERENTIATION,
-            )
+            if (
+                issubclass(type(self.backend), TensorflowBackend)
+                and self.decoding.analytic
+            ):
+                self.differentiation = None
+            else:
+                self.differentiation = utils.get_default_differentiation(
+                    decoding=self.decoding,
+                    instructions=DEFAULT_DIFFERENTIATION,
+                )()
+        elif isinstance(self.differentiation, type):
+            self.differentiation = self.differentiation()
         self.custom_gradient = None
 
     def compute_output_shape(self, input_shape):
@@ -174,8 +188,8 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
             )
             output = self.decoding(circuit)
             return output[None, :]
-        if self.custom_gradient is None:
-            self.differentiation = self.differentiation(
+        if not self.differentiation._is_built:
+            self.differentiation.build(
                 self.circuit_tracer.build_circuit(1 * self.circuit_parameters, x=x),
                 self.decoding,
             )
@@ -207,7 +221,6 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
 
         return fig
 
-    
     @property
     def output_shape(
         self,
