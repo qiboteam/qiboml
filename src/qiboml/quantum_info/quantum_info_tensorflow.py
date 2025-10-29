@@ -27,50 +27,11 @@ def _sample_from_quantum_mallows_distribution(nqubits: int):
     return hadamards, permutations
 
 
-def _gamma_delta_matrices(nqubits: int, hadamards, permutations):
-    delta_matrix = np.eye(nqubits, dtype=int)
-    delta_matrix_prime = np.copy(delta_matrix)
-
-    gamma_matrix_prime = ENGINE.random.randint(0, 2, size=nqubits).numpy()
-    gamma_matrix_prime = np.diag(gamma_matrix_prime)
-
-    gamma_matrix = ENGINE.random.randint(0, 2, size=nqubits).numpy()
-    gamma_matrix = hadamards * gamma_matrix
-    gamma_matrix = np.diag(gamma_matrix)
-
-    tril_indices = np.tril_indices(nqubits, k=-1)
-    delta_matrix_prime[tril_indices] = ENGINE.random.randint(
-        0, 2, size=len(tril_indices[0])
-    ).numpy()
-    gamma_matrix_prime[tril_indices] = ENGINE.random.randint(
-        0, 2, size=len(tril_indices[0])
-    ).numpy()
-    triu_indices = np.triu_indices(nqubits, k=1)
-    gamma_matrix_prime[triu_indices] = gamma_matrix_prime[tril_indices]
-
-    p_col_gt_row = permutations[triu_indices[1]] > permutations[triu_indices[0]]
-    p_col_neq_row = permutations[triu_indices[1]] != permutations[triu_indices[0]]
-    p_col_le_row = p_col_gt_row ^ True
-    h_row_eq_0 = hadamards[triu_indices[0]] == 0
-    h_col_eq_0 = hadamards[triu_indices[1]] == 0
-
-    idx = (h_row_eq_0 * h_col_eq_0 ^ True) * p_col_neq_row
-    elements = ENGINE.random.randint(0, 2, size=len(idx.nonzero()[0])).numpy()
-    gamma_matrix[triu_indices[0][idx], triu_indices[1][idx]] = elements
-    gamma_matrix[triu_indices[1][idx], triu_indices[0][idx]] = elements
-
-    idx = p_col_gt_row | (p_col_le_row * h_row_eq_0 * h_col_eq_0)
-    elements = ENGINE.random.randint(0, 2, size=len(idx.nonzero()[0])).numpy()
-    delta_matrix[triu_indices[1][idx], triu_indices[0][idx]] = elements
-
-    return gamma_matrix, gamma_matrix_prime, delta_matrix, delta_matrix_prime
-
-
 class QinfoTensorflow:
     pass
 
 
 QINFO = QinfoTensorflow()
 
-for function in (_sample_from_quantum_mallows_distribution, _gamma_delta_matrices):
+for function in (_sample_from_quantum_mallows_distribution,):
     setattr(QINFO, function.__name__, function)

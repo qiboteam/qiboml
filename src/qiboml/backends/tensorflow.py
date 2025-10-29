@@ -1,5 +1,6 @@
 import collections
 import os
+from copy import deepcopy
 from typing import Union
 
 import numpy as np
@@ -46,6 +47,14 @@ class TensorflowBackend(NumpyBackend):
         self.np = tnp
         self.np.flatnonzero = np.flatnonzero
         self.np.copy = np.copy
+        np_randint = deepcopy(np.random.randint)
+
+        def randint(low, high=None, size=None, dtype=int):
+            if dtype not in (self.np.int32, self.np.int64):
+                return np_randint(low, high, size, dtype)
+            return tnp.random.randint(low, high, size, dtype)
+
+        self.np.random.randint = randint
 
         self.versions = {
             "qibo": __version__,
@@ -80,6 +89,8 @@ class TensorflowBackend(NumpyBackend):
                 shape=size, mean=loc, stddev=scale
             )
         )
+        self.qinfo.ENGINE.random.randint = randint
+
         # load some custom qinfo operators
         from qiboml.quantum_info.quantum_info_tensorflow import QINFO
 
