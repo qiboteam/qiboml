@@ -92,7 +92,7 @@ class TensorflowBackend(NumpyBackend):
         self.qinfo.ENGINE.random.randint = randint
 
         # load some custom qinfo operators
-        from qiboml.quantum_info.quantum_info_tensorflow import QINFO
+        from qiboml.quantum_info._quantum_info_tensorflow import QINFO
 
         for method in dir(QINFO):
             if method[:2] != "__":

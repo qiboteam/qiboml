@@ -8,7 +8,7 @@ from qibo.backends import einsum_utils
 from qibo.backends.npmatrices import NumpyMatrices
 from qibo.backends.numpy import NumpyBackend
 
-from qiboml.quantum_info.quantum_info_jax import QINFO
+from qiboml.quantum_info._quantum_info_jax import QINFO
 
 
 @partial(jax.jit, static_argnums=(0, 1))
