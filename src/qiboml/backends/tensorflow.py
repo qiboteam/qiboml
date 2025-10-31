@@ -22,6 +22,7 @@ class TensorflowMatrices(NumpyMatrices):
         import tensorflow as tf  # pylint: disable=import-error,C0415
 
         self.engine = tf
+        self.engine.conj = self.engine.math.conj
 
     def _cast(self, array, dtype) -> ArrayLike:
         return self.engine.cast(array, dtype=dtype)
@@ -378,7 +379,9 @@ class TensorflowBackend(Backend):
         samples = self.engine.bitwise.right_shift(samples[:, np.newaxis], qrange)
         return samples % 2
 
-    def update_frequencies(self, frequencies: ArrayLike, probabilities: ArrayLike, nsamples: int) -> ArrayLike:
+    def update_frequencies(
+        self, frequencies: ArrayLike, probabilities: ArrayLike, nsamples: int
+    ) -> ArrayLike:
         # redefining this because ``tnp.unique`` and tensor update is not available
         samples = self.sample_shots(probabilities, nsamples)
         res, _, counts = self.engine.unique_with_counts(samples, out_idx=self.int64)
