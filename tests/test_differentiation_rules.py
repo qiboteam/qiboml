@@ -8,7 +8,8 @@ from qibo.backends import NumpyBackend
 from qiboml.models.ansatze import hardware_efficient
 from qiboml.models.decoding import Expectation
 from qiboml.models.encoding import PhaseEncoding
-from qiboml.operations.differentiation import PSR, Adjoint, Jax
+from qiboml.operations.differentiation import PSR, Adjoint
+from qiboml.operations.differentiation_jax import Jax
 
 # TODO: use the classical conftest mechanism or customize mechanism for this test
 EXECUTION_BACKENDS = [
@@ -160,15 +161,15 @@ def test_expval_custom_grad(
     )
 
     def equivariant_circuit(th, phi, lam):
-        c = Circuit(nqubits)
+        circuit = Circuit(nqubits)
         delta = 2 * engine.cos(phi) + lam**2
         gamma = lam * engine.exp(th / 2)
-        c.add([gates.RZ(i, theta=th) for i in range(nqubits)])
-        c.add([gates.RX(i, theta=lam) for i in range(nqubits)])
-        c.add([gates.RY(i, theta=phi) for i in range(nqubits)])
-        c.add(gates.RZ(0, theta=delta))
-        c.add(gates.RX(1, theta=gamma))
-        return c
+        circuit.add([gates.RZ(i, theta=th) for i in range(nqubits)])
+        circuit.add([gates.RX(i, theta=lam) for i in range(nqubits)])
+        circuit.add([gates.RY(i, theta=phi) for i in range(nqubits)])
+        circuit.add(gates.RZ(0, theta=delta))
+        circuit.add(gates.RX(1, theta=gamma))
+        return circuit
 
     circuit_structure = [
         encoding_layer,
@@ -189,7 +190,7 @@ def test_expval_custom_grad(
     nparams = len(training_layer.get_parameters())
     initial_params = np.linspace(0.0, 2 * np.pi, nparams)
     training_layer.set_parameters(
-        backend.cast(initial_params, dtype=backend.np.float64)
+        backend.cast(initial_params, dtype=backend.float64)
     )
 
     q_model = frontend.QuantumModel(

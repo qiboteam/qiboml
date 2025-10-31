@@ -10,8 +10,8 @@ def test_binary_encoding_layer(backend):
     qubits = np.random.choice(range(nqubits), size=(6,), replace=False)
     layer = ed.BinaryEncoding(nqubits, qubits=qubits)
     data = backend.cast(np.random.choice([0, 1], size=(len(qubits),)))
-    c = layer(data)
-    for bit, gate in zip(data, c.queue):
+    circuit = layer(data)
+    for bit, gate in zip(data, circuit.queue):
         assert bit == gate.init_kwargs["theta"] / np.pi
     # test shape error
     with pytest.raises(RuntimeError):
@@ -28,6 +28,6 @@ def test_phase_encoding_layer(backend):
 
     layer = ed.PhaseEncoding(nqubits, qubits=qubits)
     data = backend.cast(np.random.randn(1, len(qubits)))
-    c = layer(data)
-    angles = [gate.init_kwargs["theta"] for gate in c.queue if gate.name == "ry"]
+    circuit = layer(data)
+    angles = [gate.init_kwargs["theta"] for gate in circuit.queue if gate.name == "ry"]
     backend.assert_allclose(data.ravel(), angles)
