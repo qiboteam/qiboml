@@ -73,13 +73,15 @@ def test_rtqem(frontend, backend, mitigation_method):
 
     obs = Z(nqubits, dense=False, backend=backend)
 
+    noise_model = build_noise_model(nqubits=nqubits, local_pauli_noise_prob=0.02)
+
     # First we build a model with noise and without mitigation
     noisy_decoding = Expectation(
         nqubits=nqubits,
         observable=obs,
         nshots=nshots,
         backend=backend,
-        noise_model=build_noise_model(nqubits=nqubits, local_pauli_noise_prob=0.02),
+        noise_model=noise_model,
         density_matrix=True,
     )
 
@@ -99,7 +101,7 @@ def test_rtqem(frontend, backend, mitigation_method):
     mitigation_config = {
         "threshold": 3e-1,
         "method": mitigation_method,
-        "method_kwargs": {"n_training_samples": 50},
+        "method_kwargs": {"n_training_samples": 50, "nshots": 10000},
     }
 
     # Then we build a decoding with error mitigation
@@ -108,7 +110,7 @@ def test_rtqem(frontend, backend, mitigation_method):
         observable=obs,
         nshots=nshots,
         backend=backend,
-        noise_model=build_noise_model(nqubits=nqubits, local_pauli_noise_prob=0.04),
+        noise_model=noise_model,
         density_matrix=True,
         mitigation_config=mitigation_config,
     )
