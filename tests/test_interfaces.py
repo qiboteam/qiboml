@@ -9,6 +9,7 @@ from qibo.config import raise_error
 from qibo.noise import NoiseModel, PauliError
 from qibo.symbols import Z
 from qibo.transpiler import NativeGates, Passes, Unroller
+from scipy.linalg import hadamard
 
 import qiboml.models.ansatze as ans
 import qiboml.models.decoding as dec
@@ -314,9 +315,8 @@ def test_encoding(backend, frontend, layer, seed):
     nlayers = 1
     dim = 2
 
-    training_layer = ans.hardware_efficient(
-        nqubits, random_subset(nqubits, dim), nlayers, seed=seed
-    )
+    qubits = random_subset(nqubits, dim)
+    training_layer = ans.hardware_efficient(nqubits, qubits, nlayers, seed=seed)
 
     decoding_qubits = random_subset(nqubits, dim)
     observable = hamiltonians.SymbolicHamiltonian(
