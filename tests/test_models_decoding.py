@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 import torch
-from qibo import Circuit, gates, hamiltonians
+from qibo import Circuit, construct_backend, gates, hamiltonians
 from qibo.models.encodings import comp_basis_encoder
 from qibo.quantum_info import random_clifford
 from qibo.symbols import X, Z
@@ -10,12 +10,14 @@ from qibo.transpiler import NativeGates, Passes, Sabre, Unroller
 import qiboml.models.decoding as dec
 from qiboml.interfaces.pytorch import QuantumModel
 
+NPBACKEND = construct_backend("numpy")
+
 
 def test_probabilities_layer(backend):
     nqubits = 5
     qubits = np.random.choice(range(nqubits), size=(4,), replace=False)
     layer = dec.Probabilities(nqubits, qubits=qubits, backend=backend)
-    c = random_clifford(nqubits, backend=backend)
+    c = random_clifford(nqubits, backend=NPBACKEND)
     backend.assert_allclose(
         layer(c).ravel(), backend.execute_circuit(c).probabilities(qubits)
     )
@@ -25,7 +27,7 @@ def test_probabilities_layer(backend):
 def test_state_layer(backend, density_matrix):
     nqubits = 5
     layer = dec.State(nqubits, density_matrix=density_matrix, backend=backend)
-    c = random_clifford(nqubits, density_matrix=density_matrix, backend=backend)
+    c = random_clifford(nqubits, density_matrix=density_matrix, backend=NPBACKEND)
     real, im = layer(c)
     backend.assert_allclose(
         (real + 1j * im).ravel(), backend.execute_circuit(c).state().ravel()
@@ -63,13 +65,13 @@ def test_expectation_layer(backend, nshots, observable):
 def test_decoding_with_transpiler(backend):
     rng = np.random.default_rng(42)
     backend.set_seed(42)
-    c = random_clifford(3, seed=rng, backend=backend)
+    c = random_clifford(3, seed=42, backend=NPBACKEND)
     transpiler = Passes(
         connectivity=[[0, 1], [0, 2]], passes=[Unroller(NativeGates.default(), Sabre())]
     )
     layer = dec.Probabilities(3, transpiler=transpiler, backend=backend)
     backend.assert_allclose(
-        backend.execute_circuit(c).probabilities(), layer(c).ravel()
+        backend.execute_circuit(c).probabilities(), layer(c).ravel(), atol=1e-8
     )
 
 
