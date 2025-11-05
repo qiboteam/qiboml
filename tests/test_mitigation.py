@@ -62,14 +62,12 @@ def train_vqe(frontend, backend, model, epochs):
 
 
 @pytest.mark.parametrize("backend", BACKENDS)
-@pytest.mark.parametrize("mitigation_method", ["ICS", "CDR"])
-# @pytest.mark.parametrize("mitigation_method", ["CDR"])
-def test_rtqem(frontend, backend, mitigation_method):
+@pytest.mark.parametrize("mitigation_method,seed", zip(["ICS", "CDR"], [1, 1]))
+def test_rtqem(frontend, backend, mitigation_method, seed):
     nqubits = 2
     nlayers = 4
     nshots = 10000
 
-    seed = 1
     set_seed(frontend, seed)
     backend.set_seed(seed)
 
@@ -101,7 +99,7 @@ def test_rtqem(frontend, backend, mitigation_method):
         frontend=frontend,
         backend=backend,
         model=noisy_model,
-        epochs=10,
+        epochs=3,
     )
 
     mitigation_config = {
@@ -131,10 +129,11 @@ def test_rtqem(frontend, backend, mitigation_method):
         frontend=frontend,
         backend=backend,
         model=mit_model,
-        epochs=10,
+        epochs=3,
     )
 
     assert abs(mit_result - target_energy) < abs(noisy_result - target_energy)
+    assert abs(mit_result - target_energy) < 1e-1
 
 
 def test_custom_map(frontend):
