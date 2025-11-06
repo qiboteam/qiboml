@@ -30,7 +30,7 @@ class Differentiation(ABC):
 
     def build(self, circuit: Circuit, decoding: QuantumDecoding):
         """Attach model internals and prepare compiled artifacts."""
-        if self._is_built:
+        if self._is_built:  # pragma: no cover
             return
         self.circuit = circuit
         self.decoding = decoding

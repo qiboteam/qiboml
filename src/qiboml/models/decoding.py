@@ -115,12 +115,6 @@ class QuantumDecoding:
             x = self.noise_model.apply(x)
         return x
 
-    def append_measurements(self, x: Optional[Circuit] = None):
-        if x is None:
-            self._circuit.add(gates.M(*self.qubits))
-        else:
-            x.add(gates.M(*self.qubits))
-
     @property
     def circuit(
         self,
@@ -294,12 +288,11 @@ class Expectation(QuantumDecoding):
         Returns:
             (ndarray): the calculated expectation value.
         """
-        x._final_state = None
         if self.mitigation_config is not None:
             # In this case it is required before the super.call
             self.align_circuits(x)
-            x = self.transpile(x)
-            _real_time_mitigation_check(self, x)
+            transpiled_x = self.transpile(x)
+            _real_time_mitigation_check(self, transpiled_x)
 
         x._final_state = None
         x = self.preprocessing(x)
@@ -391,7 +384,6 @@ class Samples(QuantumDecoding):
 
     def __post_init__(self):
         super().__post_init__()
-        # self.append_measurements()
 
     def __call__(self, x: Circuit) -> ndarray:
         """Sample the final state of the circuit.
@@ -492,7 +484,7 @@ def _check_or_recompute_map(decoder: Expectation, x: Circuit):
     # Check or update noise map
     decoder.mitigator.check_or_update_map(
         noisy_reference_value=reference_expval,
-        circuit=x,  # + decoder._circuit,
+        circuit=x,
         observable=decoder.observable,
         noise_model=decoder.noise_model,
     )
