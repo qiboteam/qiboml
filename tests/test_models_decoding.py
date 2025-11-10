@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 import torch
-from qibo import Circuit, gates, hamiltonians
+from qibo import Circuit, construct_backend, gates, hamiltonians
 from qibo.backends import NumpyBackend
 from qibo.models.encodings import comp_basis_encoder
 from qibo.quantum_info import random_clifford
@@ -10,6 +10,8 @@ from qibo.transpiler import NativeGates, Passes, Sabre, Unroller
 
 import qiboml.models.decoding as dec
 from qiboml.interfaces.pytorch import QuantumModel
+
+NPBACKEND = construct_backend("numpy")
 
 
 def test_probabilities_layer(backend):
@@ -70,9 +72,9 @@ def test_expectation_layer(backend, nshots, observable):
 
 
 def test_decoding_with_transpiler(backend):
-    rng = backend.default_rng(42)
-    backend.set_seed(42)
-    circuit = random_clifford(3, seed=rng, backend=backend)
+    seed = 42
+    backend.set_seed(seed)
+    circuit = random_clifford(3, seed=seed, backend=NPBACKEND)
     transpiler = Passes(
         connectivity=[[0, 1], [0, 2]], passes=[Unroller(NativeGates.default(), Sabre())]
     )

@@ -7,8 +7,8 @@ from numpy.typing import ArrayLike
 from qibo import Circuit, __version__
 from qibo.backends.abstract import Backend
 from qibo.backends.npmatrices import NumpyMatrices
-from qibo.gates.abstract import Gate
 from qibo.config import raise_error
+from qibo.gates.abstract import Gate
 from qibo.result import CircuitResult, QuantumState
 
 
@@ -76,6 +76,10 @@ class PyTorchBackend(Backend):
         )
         self.parameter_dtype = self.float64
         self.tensor_types = (self.engine.Tensor, np.ndarray)
+
+    def set_seed(self, seed):
+        np.random.seed(seed)
+        self.np.manual_seed(np.random.get_state()[1][0])
 
     def cast(
         self,

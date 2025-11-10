@@ -1,7 +1,7 @@
 """Module defining the Jax backend."""
 
 from functools import partial
-from typing import List, Optional, Union, Tuple
+from typing import List, Optional, Tuple, Union
 
 import jax  # pylint: disable=import-error
 import jax.numpy as jnp  # pylint: disable=import-error
@@ -12,6 +12,8 @@ from qibo.backends import Backend, einsum_utils
 from qibo.backends.npmatrices import NumpyMatrices
 from qibo.gates.abstract import Gate
 from qibo.result import CircuitResult, QuantumState
+
+from qiboml.quantum_info._quantum_info_jax import QINFO
 
 
 @partial(jax.jit, static_argnums=(0, 1, 2))
