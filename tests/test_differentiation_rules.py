@@ -61,7 +61,7 @@ TARGET_GRAD_TENSORFLOW["no_inputs"] = (
 def set_seed(frontend, seed):
     random.seed(42)
     np.random.seed(seed)
-    frontend.np.random.seed(seed)
+    frontend.engine.random.seed(seed)
     if frontend.__name__ == "qiboml.interfaces.pytorch":
         frontend.torch.set_default_dtype(frontend.torch.float64)
         frontend.torch.manual_seed(seed)
@@ -189,9 +189,7 @@ def test_expval_custom_grad(
 
     nparams = len(training_layer.get_parameters())
     initial_params = np.linspace(0.0, 2 * np.pi, nparams)
-    training_layer.set_parameters(
-        backend.cast(initial_params, dtype=backend.float64)
-    )
+    training_layer.set_parameters(backend.cast(initial_params, dtype=backend.float64))
 
     q_model = frontend.QuantumModel(
         circuit_structure=circuit_structure,

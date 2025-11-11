@@ -77,10 +77,6 @@ class PyTorchBackend(Backend):
         self.parameter_dtype = self.float64
         self.tensor_types = (self.engine.Tensor, np.ndarray)
 
-    def set_seed(self, seed):
-        np.random.seed(seed)
-        self.np.manual_seed(np.random.get_state()[1][0])
-
     def cast(
         self,
         array: ArrayLike,
@@ -321,10 +317,10 @@ class PyTorchBackend(Backend):
         if dtype is None:
             dtype = self.dtype
 
-        copied = self.cast(matrix, copy=True)
+        copied = self.cast(matrix, copy=True)  # pylint: disable=E1111
         copied = self.to_numpy(copied) if power >= 0.0 else copied.detach()
         copied = super().matrix_power(copied, power, precision_singularity, dtype)
-        return self.cast(copied, dtype=copied.dtype)
+        return self.cast(copied, dtype=copied.dtype)  # pylint: disable=E1111
 
     ########################################################################################
     ######## Methods related to circuit execution                                   ########
