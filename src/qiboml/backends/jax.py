@@ -6,14 +6,19 @@ from typing import List, Optional, Tuple, Union
 import jax  # pylint: disable=import-error
 import jax.numpy as jnp  # pylint: disable=import-error
 import numpy as np
-from numpy.typing import ArrayLike
+from numpy.typing import ArrayLike, DTypeLike
 from qibo import __version__
 from qibo.backends import Backend, einsum_utils
 from qibo.backends.npmatrices import NumpyMatrices
 from qibo.config import raise_error
 from qibo.gates.abstract import Gate
 from qibo.result import CircuitResult, QuantumState
+from scipy.linalg import block_diag, expm, fractional_matrix_power, logm
+from scipy.sparse import csr_matrix
+from scipy.sparse import eye as eye_sparse
 from scipy.sparse import issparse
+from scipy.sparse.linalg import eigsh
+from scipy.sparse.linalg import expm as expm_sparse
 
 from qiboml.quantum_info._quantum_info_jax import QINFO
 
@@ -140,6 +145,10 @@ class JaxBackend(Backend):
     def set_seed(self, seed: int) -> None:
         np.random.seed(seed)
 
+    ########################################################################################
+    ######## Methods related to array manipulation                                  ########
+    ########################################################################################
+
     def default_rng(self, seed: Optional[int] = None) -> None:
         return np.random.default_rng(seed)
 
@@ -150,13 +159,20 @@ class JaxBackend(Backend):
         replace: bool = True,
         p: ArrayLike = None,
         seed=None,
+        **kwargs,
     ) -> ArrayLike:
+        dtype = kwargs.get("dtype", self.float64)
+
         if seed is not None:
             local_state = self.default_rng(seed) if isinstance(seed, int) else seed
 
-            return local_state.choice(array, size=size, replace=replace, p=p)
+            result = local_state.choice(array, size=size, replace=replace, p=p)
 
-        return np.random.choice(array, size=size, replace=replace, p=p)
+            return self.cast(result, dtype=dtype)
+
+        result = np.random.choice(array, size=size, replace=replace, p=p)
+
+        return self.cast(result, dtype=dtype)
 
     def random_integers(
         self,
@@ -201,6 +217,48 @@ class JaxBackend(Backend):
 
         return np.random.uniform(low, high, size)
 
+    ########################################################################################
+    ######## Methods related to the creation and manipulation of quantum objects    ########
+    ########################################################################################
+
+    def zero_state(
+        self, nqubits: int, density_matrix: bool = False, dtype=None
+    ) -> ArrayLike:
+        if dtype is None:
+            dtype = self.dtype
+
+        return zero_state(nqubits, density_matrix, dtype)
+
+    ########################################################################################
+    ######## Methods related to circuit execution                                   ########
+    ########################################################################################
+
+    def apply_gate(self, gate: Gate, state: ArrayLike, nqubits: int) -> ArrayLike:
+        density_matrix = bool(len(state.shape) == 2)
+
+        if density_matrix:
+            return self._apply_gate_density_matrix(gate, state, nqubits)
+
+        if gate.is_controlled_by:
+            order, targets = einsum_utils.control_order(gate, nqubits)
+            return _apply_gate_controlled(
+                gate.matrix(self),
+                state,
+                order,
+                targets,
+                gate.control_qubits,
+                gate.target_qubits,
+                nqubits,
+            )
+
+        return _apply_gate(gate.matrix(self), state, gate.qubits, nqubits)
+
+    def matrix(self, gate: Gate) -> ArrayLike:
+        matrix = super().matrix(gate)
+        if isinstance(matrix, self.jax.core.Tracer):
+            delattr(self.matrices, gate.__class__.__name__)
+        return matrix
+
     def matrix_fused(self, fgate: Gate) -> ArrayLike:
         rank = len(fgate.target_qubits)
         # jax only supports coo sparse arrays
@@ -236,13 +294,9 @@ class JaxBackend(Backend):
 
         return matrix
 
-    def zero_state(
-        self, nqubits: int, density_matrix: bool = False, dtype=None
-    ) -> ArrayLike:
-        if dtype is None:
-            dtype = self.dtype
-
-        return zero_state(nqubits, density_matrix, dtype)
+    ########################################################################################
+    ######## Methods related to the execution and post-processing of measurements   ########
+    ########################################################################################
 
     def update_frequencies(
         self, frequencies: ArrayLike, probabilities: ArrayLike, nsamples: int
@@ -252,41 +306,29 @@ class JaxBackend(Backend):
         frequencies = frequencies.at[res].add(counts)
         return frequencies
 
-    def matrix(self, gate: Gate) -> ArrayLike:
-        matrix = super().matrix(gate)
-        if isinstance(matrix, self.jax.core.Tracer):
-            delattr(self.matrices, gate.__class__.__name__)
-        return matrix
+    ########################################################################################
+    ######## Methods related to array manipulation                                  ########
+    ########################################################################################
 
-    def apply_gate(self, gate: Gate, state: ArrayLike, nqubits: int) -> ArrayLike:
-        density_matrix = bool(len(state.shape) == 2)
+    def block_diag(self, *arrays: ArrayLike) -> ArrayLike:
+        return block_diag(*arrays)
 
-        if density_matrix:
-            return self._apply_gate_density_matrix(gate, state, nqubits)
+    def csr_matrix(self, array: ArrayLike, **kwargs) -> ArrayLike:
+        return csr_matrix(array, **kwargs)
 
-        if gate.is_controlled_by:
-            order, targets = einsum_utils.control_order(gate, nqubits)
-            return _apply_gate_controlled(
-                gate.matrix(self),
-                state,
-                order,
-                targets,
-                gate.control_qubits,
-                gate.target_qubits,
-                nqubits,
-            )
+    def eigsh(self, array: ArrayLike, **kwargs) -> Tuple[ArrayLike, ArrayLike]:
+        return eigsh(array, **kwargs)
 
-        return _apply_gate(gate.matrix(self), state, gate.qubits, nqubits)
+    def expm(self, array: ArrayLike) -> ArrayLike:
+        func = expm_sparse if self.is_sparse(array) else expm
+        return func(array)
 
-    def assert_allclose(
-        self, value, target, rtol: float = 1e-7, atol: float = 0.0
-    ) -> None:  # pragma: no cover
-        if isinstance(value, (CircuitResult, QuantumState)):
-            value = value.state()
-        if isinstance(target, (CircuitResult, QuantumState)):
-            target = target.state()
+    def logm(self, array: ArrayLike, **kwargs) -> ArrayLike:
+        return logm(array, **kwargs)
 
-        np.testing.assert_allclose(value, target, rtol=rtol, atol=atol)
+    ########################################################################################
+    ######## Helper methods                                                         ########
+    ########################################################################################
 
     def _apply_gate_density_matrix(
         self, gate: Gate, state: ArrayLike, nqubits: int
@@ -336,3 +378,13 @@ class JaxBackend(Backend):
             state = self.einsum(right, state, matrixc)
             state = self.einsum(left, state, matrix)
         return self.reshape(state, 2 * (2**nqubits,))
+
+    def _identity_sparse(
+        self, dims: int, dtype: Optional[DTypeLike] = None, **kwargs
+    ) -> ArrayLike:
+        if dtype is None:  # pragma: no cover
+            dtype = self.dtype
+
+        sparsity_format = kwargs.get("format", "csr")
+
+        return eye_sparse(dims, dtype=dtype, format=sparsity_format, **kwargs)
