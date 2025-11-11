@@ -327,6 +327,25 @@ class JaxBackend(Backend):
         return logm(array, **kwargs)
 
     ########################################################################################
+    ######## Helper methods for testing                                             ########
+    ########################################################################################
+
+    def assert_allclose(
+        self,
+        value: Union[ArrayLike, CircuitResult, QuantumState],
+        target: Union[ArrayLike, CircuitResult, QuantumState],
+        rtol: float = 1e-7,
+        atol: float = 0.0,
+    ) -> None:
+        if isinstance(value, (CircuitResult, QuantumState)):
+            value = value.state()
+        if isinstance(target, (CircuitResult, QuantumState)):
+            target = target.state()
+
+        # needs to call numpy directly because jax has no testing equivalent
+        np.testing.assert_allclose(value, target, rtol=rtol, atol=atol)
+
+    ########################################################################################
     ######## Helper methods                                                         ########
     ########################################################################################
 
