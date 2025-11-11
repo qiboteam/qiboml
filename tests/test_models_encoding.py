@@ -30,4 +30,4 @@ def test_phase_encoding_layer(backend):
     data = backend.cast(np.random.randn(1, len(qubits)))
     circuit = layer(data)
     angles = [gate.init_kwargs["theta"] for gate in circuit.queue if gate.name == "ry"]
-    backend.assert_allclose(data.ravel(), angles)
+    backend.assert_allclose(data.ravel(), backend.cast(angles, dtype=backend.float64))

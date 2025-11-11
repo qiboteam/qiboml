@@ -10,6 +10,7 @@ from numpy.typing import ArrayLike
 from qibo import __version__
 from qibo.backends import Backend, einsum_utils
 from qibo.backends.npmatrices import NumpyMatrices
+from qibo.config import raise_error
 from qibo.gates.abstract import Gate
 from qibo.result import CircuitResult, QuantumState
 from scipy.sparse import issparse
@@ -78,7 +79,7 @@ class JaxMatrices(NumpyMatrices):
 
     def __init__(self, dtype):
         super().__init__(dtype)
-        self.np = jnp
+        self.engine = jnp
         self.dtype = dtype
 
     def _cast(self, array: ArrayLike, dtype) -> ArrayLike:
@@ -123,6 +124,10 @@ class JaxBackend(Backend):
     def is_sparse(self, array: ArrayLike) -> bool:
         """Determine if a given array is a sparse tensor."""
         return issparse(array)
+
+    def set_threads(self, nthreads: int) -> None:
+        if nthreads > 1:
+            raise_error(ValueError, "``numpy`` does not support more than one thread.")
 
     def to_numpy(self, array: ArrayLike) -> ArrayLike:
 

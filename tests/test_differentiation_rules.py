@@ -61,7 +61,6 @@ TARGET_GRAD_TENSORFLOW["no_inputs"] = (
 def set_seed(frontend, seed):
     random.seed(42)
     np.random.seed(seed)
-    frontend.engine.random.seed(seed)
     if frontend.__name__ == "qiboml.interfaces.pytorch":
         frontend.torch.set_default_dtype(frontend.torch.float64)
         frontend.torch.manual_seed(seed)

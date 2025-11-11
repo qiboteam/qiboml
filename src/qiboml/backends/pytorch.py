@@ -187,7 +187,10 @@ class PyTorchBackend(Backend):
         replace: bool = True,
         p: ArrayLike = None,
         seed=None,
+        **kwargs,
     ) -> ArrayLike:
+        dtype = kwargs.get("dtype", self.float64)
+
         if size is None:
             size = 1
 
@@ -198,11 +201,11 @@ class PyTorchBackend(Backend):
                 p, num_samples=size, replacement=replace, generator=local_state
             )
 
-            return self.copy(array[indices])
+            return self.cast(array[indices], dtype=dtype, copy=True)
 
         indices = self.engine.multinomial(p, num_samples=size, replacement=replace)
 
-        return self.copy(array[list(indices)])
+        return self.cast(array[list(indices)], dtype=dtype, copy=True)
 
     def random_integers(
         self,
