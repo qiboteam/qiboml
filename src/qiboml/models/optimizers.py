@@ -1,3 +1,4 @@
+import math
 from typing import Optional
 
 from qibo.backends import _check_backend
@@ -76,6 +77,7 @@ class ExactGeodesicTransportCG:
         self.x = self.angles_to_amplitudes(self.angles)
         self.v = self.tangent_vector()
         self.u = self.backend.cast(self.v, dtype=self.v.dtype, copy=True)
+
         # Power method learning rate
         norm_u = self.backend.sqrt(self.sphere_inner_product(self.u, self.u, self.x))
         loss_prev = self.loss()
@@ -145,13 +147,13 @@ class ExactGeodesicTransportCG:
         state = self.state()
         return self.hamiltonian.expectation(state)
 
-    def gradient(self, epsilon=1e-8):
+    def gradient(self, epsilon=1e-8):  # pragma: no cover
         """Numerically compute gradient of loss wrt angles.
 
         Returns:
             ndarray: Gradient of loss w.r.t. ``angles``.
         """
-        grad = self.backend.zeros_like(self.angles)
+        grad = self.backend.zeros_like(self.angles, dtype=self.backend.float64)
         for idx in range(len(self.angles)):
             angles_forward = self.backend.cast(
                 self.angles, dtype=self.angles.dtype, copy=True
@@ -159,15 +161,40 @@ class ExactGeodesicTransportCG:
             angles_backward = self.backend.cast(
                 self.angles, dtype=self.angles.dtype, copy=True
             )
-            angles_forward[idx] += epsilon
-            angles_backward[idx] -= epsilon
+            if self.backend.platform == "tensorflow":
+                angles_forward = self.backend.engine.tensor_scatter_nd_update(
+                    angles_forward, [[idx]], [angles_forward[idx] + epsilon]
+                )
+                angles_backward = self.backend.engine.tensor_scatter_nd_update(
+                    angles_backward, [[idx]], [angles_backward[idx] - epsilon]
+                )
+            else:
+                angles_forward[idx] += epsilon
+                angles_backward[idx] -= epsilon
             loss_forward = self.__class__(
-                self.nqubits, self.weight, self.hamiltonian, angles_forward
+                self.nqubits,
+                self.weight,
+                self.hamiltonian,
+                angles_forward,
+                backend=self.backend,
             ).loss()
             loss_backward = self.__class__(
-                self.nqubits, self.weight, self.hamiltonian, angles_backward
+                self.nqubits,
+                self.weight,
+                self.hamiltonian,
+                angles_backward,
+                backend=self.backend,
             ).loss()
-            grad[idx] = (loss_forward - loss_backward) / (2 * epsilon)
+
+            update = (loss_forward - loss_backward) / (2 * epsilon)
+
+            if self.backend.platform == "tensorflow":
+                grad = self.backend.engine.tensor_scatter_nd_update(
+                    grad, [[idx]], [update]
+                )
+            else:
+                grad[idx] = update
+
         return grad
 
     def amplitudes_to_full_state(self, amps):
@@ -179,8 +206,10 @@ class ExactGeodesicTransportCG:
         Returns:
             ndarray: Statevector corresponding to the given amplitudes.
         """
-        circuit = hamming_weight_encoder(amps, self.nqubits, self.weight)
-        return circuit().state()
+        circuit = hamming_weight_encoder(
+            amps, self.nqubits, self.weight, backend=self.backend
+        )
+        return self.backend.execute_circuit(circuit).state()
 
     def geom_gradient(self):
         """Compute geometric gradient using the diagonal metric tensor and Jacobian.
@@ -189,7 +218,7 @@ class ExactGeodesicTransportCG:
             ndarray: Geometric gradient vector.
         """
         d = len(self.angles)
-        grad = self.backend.zeros(d)
+        grad = self.backend.zeros(d, dtype=self.backend.float64)
         l_psi = self.loss()
         jacobian = self.jacobian()
         g_diag = self.metric_tensor()
@@ -198,10 +227,16 @@ class ExactGeodesicTransportCG:
             varphi = g_diag[j] ** (-1 / 2) * jacobian[:, j]
             full_varphi = self.amplitudes_to_full_state(varphi)
             l_varphi = self.hamiltonian.expectation(full_varphi)
-            phi = (psi + varphi) / self.backend.sqrt(2)
+            phi = (psi + varphi) / math.sqrt(2)
             full_phi = self.amplitudes_to_full_state(phi)
             l_phi = self.hamiltonian.expectation(full_phi)
-            grad[j] = self.backend.sqrt(g_diag[j]) * (2 * l_phi - l_varphi - l_psi)
+            update = self.backend.sqrt(g_diag[j]) * (2 * l_phi - l_varphi - l_psi)
+            if self.backend.platform == "tensorflow":
+                grad = self.backend.engine.tensor_scatter_nd_update(
+                    grad, [[j]], [update]
+                )
+            else:
+                grad[j] = update
         return grad
 
     def jacobian(self):
@@ -217,12 +252,26 @@ class ExactGeodesicTransportCG:
             reduced_params = self.backend.cast(
                 self.angles[j:], dtype=self.backend.float64, copy=True
             )
-            reduced_params[0] += self.backend.engine.pi / 2
+            if self.backend.platform == "tensorflow":
+                reduced_params = self.backend.engine.tensor_scatter_nd_update(
+                    reduced_params, [[0]], [reduced_params[0] + math.pi / 2]
+                )
+            else:
+                reduced_params[0] += math.pi / 2
 
             sins = self.backend.prod(self.backend.sin(self.angles[:j]))
             amps = self.angles_to_amplitudes(reduced_params)
 
-            jacob[j:, j] = sins * amps
+            updates = self.backend.real(sins * amps)
+
+            if self.backend.platform == "tensorflow":
+                indices = list(range(j, jacob.shape[0]))
+                indices = list(zip(indices, [j] * len(indices)))
+                jacob = self.backend.engine.tensor_scatter_nd_update(
+                    jacob, indices, updates
+                )
+            else:
+                jacob[j:, j] = updates
 
         return jacob
 
@@ -232,12 +281,11 @@ class ExactGeodesicTransportCG:
         Returns:
             ndarray: Diagonal elements of the metric tensor.
         """
-        angles = self.angles
         g_diag = [
             self.backend.prod(self.backend.sin(self.angles[:k]) ** 2)
             for k in range(len(self.angles))
         ]
-        return self.backend.cast(g_diag, dtype="float64")
+        return self.backend.cast(g_diag, dtype=self.backend.float64)
 
     def tangent_vector(self):
         """Compute the Riemannian gradient (tangent vector) at the current point on the hypersphere.
@@ -279,10 +327,10 @@ class ExactGeodesicTransportCG:
             angles_trial = self.amplitudes_to_angles(x_new)
 
             angles_orig = self.angles
-            self.angles = angles_trial
+            self.angles = self.backend.real(angles_trial)
             v_new = self.tangent_vector()
             loss_new = self.loss()
-            self.angles = angles_orig
+            self.angles = self.backend.real(angles_orig)
 
             condition_a_lhs = loss_new - loss_prev
             condition_a_rhs = (
@@ -312,7 +360,7 @@ class ExactGeodesicTransportCG:
             # Fallback to last tried point
             x_new = self.exponential_map_with_direction(u_prev, eta)
             angles_trial = self.amplitudes_to_angles(x_new)
-            self.angles = angles_trial
+            self.angles = self.backend.real(angles_trial)
             v_new = self.tangent_vector()
 
             return x_new, angles_trial, v_new, eta
@@ -348,10 +396,26 @@ class ExactGeodesicTransportCG:
         """
         d = len(x)
         angles = self.backend.zeros(d - 1)
-        for i in range(d - 2):
-            norm_tail = self.backend.vector_norm(x[i:])
-            angles[i] = 0.0 if norm_tail == 0 else self.backend.arccos(x[i] / norm_tail)
-        angles[-1] = self.backend.arctan2(x[-1], x[-2])
+        for elem in range(d - 2):
+            norm_tail = self.backend.vector_norm(x[elem:])
+            updates = (
+                0.0 if norm_tail == 0 else self.backend.arccos(x[elem] / norm_tail)
+            )
+            if self.backend.platform == "tensorflow":
+                angles = self.backend.engine.tensor_scatter_nd_update(
+                    angles, [[elem]], [updates]
+                )
+            else:
+                angles[elem] = updates
+
+        update = self.backend.arctan2(x[-1], x[-2])
+        if self.backend.platform == "tensorflow":
+            angles = self.backend.engine.tensor_scatter_nd_update(
+                angles, [[-1]], [update]
+            )
+        else:
+            angles[-1] = update
+
         return angles
 
     def parallel_transport(self, u, v, a, eta=None):
@@ -370,7 +434,7 @@ class ExactGeodesicTransportCG:
         if eta == None:
             eta = self.eta
         norm_v = self.backend.vector_norm(v)
-        vu_dot = self.backend.dot(v, u)
+        vu_dot = v @ u
         transported = (
             u
             - self.backend.sin(eta * norm_v) * (vu_dot / norm_v) * a
@@ -389,7 +453,7 @@ class ExactGeodesicTransportCG:
         Returns:
             float: Inner product value.
         """
-        return self.backend.dot(u, v) - self.backend.dot(x, u) * self.backend.dot(x, v)
+        return u @ v - (x @ u) * (x @ v)
 
     def beta_dy(self, v_next, x_next, transported_u, st):
         """Compute Dai and Yuan Beta.
@@ -510,7 +574,7 @@ class ExactGeodesicTransportCG:
 
             # Accept step
             self.x = x_new
-            self.angles = angles_trial
+            self.angles = self.backend.real(angles_trial)
             self.v = v_new
             self.eta = new_eta
 

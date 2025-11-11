@@ -195,6 +195,29 @@ class JaxBackend(Backend):
 
         return np.random.randint(low, high, size)
 
+    def random_normal(
+        self,
+        mean: Union[float, int],
+        stddev: Union[float, int],
+        size: Optional[Union[int, List[int], Tuple[int, ...]]] = None,
+        seed=None,
+        dtype: Optional[DTypeLike] = None,
+    ) -> ArrayLike:
+        if dtype is None:
+            dtype = self.float64
+
+        if seed is not None:  # pragma: no cover
+            local_state = self.default_rng(seed) if isinstance(seed, int) else seed
+
+            # local rng usually only has standard normal implemented
+            distribution = local_state.standard_normal(size)
+            distribution *= stddev
+            distribution += mean
+
+            return self.cast(distribution, dtype=dtype)
+
+        return self.cast(np.random.normal(mean, stddev, size), dtype=dtype)
+
     def random_sample(self, size: int, seed=None) -> ArrayLike:
         if seed is not None:
             local_state = self.default_rng(seed) if isinstance(seed, int) else seed

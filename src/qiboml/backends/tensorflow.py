@@ -2,10 +2,10 @@
 
 import os
 from collections import Counter
-from typing import Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
-from numpy.typing import ArrayLike
+from numpy.typing import ArrayLike, DTypeLike
 from qibo import Circuit, __version__
 from qibo.backends import Backend
 from qibo.backends.npmatrices import NumpyMatrices
@@ -107,12 +107,17 @@ class TensorflowBackend(Backend):
     ######## Methods related to array manipulation                                  ########
     ########################################################################################
 
+    def arccos(self, array, **kwargs):
+        return self.engine.keras.ops.arccos(array, **kwargs)
+
     def all(self, array: ArrayLike, **kwargs) -> Union[ArrayLike, bool]:
         return self.engine.reduce_all(array, **kwargs)
 
     def arctan2(self, array_1, array_2, **kwargs) -> ArrayLike:
-        print(array_1, array_2)
         return self.engine.math.atan2(array_1, array_2, **kwargs)
+
+    def concatenate(self, tup, **kwargs):
+        return self.engine.concat(tup, **kwargs)
 
     def conj(self, array: ArrayLike) -> ArrayLike:
         return self.engine.math.conj(array)
@@ -155,6 +160,32 @@ class TensorflowBackend(Backend):
     def prod(self, array, **kwargs) -> ArrayLike:
         return self.engine.math.reduce_prod(array, **kwargs)
 
+    def random_normal(
+        self,
+        mean: Union[float, int],
+        stddev: Union[float, int],
+        size: Optional[Union[int, List[int], Tuple[int, ...]]] = None,
+        seed=None,
+        dtype: Optional[DTypeLike] = None,
+    ) -> ArrayLike:
+        if isinstance(size, int):
+            size = [size]
+
+        if dtype is None:
+            dtype = self.float64
+
+        if seed is not None:  # pragma: no cover
+            local_state = self.default_rng(seed) if isinstance(seed, int) else seed
+
+            # local rng usually only has standard normal implemented
+            distribution = local_state.standard_normal(size)
+            distribution *= stddev
+            distribution += mean
+
+            return self.cast(distribution, dtype=dtype)
+
+        return self.engine.random.normal(size, mean, stddev, dtype=dtype)
+
     def random_uniform(
         self,
         low: Union[float, int] = 0.0,
@@ -174,6 +205,12 @@ class TensorflowBackend(Backend):
     def real(self, array: ArrayLike) -> ArrayLike:
         return self.engine.math.real(array)
 
+    def sin(self, array, **kwargs):
+        return self.engine.math.sin(array, **kwargs)
+
+        # def sqrt(self, array):
+        return self.engine.math.sqrt(array)
+
     def sum(self, array: ArrayLike, axis=None, **kwargs) -> ArrayLike:
         return self.engine.math.reduce_sum(array, axis, **kwargs)
 
@@ -188,7 +225,7 @@ class TensorflowBackend(Backend):
 
         state = self.cast(state, dtype=dtype)
 
-        return self.engine.norm(state, ord=order)
+        return self.real(self.engine.norm(state, ord=order))
 
     def vstack(self, arrays: ArrayLike, **kwargs) -> ArrayLike:
         return self.engine.stack(arrays, axis=0, **kwargs)

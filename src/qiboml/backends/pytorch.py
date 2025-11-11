@@ -3,7 +3,7 @@
 from typing import List, Optional, Tuple, Union
 
 import numpy as np
-from numpy.typing import ArrayLike
+from numpy.typing import ArrayLike, DTypeLike
 from qibo import Circuit, __version__
 from qibo.backends.abstract import Backend
 from qibo.backends.npmatrices import NumpyMatrices
@@ -230,13 +230,39 @@ class PyTorchBackend(Backend):
 
         return self.engine.randint(low, high, size)
 
+    def random_normal(
+        self,
+        mean: Union[float, int],
+        stddev: Union[float, int],
+        size: Optional[Union[int, List[int], Tuple[int, ...]]] = None,
+        seed=None,
+        dtype: Optional[DTypeLike] = None,
+    ) -> ArrayLike:
+        if isinstance(size, int):
+            size = (size,)
+
+        if dtype is None:
+            dtype = self.float64
+
+        if seed is not None:  # pragma: no cover
+            local_state = self.default_rng(seed) if isinstance(seed, int) else seed
+
+            # local rng usually only has standard normal implemented
+            distribution = local_state.standard_normal(size)
+            distribution *= stddev
+            distribution += mean
+
+            return self.cast(distribution, dtype=dtype)
+
+        return self.cast(self.engine.normal(mean, stddev, size), dtype=dtype)
+
     def random_sample(self, size: Union[int, Tuple[int, ...]], seed=None) -> ArrayLike:
         if seed is not None:
             local_state = self.default_rng(seed) if isinstance(seed, int) else seed
+        else:
+            local_state = None
 
-            return self.engine.rand(size, generator=local_state)
-
-        return self.engine.rand(size)
+        return self.engine.rand(size, generator=local_state)
 
     def random_uniform(
         self,
