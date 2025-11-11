@@ -319,7 +319,9 @@ class PyTorchBackend(Backend):
 
         copied = self.cast(matrix, copy=True)  # pylint: disable=E1111
         copied = self.to_numpy(copied) if power >= 0.0 else copied.detach()
-        copied = super().matrix_power(copied, power, precision_singularity, dtype)
+        copied = super().matrix_power(  # pylint: disable=E1111
+            copied, power, precision_singularity, dtype
+        )
         return self.cast(copied, dtype=copied.dtype)  # pylint: disable=E1111
 
     ########################################################################################
@@ -338,7 +340,7 @@ class PyTorchBackend(Backend):
             # the ``Gate.controlled_by`` method
             num_controls = len(gate.control_qubits)
             if num_controls > 0:
-                gmatrix = self.block_diag(
+                gmatrix = self.block_diag(  # pylint: disable=E1111
                     self.identity(2 ** len(gate.qubits) - len(gmatrix)), gmatrix
                 )
             # Kronecker product with identity is needed to make the
