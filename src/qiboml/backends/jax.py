@@ -12,6 +12,7 @@ from qibo.backends import Backend, einsum_utils
 from qibo.backends.npmatrices import NumpyMatrices
 from qibo.gates.abstract import Gate
 from qibo.result import CircuitResult, QuantumState
+from scipy.sparse import issparse
 
 from qiboml.quantum_info._quantum_info_jax import QINFO
 
@@ -118,6 +119,10 @@ class JaxBackend(Backend):
             return array.astype(dtype)
 
         return self.engine.array(array, dtype=dtype, copy=copy)
+
+    def is_sparse(self, array: ArrayLike) -> bool:
+        """Determine if a given array is a sparse tensor."""
+        return issparse(array)
 
     def to_numpy(self, array: ArrayLike) -> ArrayLike:
 

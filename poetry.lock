@@ -4483,7 +4483,7 @@ qulacs = ["qulacs (>=0.6.4,<0.7.0) ; python_version < \"3.13\""]
 type = "git"
 url = "https://github.com/qiboteam/qibo"
 reference = "backends"
-resolved_reference = "503baa380032b6ad062ce1906e16699a770ce0a1"
+resolved_reference = "53213e0de8a498c76a8f477ad8e2fda2725f8b04"
 
 [[package]]
 name = "qibocal"
@@ -4513,26 +4513,30 @@ skops = ">=0.11.0,<0.12.0"
 
 [[package]]
 name = "qibojit"
-version = "0.1.12"
+version = "0.1.13"
 description = "Simulation tools based on numba and cupy."
 optional = false
-python-versions = "<3.14,>=3.10"
+python-versions = ">=3.10,<3.14"
 groups = ["tests"]
 markers = "sys_platform == \"linux\" or sys_platform == \"darwin\" or sys_platform != \"linux\" and sys_platform != \"darwin\""
-files = [
-    {file = "qibojit-0.1.12-py3-none-any.whl", hash = "sha256:91426d9e17b5df62d0517d4589bf911fbdfd4c945dd2d138945762697928e4c4"},
-    {file = "qibojit-0.1.12.tar.gz", hash = "sha256:9379c7b545bdd6d12e12d2b69f59931617a87d942053551b6fd8ca1fd079a9fc"},
-]
+files = []
+develop = false
 
 [package.dependencies]
-numba = ">=0.61.0,<0.62.0"
-psutil = ">=5.9.5,<6.0.0"
-qibo = ">=0.2.21,<0.3.0"
-scipy = ">=1.10.1,<2.0.0"
+numba = "^0.61.0"
+psutil = "^5.9.5"
+qibo = {git = "https://github.com/qiboteam/qibo", branch = "backends"}
+scipy = "^1.10.1"
 
 [package.extras]
 cupy = ["cupy-cuda12x (>=13.1.0,<14.0.0)"]
 cuquantum = ["cuquantum-python-cu12 (>=24.1.0,<25.0.0)"]
+
+[package.source]
+type = "git"
+url = "https://github.com/qiboteam/qibojit"
+reference = "backends"
+resolved_reference = "300632d49055b50b2409ff28c6ae1e6f930e725b"
 
 [[package]]
 name = "qibolab"
@@ -6205,4 +6209,4 @@ torch = ["torch"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.14"
-content-hash = "817f8e951be293cb1c86210e343868aae322466b69617126d8a166c59492fdd2"
+content-hash = "2679b6250cc68535538bede1e05ec448b41f391cdfdb64b85cb466522c7e543d"
