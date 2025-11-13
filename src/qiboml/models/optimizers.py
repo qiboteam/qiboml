@@ -6,10 +6,10 @@ from qibo.backends import _check_backend
 class ExactGeodesicTransportCG:
     """Exact Geodesic Transport with Conjugate Gradients Optimizer.
 
-    Implements the Exact Geodesic Transport with Conjugate Gradients (EGT-CG) optimizer, 
-    a curvature-aware Riemannian optimizer designed specifically for variational circuits based 
+    Implements the Exact Geodesic Transport with Conjugate Gradients (EGT-CG) optimizer,
+    a curvature-aware Riemannian optimizer designed specifically for variational circuits based
     on the Hamming-weight encoder (HWE) ansatze. It updates parameters along exact geodesic
-    paths on the hyperspherical manifold defined by the HWE, combining analytic metric 
+    paths on the hyperspherical manifold defined by the HWE, combining analytic metric
     computation, conjugate-gradient memory, and dynamic learning rates for fast, globally
     convergent optimization.
 
@@ -30,15 +30,15 @@ class ExactGeodesicTransportCG:
       c2 (float, optional): Constant for curvature condition in Wolfe line search.
           It should satisfy ``c1 < c2 < 1``. Defaults to :math:`0.9`.
       backend (:class:`qibo.backends.abstract.Backend`, optional): backend
-          to be used in the execution. If ``None``, it uses the current backend. 
+          to be used in the execution. If ``None``, it uses the current backend.
           Defaults to ``None``.
 
     Returns:
       ExactGeodesicTransportCG: Instantiated optimizer object.
 
     References:
-        A. J. Ferreira‑Martins, R. M. S. Farias, G. Camilo, T. O. Maciel, A. Tosta, R. Lin, A. Alhajri, T. Haug, and L. Aolita,  
-        *Variational quantum algorithms with exact geodesic transport*,  
+        A. J. Ferreira‑Martins, R. M. S. Farias, G. Camilo, T. O. Maciel, A. Tosta, R. Lin, A. Alhajri, T. Haug, and L. Aolita,
+        *Variational quantum algorithms with exact geodesic transport*,
         `arXiv:2506.17395 (2025) <https://arxiv.org/abs/2506.17395>`_.
     """
 
@@ -53,7 +53,7 @@ class ExactGeodesicTransportCG:
         multiplicative_factor: float = 1.0,
         c1: float = 0.0001,
         c2: float = 0.9,
-        backend = None,
+        backend=None,
     ):
         self.nqubits = nqubits
         self.weight = weight
@@ -78,14 +78,16 @@ class ExactGeodesicTransportCG:
         # Power method learning rate
         norm_u = self.backend.np.sqrt(self.sphere_inner_product(self.u, self.u, self.x))
         loss_prev = self.loss()
-        self.eta = ((1 / norm_u) * self.backend.np.arccos((1 + (norm_u / (2 * loss_prev)) ** 2) ** -0.5
-                    )) * self.multiplicative_factor
+        self.eta = (
+            (1 / norm_u)
+            * self.backend.np.arccos((1 + (norm_u / (2 * loss_prev)) ** 2) ** -0.5)
+        ) * self.multiplicative_factor
 
     def angles_to_amplitudes(self, angles):
         """Convert angles to amplitudes.
 
         Args:
-           angles (ndarray): Angles in hyperspherical coordinates. 
+           angles (ndarray): Angles in hyperspherical coordinates.
 
         Returns:
             ndarray: Amplitudes calculated from the hyperspherical coordinates.
@@ -101,16 +103,18 @@ class ExactGeodesicTransportCG:
 
     def encoder(self):
         """Build and return the Hamming-weight encoder circuit for the given amplitudes.
-        
+
         Returns:
             circuit (qibo.models.hamming_weight_encoder): Circuit prepared with current amplitudes.
         """
         amps = self.angles_to_amplitudes(self.angles)
-        self.circuit = hamming_weight_encoder(amps, self.nqubits, self.weight, backend=self.backend)
+        self.circuit = hamming_weight_encoder(
+            amps, self.nqubits, self.weight, backend=self.backend
+        )
 
     def state(self, initial_state=None, nshots=1000):
         """Return the statevector after encoding.
-       
+
         Args:
             initial_state (ndarray, optional): Initial statevector. Defaults to None.
             nshots (int, optional): Number of measurement shots. Defaults to 1000.
@@ -119,29 +123,34 @@ class ExactGeodesicTransportCG:
             statevector (ndarray): Statevector of the encoded quantum state.
         """
         self.encoder()
-        result = self.backend.execute_circuit(self.circuit, initial_state=initial_state, nshots=nshots)
+        result = self.backend.execute_circuit(
+            self.circuit, initial_state=initial_state, nshots=nshots
+        )
         return result.state()
 
     def loss(self):
         """Loss function to be minimized.
-        
+
         Given a quantum state :math:`\\ket{\\psi}` and a Hamiltonian :math:`H`, the loss
         function is defined as
-        
+
         .. math::
-            \\mathcal{L} = \\bra{\\psi} \\, H \\, \\ket{\\psi} \\, .  
+            \\mathcal{L} = \\bra{\\psi} \\, H \\, \\ket{\\psi} \\, .
 
         Returns:
             float: Expectation value of ``hamiltonain``.
         """
         state = self.state()
-        return self.hamiltonian.expectation(state)
 
-    def gradient(self, epsilon = 1e-8):
+        expval = self.hamiltonian.expectation(state)
+
+        return expval
+
+    def gradient(self, epsilon=1e-8):
         """Numerically compute gradient of loss wrt angles.
-        
+
         Returns:
-            ndarray: Gradient of loss w.r.t. ``angles``. 
+            ndarray: Gradient of loss w.r.t. ``angles``.
         """
         grad = self.backend.np.zeros_like(self.angles)
         for idx in range(len(self.angles)):
@@ -149,8 +158,12 @@ class ExactGeodesicTransportCG:
             angles_backward = self.angles.copy()
             angles_forward[idx] += epsilon
             angles_backward[idx] -= epsilon
-            loss_forward = self.__class__(self.nqubits, self.weight, self.hamiltonian, angles_forward).loss()
-            loss_backward = self.__class__(self.nqubits, self.weight, self.hamiltonian, angles_backward).loss()
+            loss_forward = self.__class__(
+                self.nqubits, self.weight, self.hamiltonian, angles_forward
+            ).loss()
+            loss_backward = self.__class__(
+                self.nqubits, self.weight, self.hamiltonian, angles_backward
+            ).loss()
             grad[idx] = (loss_forward - loss_backward) / (2 * epsilon)
         return grad
 
@@ -194,14 +207,16 @@ class ExactGeodesicTransportCG:
         Returns:
             ndarray: Jacobian matrix.
         """
-        dim = len(self.angles) 
+        dim = len(self.angles)
         jacob = self.backend.np.zeros((dim + 1, dim), dtype=self.backend.np.float64)
 
         for j in range(dim):
-            reduced_params = self.backend.np.array(self.angles[j:], dtype=self.backend.np.float64, copy=True)
+            reduced_params = self.backend.np.array(
+                self.angles[j:], dtype=self.backend.np.float64, copy=True
+            )
             reduced_params[0] += self.backend.np.pi / 2
 
-            sins = self.backend.np.prod(self.backend.np.sin(self.angles[:j])) 
+            sins = self.backend.np.prod(self.backend.np.sin(self.angles[:j]))
             amps = self.angles_to_amplitudes(reduced_params)
 
             jacob[j:, j] = sins * amps
@@ -216,7 +231,8 @@ class ExactGeodesicTransportCG:
         """
         angles = self.angles
         g_diag = [
-            self.backend.np.prod(self.backend.np.sin(self.angles[:k]) ** 2) for k in range(len(self.angles))
+            self.backend.np.prod(self.backend.np.sin(self.angles[:k]) ** 2)
+            for k in range(len(self.angles))
         ]
         return self.backend.cast(g_diag, dtype="float64")
 
@@ -372,11 +388,13 @@ class ExactGeodesicTransportCG:
         Returns:
             float: Inner product value.
         """
-        return self.backend.np.dot(u, v) - self.backend.np.dot(x, u) * self.backend.np.dot(x, v)
+        return self.backend.np.dot(u, v) - self.backend.np.dot(
+            x, u
+        ) * self.backend.np.dot(x, v)
 
     def beta_dy(self, v_next, x_next, transported_u, st):
         """Compute Dai and Yuan Beta.
-        
+
         Args:
             v_next (ndarray): Next gradient.
             x_next (ndarray): Next point.
@@ -450,9 +468,11 @@ class ExactGeodesicTransportCG:
             norm_u = self.backend.np.sqrt(
                 self.sphere_inner_product(self.u, self.u, self.x)
             )
-            self.eta = (1 / norm_u) * self.backend.np.arccos(
-                (1 + (norm_u / (2 * loss_prev)) ** 2) ** -0.5
-            ) * self.multiplicative_factor
+            self.eta = (
+                (1 / norm_u)
+                * self.backend.np.arccos((1 + (norm_u / (2 * loss_prev)) ** 2) ** -0.5)
+                * self.multiplicative_factor
+            )
 
             # Line search via Wolfe conditions
             x_new, angles_trial, v_new, new_eta = self.optimize_step_size(
