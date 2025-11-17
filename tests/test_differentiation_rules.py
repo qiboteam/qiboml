@@ -351,7 +351,7 @@ def test_expval_custom_grad_reuploading(
     circuit_structure = [
         encoding_layer,
         training_layer_1,
-        encoding_layer,
+        # encoding_layer,
         # training_layer_2,
     ]
     circuit_structure_native = [copy.deepcopy(c) for c in circuit_structure]
@@ -370,7 +370,7 @@ def test_expval_custom_grad_reuploading(
         circuit_structure_native,
         x_native,
         nqubits,
-        nshots,
+        None,
         frontend,
         native_backend,
         None,

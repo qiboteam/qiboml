@@ -222,12 +222,16 @@ class QuantumModelAutoGrad(torch.autograd.Function):
         *parameters: List[torch.nn.Parameter],
     ):
         parameters = torch.stack(parameters)
-        # breakpoint()
         # it would be maybe better to perform the tracing in the backward only
         # this way the jacobians are calculated only if the backward is called
         circuit, jacobian_wrt_inputs, jacobian, input_to_gate_map = circuit_tracer(
             parameters, x=x
         )
+        print("### ---> circuit tracer jacobians")
+        print(jacobian_wrt_inputs)
+        print("\n")
+        print(jacobian)
+        print("### ------------------------------")
 
         angles = torch.stack(
             [
@@ -245,6 +249,13 @@ class QuantumModelAutoGrad(torch.autograd.Function):
             g.parameters = p
         circuit = differentiation.circuit
         # circuit.set_parameters(params)
+
+        wrt_inputs = jacobian_wrt_inputs is not None
+        if not wrt_inputs:
+            angles = decoding.backend.cast(
+                [par for params in circuit.get_parameters() for par in params],
+                dtype=dtype,
+            )
 
         # Save the context
         ctx.save_for_backward(jacobian_wrt_inputs, jacobian)
@@ -265,7 +276,6 @@ class QuantumModelAutoGrad(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor):
-        # breakpoint()
         jacobian_wrt_inputs, jacobian = ctx.saved_tensors
         backend = ctx.differentiation.decoding.backend
         params = ctx.angles
