@@ -250,46 +250,6 @@ def test_expval_custom_grad(
     backend.assert_allclose(grad_wrt_params, params_target, atol=tol)
 
 
-TARGET_GRAD_REUPLOADING = {
-    "wrt_inputs": (
-        np.array([1.668244, -0.350845]),
-        np.array(
-            [
-                0.553438,
-                0.701541,
-                -0.897603,
-                0.369002,
-                0.280684,
-                0.303648,
-                0.72218,
-                -0.120478,
-                0.679402,
-                0.017968,
-                2.286109,
-            ]
-        ),
-    ),
-    "no_inputs": (
-        None,
-        np.array(
-            [
-                0.182884,
-                0.226752,
-                -0.637248,
-                -0.270067,
-                0.315737,
-                0.653579,
-                0.899997,
-                -0.235639,
-                0.514433,
-                -0.488684,
-                1.068054,
-            ]
-        ),
-    ),
-}
-
-
 @pytest.mark.parametrize("nshots", [None, 12000000])
 @pytest.mark.parametrize("backend", EXECUTION_BACKENDS)
 @pytest.mark.parametrize("diff_rule", DIFF_RULES)
@@ -351,18 +311,16 @@ def test_expval_custom_grad_reuploading(
     circuit_structure = [
         encoding_layer,
         training_layer_1,
-        # encoding_layer,
-        # training_layer_2,
+        encoding_layer,
+        training_layer_2,
     ]
-    circuit_structure_native = [copy.deepcopy(c) for c in circuit_structure]
     """
     circuit_structure += [
         equivariant_circuit,
     ]
-    circuit_structure_native += [
-        equivariant_circuit,
-    ]
     """
+    circuit_structure_native = [copy.deepcopy(c) for c in circuit_structure]
+
     custom_gradients = gradient_test_setup(
         circuit_structure, x, nqubits, nshots, frontend, backend, diff_rule, wrt_inputs
     )
