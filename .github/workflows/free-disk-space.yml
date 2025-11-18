@@ -4,10 +4,6 @@ on:
   pull_request:
     types: [labeled]
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref }}
-  cancel-in-progress: true
-
 jobs:
   free-disk-space:
     if: contains(join(github.event.pull_request.labels.*.name), 'free-disk-space')
