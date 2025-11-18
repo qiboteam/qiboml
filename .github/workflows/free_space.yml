@@ -11,7 +11,7 @@ concurrency:
 jobs:
   free-disk-space:
     if: contains(join(github.event.pull_request.labels.*.name), 'free-disk-space')
-    uses: jlumbroso/free-disk-space/action.yml
+    uses: jlumbroso/free-disk-space/action.yml@main
     with:
       # this might remove tools that are actually needed,
       # if set to "true" but frees about 6 GB
