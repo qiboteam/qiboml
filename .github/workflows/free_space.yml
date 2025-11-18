@@ -13,7 +13,7 @@ jobs:
     if: contains(join(github.event.pull_request.labels.*.name), 'free-disk-space')
     runs-on: ubuntu-latest
     steps:
-      - name: Free Disk Space
+      - name: Free Disk Space (Ubuntu)
         uses: jlumbroso/free-disk-space@v1.3.1
         with:
           tool-cache: false
