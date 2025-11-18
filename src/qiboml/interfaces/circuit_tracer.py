@@ -310,7 +310,6 @@ class CircuitTracer(ABC):
                 if input_map is not None:
                     # update the input_map to the index of the global circuit
                     input_map = {
-                        # inp: tuple(i + index for i in indices)
                         inp: tuple(i + angle_offset for i in indices)
                         for inp, indices in input_map.items()
                     }

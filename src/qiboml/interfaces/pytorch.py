@@ -227,12 +227,6 @@ class QuantumModelAutoGrad(torch.autograd.Function):
         circuit, jacobian_wrt_inputs, jacobian, input_to_gate_map = circuit_tracer(
             parameters, x=x
         )
-        print("### ---> circuit tracer jacobians")
-        print(jacobian_wrt_inputs)
-        print("\n")
-        print(jacobian)
-        print("### ------------------------------")
-
         angles = torch.stack(
             [
                 par
@@ -288,7 +282,6 @@ class QuantumModelAutoGrad(torch.autograd.Function):
             dtype=jacobian.dtype,
             device=jacobian.device,
         )
-        print(jacobian_wrt_angles)
         out_shape = ctx.differentiation.decoding.output_shape
         # contraction to combine jacobians wrt inputs/parameters with those
         # wrt the circuit angles

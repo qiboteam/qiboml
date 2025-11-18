@@ -261,11 +261,6 @@ def test_expval_custom_grad_reuploading(
     diff_rule,
     wrt_inputs,
 ):
-    """
-    Compute test gradient of < 0 | model^dag observable model | 0 > w.r.t model's
-    parameters. In this test the system size is fixed to two qubits and all the
-    parameters/data values are fixed.
-    """
 
     if diff_rule is not None and diff_rule.__name__ == "Jax" and nshots is not None:
         pytest.skip("Jax differentiation does not work with shots.")
@@ -297,28 +292,13 @@ def test_expval_custom_grad_reuploading(
         else frontend.keras.ops
     )
 
-    def equivariant_circuit(th, phi, lam):
-        c = Circuit(nqubits)
-        delta = 2 * engine.cos(phi) + lam**2
-        gamma = lam * engine.exp(th / 2)
-        c.add([gates.RZ(i, theta=th) for i in range(nqubits)])
-        c.add([gates.RX(i, theta=lam) for i in range(nqubits)])
-        c.add([gates.RY(i, theta=phi) for i in range(nqubits)])
-        c.add(gates.RZ(0, theta=delta))
-        c.add(gates.RX(1, theta=gamma))
-        return c
-
     circuit_structure = [
         encoding_layer,
         training_layer_1,
         encoding_layer,
         training_layer_2,
     ]
-    """
-    circuit_structure += [
-        equivariant_circuit,
-    ]
-    """
+
     circuit_structure_native = [copy.deepcopy(c) for c in circuit_structure]
 
     custom_gradients = gradient_test_setup(
