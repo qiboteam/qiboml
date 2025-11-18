@@ -11,7 +11,6 @@ concurrency:
 jobs:
   free-disk-space:
     if: contains(join(github.event.pull_request.labels.*.name), 'free-disk-space')
-    runs-on: ubuntu-latest
     uses: jlumbroso/free-disk-space@main
     with:
       # this might remove tools that are actually needed,
