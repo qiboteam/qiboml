@@ -5,6 +5,7 @@ import random
 import numpy as np
 import pytest
 from qibo import Circuit, construct_backend, gates, hamiltonians
+from qibo.backends.numpy import NumpyBackend
 from qibo.config import raise_error
 from qibo.noise import NoiseModel, PauliError
 from qibo.symbols import Z
@@ -143,7 +144,11 @@ def train_model(frontend, model, data, target, max_epochs=5):
                 else:
                     loss = model()
                 loss.backward()
-                avg_grad += list(model.parameters())[-1].grad.norm()
+                # grad = list(model.parameters())[-1].grad
+                for par in model.parameters():
+                    grad = par.grad
+                    if grad is not None:
+                        avg_grad += grad.norm()
                 avg_loss += loss
                 optimizer.step()
             avg_grad /= len(data)
@@ -172,7 +177,11 @@ def train_model(frontend, model, data, target, max_epochs=5):
         def get_avg_grad():
             avg_grad = 0.0
             for x, y in zip(data, target):
-                tmp = [frontend.tf.norm(grad) for grad in train_step(x[None, :], y)]
+                tmp = [
+                    frontend.tf.norm(grad)
+                    for grad in train_step(x[None, :], y)
+                    if grad is not None
+                ]
                 avg_grad += sum(tmp) / len(tmp)
             return avg_grad / len(data)
 
@@ -717,3 +726,26 @@ def test_equivariant(backend, frontend):
     grad = train_model(frontend, model, none, none, max_epochs=10)
     cost = model()
     backend.assert_allclose(float(cost), -2.0, atol=5e-2)
+
+
+def test_parameters_less_models(frontend):
+    set_seed(frontend, 42)
+    backend = NumpyBackend()
+    backend.set_seed(42)
+    nqubits = 1
+    encoding_layer = enc.PhaseEncoding(nqubits)
+    decoding = dec.Expectation(nqubits, backend=backend)
+    model = build_sequential_model(
+        frontend,
+        [
+            build_linear_layer(frontend, 2, 1),
+            frontend.QuantumModel(
+                [encoding_layer],
+                decoding,
+            ),
+        ],
+    )
+    # just check that forward and backward don't crash
+    x = random_tensor(frontend, (1, 2))
+    y = random_tensor(frontend, (1, 1))
+    train_model(frontend, model, x, y, max_epochs=1)
