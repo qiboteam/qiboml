@@ -10,26 +10,12 @@ on:
       - published
 
 jobs:
-  free-disk-space:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Free Disk Space (Ubuntu)
-        uses: jlumbroso/free-disk-space@v1.3.1
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
   build:
-    needs: free-disk-space
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         python-version: ['3.10', '3.11', '3.12']
-    uses: qiboteam/workflows/.github/workflows/deploy-pip-poetry.yml@v1
+    uses: qiboteam/workflows/.github/workflows/deploy-pip-poetry_with_free-space.yml@free_space
     with:
       os: ${{ matrix.os }}
       python-version: ${{ matrix.python-version }}
