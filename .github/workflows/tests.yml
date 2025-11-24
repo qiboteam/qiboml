@@ -22,6 +22,7 @@ jobs:
           docker-images: true
           swap-storage: true
   build:
+    needs: free-disk-space
     if: contains(github.event.pull_request.labels.*.name, 'run-workflow') || github.event_name == 'push'
     strategy:
       matrix:
