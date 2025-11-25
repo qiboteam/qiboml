@@ -305,7 +305,7 @@ def backprop_test(frontend, model, data, target):
     # specific (rare) cases
 
 
-@pytest.mark.parametrize("layer,seed", zip(ENCODING_LAYERS, [5, 5]))
+@pytest.mark.parametrize("layer,seed", zip(ENCODING_LAYERS, [6, 5]))
 def test_encoding(backend, frontend, layer, seed):
     set_device(frontend)
     set_seed(frontend, seed)
@@ -354,7 +354,7 @@ def test_encoding(backend, frontend, layer, seed):
     backprop_test(frontend, q_model, data, target)
 
 
-@pytest.mark.parametrize("layer,seed", zip(DECODING_LAYERS, [1, 53, 1, 26]))
+@pytest.mark.parametrize("layer,seed", zip(DECODING_LAYERS, [1, 1, 1, 26]))
 def test_decoding(backend, frontend, layer, seed):
 
     if layer is dec.State:

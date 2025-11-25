@@ -41,7 +41,6 @@ def test_state_layer(backend, density_matrix):
 )
 def test_expectation_layer(backend, nshots, observable):
     backend.set_seed(42)
-    rng = np.random.default_rng(42)
     nqubits = 5
 
     c = comp_basis_encoder("1" * 5)
@@ -63,9 +62,9 @@ def test_expectation_layer(backend, nshots, observable):
 
 
 def test_decoding_with_transpiler(backend):
-    rng = np.random.default_rng(42)
-    backend.set_seed(42)
-    c = random_clifford(3, seed=42, backend=NPBACKEND)
+    seed = 42
+    backend.set_seed(seed)
+    c = random_clifford(3, seed=seed, backend=NPBACKEND)
     transpiler = Passes(
         connectivity=[[0, 1], [0, 2]], passes=[Unroller(NativeGates.default(), Sabre())]
     )
