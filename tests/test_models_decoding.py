@@ -56,11 +56,7 @@ def test_expectation_layer(backend, nshots, observable):
     layer_expv = layer(c)
     if observable is None:
         observable = hamiltonians.Z(nqubits, dense=False, backend=backend)
-    expv = (
-        observable.expectation(backend.execute_circuit(c).state())
-        if nshots is None
-        else observable.expectation_from_circuit(c, nshots=nshots)
-    )
+    expv = observable.expectation(c, nshots=nshots)
     atol = 1e-8 if nshots is None else 1e-2
     backend.assert_allclose(layer_expv, expv, atol=atol)
 

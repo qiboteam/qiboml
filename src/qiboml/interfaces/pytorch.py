@@ -10,6 +10,7 @@ from qibo import Circuit
 from qibo.backends import Backend
 from qibo.config import raise_error
 
+from qiboml.backends.pytorch import PyTorchBackend
 from qiboml.interfaces import utils
 from qiboml.interfaces.circuit_tracer import CircuitTracer
 from qiboml.models.decoding import QuantumDecoding
@@ -67,8 +68,10 @@ class QuantumModel(torch.nn.Module):
         parameters_initialization (Union[keras.initializers.Initializer, np.ndarray]]): if an initialiser is provided it will be used
         either as the parameters or to sample the parameters of the model.
         differentiation (Differentiation, optional): the differentiation engine,
-            if not provided a default one will be picked following what described in the :ref:`docs <_differentiation_engine>`.
-        circuit_tracer (CircuitTracer, optional): tracer used to build the circuit and trace the operations performed upon construction. Defaults to ``TorchCircuitTracer``.
+            if not provided a default one will be picked following what described in
+            the :ref:`docs <_differentiation_engine>`.
+        circuit_tracer (CircuitTracer, optional): tracer used to build the circuit
+        and trace the operations performed upon construction. Defaults to ``TorchCircuitTracer``.
     """
 
     circuit_structure: Union[Circuit, List[Union[Circuit, QuantumEncoding, Callable]]]
@@ -115,10 +118,18 @@ class QuantumModel(torch.nn.Module):
         self.circuit_tracer = self.circuit_tracer(self.circuit_structure)
 
         if self.differentiation is None:
-            self.differentiation = utils.get_default_differentiation(
-                decoding=self.decoding,
-                instructions=DEFAULT_DIFFERENTIATION,
-            )
+            if (
+                issubclass(type(self.backend), PyTorchBackend)
+                and self.decoding.analytic
+            ):
+                self.differentiation = None
+            else:
+                self.differentiation = utils.get_default_differentiation(
+                    decoding=self.decoding,
+                    instructions=DEFAULT_DIFFERENTIATION,
+                )()
+        elif isinstance(self.differentiation, type):
+            self.differentiation = self.differentiation()
 
     def forward(self, x: Optional[torch.Tensor] = None):
         """
@@ -137,8 +148,8 @@ class QuantumModel(torch.nn.Module):
             )
             x = self.decoding(circuit)
         else:
-            if isinstance(self.differentiation, type):
-                self.differentiation = self.differentiation(
+            if not self.differentiation._is_built:
+                self.differentiation.build(
                     self.circuit_tracer.build_circuit(list(self.parameters())[0], x=x),
                     self.decoding,
                 )

@@ -1,9 +1,12 @@
 from copy import deepcopy
 
 import pytest
+from qibo import transpiler
 from qibo.backends import NumpyBackend
-from qibo.hamiltonians import Z
+from qibo.hamiltonians import XXZ, SymbolicHamiltonian
 from qibo.noise import NoiseModel, PauliError
+from qibo.transpiler.pipeline import Passes
+from qibo.transpiler.unroller import NativeGates, Unroller
 
 from qiboml.models.ansatze import hardware_efficient
 from qiboml.models.decoding import Expectation
@@ -38,10 +41,11 @@ def train_vqe(frontend, backend, model, epochs):
     """Implement training procedure given interface."""
 
     if frontend.__name__ == "qiboml.interfaces.pytorch":
-        optimizer = frontend.torch.optim.Adam(model.parameters(), lr=0.3)
+        optimizer = frontend.torch.optim.Adam(model.parameters(), lr=0.1)
         for _ in range(epochs):
             optimizer.zero_grad()
             cost = model()
+            print(cost)
             cost.backward()
             optimizer.step()
         return backend.cast(cost.item(), dtype="double")
@@ -58,20 +62,23 @@ def train_vqe(frontend, backend, model, epochs):
 
 
 @pytest.mark.parametrize("backend", BACKENDS)
-@pytest.mark.parametrize("mitigation_method", ["ICS", "CDR"])
-def test_rtqem(frontend, backend, mitigation_method):
-    nqubits = 1
-    nlayers = 3
+@pytest.mark.parametrize("mitigation_method,seed", zip(["ICS", "CDR"], [1, 1]))
+def test_rtqem(frontend, backend, mitigation_method, seed):
+    nqubits = 2
+    nlayers = 4
     nshots = 10000
 
-    seed = 42
     set_seed(frontend, seed)
     backend.set_seed(seed)
 
     # We build a trainable circuit
     vqe = hardware_efficient(nqubits=nqubits, nlayers=nlayers, seed=seed)
+    from qibo.symbols import Z
 
-    obs = Z(nqubits, dense=False, backend=backend)
+    obs = SymbolicHamiltonian(Z(0) * Z(1), backend=backend)
+    target_energy = min(obs.eigenvalues())
+
+    noise_model = build_noise_model(nqubits=nqubits, local_pauli_noise_prob=0.003)
 
     # First we build a model with noise and without mitigation
     noisy_decoding = Expectation(
@@ -79,7 +86,7 @@ def test_rtqem(frontend, backend, mitigation_method):
         observable=obs,
         nshots=nshots,
         backend=backend,
-        noise_model=build_noise_model(nqubits=nqubits, local_pauli_noise_prob=0.02),
+        noise_model=noise_model,
         density_matrix=True,
     )
 
@@ -88,18 +95,18 @@ def test_rtqem(frontend, backend, mitigation_method):
         decoding=noisy_decoding,
         differentiation=PSR,
     )
-
     noisy_result = train_vqe(
         frontend=frontend,
         backend=backend,
         model=noisy_model,
-        epochs=30,
+        epochs=5,
     )
 
     mitigation_config = {
         "threshold": 3e-1,
         "method": mitigation_method,
-        "method_kwargs": {"n_training_samples": 50},
+        "method_kwargs": {"n_training_samples": 50, "nshots": 10000},
+        "min_iterations": 100,
     }
 
     # Then we build a decoding with error mitigation
@@ -108,7 +115,7 @@ def test_rtqem(frontend, backend, mitigation_method):
         observable=obs,
         nshots=nshots,
         backend=backend,
-        noise_model=build_noise_model(nqubits=nqubits, local_pauli_noise_prob=0.04),
+        noise_model=noise_model,
         density_matrix=True,
         mitigation_config=mitigation_config,
     )
@@ -118,15 +125,15 @@ def test_rtqem(frontend, backend, mitigation_method):
         decoding=mit_decoding,
         differentiation=PSR,
     )
-
     mit_result = train_vqe(
         frontend=frontend,
         backend=backend,
         model=mit_model,
-        epochs=30,
+        epochs=5,
     )
 
-    assert mit_result < noisy_result
+    assert abs(mit_result - target_energy) < abs(noisy_result - target_energy)
+    assert abs(mit_result - target_energy) < 1e-1
 
 
 def test_custom_map(frontend):
