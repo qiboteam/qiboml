@@ -58,7 +58,6 @@ optional = true
 pytest = "^7.2.1"
 pylint = "3.1.0"
 pytest-cov = "4.0.0"
-qibojit = "^0.1.7"
 matplotlib = "^3.7.0"
 keras = "^3.11.0"
 qibocal = "^0.2.2"
