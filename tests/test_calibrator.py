@@ -90,6 +90,7 @@ def test_calibrator():
         wire_names=wire_names,
         transpiler=transpiler,
         calibrator=calibrator,
+        backend=backend,
     )
     model = QuantumModel(circuit_structure=vqe_circ, decoding=dec, differentiation=PSR)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.1)
