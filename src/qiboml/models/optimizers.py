@@ -145,7 +145,7 @@ class ExactGeodesicTransportCG:
             float: Expectation value of ``hamiltonain``.
         """
         state = self.state()
-        return self.hamiltonian.expectation(state)
+        return self.hamiltonian.expectation_from_state(state)
 
     def gradient(self, epsilon=1e-8):  # pragma: no cover
         """Numerically compute gradient of loss wrt angles.

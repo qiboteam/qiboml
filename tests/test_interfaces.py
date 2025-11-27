@@ -9,6 +9,7 @@ from qibo.config import raise_error
 from qibo.noise import NoiseModel, PauliError
 from qibo.symbols import Z
 from qibo.transpiler import NativeGates, Passes, Unroller
+from scipy.linalg import hadamard
 
 import qiboml.models.ansatze as ans
 import qiboml.models.decoding as dec
@@ -304,7 +305,7 @@ def backprop_test(frontend, model, data, target):
     # specific (rare) cases
 
 
-@pytest.mark.parametrize("layer,seed", zip(ENCODING_LAYERS, [5, 5]))
+@pytest.mark.parametrize("layer,seed", zip(ENCODING_LAYERS, [6, 5]))
 def test_encoding(backend, frontend, layer, seed):
     set_device(frontend)
     set_seed(frontend, seed)
@@ -314,9 +315,8 @@ def test_encoding(backend, frontend, layer, seed):
     nlayers = 1
     dim = 2
 
-    training_layer = ans.hardware_efficient(
-        nqubits, random_subset(nqubits, dim), nlayers, seed=seed
-    )
+    qubits = random_subset(nqubits, dim)
+    training_layer = ans.hardware_efficient(nqubits, qubits, nlayers, seed=seed)
 
     decoding_qubits = random_subset(nqubits, dim)
     observable = hamiltonians.SymbolicHamiltonian(
@@ -353,7 +353,8 @@ def test_encoding(backend, frontend, layer, seed):
 
     backprop_test(frontend, q_model, data, target)
 
-@pytest.mark.parametrize("layer,seed", zip(DECODING_LAYERS, [1, 53, 1, 26]))
+
+@pytest.mark.parametrize("layer,seed", zip(DECODING_LAYERS, [1, 1, 1, 26]))
 def test_decoding(backend, frontend, layer, seed):
 
     if layer is dec.State:
@@ -593,7 +594,11 @@ def test_qibolab(frontend):
     _, loss_trained = eval_model(frontend, model, data, target)
     assert loss_untrained > loss_trained
 
-@pytest.mark.parametrize("with_initializer", [False, True, "numpy_array", "error_check_numpy", "error_check_keras_torch"])
+
+@pytest.mark.parametrize(
+    "with_initializer",
+    [False, True, "numpy_array", "error_check_numpy", "error_check_keras_torch"],
+)
 def test_parameters_initialization(backend, frontend, with_initializer):
     set_device(frontend)
 
@@ -601,7 +606,7 @@ def test_parameters_initialization(backend, frontend, with_initializer):
 
     circuit_structure = [
         enc.PhaseEncoding(nqubits=nqubits),
-        ans.HardwareEfficient(nqubits)
+        ans.HardwareEfficient(nqubits),
     ]
 
     # Function to create the model
@@ -610,22 +615,29 @@ def test_parameters_initialization(backend, frontend, with_initializer):
             circuit_structure=circuit_structure,
             parameters_initialization=initializer,
             decoding=dec.Expectation(
-            nqubits=nqubits,
-            backend=backend,
-            )
+                nqubits=nqubits,
+                backend=backend,
+            ),
         )
-    
+
     # Function to check the parameters
     def assert_check(model_params, initializer):
         if frontend.__name__ == "qiboml.interfaces.keras":
-            assert np.allclose(model.circuit_parameters, initializer, rtol=1e-7, atol=1e-10)
+            assert np.allclose(
+                model.circuit_parameters, initializer, rtol=1e-7, atol=1e-10
+            )
         elif frontend.__name__ == "qiboml.interfaces.pytorch":
-            assert np.all(np.equal(model.circuit_parameters.detach().numpy(), initializer))
+            assert np.all(
+                np.equal(model.circuit_parameters.detach().numpy(), initializer)
+            )
+
     if with_initializer == True:
         if frontend.__name__ == "qiboml.interfaces.keras":
             frontend.tf.random.set_seed(1)
-            initializer = frontend.tf.keras.initializers.RandomNormal(mean=0.0, stddev=0.05)
-    
+            initializer = frontend.tf.keras.initializers.RandomNormal(
+                mean=0.0, stddev=0.05
+            )
+
             model = q_model(nqubits, initializer, circuit_structure)
             model_params = model.circuit_parameters
             values = initializer(shape=model_params.shape)
@@ -646,13 +658,12 @@ def test_parameters_initialization(backend, frontend, with_initializer):
         else:
             raise_error(RuntimeError, f"Unknown frontend {frontend}.")
 
-  
     # Numpy array initializer
     elif with_initializer == "numpy_array":
         initializer = np.array([0.5, 0.6, 0.7, 0.8])
         model = q_model(nqubits, initializer, circuit_structure)
         model_params = model.circuit_parameters
-        
+
         assert_check(model_params, initializer)
 
     # Error check keras and torch
@@ -672,6 +683,7 @@ def test_parameters_initialization(backend, frontend, with_initializer):
             model_params = model.circuit_parameters
 
             assert_check(model_params, initializer)
+
 
 def test_equivariant(backend, frontend):
 

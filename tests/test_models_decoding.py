@@ -59,11 +59,7 @@ def test_expectation_layer(backend, nshots, observable):
     layer_expv = layer(circuit)
     if observable is None:
         observable = hamiltonians.Z(nqubits, dense=False, backend=backend)
-    expv = (
-        observable.expectation(backend.execute_circuit(circuit).state())
-        if nshots is None
-        else observable.expectation_from_circuit(circuit, nshots=nshots)
-    )
+    expv = observable.expectation(circuit, nshots=nshots)
     atol = 1e-8 if nshots is None else 1e-2
 
     layer_expv = layer_expv[0, 0]

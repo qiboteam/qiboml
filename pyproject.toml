@@ -67,6 +67,10 @@ jaxlib = "^0.4.25"
 keras = "^3.11.0"
 tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux' or sys_platform == 'darwin'" }
 torch = { version = "^2.7.0" }
+qibotn = {git = "https://github.com/qiboteam/qibotn", python = "^3.11", platform = "linux || darwin" }
+quimb = {version="^1.11.2", python = "^3.11", platform = "linux || darwin"}
+cotengra = {version="^0.7.5", python = "^3.11", platform = "linux || darwin"}
+kahypar = {version="^1.3.5", python = "^3.11", platform = "linux || darwin"}
 
 [tool.poetry.group.cuda11]
 optional = true

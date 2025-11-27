@@ -299,6 +299,7 @@ class CircuitTracer(ABC):
         input_to_gate_map = {}
 
         index = 0
+        angle_offset = 0
         for circ in self.circuit_structure:
             if isinstance(circ, QuantumEncoding):
                 # encoders do not have parameters
@@ -309,7 +310,7 @@ class CircuitTracer(ABC):
                 if input_map is not None:
                     # update the input_map to the index of the global circuit
                     input_map = {
-                        inp: tuple(i + index for i in indices)
+                        inp: tuple(i + angle_offset for i in indices)
                         for inp, indices in input_map.items()
                     }
                     # update the global map
@@ -318,6 +319,7 @@ class CircuitTracer(ABC):
                             input_to_gate_map[inp] += indices
                         else:
                             input_to_gate_map[inp] = indices
+
                 jacobians_wrt_inputs.append(jacobian)
             elif isinstance(circ, Circuit):
                 nparams = len(circ.get_parameters())
@@ -337,6 +339,10 @@ class CircuitTracer(ABC):
                 circuit = circ
             else:
                 circuit += circ
+
+            angle_offset += sum(
+                len(pars) for pars in circ.get_parameters(include_not_trainable=True)
+            )
 
         total_dim = tuple(sum(np.array(j.shape) for j in jacobians))
         # build the global jacobian

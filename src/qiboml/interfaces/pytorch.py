@@ -10,6 +10,7 @@ from qibo import Circuit
 from qibo.backends import Backend
 from qibo.config import raise_error
 
+from qiboml.backends.pytorch import PyTorchBackend
 from qiboml.interfaces import utils
 from qiboml.interfaces.circuit_tracer import CircuitTracer
 from qiboml.models.decoding import QuantumDecoding
@@ -24,6 +25,7 @@ DEFAULT_DIFFERENTIATION = {
 }
 
 engine = torch
+
 
 class TorchCircuitTracer(CircuitTracer):
 
@@ -68,8 +70,10 @@ class QuantumModel(torch.nn.Module):
         parameters_initialization (Union[keras.initializers.Initializer, np.ndarray]]): if an initialiser is provided it will be used
         either as the parameters or to sample the parameters of the model.
         differentiation (Differentiation, optional): the differentiation engine,
-            if not provided a default one will be picked following what described in the :ref:`docs <_differentiation_engine>`.
-        circuit_tracer (CircuitTracer, optional): tracer used to build the circuit and trace the operations performed upon construction. Defaults to ``TorchCircuitTracer``.
+            if not provided a default one will be picked following what described in
+            the :ref:`docs <_differentiation_engine>`.
+        circuit_tracer (CircuitTracer, optional): tracer used to build the circuit
+        and trace the operations performed upon construction. Defaults to ``TorchCircuitTracer``.
     """
 
     circuit_structure: Union[Circuit, List[Union[Circuit, QuantumEncoding, Callable]]]
@@ -116,10 +120,18 @@ class QuantumModel(torch.nn.Module):
         self.circuit_tracer = self.circuit_tracer(self.circuit_structure)
 
         if self.differentiation is None:
-            self.differentiation = utils.get_default_differentiation(
-                decoding=self.decoding,
-                instructions=DEFAULT_DIFFERENTIATION,
-            )
+            if (
+                issubclass(type(self.backend), PyTorchBackend)
+                and self.decoding.analytic
+            ):
+                self.differentiation = None
+            else:
+                self.differentiation = utils.get_default_differentiation(
+                    decoding=self.decoding,
+                    instructions=DEFAULT_DIFFERENTIATION,
+                )()
+        elif isinstance(self.differentiation, type):
+            self.differentiation = self.differentiation()
 
     def forward(self, x: Optional[torch.Tensor] = None):
         """
@@ -138,8 +150,8 @@ class QuantumModel(torch.nn.Module):
             )
             x = self.decoding(circuit)
         else:
-            if isinstance(self.differentiation, type):
-                self.differentiation = self.differentiation(
+            if not self.differentiation._is_built:
+                self.differentiation.build(
                     self.circuit_tracer.build_circuit(list(self.parameters())[0], x=x),
                     self.decoding,
                 )
@@ -223,13 +235,11 @@ class QuantumModelAutoGrad(torch.autograd.Function):
         *parameters: List[torch.nn.Parameter],
     ):
         parameters = torch.stack(parameters)
-
         # it would be maybe better to perform the tracing in the backward only
         # this way the jacobians are calculated only if the backward is called
         circuit, jacobian_wrt_inputs, jacobian, input_to_gate_map = circuit_tracer(
             parameters, x=x
         )
-
         angles = torch.stack(
             [
                 par
@@ -246,6 +256,13 @@ class QuantumModelAutoGrad(torch.autograd.Function):
             g.parameters = p
         circuit = differentiation.circuit
         # circuit.set_parameters(params)
+
+        wrt_inputs = jacobian_wrt_inputs is not None
+        if not wrt_inputs:
+            angles = decoding.backend.cast(
+                [par for params in circuit.get_parameters() for par in params],
+                dtype=dtype,
+            )
 
         # Save the context
         ctx.save_for_backward(jacobian_wrt_inputs, jacobian)
@@ -278,7 +295,6 @@ class QuantumModelAutoGrad(torch.autograd.Function):
             dtype=jacobian.dtype,
             device=jacobian.device,
         )
-
         out_shape = ctx.differentiation.decoding.output_shape
         # contraction to combine jacobians wrt inputs/parameters with those
         # wrt the circuit angles
@@ -288,7 +304,6 @@ class QuantumModelAutoGrad(torch.autograd.Function):
         left_indices = (0,) + right_indices
 
         if jacobian_wrt_inputs is not None:
-
             # extract the rows corresponding to encoding gates
             # thus those element to be combined with the jacobian
             # wrt the inputs
@@ -321,7 +336,6 @@ class QuantumModelAutoGrad(torch.autograd.Function):
             )
         else:
             grad_input = None
-
         # combine the jacobians wrt parameters with those
         # wrt the circuit angles
         gradient = torch.einsum(
