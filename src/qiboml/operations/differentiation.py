@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from functools import cached_property, partial
 from typing import Callable, Optional, Tuple
 
+import jax
 import numpy as np
 from numpy.typing import ArrayLike
 from qibo import Circuit
@@ -224,7 +225,7 @@ class Jax(Differentiation):
 
     def __post_init__(self):
         super().__post_init__()
-        self._jax = JaxBackend()
+        self._jax = construct_backend("qiboml", platform="jax")
 
     def _on_build(self):
         self._compile_jacobians()

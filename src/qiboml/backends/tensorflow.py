@@ -108,7 +108,7 @@ class TensorflowBackend(Backend):
     ########################################################################################
 
     def arccos(self, array, **kwargs):
-        return self.engine.keras.ops.arccos(array, **kwargs)
+        return self.engine.math.acos(array, **kwargs)
 
     def all(self, array: ArrayLike, **kwargs) -> Union[ArrayLike, bool]:
         return self.engine.reduce_all(array, **kwargs)

@@ -16,7 +16,7 @@ from qibo import Circuit
 from qibo.backends import Backend
 from qibo.config import raise_error
 
-from qiboml.backends import TensorflowBackend
+from qiboml.backends.tensorflow import TensorflowBackend
 from qiboml.interfaces import utils
 from qiboml.interfaces.circuit_tracer import CircuitTracer
 from qiboml.models.decoding import QuantumDecoding
