@@ -275,7 +275,7 @@ class Jax(Differentiation):
         for g in self.non_trainable_gates:
             g.parameters = tgt_backend.cast(
                 np.array([src_backend.to_numpy(par) for par in g.parameters]),
-                dtype=tgt_backend.np.float64,
+                dtype=tgt_backend.float64,
             )
 
     def evaluate(self, parameters, wrt_inputs: bool = False):
@@ -298,7 +298,7 @@ class Jax(Differentiation):
         backend = self.decoding.backend
         # convert params to jax
         params = np.array(backend.to_numpy(parameters))
-        params = self._jax.cast(params, dtype=self._jax.np.float64)
+        params = self._jax.cast(params, dtype=self._jax.float64)
         if not wrt_inputs:
             self._cast_non_trainable_parameters(self.backend, self._jax)
         # set jax for running
@@ -322,7 +322,7 @@ class Jax(Differentiation):
             self._cast_non_trainable_parameters(self._jax, self.backend)
         self.circuit._final_state = None
         # transform back to the backend native array
-        return backend.cast(self._jax.to_numpy(jacobian).tolist(), backend.np.float64)
+        return backend.cast(self._jax.to_numpy(jacobian).tolist(), backend.float64)
 
 
 class QuimbJax(Jax):

@@ -7,7 +7,8 @@ import pytest
 from qibo import Circuit, gates, hamiltonians
 from qibo.backends import NumpyBackend
 
-from qiboml.backends import PyTorchBackend, TensorflowBackend
+from qiboml.backends.pytorch import PyTorchBackend
+from qiboml.backends.tensorflow import TensorflowBackend
 from qiboml.models.ansatze import hardware_efficient
 from qiboml.models.decoding import Expectation
 from qiboml.models.encoding import PhaseEncoding
