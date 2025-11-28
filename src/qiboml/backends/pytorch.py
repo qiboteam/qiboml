@@ -180,6 +180,10 @@ class PyTorchBackend(Backend):
     def flatnonzero(self, array: ArrayLike) -> ArrayLike:
         return self.engine.nonzero(array).flatten()
 
+    def nonzero(self, array: ArrayLike) -> ArrayLike:
+        rows_cols = self.engine.nonzero(array)
+        return rows_cols[:, 0], rows_cols[:, 1]
+
     def random_choice(
         self,
         array: ArrayLike,
