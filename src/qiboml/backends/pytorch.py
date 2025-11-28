@@ -129,6 +129,54 @@ class PyTorchBackend(Backend):
     def set_device(self, device: str) -> None:  # pragma: no cover
         self.device = "cpu" if "CPU" in device else device
 
+    def set_dtype(self, dtype: str) -> None:
+        """Set data type of arrays created using the backend. Works in-place.
+
+        .. note::
+            The data types ``float32`` and ``float64`` are intended to be used when the circuits
+            to be simulated only contain gates with real-valued matrix representations.
+            Using one of the aforementioned data types with circuits that contain complex-valued
+            matrices will raise a casting error.
+
+        .. note::
+            List of gates that always admit a real-valued matrix representation:
+            :class:`qibo.gates.I`, :class:`qibo.gates.X`, :class:`qibo.gates.Z`,
+            :class:`qibo.gates.H`, :class:`qibo.gates.Align`, :class:`qibo.gates.RY`,
+            :class:`qibo.gates.CNOT`, :class:`qibo.gates.CZ`, :class:`qibo.gates.CRY`,
+            :class:`qibo.gates.SWAP`, :class:`qibo.gates.FSWAP`, :class:`qibo.gates.GIVENS`,
+            :class:`qibo.gates.RBS`, :class:`qibo.gates.TOFFOLI`, :class:`qibo.gates.CCZ`,
+            and :class:`qibo.gates.FanOut`.
+
+        .. note::
+            The following parametrized gates can have real-valued matrix representations
+            depending on the values of their parameters:
+            :class:`qibo.gates.RX`, :class:`qibo.gates.RZ`, :class:`qibo.gates.U1`,
+            :class:`qibo.gates.U2`, :class:`qibo.gates.U3`, :class:`qibo.gates.CRX`,
+            :class:`qibo.gates.CRZ`, :class:`qibo.gates.CU1`, :class:`qibo.gates.CU2`,
+            :class:`qibo.gates.CU3`, :class:`qibo.gates.fSim`, :class:`qibo.gates.GeneralizedfSim`,
+            :class:`qibo.gates.RXX`, :class:`qibo.gates.RYY`, :class:`qibo.gates.RZZ`,
+            :class:`qibo.gates.RZX`, and :class:`qibo.gates.GeneralizedRBS`.
+
+        Args:
+            dtype (str): the options are the following: ``complex128``, ``complex64``,
+                ``float64``, and ``float32``.
+        """
+        dtypes_str = ("float32", "float64", "complex64", "complex128")
+
+        if dtype not in self.numeric_types and dtype not in dtypes_str:
+            raise_error(
+                ValueError,
+                f"Unknown ``dtype`` ``{dtype}``. For this backend ({self}), "
+                + f"``dtype`` must be either one of the following string: {dtypes_str}, "
+                + f"or one of the following options: {self.numeric_types}",
+            )
+
+        if dtype != self.dtype:
+            self.dtype = dtype
+
+            if self.matrices is not None:
+                self.matrices = self.matrices.__class__(self.dtype, device=self.device)
+
     def set_seed(self, seed) -> None:
         self.engine.manual_seed(seed)
         np.random.seed(seed)
