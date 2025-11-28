@@ -175,7 +175,9 @@ class PyTorchBackend(Backend):
             self.dtype = dtype
 
             if self.matrices is not None:
-                self.matrices = self.matrices.__class__(self.dtype, device=self.device)
+                self.matrices = self.matrices.__class__(
+                    getattr(self, self.dtype), device=self.device
+                )
 
     def set_seed(self, seed) -> None:
         self.engine.manual_seed(seed)
