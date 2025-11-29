@@ -335,6 +335,9 @@ class PyTorchBackend(Backend):
 
         return low + (high - low) * self.engine.rand(size)
 
+    def right_shift(self, *args, **kwargs) -> ArrayLike:
+        return self.engine.bitwise_right_shift(*args, **kwargs)
+
     def transpose(
         self, array: ArrayLike, axes: Union[Tuple[int, ...], List[int]] = None
     ) -> ArrayLike:
