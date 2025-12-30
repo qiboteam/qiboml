@@ -10,16 +10,18 @@ For this reason ``Qiboml`` allows for the definition of custom circuits by means
    import torch
 
    # this defines 3 independent parameters
-   def my_equivariant_circuit(th, phi, lam):
-      c = Circuit(2)
+   def my_equivariant_circuit(theta, phi, lam):
       delta = 2 * torch.cos(phi) + lam**2
-      gamma = lam * torch.exp(th / 2)
-      c.add([gates.RZ(i, theta=th) for i in range(2)])
-      c.add([gates.RX(i, theta=lam) for i in range(2)])
-      c.add([gates.RY(i, theta=phi) for i in range(2)])
-      c.add(gates.RZ(0, theta=delta))
-      c.add(gates.RX(1, theta=gamma))
-      return c
+      gamma = lam * torch.exp(theta / 2)
+
+      circuit = Circuit(2)
+      circuit.add([gates.RZ(k, theta) for k in range(2)])
+      circuit.add([gates.RX(k, lam) for k in range(2)])
+      circuit.add([gates.RY(k, phi) for k in range(2)])
+      circuit.add(gates.RZ(0, delta))
+      circuit.add(gates.RX(1, gamma))
+
+      return circuit
 
 and then pass it to the ``QuantumModel`` through its ``circuit_structure`` argument:
 
