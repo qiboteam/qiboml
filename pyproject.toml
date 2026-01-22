@@ -16,7 +16,7 @@ packages = [{ include = "qiboml", from = "src" }]
 [tool.poetry.dependencies]
 python = ">=3.10,<3.14"
 numpy = "^2.0.0"
-qibo = { git = "https://github.com/qiboteam/qibo" }
+qibo = { git = "https://github.com/qiboteam/qibo", branch = "backends" }
 qibocal = { git = "https://github.com/qiboteam/qibocal" , branch = "backends", optional = true }
 jax = { version = "^0.4.25", optional = true }
 jaxlib = { version = "^0.4.25", optional = true }

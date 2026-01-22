@@ -527,20 +527,6 @@ class PyTorchBackend(Backend):
             param, dtype=self.dtype, requires_grad=trainable, device=self.device
         )
 
-    def _order_probabilities(
-        self, probs: ArrayLike, qubits: Tuple[int, ...], nqubits: int
-    ) -> ArrayLike:
-        """Arrange probabilities according to the given ``qubits`` ordering."""
-        if probs.dim() == 0:  # pragma: no cover
-            return probs
-        unmeasured, reduced = [], {}
-        for i in range(nqubits):
-            if i in qubits:
-                reduced[i] = i - len(unmeasured)
-            else:
-                unmeasured.append(i)
-        return self.transpose(probs, [reduced.get(i) for i in qubits])
-
     def _test_regressions(self, name):
         if name == "test_measurementresult_apply_bitflips":
             return [
