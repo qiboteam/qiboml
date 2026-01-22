@@ -169,6 +169,9 @@ class ExactGeodesicTransportCG:
                 angles_backward = self.backend.engine.tensor_scatter_nd_update(
                     angles_backward, [[idx]], [angles_backward[idx] - epsilon]
                 )
+            elif self.backend.platform == "jax":
+                angles_forward.at[idx].set(angles_forward[idx] + epsilon)
+                angles_backward.at[idx].set(angles_forward[idx] - epsilon)
             else:
                 angles_forward[idx] += epsilon
                 angles_backward[idx] -= epsilon
@@ -193,6 +196,8 @@ class ExactGeodesicTransportCG:
                 grad = self.backend.engine.tensor_scatter_nd_update(
                     grad, [[idx]], [update]
                 )
+            elif self.backend.platform == "jax":
+                grad.at[idx].set(update)
             else:
                 grad[idx] = update
 
@@ -257,6 +262,8 @@ class ExactGeodesicTransportCG:
                 reduced_params = self.backend.engine.tensor_scatter_nd_update(
                     reduced_params, [[0]], [reduced_params[0] + math.pi / 2]
                 )
+            elif self.backend.platform == "jax":
+                reduced_params.at[0].set(reduced_params[0] + math.pi / 2)
             else:
                 reduced_params[0] += math.pi / 2
 
@@ -271,6 +278,8 @@ class ExactGeodesicTransportCG:
                 jacob = self.backend.engine.tensor_scatter_nd_update(
                     jacob, indices, updates
                 )
+            elif self.backend.platform == "jax":
+                jacob.at[j:, j].set(updates)
             else:
                 jacob[j:, j] = updates
 
@@ -406,6 +415,8 @@ class ExactGeodesicTransportCG:
                 angles = self.backend.engine.tensor_scatter_nd_update(
                     angles, [[elem]], [updates]
                 )
+            elif self.backend.platform == "jax":
+                angles.at[elem].set(updates)
             else:
                 angles[elem] = updates
 
@@ -414,6 +425,8 @@ class ExactGeodesicTransportCG:
             angles = self.backend.engine.tensor_scatter_nd_update(
                 angles, [[-1]], [update]
             )
+        elif self.backend.platform == "jax":
+            angles.at[-1].set(updates)
         else:
             angles[-1] = update
 
