@@ -2895,7 +2895,7 @@ files = [
 numpy = [
     {version = ">=1.21.2", markers = "python_version >= \"3.10\""},
     {version = ">=2.1.0", markers = "python_version >= \"3.13\""},
-    {version = ">=1.26.0", markers = "python_version >= \"3.12\""},
+    {version = ">=1.26.0", markers = "python_version == \"3.12\""},
     {version = ">=1.23.3", markers = "python_version >= \"3.11\""},
 ]
 
@@ -4711,9 +4711,9 @@ sympy = "^1.13.1"
 tabulate = "^0.9.0"
 
 [package.extras]
-cudaq = ["qbraid[cudaq, qir] (>=0.10.0,<0.11.0)", "qbraid[cudaq] (>=0.10.0,<0.11.0)", "qbraid[qir] (>=0.10.0,<0.11.0)"]
+cudaq = ["qbraid[cudaq,qir] (>=0.10.0,<0.11.0)", "qbraid[cudaq] (>=0.10.0,<0.11.0)", "qbraid[qir] (>=0.10.0,<0.11.0)"]
 qinfo = []
-qir = ["qbraid[cudaq, qir] (>=0.10.0,<0.11.0)", "qbraid[cudaq] (>=0.10.0,<0.11.0)", "qbraid[qir] (>=0.10.0,<0.11.0)"]
+qir = ["qbraid[cudaq,qir] (>=0.10.0,<0.11.0)", "qbraid[cudaq] (>=0.10.0,<0.11.0)", "qbraid[qir] (>=0.10.0,<0.11.0)"]
 qulacs = ["qulacs (>=0.6.4,<0.7.0) ; python_version < \"3.13\""]
 
 [package.source]
