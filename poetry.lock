@@ -2895,7 +2895,7 @@ files = [
 numpy = [
     {version = ">=1.21.2", markers = "python_version >= \"3.10\""},
     {version = ">=2.1.0", markers = "python_version >= \"3.13\""},
-    {version = ">=1.26.0", markers = "python_version == \"3.12\""},
+    {version = ">=1.26.0", markers = "python_version >= \"3.12\""},
     {version = ">=1.23.3", markers = "python_version >= \"3.11\""},
 ]
 
@@ -4711,20 +4711,20 @@ sympy = "^1.13.1"
 tabulate = "^0.9.0"
 
 [package.extras]
-cudaq = ["qbraid[cudaq,qir] (>=0.10.0,<0.11.0)", "qbraid[cudaq] (>=0.10.0,<0.11.0)", "qbraid[qir] (>=0.10.0,<0.11.0)"]
+cudaq = ["qbraid[cudaq, qir] (>=0.10.0,<0.11.0)", "qbraid[cudaq] (>=0.10.0,<0.11.0)", "qbraid[qir] (>=0.10.0,<0.11.0)"]
 qinfo = []
-qir = ["qbraid[cudaq,qir] (>=0.10.0,<0.11.0)", "qbraid[cudaq] (>=0.10.0,<0.11.0)", "qbraid[qir] (>=0.10.0,<0.11.0)"]
+qir = ["qbraid[cudaq, qir] (>=0.10.0,<0.11.0)", "qbraid[cudaq] (>=0.10.0,<0.11.0)", "qbraid[qir] (>=0.10.0,<0.11.0)"]
 qulacs = ["qulacs (>=0.6.4,<0.7.0) ; python_version < \"3.13\""]
 
 [package.source]
 type = "git"
 url = "https://github.com/qiboteam/qibo"
 reference = "HEAD"
-resolved_reference = "d09d34cd3f9f884c63a56fdc24f533e3531afb58"
+resolved_reference = "a8173fd49cb3c087fd6fd58dd7ba945d02e41e5b"
 
 [[package]]
 name = "qibocal"
-version = "0.2.4"
+version = "0.2.5"
 description = "Qibo's quantum calibration, characterization and validation module."
 optional = false
 python-versions = ">=3.10,<3.14"
@@ -4750,7 +4750,7 @@ skops = ">=0.11,<0.14"
 type = "git"
 url = "https://github.com/qiboteam/qibocal"
 reference = "backends"
-resolved_reference = "594b1bdf9a7583a19c9e8ac188fb50121d9fa022"
+resolved_reference = "e4eebbb814b501c5ef5e99dc074af5b7ad59ff7d"
 
 [[package]]
 name = "qibojit"
