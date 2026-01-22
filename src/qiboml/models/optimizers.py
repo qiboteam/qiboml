@@ -39,9 +39,10 @@ class ExactGeodesicTransportCG:
       ExactGeodesicTransportCG: Instantiated optimizer object.
 
     References:
-        A. J. Ferreira‑Martins, R. M. S. Farias, G. Camilo, T. O. Maciel, A. Tosta, R. Lin, A. Alhajri, T. Haug, and L. Aolita,
-        *Variational quantum algorithms with exact geodesic transport*,
-        `arXiv:2506.17395 (2025) <https://arxiv.org/abs/2506.17395>`_.
+        A. J. Ferreira‑Martins, R. M. S. Farias, G. Camilo, T. O. Maciel, A. Tosta,
+        R. Lin, A. Alhajri, T. Haug, and L. Aolita, *Variational quantum algorithms
+        with exact geodesic transport*, `arXiv:2506.17395 (2025)
+        <https://arxiv.org/abs/2506.17395>`_.
     """
 
     def __init__(

@@ -1,12 +1,12 @@
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional, Tuple, Union
 
 from numpy.typing import ArrayLike
 from qibo import Circuit, gates
 from qibo.backends import Backend, _check_backend
 from qibo.config import log, raise_error
-from qibo.hamiltonians import Hamiltonian, SymbolicHamiltonian, Z
+from qibo.hamiltonians import Hamiltonian, Z
 from qibo.noise import NoiseModel
 from qibo.quantum_info.metrics import infidelity
 from qibo.result import CircuitResult, MeasurementOutcomes, QuantumState
@@ -23,10 +23,11 @@ class QuantumDecoding:
 
     Args:
         nqubits (int): total number of qubits.
-        qubits (tuple[int], optional): set of qubits it acts on, by default ``range(nqubits)``.
-        wire_names (tuple[int] | tuple[str], optional): names to be given to the wires, this has to
-            have ``len`` equal to ``nqubits``. Additionally, this is mostly useful when executing
-            on hardware to select which qubits to make use of. Namely, if the chip has qubits named:
+        qubits (Tuple[int], optional): set of qubits it acts on, by default ``range(nqubits)``.
+        wire_names (Tuple[int] or Tuple[str], optional): names to be given to the wires,
+            this has to have ``len`` equal to ``nqubits``. Additionally, this is mostly useful
+            when executing on hardware to select which qubits to make use of.
+            Namely, if the chip has qubits named:
             ```
             ("a", "b", "c", "d")
             ```
@@ -36,21 +37,22 @@ class QuantumDecoding:
             decoding = QuantumDecoding(nqubits=2, wire_names=("a", "d"))
             ```
         nshots (int, optional): number of shots used for circuit execution and sampling.
-        backend (Backend, optional): backend used for computation, by default the globally-set
-            backend is used.
-        transpiler (Passes, optional): transpiler to run before circuit execution, by default
-            no transpilation is performed on the circuit (``transpiler=None``).
-        noise_model (NoiseModel): a ``NoiseModel`` of Qibo, which is applied to the
-            given circuit to perform noisy simulations. In case a `transpiler` is
-            passed, the noise model is applied to the transpiled circuit.
-            Default is ``None`` and no noise is added.
-        density_matrix (bool): if ``True``, density matrix simulation is performed
+        backend (:class:`qibo.backends.Backend`, optional): backend used for computation,
+            by default the globally-set backend is used.
+        transpiler (:class:`qibo.transpiler.Passes`, optional): transpiler to run before
+            circuit execution, by default no transpilation is performed on the circuit
+            (``transpiler=None``).
+        noise_model (:class:`qibo.noise.NoiseModel`, optional): a ``NoiseModel`` of Qibo,
+            which is applied to the given circuit to perform noisy simulations.
+            In case a `transpiler` is passed, the noise model is applied to the transpiled
+            circuit. Defaults to ``None``, and no noise is added.
+        density_matrix (bool, optional): if ``True``, density matrix simulation is performed
             instead of state-vector simulation.
     """
 
     nqubits: int
-    qubits: Optional[tuple[int]] = None
-    wire_names: Optional[Union[tuple[int], Union[tuple[str]]]] = None
+    qubits: Optional[Tuple[int]] = None
+    wire_names: Optional[Union[Tuple[int], Union[Tuple[str]]]] = None
     nshots: Optional[int] = None
     backend: Optional[Backend] = None
     transpiler: Optional[Passes] = None
@@ -200,21 +202,21 @@ class Probabilities(QuantumDecoding):
         """Computes the final state probabilities.
 
         Args:
-            x (Circuit): input circuit.
+            x (:class:`qibo.models.circuit.Circuit`): Input circuit.
 
         Returns:
-            (ndarray): the final probabilities.
+            ArrayLike: the final probabilities.
         """
         return self.backend.reshape(
             super().__call__(x).probabilities(self.qubits), self.output_shape
         )
 
     @property
-    def output_shape(self) -> tuple[int, int]:
+    def output_shape(self) -> Tuple[int, int]:
         """Shape of the output probabilities.
 
         Returns:
-            (tuple[int, int]): a ``(1, 2**nqubits)`` shape.
+            Tuple[int, int]: A ``(1, 2**nqubits)`` shape.
         """
         n = 2 ** len(self.qubits)
         return (1, n)
@@ -226,25 +228,24 @@ class Probabilities(QuantumDecoding):
 
 @dataclass
 class Expectation(QuantumDecoding):
-    r"""The expectation value decoder.
+    """The expectation value decoder.
 
     Args:
-        observable (Hamiltonian | ndarray): the observable to calculate the expectation value of,
-            by default :math:`Z_0 + Z_1 + ... + Z_n` is used.
+        observable (ArrayLike or :class:`qibo.hamiltonians.Hamiltonian`): The observable
+            to calculate the expectation value of. Defaults to :math:`Z_0 + Z_1 + ... + Z_n`.
         mitigation_config (dict): configuration of the real-time quantum error mitigation
-            method in case it is desired.
-            The real-time quantum error mitigation algorithm is proposed in
-            https://arxiv.org/abs/2311.05680 and consists in performing a real-time check
+            method in case it is desired. The real-time quantum error mitigation algorithm
+            from Ref. [1] is proposed, and consists in performing a real-time check
             of the reliability of a learned mitigation map. This is done by constructing
             a reference error-sensitive Clifford circuit, which preserves the size of the original,
             target one. When the decoder is called, the reliability of the mitigation map is
             checked by computing a simple metric :math:`D = |E_{\rm noisy} - E_{\rm mitigated}|`.
-            If the metric is found exceeding an arbitrary threshold value :math:`\delta`,
+            If the metric is found exceeding an arbitrary threshold value :math:`\\delta`,
             then a chosen data-driven error mitigation technique is executed to
             retrieve the mitigation map.
             To successfully check the reliability of the mitigation map or computing
             the map itself, it is recommended to use a number of shots which leads
-            to a statistical noise (due to measurements) :math:`\varepsilon << \delta`.
+            to a statistical noise (due to measurements) :math:`\varepsilon << \\delta`.
             For this reason, the real-time error mitigation algorithm can be customized
             by passing also a `min_iterations` argument, which will define the minimum
             number of decoding calls which have to happen before the mitigation map
@@ -263,9 +264,14 @@ class Expectation(QuantumDecoding):
             The given example is performing real-time error mitigation with the
             request of computing the mitigation map via Clifford Data Regression
             whenever the reference expectation value differs from the mitigated
-            one of :math:`\delta > 0.2`. This check is performed every 500 iterations and,
+            one of :math:`\\delta > 0.2`. This check is performed every 500 iterations and,
             in case it is required, the mitigation map is computed executing circuits
             with `nshots=10000`.
+
+    References:
+        1. M. Robbiati, A. Sopena, A. Papaluca, and S. Carrazza, *Real-time error mitigation
+        for variational optimization on quantum hardware*, `arxiv:2311.05680 (2023)
+        <https://arxiv.org/abs/2311.05680>`_.
     """
 
     observable: Union[ArrayLike, Hamiltonian] = None
@@ -320,19 +326,19 @@ class Expectation(QuantumDecoding):
         return self.backend.reshape(expval, (1, 1))
 
     @property
-    def output_shape(self) -> tuple[int, int]:
+    def output_shape(self) -> Tuple[int, int]:
         """Shape of the output expectation value.
 
         Returns:
-            (tuple[int, int]): a ``(1, 1)`` shape.
+            Tuple[int, int]: A ``(1, 1)`` shape.
         """
         return (1, 1)
 
-    def set_backend(self, backend: Backend):
+    def set_backend(self, backend: Backend) -> None:
         """Set the internal and observable's backends.
 
         Args:
-            backend (Backend): backend to be set.
+            backend (:class:`qibo.backends.Backend`): backend to be set.
         """
         if isinstance(self.observable, Hamiltonian):
             matrix = self.backend.to_numpy(self.observable.matrix)
@@ -358,10 +364,10 @@ class State(QuantumDecoding):
         imaginary parts stacked on top of each other.
 
         Args:
-            x (Circuit): input Circuit.
+            x (:class:`qibo.models.circuit.Circuit`): input Circuit.
 
         Returns:
-            (ndarray): the final state.
+            ArrayLike: The final state.
         """
         state = super().__call__(x).state()
         return self.backend.vstack(  # pylint: disable=no-member
@@ -372,11 +378,11 @@ class State(QuantumDecoding):
         ).reshape(self.output_shape)
 
     @property
-    def output_shape(self) -> tuple[int, int, int]:
+    def output_shape(self) -> Tuple[int, int, int]:
         """Shape of the output state.
 
         Returns:
-            (tuple[int, int, int]): a ``(2, 1, 2**nqubits)`` shape.
+            Tuple[int, int, int]: A ``(2, 1, 2**nqubits)`` shape.
         """
         n = 2 ** len(self.qubits)
         if self.density_matrix:
@@ -406,11 +412,11 @@ class Samples(QuantumDecoding):
         return self.backend.cast(super().__call__(x).samples(), self.backend.float64)
 
     @property
-    def output_shape(self) -> tuple[int, int]:
+    def output_shape(self) -> Tuple[int, int]:
         """Shape of the output samples.
 
         Returns:
-            (tuple[int, int]): a ``(nshots, nqubits)`` shape.
+            Tuple[int, int]: A ``(nshots, nqubits)`` shape.
         """
         return (self.nshots, len(self.qubits))
 
@@ -452,7 +458,7 @@ class VariationalQuantumLinearSolver(QuantumDecoding):
         return self.backend.cast(self.backend.real(cost), dtype=self.backend.float64)
 
     @property
-    def output_shape(self) -> tuple[int, int]:
+    def output_shape(self) -> Tuple[int, int]:
         return (1, 1)
 
     @property
