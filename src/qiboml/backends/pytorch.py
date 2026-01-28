@@ -180,6 +180,8 @@ class PyTorchBackend(Backend):
                 )
 
     def set_seed(self, seed) -> None:
+        if seed is None:
+            seed = self.engine.seed()
         self.engine.manual_seed(seed)
         np.random.seed(seed)
 
