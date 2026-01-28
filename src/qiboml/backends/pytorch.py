@@ -179,7 +179,7 @@ class PyTorchBackend(Backend):
                     getattr(self, self.dtype), device=self.device
                 )
 
-    def set_seed(self, seed) -> None:
+    def set_seed(self, seed: int) -> None:
         if seed is None:
             seed = self.engine.seed()
         self.engine.manual_seed(seed)
