@@ -1,24 +1,17 @@
-from typing import Union
-
+from qibo.backends.abstract import Backend
 from qibo.config import raise_error
 
-from qiboml.backends.jax import JaxBackend
-from qiboml.backends.pytorch import PyTorchBackend
-from qiboml.backends.tensorflow import TensorflowBackend
+PLATFORMS = ("jax", "pytorch", "tensorflow")
 
-PLATFORMS = ["tensorflow", "pytorch", "jax"]
-AVAILABLE_PLATFORMS = [
-    "tensorflow",
-    "pytorch",
-]  # temporary: to remove once pytorch and tensorflow are migrated  and jax is fully working
-QibomlBackend = Union[TensorflowBackend, PyTorchBackend, JaxBackend]
+# temporary: to remove once jax is fully working
+AVAILABLE_PLATFORMS = ("pytorch", "tensorflow")
 
 
 class MetaBackend:
     """Meta-backend class which takes care of loading the qiboml backends."""
 
     @staticmethod
-    def load(platform: str) -> QibomlBackend:
+    def load(platform: str) -> Backend:
         """Load the qiboml backend.
 
         Args:
@@ -27,17 +20,27 @@ class MetaBackend:
             qibo.backends.abstract.Backend: The loaded backend.
         """
 
-        if platform == "tensorflow":
-            return TensorflowBackend()
-        elif platform == "pytorch":
-            return PyTorchBackend()
-        elif platform == "jax":
-            return JaxBackend()
-        else:
+        if platform not in PLATFORMS:
             raise_error(
                 ValueError,
                 f"Backend {platform} is not available. The qiboml backends are {PLATFORMS}.",
             )
+
+        if platform == "tensorflow":
+            from qiboml.backends.tensorflow import (  # pylint: disable=C0415
+                TensorflowBackend,
+            )
+
+            return TensorflowBackend()
+
+        if platform == "pytorch":
+            from qiboml.backends.pytorch import PyTorchBackend  # pylint: disable=C0415
+
+            return PyTorchBackend()
+
+        from qiboml.backends.jax import JaxBackend  # pylint: disable=C0415
+
+        return JaxBackend()
 
     def list_available(self) -> dict:
         """List all the available qiboml backends."""

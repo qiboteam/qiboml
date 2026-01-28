@@ -16,15 +16,15 @@ packages = [{ include = "qiboml", from = "src" }]
 [tool.poetry.dependencies]
 python = ">=3.10,<3.14"
 numpy = "^2.0.0"
+qibo = { git = "https://github.com/qiboteam/qibo" }
+qibocal = { git = "https://github.com/qiboteam/qibocal" , branch = "backends", optional = true }
+jax = { version = "^0.4.25", optional = true }
+jaxlib = { version = "^0.4.25", optional = true }
 keras = { version = "^3.11.0", optional = true }
-tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux' or sys_platform == 'darwin'", optional = true }
 # TODO: the marker is a temporary solution due to the lack of the tensorflow-io 0.32.0's wheels for Windows, this package is one of
 # the tensorflow requirements
-qibo = { git="https://github.com/qiboteam/qibo" }
+tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux' or sys_platform == 'darwin'", optional = true }
 torch = { version = "^2.7.0", optional = true }
-jax = "^0.4.25"
-jaxlib = "^0.4.25"
-qibocal = {version="^0.2.2", optional=true}
 
 [tool.poetry.group.docs]
 optional = true
@@ -59,11 +59,14 @@ pytest = "^7.2.1"
 pylint = "3.1.0"
 pytest-cov = "4.0.0"
 matplotlib = "^3.7.0"
+# qibojit = { git = "https://github.com/qiboteam/qibojit" }
+qibocal = { git = "https://github.com/qiboteam/qibocal", branch = "backends" }
+qibolab = { git = "https://github.com/qiboteam/qibolab", extras = ["emulator"] }
+jax = "^0.4.25"
+jaxlib = "^0.4.25"
 keras = "^3.11.0"
-qibocal = "^0.2.2"
 tensorflow = { version = "^2.16.1", markers = "sys_platform == 'linux' or sys_platform == 'darwin'" }
 torch = { version = "^2.7.0" }
-qibolab = { git = "https://github.com/qiboteam/qibolab", extras = ["emulator"] }
 qibotn = {git = "https://github.com/qiboteam/qibotn", python = "^3.11", platform = "linux || darwin" }
 quimb = {version="^1.11.2", python = "^3.11", platform = "linux || darwin"}
 cotengra = {version="^0.7.5", python = "^3.11", platform = "linux || darwin"}
@@ -85,7 +88,7 @@ jax = { extras = ["cuda12"], version = "^0.4.25" }
 optional = true
 
 [tool.poetry.group.qibocal.dependencies]
-qibocal = "^0.2.2"
+qibocal = { git = "https://github.com/qiboteam/qibocal", branch = "backends" }
 
 [tool.poe.tasks]
 test = "pytest"
