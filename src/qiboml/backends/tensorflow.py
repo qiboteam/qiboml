@@ -131,6 +131,9 @@ class TensorflowBackend(Backend):
 
         return self.engine.random.Generator.from_seed(seed)
 
+    def diag(self, array: ArrayLike, **kwargs) -> ArrayLike:
+        return self.engine.linalg.diag(array, **kwargs)
+
     def flatnonzero(self, array: ArrayLike) -> ArrayLike:
         return np.flatnonzero(array)
 
