@@ -127,7 +127,10 @@ class PyTorchBackend(Backend):
         return super().is_sparse(array)
 
     def set_device(self, device: str) -> None:  # pragma: no cover
-        self.device = "cpu" if "CPU" in device else device
+        if "CPU" in device:
+            self.device = "cpu"
+        else:
+            self.device = "cuda:" + device.split(":")[-1]
 
     def set_dtype(self, dtype: str) -> None:
         """Set data type of arrays created using the backend. Works in-place.
