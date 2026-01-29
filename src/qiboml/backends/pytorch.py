@@ -183,7 +183,6 @@ class PyTorchBackend(Backend):
         if seed is None:
             seed = self.engine.seed()
         self.engine.manual_seed(seed)
-        np.random.seed(seed)
 
     def set_threads(self, nthreads: int) -> None:  # pragma: no cover
         """Set number of threads for CPU backend simulations that accept it. Works in-place.
