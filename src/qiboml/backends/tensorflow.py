@@ -165,6 +165,9 @@ class TensorflowBackend(Backend):
             return self.trace(state)
         return self.engine.norm(state, ord=order, **kwargs)
 
+    def outer(self, array_1: ArrayLike, array_2: ArrayLike) -> ArrayLike:
+        return self.tensordot(array_1, array_2, axes=0)
+
     def prod(self, array, **kwargs) -> ArrayLike:
         return self.engine.math.reduce_prod(array, **kwargs)
 
