@@ -132,7 +132,9 @@ class TensorflowBackend(Backend):
         return self.engine.random.Generator.from_seed(seed)
 
     def diag(self, array: ArrayLike, **kwargs) -> ArrayLike:
-        return self.engine.linalg.diag(array, **kwargs)
+        if len(array.shape) == 1:
+            return self.engine.linalg.tensor_diag(array, **kwargs)
+        return self.engine.linalg.tensor_diag_part(array, **kwargs)
 
     def flatnonzero(self, array: ArrayLike) -> ArrayLike:
         return np.flatnonzero(array)
