@@ -149,10 +149,10 @@ class TensorflowBackend(Backend):
         return self.engine.math.log(array, **kwargs)
 
     def log2(self, array: ArrayLike, **kwargs) -> ArrayLike:
-        return self.engine.math.log(array, **kwargs) / self.engine.math.log(2)
+        return self.engine.math.log(array, **kwargs) / self.engine.math.log(2.0)
 
     def log10(self, array: ArrayLike, **kwargs) -> ArrayLike:
-        return self.engine.math.log(array, **kwargs) / self.engine.math.log(10)
+        return self.engine.math.log(array, **kwargs) / self.engine.math.log(10.0)
 
     def matrix_norm(
         self, state: ArrayLike, order: Union[int, float, str] = "nuc", **kwargs
