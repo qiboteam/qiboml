@@ -136,6 +136,9 @@ class TensorflowBackend(Backend):
             return self.engine.linalg.tensor_diag(array, **kwargs)
         return self.engine.linalg.tensor_diag_part(array, **kwargs)
 
+    def expm(self, array: ArrayLike) -> ArrayLike:
+        return self.engine.linalg.expm(array)
+
     def flatnonzero(self, array: ArrayLike) -> ArrayLike:
         return np.flatnonzero(array)
 
@@ -213,7 +216,7 @@ class TensorflowBackend(Backend):
     def sin(self, array, **kwargs):
         return self.engine.math.sin(array, **kwargs)
 
-        # def sqrt(self, array):
+    def sqrt(self, array):
         return self.engine.math.sqrt(array)
 
     def sum(self, array: ArrayLike, axis=None, **kwargs) -> ArrayLike:
