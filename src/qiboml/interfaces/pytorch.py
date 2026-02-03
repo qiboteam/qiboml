@@ -58,22 +58,24 @@ class TorchCircuitTracer(CircuitTracer):
 @dataclass(eq=False)
 class QuantumModel(torch.nn.Module):
     """
-    The pytorch interface to qiboml models.
+    The ``pytorch`` interface to ``qiboml`` models.
 
     Args:
-        circuit_structure (Union[List[QuantumEncoding, Circuit, Callable], Circuit]):
+        circuit_structure (List[QuantumEncoding, Circuit, Callable or :class:`qibo.models.Circuit`]):
             a list of Qibo circuits and Qiboml encoding layers, which defines
             the complete structure of the model. The whole circuit will be mounted
             by sequentially stacking the elements of the given list. It is also possible
             to pass a single circuit, in the case a sequential structure is not needed.
         decoding (QuantumDecoding): the decoding layer.
-        parameters_initialization (Union[keras.initializers.Initializer, np.ndarray]]): if an initialiser is provided it will be used
-        either as the parameters or to sample the parameters of the model.
+        parameters_initialization (:class:`keras.initializers.Initializer` or ArrayLike):
+            if an initialiser is provided it will be used either as the parameters or to sample the
+            parameters of the model.
         differentiation (Differentiation, optional): the differentiation engine,
             if not provided a default one will be picked following what described in
             the :ref:`docs <_differentiation_engine>`.
-        circuit_tracer (CircuitTracer, optional): tracer used to build the circuit
-        and trace the operations performed upon construction. Defaults to ``TorchCircuitTracer``.
+        circuit_tracer (:class:`qiboml.interfacs.circuit_tracer.CircuitTracer`, optional):
+            tracer used to build the circuit and trace the operations performed upon
+            construction. Defaults to ``TorchCircuitTracer``.
     """
 
     circuit_structure: Union[Circuit, List[Union[Circuit, QuantumEncoding, Callable]]]
@@ -129,7 +131,13 @@ class QuantumModel(torch.nn.Module):
                 self.differentiation = utils.get_default_differentiation(
                     decoding=self.decoding,
                     instructions=DEFAULT_DIFFERENTIATION,
-                )()
+                )
+                self.differentiation = self.differentiation(
+                    circuit=self.circuit_tracer.build_circuit(
+                        params=list(self.parameters())
+                    ),
+                    decoding=self.decoding,
+                )
         elif isinstance(self.differentiation, type):
             self.differentiation = self.differentiation()
 
@@ -139,9 +147,10 @@ class QuantumModel(torch.nn.Module):
         in a quantum circuit, executes it and decodes it.
 
         Args:
-            x (Optional[torch.tensor]): the input data, if required. Default is None.
+            x (:class:`torch.tensor`, optional): the input data, if required. Default is ``None``.
+
         Returns:
-            (torch.tensor): the computed outputs.
+            :class:`torch.tensor`: The computed outputs.
         """
         if self.differentiation is None:
             circuit = self.circuit_tracer.build_circuit(
