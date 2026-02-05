@@ -24,11 +24,11 @@ You can quickly build a QML model using one of the currently supported interface
 to train a VQE to find the ground state of an Hamiltonian $H=\sum_i Z_i$:
 
 ```python
-from qiboml.models.ansatze import HardwareEfficient
+from qiboml.models.ansatze import hardware_efficient
 from qiboml.models.decoding import Expectation
 
 nqubits = 2
-circuit = HardwareEfficient(nqubits)
+circuit = hardware_efficient(nqubits)
 # By default Expectation sets Z_0 + Z_1 + ... + Z_n as observable,
 # any Hamiltonian can be used though
 decoding = Expectation(nqubits)
@@ -64,6 +64,8 @@ for iteration in range(100):
 
 
 ### Citation policy
+[![arXiv](https://img.shields.io/badge/arXiv-2510.11773-b31b1b.svg)](https://arxiv.org/abs/2510.11773)
+[![DOI](https://zenodo.org/badge/759801297.svg)](https://doi.org/10.5281/zenodo.17310378)
 
 If you use the package please refer to [the documentation](https://qibo.science/qibo/stable/appendix/citing-qibo.html#publications) for citation instructions.
 

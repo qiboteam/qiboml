@@ -1,6 +1,7 @@
 from typing import Optional
-from qibo.models.encodings import hamming_weight_encoder
+
 from qibo.backends import _check_backend
+from qibo.models.encodings import hamming_weight_encoder
 
 
 class ExactGeodesicTransportCG:
@@ -141,10 +142,7 @@ class ExactGeodesicTransportCG:
             float: Expectation value of ``hamiltonain``.
         """
         state = self.state()
-
-        expval = self.hamiltonian.expectation(state)
-
-        return expval
+        return self.hamiltonian.expectation_from_state(state)
 
     def gradient(self, epsilon=1e-8):
         """Numerically compute gradient of loss wrt angles.
@@ -194,10 +192,10 @@ class ExactGeodesicTransportCG:
         for j in range(d):
             varphi = g_diag[j] ** (-1 / 2) * jacobian[:, j]
             full_varphi = self.amplitudes_to_full_state(varphi)
-            l_varphi = self.hamiltonian.expectation(full_varphi)
+            l_varphi = self.hamiltonian.expectation_from_state(full_varphi)
             phi = (psi + varphi) / self.backend.np.sqrt(2)
             full_phi = self.amplitudes_to_full_state(phi)
-            l_phi = self.hamiltonian.expectation(full_phi)
+            l_phi = self.hamiltonian.expectation_from_state(full_phi)
             grad[j] = self.backend.np.sqrt(g_diag[j]) * (2 * l_phi - l_varphi - l_psi)
         return grad
 

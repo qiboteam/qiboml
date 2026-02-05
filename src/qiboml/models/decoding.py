@@ -2,7 +2,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Union
 
-from qibo import Circuit, gates, transpiler
+from qibo import Circuit, gates, get_transpiler, transpiler
 from qibo.backends import Backend, NumpyBackend, _check_backend
 from qibo.config import log, raise_error
 from qibo.hamiltonians import Hamiltonian, SymbolicHamiltonian, Z
@@ -13,6 +13,7 @@ from qibo.result import CircuitResult, MeasurementOutcomes, QuantumState
 from qibo.transpiler import Passes
 
 from qiboml import ndarray
+from qiboml.models.calibrator import Calibrator
 from qiboml.models.utils import Mitigator
 
 
@@ -260,6 +261,7 @@ class Expectation(QuantumDecoding):
 
     observable: Union[ndarray, Hamiltonian] = None
     mitigation_config: Optional[Dict[str, Any]] = None
+    calibrator: Optional[Calibrator] = None
 
     def __post_init__(self):
         """Ancillary post initialization operations."""
@@ -286,28 +288,15 @@ class Expectation(QuantumDecoding):
         Returns:
             (ndarray): the calculated expectation value.
         """
-
         if self.mitigation_config is not None:
             # In this case it is required before the super.call
             self.align_circuits(x)
-            x = self.transpile(x)
-            _real_time_mitigation_check(self, x)
+            transpiled_x = self.transpile(x)
+            _real_time_mitigation_check(self, transpiled_x)
 
-        # run circuit
-        if self.analytic:
-            expval = self.observable.expectation(super().__call__(x).state())
-        else:
-            if isinstance(self.observable, SymbolicHamiltonian):
-                x = self.preprocessing(x)
-                expval = self.observable.expectation_from_circuit(
-                    x,
-                    nshots=self.nshots,
-                )
-            else:
-                expval = self.observable.expectation_from_samples(
-                    super().__call__(x).frequencies(),
-                    qubit_map=self.qubits,
-                )
+        x._final_state = None
+        x = self.preprocessing(x)
+        expval = self.observable.expectation(x, nshots=self.nshots)
 
         # apply mitigation if requested
         if self.mitigation_config is not None:
@@ -315,6 +304,9 @@ class Expectation(QuantumDecoding):
                 self.mitigator(expval),
                 dtype=self.backend.np.float64,
             )
+
+        if self.calibrator is not None:
+            self.calibrator()
 
         return self.backend.np.reshape(expval, (1, 1))
 
@@ -486,19 +478,13 @@ def _real_time_mitigation_check(decoder: Expectation, x: Circuit):
 def _check_or_recompute_map(decoder: Expectation, x: Circuit):
     """Helper function to recompute the mitigation map."""
     # Compute the expectation value of the reference circuit
-    with decoder._temporary_nshots(decoder.mitigator._nshots):
-        freqs = (
-            super(Expectation, decoder)
-            .__call__(decoder.mitigator._reference_circuit)
-            .frequencies()
-        )
-        reference_expval = decoder.observable.expectation_from_samples(
-            freqs, qubit_map=decoder.qubits
-        )
+    reference_expval = decoder.observable.expectation(
+        decoder.mitigator._reference_circuit, nshots=decoder.mitigator._nshots
+    )
     # Check or update noise map
     decoder.mitigator.check_or_update_map(
         noisy_reference_value=reference_expval,
-        circuit=x + decoder._circuit,
+        circuit=x,
         observable=decoder.observable,
         noise_model=decoder.noise_model,
     )
