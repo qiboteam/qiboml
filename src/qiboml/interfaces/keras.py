@@ -171,7 +171,11 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
                 self.differentiation = utils.get_default_differentiation(
                     decoding=self.decoding,
                     instructions=DEFAULT_DIFFERENTIATION,
-                )()
+                )
+                self.differentiation = self.differentiation(
+                    self.circuit_tracer.build_circuit(self.circuit_parameters),
+                    self.decoding,
+                )
         elif isinstance(self.differentiation, type):
             self.differentiation = self.differentiation()
         self.custom_gradient = None
