@@ -132,7 +132,10 @@ class QuantumModel(torch.nn.Module):
                     decoding=self.decoding,
                     instructions=DEFAULT_DIFFERENTIATION,
                 )
-                self.differentiation = self.differentiation()
+                self.differentiation = self.differentiation(
+                    self.circuit_tracer.build_circuit(self.circuit_parameters),
+                    self.decoding,
+                )
         elif isinstance(self.differentiation, type):
             self.differentiation = self.differentiation()
 
