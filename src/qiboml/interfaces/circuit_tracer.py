@@ -388,7 +388,7 @@ class CircuitTracer(ABC):
         for circ in self.circuit_structure:
             if isinstance(circ, QuantumEncoding):
                 if x is None:
-                    x = self.engine.zeros(circ.nqubits, dtype=self.engine.float64)
+                    x = self.engine.zeros(circ.nqubits, dtype=np.float64)
                 nparams = 0
                 circ = self._build_from_encoding(circ, x, trace=False)
             elif isinstance(circ, Circuit):
