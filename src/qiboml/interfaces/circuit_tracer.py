@@ -30,25 +30,25 @@ class CircuitTracer(ABC):
     @staticmethod
     @abstractmethod
     def jacfwd(f: Callable, argnums: Union[int, Tuple[int]]):  # pragma: no cover
-        """The jacobian functional in forward derivation mode."""
+        """The Jacobian functional in forward derivation mode."""
         pass
 
     @staticmethod
     @abstractmethod
     def jacrev(f: Callable, argnums: Union[int, Tuple[int]]):  # pragma: no cover
-        """The jacobian functional in reverse derivation mode."""
+        """The Jacobian functional in reverse derivation mode."""
         pass
 
     def _compute_jacobian_functional(
         self, circuit: Union[QuantumEncoding, Callable]
     ) -> Callable:
-        """Compute the jacobian functional for the input function.
+        """Compute the Jacobian functional for the input function.
 
         Args:
             circuit (Callable): the input functions that build the circuit.
 
         Returns:
-            (Callable) the jacobian functional
+            (Callable) the Jacobian functional
         """
         _tmp_circuit = circuit
 
@@ -78,7 +78,7 @@ class CircuitTracer(ABC):
     def jacobian_functionals(
         self,
     ) -> dict[int, Callable]:
-        """The dictionary containing the jacobian functionals of each element composing
+        """The dictionary containing the Jacobian functionals of each element composing
         circuit structure.
         """
         jacobians = {}
@@ -97,7 +97,7 @@ class CircuitTracer(ABC):
         """Construct the mapping between independent and dependent parameters.
         In detail, the index of each independent parameter is mapped to the indices
         of all the dependent parameters that originated from it. This is particularly
-        useful for the jacobian of encoders, as it provides a map from the inputs to
+        useful for the Jacobian of encoders, as it provides a map from the inputs to
         the actual gates where they are encoded in the circuit.
         """
         par_map = {}
@@ -122,11 +122,11 @@ class CircuitTracer(ABC):
             params (ArrayLike): the parameters assigned to the built circuit.
 
         Returns:
-            (Tuple(ArrayLike, dict)) the computed jacobian and the mapping between the independent
+            (Tuple(ArrayLike, dict)) the computed Jacobian and the mapping between the independent
         and dependent parameters of `f`.
         """
         # we always assume the input is a 1-dim array, even for encodings
-        # thus the jacobian is always a matrix
+        # thus the Jacobian is always a matrix
         jac = self.engine.reshape(
             self.jacobian_functionals[id(f)](params), (-1, params.shape[0])
         )
@@ -161,11 +161,11 @@ class CircuitTracer(ABC):
             encoding (QuantumEncoding): the encoder.
             x (ArrayLike): the input data.
             trace (bool): whether to trace the construction and thus also
-            calculate the jacobian. Defaults to ``True``.
+            calculate the Jacobian. Defaults to ``True``.
 
         Returns:
             (Circuit | Tuple(ArrayLike, dict, Circuit)) the built circuit or the
-        tuple: jacobian wrt inputs, input to gate map and circuit.
+        tuple: Jacobian wrt inputs, input to gate map and circuit.
         """
         circuit = encoding(x)
         if trace:
@@ -186,11 +186,11 @@ class CircuitTracer(ABC):
             circuit (Circuit): the circuit.
             params (ArrayLike): the parameters to set.
             trace (bool): whether to trace the construction and thus also
-            calculate the jacobian. Defaults to ``True``.
+            calculate the Jacobian. Defaults to ``True``.
 
         Returns:
             (Circuit | Tuple(ArrayLike, dict, Circuit)) the built circuit or the
-        tuple: jacobian wrt parameters, input to gate map and circuit.
+        tuple: Jacobian wrt parameters, input to gate map and circuit.
         """
         circuit.set_parameters(params)
         if trace:
@@ -213,11 +213,11 @@ class CircuitTracer(ABC):
             f (Callable): the custom callable which builds the circuit.
             params (ArrayLike): the parameters used for construction.
             trace (bool): whether to trace the construction and thus also
-            calculate the jacobian. Defaults to ``True``.
+            calculate the Jacobian. Defaults to ``True``.
 
         Returns:
             (Circuit | Tuple(ArrayLike, dict, Circuit)) the built circuit or the
-        tuple: jacobian wrt parameters, input to gate map and circuit.
+        tuple: Jacobian wrt parameters, input to gate map and circuit.
         """
         circuit = f(*params)
         if trace:
@@ -253,18 +253,18 @@ class CircuitTracer(ABC):
         col_span: Tuple[int, int],
         values: ArrayLike,
     ) -> ArrayLike:
-        """Fill the input jacobian in the span defined by (row_span, col_span) with
+        """Fill the input Jacobian in the span defined by (row_span, col_span) with
         the given values. This is mostly here to be overwritten by engines that do not
         allow for direct item assignment.
 
         Args:
-            jacobian (ArrayLike): the jacobian to fill.
+            jacobian (ArrayLike): the Jacobian to fill.
             row_span (Tuple[int, int]): the span of row indices.
             col_span (Tuple[int, int]): the span of column indices.
             values (ArrayLike): the values to insert.
 
         Returns:
-            (ArrayLike) the filled jacobian.
+            (ArrayLike) the filled Jacobian.
         """
         jacobian[row_span[0] : row_span[1], col_span[0] : col_span[1]] = values
         return jacobian
@@ -273,15 +273,15 @@ class CircuitTracer(ABC):
         self, params: ArrayLike, x: Optional[ArrayLike] = None
     ) -> Tuple[Circuit, Optional[ArrayLike], ArrayLike, Optional[dict]]:
         """Construct the circuit defined by the internal ``circuit_structure`` and compute
-        the jacobian wrt to the parameters `params` and inputs `x` of the construction process.
+        the Jacobian wrt to the parameters `params` and inputs `x` of the construction process.
 
         Args:
             params (ArrayLike): the parameters to construct the circuit with.
             x (ArrayLike, optional): the inputs to construct the circuit with.
 
         Returns:
-            (Tuple(Circuit, ArrayLike, ArrayLike, dict)) the constructed circuit, jacobian wrt inputs,
-        jacobian wrt parameters and mapping of inputs ``x`` to the corresponding gate in the built circuit.
+            (Tuple(Circuit, ArrayLike, ArrayLike, dict)) the constructed circuit, Jacobian wrt inputs,
+            Jacobian wrt parameters and mapping of inputs ``x`` to the corresponding gate in the built circuit.
         """
         if (
             any(isinstance(circ, QuantumEncoding) for circ in self.circuit_structure)
@@ -293,7 +293,7 @@ class CircuitTracer(ABC):
 
         # the complete circuit
         circuit = None
-        # the jacobian for each sub-circuit
+        # the Jacobian for each sub-circuit
         jacobians = []
         jacobians_wrt_inputs = []
         input_to_gate_map = {}
@@ -345,12 +345,12 @@ class CircuitTracer(ABC):
             )
 
         total_dim = tuple(sum(np.array(j.shape) for j in jacobians))
-        # build the global jacobian
+        # build the global Jacobian
         J = self.zeros(
             total_dim, dtype=self._get_dtype(params), device=self._get_device(params)
         )
         position = np.array([0, 0])
-        # insert each sub-jacobian in the total one
+        # insert each sub-Jacobian in the total one
         for j in jacobians:
             shape = np.array(j.shape)
             interval = tuple(zip(position, shape + position))
@@ -380,7 +380,7 @@ class CircuitTracer(ABC):
             x (ArrayLike, optional): the inputs to construct the circuit with.
 
         Returns:
-            (Circuit) the constructed circuit.
+            :class:`qibo.models.circuit.Circuit`: The constructed circuit.
         """
         circuit = None
 

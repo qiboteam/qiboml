@@ -86,7 +86,7 @@ class PhaseEncoding(QuantumEncoding):
             x (ArrayLike): the input real data to encode in rotation angles.
 
         Returns:
-            (Circuit): the constructed ``qibo.Circuit``.
+            :class:`qibo.models.circuit.Circuit`: The constructed circuit.
         """
         circuit = self.circuit
         # x = x.ravel()
@@ -109,7 +109,7 @@ class BinaryEncoding(QuantumEncoding):
             x (ArrayLike): the input binary data.
 
         Returns:
-            (Circuit): the constructed ``qibo.Circuit``.
+            :class:`qibo.models.circuit.Circuit`: The constructed circuit.
         """
         if x.shape[-1] != len(self.qubits):
             raise_error(

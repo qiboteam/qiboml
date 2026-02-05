@@ -341,8 +341,7 @@ def test_encoding(backend, frontend, layer, seed):
         [
             activation,
             frontend.QuantumModel(
-                circuit_structure=circuit_structure,
-                decoding=decoding_layer,
+                circuit_structure=circuit_structure, decoding=decoding_layer
             ),
         ],
     )
@@ -359,7 +358,8 @@ def test_decoding(backend, frontend, layer, seed):
 
     if layer is dec.State:
         pytest.skip(
-            "Can't reliably pass for State decoder due to poor sensibility to the parameters probably..."
+            "Can't reliably pass for State decoder due to poor "
+            + "sensibility to the parameters probably..."
         )
 
     set_device(frontend)
