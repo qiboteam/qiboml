@@ -132,12 +132,7 @@ class QuantumModel(torch.nn.Module):
                     decoding=self.decoding,
                     instructions=DEFAULT_DIFFERENTIATION,
                 )
-                self.differentiation = self.differentiation(
-                    circuit=self.circuit_tracer.build_circuit(
-                        params=list(self.parameters())
-                    ),
-                    decoding=self.decoding,
-                )
+                self.differentiation = self.differentiation()
         elif isinstance(self.differentiation, type):
             self.differentiation = self.differentiation()
 
@@ -152,6 +147,9 @@ class QuantumModel(torch.nn.Module):
         Returns:
             :class:`torch.tensor`: The computed outputs.
         """
+        if x is None:
+            x = self.engine.empty(1, dtype=self.engine.float64)
+
         if self.differentiation is None:
             circuit = self.circuit_tracer.build_circuit(
                 params=list(self.parameters())[0],

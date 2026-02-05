@@ -89,7 +89,6 @@ class PhaseEncoding(QuantumEncoding):
             :class:`qibo.models.circuit.Circuit`: The constructed circuit.
         """
         circuit = self.circuit
-        # x = x.ravel()
         if len(x.shape) > 1:
             x = x[0]
         for i, q in enumerate(self.qubits):
