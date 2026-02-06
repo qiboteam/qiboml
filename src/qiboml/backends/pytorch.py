@@ -200,6 +200,9 @@ class PyTorchBackend(Backend):
             return np.asarray([self.to_numpy(i) for i in array])
 
         if isinstance(array, self.engine.Tensor):
+            if array.requires_grad:
+                return array.detach().cpu().numpy()
+
             return array.cpu().numpy(force=True)
 
         return array
