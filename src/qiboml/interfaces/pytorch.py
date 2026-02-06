@@ -94,7 +94,20 @@ class QuantumModel(torch.nn.Module):
         params = utils.get_params_from_circuit_structure(
             self.circuit_structure,
         )
-        params = torch.as_tensor(self.backend.to_numpy(params)).ravel()
+        if (
+            isinstance(params, list)
+            and isinstance(params[0], torch.Tensor)
+            and self.backend.platform == "tensorflow"
+        ):
+            aux = []
+            for param in params:
+                if param.requires_grad:
+                    aux.append(param.detach().cpu().numpy())
+                else:
+                    aux.append(param.cpu().numpy())
+        else:
+            params = self.backend.to_numpy(params)
+        params = torch.as_tensor(params).ravel()
 
         if self.parameters_initialization is not None:
             if callable(self.parameters_initialization):
