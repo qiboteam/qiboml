@@ -192,6 +192,7 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
             )
             output = self.decoding(circuit)
             return output[None, :]
+
         if not self.differentiation._is_built:
             self.differentiation.build(
                 self.circuit_tracer.build_circuit(1 * self.circuit_parameters, x=x),
@@ -204,6 +205,7 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
             )
         if x is None:
             x = tf.constant([], dtype=np.float64)
+
         return self.custom_gradient.evaluate(x, 1 * self.circuit_parameters)
 
     def draw(self, plt_drawing=True, **plt_kwargs):
