@@ -485,12 +485,7 @@ def test_vqe(backend, frontend, dense, nshots):
         decoding=decoding_layer,
     )
 
-    none = np.array(
-        5
-        * [
-            None,
-        ]
-    )
+    none = np.array(5 * [None])
     grad = train_model(frontend, q_model, none, none, max_epochs=10)
     cost = q_model()
     backend.assert_allclose(float(cost), -2.0, atol=6e-2)
