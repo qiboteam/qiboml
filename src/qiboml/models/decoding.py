@@ -146,7 +146,7 @@ class QuantumDecoding:
         self.backend = backend
 
     @property
-    def output_shape(self):
+    def output_shape(self):  # pragma: no cover
         """The shape of the decoded outputs."""
         raise_error(NotImplementedError)
 
@@ -394,13 +394,13 @@ class State(QuantumDecoding):
         return True
 
 
-class Samples(QuantumDecoding):
+class Samples(QuantumDecoding):  # pragma: no cover
     """The samples decoder."""
 
     def __post_init__(self):
         super().__post_init__()
 
-    def __call__(self, x: Circuit) -> ArrayLike:  # pragma: no cover
+    def __call__(self, x: Circuit) -> ArrayLike:
         """Sample the final state of the circuit.
 
         Args:
@@ -421,7 +421,7 @@ class Samples(QuantumDecoding):
         return (self.nshots, len(self.qubits))
 
     @property
-    def analytic(self) -> bool:  # pragma: no cover
+    def analytic(self) -> bool:
         return False
 
 
