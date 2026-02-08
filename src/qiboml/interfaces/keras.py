@@ -186,6 +186,10 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
             self.differentiation = self.differentiation()
         self.custom_gradient = None
 
+    def compute_output_shape(self, input_shape):
+        """Overwrites a method from the parent class."""
+        return self.decoding.output_shape
+
     def call(self, x: Optional[tf.Tensor] = None) -> tf.Tensor:
         if self.differentiation is None:
             # This `1 * self.circuit_parameters` is needed otherwise a TypeError is raised
