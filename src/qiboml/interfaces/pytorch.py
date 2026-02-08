@@ -24,8 +24,6 @@ DEFAULT_DIFFERENTIATION = {
     "numpy": Jax,
 }
 
-engine = torch
-
 
 class TorchCircuitTracer(CircuitTracer):
 
