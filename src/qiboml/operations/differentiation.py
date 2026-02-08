@@ -278,16 +278,19 @@ class Jax(Differentiation):
                 dtype=tgt_backend.float64,
             )
 
-    def evaluate(self, parameters, wrt_inputs: bool = False):
+    def evaluate(self, parameters: list[ArrayLike], wrt_inputs: bool = False):
         """
         Evaluate the jacobian of the internal quantum model (circuit + decoding) w.r.t to its ``parameters``,
-        i.e. the parameterized gates in the circuit.
+        *i.e.* the parameterized gates in the circuit.
+
         Args:
-            parameters (list[ndarray]): the parameters at which to evaluate the circuit, and thus the derivatives.
-            wrt_inputs (bool): whether to calculate the derivative with respect to, also, inputs (i.e. encoding angles)
-        or not, by default ``False``.
+            parameters (list[ArrayLike]): the parameters at which to evaluate the circuit,
+                and thus the derivatives.
+            wrt_inputs (bool): whether to calculate the derivative with respect to,
+                also, inputs (i.e. encoding angles) or not. Defaults to ``False``.
+
         Returns:
-            (ndarray): the calculated jacobian.
+            ArrayLike: The calculated jacobian.
         """
 
         assert (
@@ -321,6 +324,7 @@ class Jax(Differentiation):
         if not wrt_inputs:
             self._cast_non_trainable_parameters(self._jax, self.backend)
         self.circuit._final_state = None
+
         # transform back to the backend native array
         return backend.cast(self._jax.to_numpy(jacobian).tolist(), backend.float64)
 
@@ -379,14 +383,14 @@ class QuimbJax(Jax):  # pragma: no cover
         )
 
     @staticmethod
-    def _run(circuit, decoding, *parameters):
+    def _run(circuit: Circuit, decoding: QuantumDecoding, *parameters):
         for g, p in zip(circuit.trainable_gates, parameters):
             g.parameters = p
         circuit._final_state = None
         return decoding(circuit)
 
     @staticmethod
-    def _run_with_inputs(circuit, decoding, *parameters):
+    def _run_with_inputs(circuit: Circuit, decoding: QuantumDecoding, *parameters):
         for g, p in zip(circuit.parametrized_gates, parameters):
             g.parameters = p
         circuit._final_state = None

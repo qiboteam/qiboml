@@ -2,6 +2,7 @@ from functools import partial
 from typing import Callable
 
 import numpy as np
+from numpy.typing import ArrayLike
 import jax  # pylint: disable=import-error
 from qibo import Circuit
 from qibo.backends.abstract import Backend
@@ -44,18 +45,18 @@ class Jax(Differentiation):
 
     @staticmethod
     @partial(jax.jit, static_argnums=(0, 1))
-    def _run(circuit, decoding, *parameters):
+    def _run(circuit: Circuit, decoding: QuantumDecoding, *parameters):
         for g, p in zip(circuit.trainable_gates, parameters):
             g.parameters = p
-        # circuit.set_parameters(parameters)
+
         return decoding(circuit)
 
     @staticmethod
     @partial(jax.jit, static_argnums=(0, 1))
-    def _run_with_inputs(circuit, decoding, *parameters):
+    def _run_with_inputs(circuit: Circuit, decoding: QuantumDecoding, *parameters):
         for g, p in zip(circuit.parametrized_gates, parameters):
             g.parameters = p
-        # circuit.set_parameters(parameters)
+
         return decoding(circuit)
 
     @property
@@ -63,7 +64,7 @@ class Jax(Differentiation):
         return self._circuit
 
     @circuit.setter
-    def circuit(self, circ):
+    def circuit(self, circ: Circuit):
         self._circuit = circ
         self.__post_init__()
 
@@ -72,26 +73,31 @@ class Jax(Differentiation):
         return self._decoding
 
     @decoding.setter
-    def decoding(self, dec):
+    def decoding(self, dec: QuantumDecoding):
         self._decoding = dec
         self.__post_init__()
 
-    def _cast_non_trainable_parameters(self, src_backend, tgt_backend):
+    def _cast_non_trainable_parameters(
+        self, src_backend: Backend, tgt_backend: Backend
+    ):
         for g in self.non_trainable_gates:
             g.parameters = tgt_backend.cast(
                 np.array([src_backend.to_numpy(par) for par in g.parameters])
             )
 
-    def evaluate(self, parameters, wrt_inputs: bool = False):
+    def evaluate(self, parameters: list[ArrayLike], wrt_inputs: bool = False):
         """
         Evaluate the jacobian of the internal quantum model (circuit + decoding) w.r.t to its ``parameters``,
-        i.e. the parameterized gates in the circuit.
+        *i.e*. the parameterized gates in the circuit.
+
         Args:
-            parameters (list[ndarray]): the parameters at which to evaluate the circuit, and thus the derivatives.
-            wrt_inputs (bool): whether to calculate the derivative with respect to, also, inputs (i.e. encoding angles)
-        or not, by default ``False``.
+            parameters (list[ArrayLike]): the parameters at which to evaluate the circuit,
+                and thus the derivatives.
+            wrt_inputs (bool): whether to calculate the derivative with respect to,
+                also, inputs (i.e. encoding angles) or not. Defaults to ``False``.
+
         Returns:
-            (ndarray): the calculated jacobian.
+            ArrayLike: the calculated jacobian.
         """
         # backup the backend
         backend = self.decoding.backend

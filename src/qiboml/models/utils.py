@@ -95,7 +95,7 @@ class Mitigator:
         Check the distance between the reference value and the mitigated one.
 
         Args:
-            noisy_reference_value (ndarray): the noisy expectation value obtained
+            noisy_reference_value (ArrayLike): the noisy expectation value obtained
                 executing the reference circuit on a noisy engine.
 
         Returns:

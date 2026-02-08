@@ -96,17 +96,23 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
     The Keras interface to qiboml models.
 
     Args:
-        circuit_structure (Union[List[QuantumEncoding, Circuit, Callable], Circuit]):
-            a list of Qibo circuits and Qiboml encoding layers, which defines
-            the complete structure of the model. The whole circuit will be mounted
-            by sequentially stacking the elements of the given list. It is also possible
-            to pass a single circuit, in the case a sequential structure is not needed.
-        decoding (QuantumDecoding): the decoding layer.
-        parameters_initialization (Union[keras.initializers.Initializer, np.ndarray]]): if an initialiser is provided it will be used
-        either as the parameters or to sample the parameters of the model.
-        differentiation (Differentiation, optional): the differentiation engine,
-            if not provided a default one will be picked following what described in the :ref:`docs <_differentiation_engine>`.
-        circuit_tracer (CircuitTracer, optional): tracer used to build the circuit and trace the operations performed upon construction. Defaults to ``KerasCircuitTracer``.
+        circuit_structure (list[:class:`qiboml.models.encoding.QuantumEncoding`,
+            :class:`qibo.models.circuit.Circuit`, Callable] or
+            :class:`qibo.models.circuit.Circuit`]): a list of ``qibo`` circuits
+            and ``qiboml`` encoding layers, which defines the complete structure
+            of the model. The whole circuit will be mounted by sequentially stacking
+            the elements of the given list. It is also possible to pass a single circuit,
+            in the case a sequential structure is not needed.
+        decoding (:class:`qiboml.models.encoding.QuantumDecoding`): the decoding layer.
+        parameters_initialization (:class:`keras.initializers.Initializer` or ArrayLike):
+            if an initialiser is provided it will be used either as the parameters
+            or to sample the parameters of the model.
+        differentiation (Differentiation, optional): the differentiation engine. If not
+            provided, a default one will be picked following what described in the
+            :ref:`docs <_differentiation_engine>`.
+        circuit_tracer (:class:`qiboml.models.circuit_tracer.CircuitTracer`, optional):
+            tracer used to build the circuit and trace the operations performed upon construction.
+            Defaults to :class:`qiboml.interfaces.keras.KerasCircuitTracer`.
     """
 
     circuit_structure: Union[Circuit, List[Union[Circuit, QuantumEncoding, Callable]]]
@@ -180,9 +186,6 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
             self.differentiation = self.differentiation()
         self.custom_gradient = None
 
-    def compute_output_shape(self, input_shape):
-        return self.decoding.output_shape
-
     def call(self, x: Optional[tf.Tensor] = None) -> tf.Tensor:
         if self.differentiation is None:
             # This `1 * self.circuit_parameters` is needed otherwise a TypeError is raised
@@ -210,15 +213,16 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
 
         return self.custom_gradient.evaluate(x, 1 * self.circuit_parameters)
 
-    def draw(self, plt_drawing=True, **plt_kwargs):
+    def draw(self, plt_drawing: bool = True, **plt_kwargs):
         """
         Draw the full circuit structure.
 
         Args:
-            plt_drawing (bool): if True, the `qibo.ui.plot_circuit` function is used.
-                If False, the default `circuit.draw` method is used.
+            plt_drawing (bool, optional): if ``True``, the :class:`qibo.ui.plot_circuit`
+                function is used. If ``False``, the default
+                :meth:`qibo.models.circuit.Circuit.draw` method is used. Defaults to ``True``.
             plt_kwargs (dict): extra arguments which can be set to customize the
-                `qibo.ui.plot_circuit` function.
+                :func:`qibo.ui.plot_circuit` function.
         """
 
         fig = utils.draw_circuit(
@@ -260,7 +264,7 @@ class QuantumModelCustomGradient:
         return self.decoding.backend
 
     @tf.custom_gradient
-    def evaluate(self, x, params):
+    def evaluate(self, x: tf.Tensor, params: tf.Tensor) -> tuple[tf.Tensor, tf.Tensor]:
         if x.shape[0] == 0:
             x = None
         circuit, jacobian_wrt_inputs, jacobian, input_to_gate_map = self.circuit_tracer(

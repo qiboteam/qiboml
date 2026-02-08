@@ -1,5 +1,7 @@
 import math
-from typing import Optional
+from typing import Optional, Union
+
+from numpy.typing import ArrayLike
 
 from qibo.backends import _check_backend
 from qibo.models.encodings import hamming_weight_encoder
@@ -20,7 +22,7 @@ class ExactGeodesicTransportCG:
       weight (int): Hamming weight to encode.
       hamiltonian (:class:'qibo.hamiltonians.Hamiltonian'): Hamiltonian whose expectation
         value defines the loss to minimize.
-      angles (ndarray): Initial hyperspherical angles parameterizing the amplitudes.
+      angles (ArrayLike): Initial hyperspherical angles parameterizing the amplitudes.
       backtrack_rate (float, optional): Backtracking rate for Wolfe condition
         line search. If ``None``, defaults to :math:`0.5`. Defaults to ``None``.
       geometric_gradient (bool, optional): If ``True``, uses the geometric gradient
@@ -40,7 +42,7 @@ class ExactGeodesicTransportCG:
 
     References:
         A. J. Ferreira‑Martins, R. M. S. Farias, G. Camilo, T. O. Maciel, A. Tosta,
-        R. Lin, A. Alhajri, T. Haug, and L. Aolita, *Variational quantum algorithms
+        R. Lin, A. Alhajri, T. Haug, and L. Aolita, *Quantum optimization
         with exact geodesic transport*, `arXiv:2506.17395 (2025)
         <https://arxiv.org/abs/2506.17395>`_.
     """
@@ -87,14 +89,14 @@ class ExactGeodesicTransportCG:
             * self.backend.arccos((1 + (norm_u / (2 * loss_prev)) ** 2) ** -0.5)
         ) * self.multiplicative_factor
 
-    def angles_to_amplitudes(self, angles):
+    def angles_to_amplitudes(self, angles: ArrayLike) -> ArrayLike:
         """Convert angles to amplitudes.
 
         Args:
-           angles (ndarray): Angles in hyperspherical coordinates.
+           angles (ArrayLike): Angles in hyperspherical coordinates.
 
         Returns:
-            ndarray: Amplitudes calculated from the hyperspherical coordinates.
+            ArrayLike: Amplitudes calculated from the hyperspherical coordinates.
         """
         d = len(angles) + 1
         amps = []
@@ -117,15 +119,15 @@ class ExactGeodesicTransportCG:
             amps, self.nqubits, self.weight, backend=self.backend
         )
 
-    def state(self, initial_state=None, nshots=1000):
+    def state(self, initial_state: ArrayLike = None, nshots=1000) -> ArrayLike:
         """Return the statevector after encoding.
 
         Args:
-            initial_state (ndarray, optional): Initial statevector. Defaults to None.
+            initial_state (ArrayLike, optional): Initial statevector. Defaults to None.
             nshots (int, optional): Number of measurement shots. Defaults to 1000.
 
         Returns:
-            statevector (ndarray): Statevector of the encoded quantum state.
+            ArrayLike: Statevector of the encoded quantum state.
         """
         self.encoder()
         result = self.backend.execute_circuit(
@@ -203,14 +205,16 @@ class ExactGeodesicTransportCG:
 
         return grad
 
-    def amplitudes_to_full_state(self, amps):  # pragma: no cover
+    def amplitudes_to_full_state(
+        self, amps: ArrayLike
+    ) -> ArrayLike:  # pragma: no cover
         """Convert amplitudes to the full quantum statevector.
 
         Args:
-            amps (ndarray): Amplitude vector.
+            amps (ArrayLike): Amplitude vector.
 
         Returns:
-            ndarray: Statevector corresponding to the given amplitudes.
+            ArrayLike: Statevector corresponding to the given amplitudes.
         """
         circuit = hamming_weight_encoder(
             amps, self.nqubits, self.weight, backend=self.backend
@@ -312,17 +316,24 @@ class ExactGeodesicTransportCG:
         jacobian = self.jacobian()
         return jacobian @ nat_grad
 
-    def optimize_step_size(self, x_prev, u_prev, v_prev, loss_prev):
+    def optimize_step_size(
+        self,
+        x_prev: ArrayLike,
+        u_prev: ArrayLike,
+        v_prev: ArrayLike,
+        loss_prev: ArrayLike,
+    ) -> tuple[ArrayLike, ArrayLike, ArrayLike, float]:
         """Perform Wolfe line search to determine optimal step size eta.
 
         Args:
-            x_prev (ndarray): Previous position on the sphere.
-            u_prev (ndarray): Previous search direction.
-            v_prev (ndarray): Previous gradient vector.
+            x_prev (ArrayLike): Previous position on the sphere.
+            u_prev (ArrayLike): Previous search direction.
+            v_prev (ArrayLike): Previous gradient vector.
             loss_prev (float): Loss at previous position.
 
         Returns:
-            tuple: Respectively, updated position, angles, gradient, and step size.
+            tuple(ArrayLike, ArrayLike, ArrayLike, float): Respectively,
+            updated position, angles, gradient, and step size.
         """
         backtrack_rate = self.backtrack_rate
         if backtrack_rate is None:
@@ -375,15 +386,17 @@ class ExactGeodesicTransportCG:
 
             return x_new, angles_trial, v_new, eta
 
-    def exponential_map_with_direction(self, direction, eta=None):
+    def exponential_map_with_direction(
+        self, direction: ArrayLike, eta: Union[float, int] = None
+    ) -> ArrayLike:
         """Exponential map from current point along specified direction.
 
         Args:
-            direction (ndarray): Tangent vector direction.
-            eta (float, optional): Step size. Defaults to current eta.
+            direction (ArrayLike): Tangent vector direction.
+            eta (float, optional): Step size. Defaults to current :math:`\\eta`.
 
         Returns:
-            ndarray: New point on the hypersphere.
+            ArrayLike: New point on the hypersphere.
         """
         if eta is None:  # pragma: no cover
             eta = self.eta
@@ -395,14 +408,14 @@ class ExactGeodesicTransportCG:
             eta * norm_dir
         ) * (direction / norm_dir)
 
-    def amplitudes_to_angles(self, x):
+    def amplitudes_to_angles(self, x: ArrayLike) -> ArrayLike:
         """Convert amplitude vector back to hyperspherical angles.
 
         Args:
-            x (ndarray): Amplitude vector.
+            x (ArrayLike): Amplitude vector.
 
         Returns:
-            ndarray: Corresponding angles.
+            ArrayLike: Corresponding angles.
         """
         d = len(x)
         angles = self.backend.zeros(d - 1)
@@ -432,18 +445,20 @@ class ExactGeodesicTransportCG:
 
         return angles
 
-    def parallel_transport(self, u, v, a, eta=None):
+    def parallel_transport(
+        self, u: ArrayLike, v: ArrayLike, a: ArrayLike, eta: Union[float, int] = None
+    ) -> ArrayLike:
         """Parallel transport a tangent vector u along geodesic defined by v.
 
         Args:
-            u (ndarray): Vector to transport.
-            v (ndarray): Direction of geodesic.
-            a (ndarray): Starting point on sphere.
-            eta (float, optional): Step size. If ``None``, defaults to current ``eta``.
+            u (ArrayLike): Vector to transport.
+            v (ArrayLike): Direction of geodesic.
+            a (ArrayLike): Starting point on sphere.
+            eta (float, optional): Step size. If ``None``, defaults to current :math:`eta`.
                 Defaults to ``None``.
 
         Returns:
-            ndarray: Transported vector.
+            ArrayLike: Transported vector.
         """
         if eta == None:
             eta = self.eta
@@ -456,26 +471,30 @@ class ExactGeodesicTransportCG:
         )
         return transported
 
-    def sphere_inner_product(self, u, v, x):
+    def sphere_inner_product(
+        self, u: ArrayLike, v: ArrayLike, x: ArrayLike
+    ) -> ArrayLike:
         """Compute inner product on tangent space at x on the sphere.
 
         Args:
-            u (ndarray): First tangent vector.
-            v (ndarray): Second tangent vector.
-            x (ndarray): Base point on the sphere.
+            u (ArrayLike): First tangent vector.
+            v (ArrayLike): Second tangent vector.
+            x (ArrayLike): Base point on the sphere.
 
         Returns:
             float: Inner product value.
         """
         return u @ v - (x @ u) * (x @ v)
 
-    def beta_dy(self, v_next, x_next, transported_u, st):
+    def beta_dy(
+        self, v_next: ArrayLike, x_next: ArrayLike, transported_u: ArrayLike, st
+    ) -> float:
         """Compute Dai and Yuan Beta.
 
         Args:
-            v_next (ndarray): Next gradient.
-            x_next (ndarray): Next point.
-            transported_u (ndarray): Parallel-transported u.
+            v_next (ArrayLike): Next gradient.
+            x_next (ArrayLike): Next point.
+            transported_u (ArrayLike): Parallel-transported u.
             st (float): Scaling factor.
 
         Returns:
@@ -488,14 +507,22 @@ class ExactGeodesicTransportCG:
         ) - self.sphere_inner_product(-self.v, self.u, self.x)
         return numerator / denominator
 
-    def beta_hs(self, v_next, x_next, transported_u, transported_v, lt, st):
+    def beta_hs(
+        self,
+        v_next: ArrayLike,
+        x_next: ArrayLike,
+        transported_u: ArrayLike,
+        transported_v: ArrayLike,
+        lt: Union[float, int],
+        st: Union[float, int],
+    ) -> Union[float, int]:
         """Compute Hestenes-Stiefel conjugate gradient beta.
 
         Args:
-            v_next (ndarray): Next gradient.
-            x_next (ndarray): Next point.
-            transported_u (ndarray): Parallel-transported u.
-            transported_v (ndarray): Parallel-transported v.
+            v_next (ArrayLike): Next gradient.
+            x_next (ArrayLike): Next point.
+            transported_u (ArrayLike): Parallel-transported u.
+            transported_v (ArrayLike): Parallel-transported v.
             lt (float): Scaling factor.
             st (float): Scaling factor.
 
@@ -522,7 +549,7 @@ class ExactGeodesicTransportCG:
             tuple: (final_loss, losses, final_parameters)
             final_loss (float): Final loss value.
             losses (list): Loss at each iteration.
-            final_parameters (ndarray): Final angles.
+            final_parameters (ArrayLike): Final angles.
         """
         self.initialize_cg_state()
         losses = []
