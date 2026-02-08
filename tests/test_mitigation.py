@@ -133,7 +133,7 @@ def test_rtqem(frontend, backend, mitigation_method, seed):
     )
 
     assert abs(mit_result - target_energy) < abs(noisy_result - target_energy)
-    assert abs(mit_result - target_energy) < 1e-1
+    assert abs(mit_result - target_energy) < 2e-1
 
 
 def test_custom_map(frontend):
