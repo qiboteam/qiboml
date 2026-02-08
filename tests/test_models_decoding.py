@@ -28,6 +28,9 @@ def test_probabilities_layer(backend):
 def test_state_layer(backend, density_matrix):
     nqubits = 5
     layer = dec.State(nqubits, density_matrix=density_matrix, backend=backend)
+
+    assert layer.analytic
+
     circuit = random_clifford(
         nqubits, density_matrix=density_matrix, backend=NumpyBackend()
     )
@@ -35,7 +38,6 @@ def test_state_layer(backend, density_matrix):
     backend.assert_allclose(
         (real + 1j * im).ravel(), backend.execute_circuit(circuit).state().ravel()
     )
-
 
 @pytest.mark.parametrize("nshots", [None, 10000])
 @pytest.mark.parametrize(

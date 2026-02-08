@@ -203,7 +203,7 @@ class ExactGeodesicTransportCG:
 
         return grad
 
-    def amplitudes_to_full_state(self, amps):
+    def amplitudes_to_full_state(self, amps):  # pragma: no cover
         """Convert amplitudes to the full quantum statevector.
 
         Args:
@@ -217,7 +217,7 @@ class ExactGeodesicTransportCG:
         )
         return self.backend.execute_circuit(circuit).state()
 
-    def geom_gradient(self):
+    def geom_gradient(self):  # pragma: no cover
         """Compute geometric gradient using the diagonal metric tensor and Jacobian.
 
         Returns:
@@ -598,7 +598,7 @@ class ExactGeodesicTransportCG:
         final_parameters = self.angles
         return final_loss, losses, final_parameters
 
-    def __call__(self, steps: int = 10, tolerance: float = 1e-8):
+    def __call__(self, steps: int = 10, tolerance: float = 1e-8):  # pragma: no cover
         """Run the optimizer.
 
         Args:

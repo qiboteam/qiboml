@@ -485,6 +485,9 @@ def test_vqe(backend, frontend, dense, nshots):
         decoding=decoding_layer,
     )
 
+    assert q_model.nqubits == nqubits
+    assert q_model.output_shape == (1, 1)
+
     none = np.array(5 * [None])
     grad = train_model(frontend, q_model, none, none, max_epochs=10)
     cost = q_model()

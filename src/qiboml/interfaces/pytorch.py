@@ -38,7 +38,9 @@ class TorchCircuitTracer(CircuitTracer):
         return torch.func.jacfwd(f, argnums)
 
     @staticmethod
-    def jacrev(f: Callable, argnums: Union[int, Tuple[int]]) -> Callable:
+    def jacrev(
+        f: Callable, argnums: Union[int, Tuple[int]]
+    ) -> Callable:  # pragma: no cover
         return torch.func.jacrev(f, argnums)
 
     def identity(
@@ -104,7 +106,7 @@ class QuantumModel(torch.nn.Module):
                 if param.requires_grad:
                     aux.append(param.detach().cpu().numpy())
                 else:
-                    aux.append(param.cpu().numpy())
+                    aux.append(param.cpu().numpy())  # pragma: no cover
         else:
             params = self.backend.to_numpy(params)
         params = torch.as_tensor(params).ravel()

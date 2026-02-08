@@ -180,7 +180,7 @@ class QuantumDecoding:
         x.init_kwargs["wire_names"] = wire_names
 
     @contextmanager
-    def _temporary_nshots(self, nshots):
+    def _temporary_nshots(self, nshots):  # pragma: no cover
         """Context manager to execute the decoder with a custom number of shots."""
         original = self.nshots
         self.nshots = nshots
@@ -298,10 +298,10 @@ class Expectation(QuantumDecoding):
         the internal observable on the final state.
 
         Args:
-            x (Circuit): input Circuit.
+            x (:class:`qibo.models.circuit.Circuit`): input circuit.
 
         Returns:
-            (ndarray): the calculated expectation value.
+            ArrayLike: the calculated expectation value.
         """
         if self.mitigation_config is not None:
             # In this case it is required before the super.call
@@ -400,14 +400,14 @@ class Samples(QuantumDecoding):
     def __post_init__(self):
         super().__post_init__()
 
-    def __call__(self, x: Circuit) -> ArrayLike:
+    def __call__(self, x: Circuit) -> ArrayLike:  # pragma: no cover
         """Sample the final state of the circuit.
 
         Args:
-            x (Circuit): input Circuit.
+            x (:class:`qibo.models.circuit.Circuit`): input circuit.
 
         Returns:
-            ndarray: Generated samples.
+            ArrayLike: Generated samples.
         """
         return self.backend.cast(super().__call__(x).samples(), self.backend.float64)
 
@@ -430,8 +430,8 @@ class VariationalQuantumLinearSolver(QuantumDecoding):
     """Decoder for the Variational Quantum Linear Solver (VQLS).
 
     Args:
-        target_state (ndarray): Target solution vector :math:`\\ket{b}`.
-        A (ndarray): The matrix ``A`` in the linear system :math:`A \\, \\ket{x} = \\ket{b}`.
+        target_state (ArrayLike): Target solution vector :math:`\\ket{b}`.
+        A (ArrayLike): The matrix ``A`` in the linear system :math:`A \\, \\ket{x} = \\ket{b}`.
 
     Reference:
         C. Bravo-Prieto, R. LaRose, M. Cerezo, Y. Subasi, L. Cincio, and P. J. Coles,

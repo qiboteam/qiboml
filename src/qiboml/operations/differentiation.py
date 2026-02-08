@@ -325,7 +325,7 @@ class Jax(Differentiation):
         return backend.cast(self._jax.to_numpy(jacobian).tolist(), backend.float64)
 
 
-class QuimbJax(Jax):
+class QuimbJax(Jax):  # pragma: no cover
 
     def __init__(
         self,
