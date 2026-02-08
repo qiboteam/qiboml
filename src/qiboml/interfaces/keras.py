@@ -198,11 +198,13 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
                 self.circuit_tracer.build_circuit(1 * self.circuit_parameters, x=x),
                 self.decoding,
             )
-            self.custom_gradient = QuantumModelCustomGradient(
-                self.decoding,
-                self.differentiation,
-                self.circuit_tracer,
-            )
+
+        self.custom_gradient = QuantumModelCustomGradient(
+            self.decoding,
+            self.differentiation,
+            self.circuit_tracer,
+        )
+
         if x is None:
             x = tf.constant([], dtype=np.float64)
 
