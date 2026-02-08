@@ -423,10 +423,10 @@ class ExactGeodesicTransportCG:
         update = self.backend.arctan2(x[-1], x[-2])
         if self.backend.platform == "tensorflow":
             angles = self.backend.engine.tensor_scatter_nd_update(
-                angles, [[-1]], [update]
+                angles, [[len(angles) - 1]], [update]
             )
         elif self.backend.platform == "jax":
-            angles.at[-1].set(updates)
+            angles.at[-1].set(update)
         else:
             angles[-1] = update
 
