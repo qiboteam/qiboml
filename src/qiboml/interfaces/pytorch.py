@@ -97,7 +97,7 @@ class QuantumModel(torch.nn.Module):
         if (
             isinstance(params, list)
             and isinstance(params[0], torch.Tensor)
-            and self.backend.platform == "tensorflow"
+            and self.backend.platform in ("tensorflow", "jax")
         ):
             aux = []
             for param in params:
