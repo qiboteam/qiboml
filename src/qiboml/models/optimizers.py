@@ -346,6 +346,14 @@ class ExactGeodesicTransportCG:
             amps[k] = prod
         return amps
 
+        amps = self.backend.engine.zeros(d)
+        for k in range(d):
+            prod = self.backend.engine.prod(self.backend.engine.sin(angles[:k]))
+            if k < d - 1:
+                prod *= self.backend.engine.cos(angles[k])
+            amps[k] = prod
+        return amps
+
     def geom_gradient(self):
         """Compute geometric gradient using the diagonal metric tensor and Jacobian.
 
@@ -439,6 +447,14 @@ class ExactGeodesicTransportCG:
             )
             reduced_params[0] += self.backend.engine.pi / 2
 
+        jacob = self.backend.engine.zeros((dim + 1, dim), dtype=self.backend.engine.float64)
+
+        for j in range(dim):
+            reduced_params = self.backend.engine.array(
+                self.angles[j:], dtype=self.backend.engine.float64, copy=True
+            )
+            reduced_params[0] += self.backend.engine.pi / 2
+
             sins = self.backend.engine.prod(self.backend.engine.sin(self.angles[:j]))
             amps = self.angles_to_amplitudes(reduced_params)
 
@@ -495,6 +511,23 @@ class ExactGeodesicTransportCG:
 
             return self.jacobian @ nat_grad
 
+        if self.riemannian_tangent:
+
+            l_psi = self.loss(self.circuit, self.backend, **self.loss_kwargs)
+            psi_amps = self.x
+            self.n_calls_gradient += 1
+
+            return (2 * (l_psi * psi_amps - self.hamiltolian_subspace @ psi_amps)).real
+
+        else:
+            self.grad = self.gradient_func()
+
+            inv_g = 1.0 / self.metric_tensor()
+
+            nat_grad = -inv_g * self.grad
+
+            return self.jacobian @ nat_grad
+
     def optimize_step_size(
         self,
         x_prev: ArrayLike,
@@ -520,6 +553,11 @@ class ExactGeodesicTransportCG:
         norm_u = self.backend.sqrt(self.sphere_inner_product(self.u, self.u, self.x))
         eta = self.eta
         count = 0
+
+        eta = self.backtrack_multiplier * self.eta
+
+        angles_orig = self.angles
+        amps_orig = self.x
 
         eta = self.backtrack_multiplier * self.eta
 
@@ -575,6 +613,24 @@ class ExactGeodesicTransportCG:
                     return x_new, angles_trial, v_new, eta
 
             eta *= self.backtrack_rate
+
+            # reset original angles and amps, before looping again
+            # when return happens, the angles are set to the new ones, outside
+            self.angles = angles_orig
+            self.x = amps_orig
+
+        # Fallback to last tried point
+        x_new = self.exponential_map_with_direction(u_prev, eta)
+        angles_trial = self.amplitudes_to_angles(x_new)
+        self.circuit = hamming_weight_encoder(
+            x_new,
+            self.nqubits,
+            self.weight,
+            backend=self.backend,
+        )
+        self.angles = angles_trial
+        v_new = self.tangent_vector()
+        return x_new, angles_trial, v_new, eta
 
             # reset original angles and amps, before looping again
             # when return happens, the angles are set to the new ones, outside
@@ -659,6 +715,12 @@ class ExactGeodesicTransportCG:
             angles[i] = (
                 0.0 if norm_tail == 0 else self.backend.engine.arccos(x[i] / norm_tail)
             )
+        angles = self.backend.engine.zeros(d - 1)
+        for i in range(d - 2):
+            norm_tail = self.backend.engine.linalg.norm(x[i:])
+            angles[i] = (
+                0.0 if norm_tail == 0 else self.backend.engine.arccos(x[i] / norm_tail)
+            )
         angles[-1] = self.backend.engine.arctan2(x[-1], x[-2])
         return angles
 
@@ -709,6 +771,15 @@ class ExactGeodesicTransportCG:
     def beta_dy(
         self, v_next: ArrayLike, x_next: ArrayLike, transported_u: ArrayLike, st
     ) -> float:
+        norm_v = self.backend.engine.linalg.norm(v)
+        vu_dot = self.backend.engine.dot(v, u)
+        transported = (
+            u
+            - self.backend.engine.sin(eta * norm_v) * (vu_dot / norm_v) * a
+            + (self.backend.engine.cos(eta * norm_v) - 1) * (vu_dot / (norm_v**2)) * v
+        )
+        return transported
+
         norm_v = self.backend.engine.linalg.norm(v)
         vu_dot = self.backend.engine.dot(v, u)
         transported = (
