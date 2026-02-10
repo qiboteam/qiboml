@@ -211,8 +211,16 @@ class PyTorchBackend(Backend):
     ######## Methods related to array manipulation                                  ########
     ########################################################################################
 
+    def coo_matrix(self, array, **kwargs):  # pragma: no cover
+        array = self.cast(array, dtype=array.dtype)
+        return array.to_sparse_coo(**kwargs)
+
     def copy(self, array: ArrayLike, **kwargs) -> ArrayLike:
         return self.engine.clone(array, **kwargs)
+
+    def csr_matrix(self, array, **kwargs):  # pragma: no cover
+        array = self.cast(array, dtype=array.dtype)
+        return array.to_sparse_csr(**kwargs)
 
     def default_rng(self, seed: Optional[int] = None):
         if seed is not None:

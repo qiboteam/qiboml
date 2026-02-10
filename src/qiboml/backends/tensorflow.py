@@ -122,6 +122,9 @@ class TensorflowBackend(Backend):
     def conj(self, array: ArrayLike) -> ArrayLike:
         return self.engine.math.conj(array)
 
+    def coo_matrix(self, array, **kwargs):  # pragma: no cover
+        return self.engine.sparse.from_dense(array, **kwargs)
+
     def copy(self, array: ArrayLike, **kwargs) -> ArrayLike:
         return self.engine.identity(array, **kwargs)
 
