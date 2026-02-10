@@ -129,6 +129,12 @@ class ExactGeodesicTransportCG:
 
             def loss_func(circuit, backend, *, hamiltonian):
                 state = backend.execute_circuit(circuit).state()
+                # print()
+                # circuit.draw()
+                # print()
+                # print("parameters", circuit.get_parameters())
+                # print("\tstate:")
+                # print(backend.real(state))
                 return backend.real(backend.conj(state) @ hamiltonian @ state)
 
             loss_fn = loss_func
@@ -453,7 +459,7 @@ class ExactGeodesicTransportCG:
                     reduced_params, [[0]], [reduced_params[0] + math.pi / 2]
                 )
             elif self.backend.platform == "jax":
-                reduced_params.at[0].set(reduced_params[0] + math.pi / 2)
+                reduced_params = reduced_params.at[0].set(reduced_params[0] + math.pi / 2)
             else:
                 reduced_params[0] += math.pi / 2
 
@@ -469,7 +475,7 @@ class ExactGeodesicTransportCG:
                     jacob, indices, updates
                 )
             elif self.backend.platform == "jax":
-                jacob.at[j:, j].set(updates)
+                jacob = jacob.at[j:, j].set(updates)
             else:
                 jacob[j:, j] = updates
 
@@ -508,10 +514,18 @@ class ExactGeodesicTransportCG:
         return self.jacobian @ nat_grad
 
     def regularization(self, angles):
-        angles = angles % (2 * math.pi)
+
+        # print(angles)
+
+        # angles = angles % (2 * math.pi)
         condition = self.backend.abs(self.backend.sin(angles[:-1])) < 1e-3
         # angles[:-1] = self.backend.where(condition, math.pi / 2, angles[:-1])
         # return self.angles_to_amplitudes(angles)
+
+        # print(angles)
+        # print(self.backend.abs(self.backend.sin(angles[:-1])))
+        # print(condition)
+
         updated = self.backend.where(condition, math.pi / 2, angles[:-1])
         return self.angles_to_amplitudes(
             self.backend.concatenate([updated, angles[-1:]], axis=0)
@@ -559,6 +573,11 @@ class ExactGeodesicTransportCG:
             )
             self.x = x_new
 
+            # print(x_prev)
+            # print(u_prev)
+            # print(x_new)
+            # print()
+
             loss_new = self.loss(self.circuit, self.backend, **self.loss_kwargs)
 
             condition_a_lhs = loss_new - loss_prev
@@ -575,6 +594,7 @@ class ExactGeodesicTransportCG:
                 condition_b = condition_b_lhs <= condition_b_rhs
 
                 if condition_a and condition_b:
+
                     self.x = amps_orig
                     return x_new, v_new, eta
 
@@ -613,9 +633,11 @@ class ExactGeodesicTransportCG:
             eta = self.eta
 
         norm_dir = self.backend.sqrt((direction @ direction))
-        return self.backend.cos(eta * norm_dir) * self.x + self.backend.sin(
+        x_new =  self.backend.cos(eta * norm_dir) * self.x + self.backend.sin(
             eta * norm_dir
         ) * (direction / norm_dir)
+        
+        return x_new
 
     def amplitudes_to_angles(self, x):
         """Convert amplitude vector back to hyperspherical angles.
@@ -648,7 +670,7 @@ class ExactGeodesicTransportCG:
                     angles, [[elem]], [updates]
                 )
             elif self.backend.platform == "jax":
-                angles.at[elem].set(updates)
+                angles = angles.at[elem].set(updates)
             else:
                 angles[elem] = updates
 
@@ -658,9 +680,11 @@ class ExactGeodesicTransportCG:
                 angles, [[len(angles) - 1]], [update]
             )
         elif self.backend.platform == "jax":
-            angles.at[-1].set(update)
+            angles = angles.at[-1].set(update)
         else:
             angles[-1] = update
+
+        # print("saida angles:", angles)
 
         return angles
 
@@ -740,8 +764,15 @@ class ExactGeodesicTransportCG:
         losses = []
         for iter_num in range(steps):
 
+            # print(f"iter {iter_num}")
+            # print(self.x)
+            # print()
+
             loss_prev = self.loss(self.circuit, self.backend, **self.loss_kwargs)
             losses.append(loss_prev)
+
+            # print(f"angles: {self.circuit.get_parameters()}")
+            # print(loss_prev)
 
             res = ((-self.v @ self.u) ** 2) / (
                 self.u @ self.u
