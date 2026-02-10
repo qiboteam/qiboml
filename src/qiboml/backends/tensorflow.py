@@ -217,7 +217,7 @@ class TensorflowBackend(Backend):
         return self.engine.random.uniform(shape=shape, minval=low, maxval=high)
 
     def ravel(self, array, **kwargs):  # pragma: no cover
-        return self.engine.keras.ops.ravel(array, **kwargs)
+        return self.engine.keras.ops.ravel(array, **kwargs)  # pylint: disable=E1101
 
     def real(self, array: ArrayLike) -> ArrayLike:
         return self.engine.math.real(array)
