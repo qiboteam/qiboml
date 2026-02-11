@@ -1,71 +1,57 @@
-import math
-
 import pytest
-from qibo.hamiltonians import XXZ
-from qibo.quantum_info import random_statevector
-from scipy.special import comb
+import scipy
 
 from qiboml.models.optimizers import ExactGeodesicTransportCG
+from qibo import hamiltonians
+from scipy.sparse import csr_matrix
 
 
-def optimizer_fixture(backend):
-    backend.set_seed(42)
-    nqubits = 4
-    weight = 2
-    dim = int(comb(nqubits, weight))
-    theta_init = random_statevector(
-        dim, seed=10, dtype=backend.float64, backend=backend
+def get_xxz_hamiltonian(nqubits, hamiltonian_type, backend):
+    delta = 0.5
+    if hamiltonian_type == "sparse":
+        hamiltonian = csr_matrix(
+            hamiltonians.XXZ(nqubits=nqubits, delta=delta, backend=backend).matrix
+        )
+        eigenvalues = scipy.sparse.linalg.eigsh(hamiltonian, k=1)
+        true_gs_energy = backend.real(backend.cast(eigenvalues[0][0]))
+    elif hamiltonian_type == "dense":
+        hamiltonian = hamiltonians.XXZ(
+            nqubits=nqubits, delta=delta, backend=backend
+        ).matrix
+        eigenvalues = backend.eigenvalues(hamiltonian)
+        true_gs_energy = backend.real(backend.cast(eigenvalues[0]))
+
+    return hamiltonian, true_gs_energy
+
+@pytest.mark.parametrize("nqubits", [4, 6])
+@pytest.mark.parametrize("hamiltonian_type", ["sparse", "dense"])
+# @pytest.mark.parametrize("hamiltonian_type", ["dense", "sparse"])
+def test_egt_cg(
+    backend,
+    nqubits,
+    hamiltonian_type,
+):
+    hamiltonian, true_gs_energy = get_xxz_hamiltonian(
+        nqubits, hamiltonian_type, backend
     )
-
-    hamiltonian = XXZ(nqubits=nqubits, backend=backend)
+    print(f"backend: {backend}\nhamilt type: {type(hamiltonian)}")
+    chem_acc = 0.03 / (27.2114 * backend.abs(true_gs_energy))
 
     optimizer = ExactGeodesicTransportCG(
         nqubits=nqubits,
-        weight=weight,
-        hamiltonian=hamiltonian,
-        angles=theta_init,
+        weight=int(nqubits / 2),
+        initial_parameters=None,
+        loss_fn="exp_val",
+        loss_kwargs={"hamiltonian": hamiltonian},
+        c1=0.485,
+        c2=0.999,
+        backtrack_rate=0.5,
+        backtrack_multiplier=1.5,
+        callback=None,
+        seed=13,
         backend=backend,
     )
-    return optimizer
+    _, losses, _ = optimizer(steps=20)
+    rel_errors = backend.abs(1 - losses / true_gs_energy)
 
-
-def test_loss_decreases(backend):
-    initial_loss = optimizer_fixture(backend).loss()
-    final_loss, _, _ = optimizer_fixture(backend).run_egt_cg(steps=1)
-    assert final_loss < initial_loss
-
-
-def test_geometric_vs_numerical(backend):
-    pytest.skip("To be removed in PR #150")
-    backend.set_seed(42)
-    nqubits = 4
-    weight = 2
-
-    dim = int(comb(nqubits, weight))
-    theta_init = backend.random_uniform(low=0, high=math.pi, size=dim - 1)
-
-    hamiltonian = XXZ(nqubits=nqubits, backend=backend)
-
-    # Optimizer with numerical gradient
-    optimizer_num = ExactGeodesicTransportCG(
-        nqubits=nqubits,
-        weight=weight,
-        hamiltonian=hamiltonian,
-        angles=backend.cast(theta_init, dtype=theta_init.dtype, copy=True),
-        geometric_gradient=False,
-        backend=backend,
-    )
-    final_loss_num, _, _ = optimizer_num.run_egt_cg(steps=1)
-
-    # Optimizer with geometric gradient
-    optimizer_geo = ExactGeodesicTransportCG(
-        nqubits=nqubits,
-        weight=weight,
-        hamiltonian=hamiltonian,
-        angles=backend.cast(theta_init, dtype=theta_init.dtype, copy=True),
-        geometric_gradient=True,
-        backend=backend,
-    )
-    final_loss_geo, _, _ = optimizer_geo(steps=10)
-
-    assert backend.assert_allclose(final_loss_geo, final_loss_num, rtol=0.05)
+    assert rel_errors[-1] < chem_acc
