@@ -7,13 +7,12 @@ import jax  # pylint: disable=import-error
 import jax.numpy as jnp  # pylint: disable=import-error
 import numpy as np
 from numpy.typing import ArrayLike, DTypeLike
-from qibo import __version__
 from qibo.backends import Backend, einsum_utils
 from qibo.backends.npmatrices import NumpyMatrices
 from qibo.config import raise_error
 from qibo.gates.abstract import Gate
 from qibo.result import CircuitResult, QuantumState
-from scipy.linalg import block_diag, expm, fractional_matrix_power, logm
+from scipy.linalg import block_diag, expm, logm
 from scipy.sparse import csr_matrix
 from scipy.sparse import eye as eye_sparse
 from scipy.sparse import issparse
@@ -29,6 +28,7 @@ def zero_state(nqubits: int, density_matrix: bool, dtype) -> ArrayLike:
         state = jnp.zeros(2 * (2**nqubits,), dtype=dtype).at[0, 0].set(1)
     else:
         state = jnp.zeros(2**nqubits, dtype=dtype).at[0].set(1)
+
     return state
 
 
@@ -336,6 +336,9 @@ class JaxBackend(Backend):
 
     def block_diag(self, *arrays: ArrayLike) -> ArrayLike:
         return block_diag(*arrays)
+
+    def coo_matrix(self, array, **kwargs):  # pragma: no cover
+        return self.jax.experimental.sparse.BCOO.fromdense(array, **kwargs)
 
     def csr_matrix(self, array: ArrayLike, **kwargs) -> ArrayLike:
         return csr_matrix(array, **kwargs)
