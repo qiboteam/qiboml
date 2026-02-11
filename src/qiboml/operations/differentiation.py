@@ -5,12 +5,11 @@ from typing import Callable, Optional, Tuple
 
 import jax
 import numpy as np
+from numpy.typing import ArrayLike
 from qibo import Circuit
 from qibo.backends import Backend, construct_backend
 from qibo.config import raise_error
 
-from qiboml import ndarray
-from qiboml.backends.jax import JaxBackend
 from qiboml.models.decoding import Expectation, QuantumDecoding
 
 
@@ -42,7 +41,7 @@ class Differentiation(ABC):
 
     @abstractmethod
     def evaluate(
-        self, parameters: ndarray, wrt_inputs: bool = False
+        self, parameters: ArrayLike, wrt_inputs: bool = False
     ):  # pragma: no cover
         """
         Evaluate the gradient of the quantum circuit w.r.t its parameters, i.e. its rotation angles.
@@ -78,15 +77,15 @@ class PSR(Differentiation):
                 "PSR differentiation works only for decoders with scalar outpus, i.e. expectation values.",
             )
 
-    def evaluate(self, parameters: ndarray, wrt_inputs: bool = False):
+    def evaluate(self, parameters: ArrayLike, wrt_inputs: bool = False):
         """
         Evaluate the gradient of the quantum circuit w.r.t its parameters, i.e. its rotation angles.
         Args:
-            parameters (List[ndarray]): the parameters at which to evaluate the model, and thus the derivative.
+            parameters (List[ArrayLike]): the parameters at which to evaluate the model, and thus the derivative.
             wrt_inputs (bool): whether to calculate the derivative with respect to, also, inputs (i.e. encoding angles)
         or not, by default ``False``.
         Returns:
-            (ndarray): the calculated jacobian.
+            (ArrayLike): the calculated jacobian.
         """
 
         assert self._is_built, "Call .build(circuit, decoding) before evaluate()."
@@ -108,14 +107,14 @@ class PSR(Differentiation):
         )
         forwards = expvals[::2]
         backwards = expvals[1::2]
-        eigvals = self.backend.np.reshape(
+        eigvals = self.backend.reshape(
             self.backend.cast(eigvals, dtype=parameters.dtype), forwards.shape
         )
 
         return (forwards - backwards) * eigvals
 
     def one_parameter_shift(
-        self, parameters: ndarray, parameter_index: int, wrt_inputs: bool = False
+        self, parameters: ArrayLike, parameter_index: int, wrt_inputs: bool = False
     ) -> Tuple[Circuit, Circuit, float]:
         """Compute one derivative of the decoding strategy w.r.t. a target parameter."""
         target_gates = (
@@ -156,13 +155,15 @@ class PSR(Differentiation):
     @staticmethod
     def shift_parameter(parameters, i, epsilon, backend):
         if backend.platform == "tensorflow":
-            return backend.tf.stack(
+            return backend.engine.stack(
                 [parameters[j] + int(i == j) * epsilon for j in range(len(parameters))]
             )
-        elif backend.platform == "jax":
+
+        if backend.platform == "jax":
             parameters = parameters.at[i].set(parameters[i] + epsilon)
         else:
             parameters[i] = parameters[i] + epsilon
+
         return parameters
 
 
@@ -173,14 +174,14 @@ class Adjoint(Differentiation):
     must have a gradient method returning the gradient of the single gate.
     """
 
-    def evaluate(self, parameters: ndarray, wrt_inputs: bool = False):
+    def evaluate(self, parameters: ArrayLike, wrt_inputs: bool = False):
         """
         Evaluate the gradient of the quantum circuit w.r.t its parameters, i.e. its rotation angles.
         Args:
-            parameters (List[ndarray]): the parameters at which to evaluate the model, and thus the derivative.
+            parameters (List[ArrayLike]): the parameters at which to evaluate the model, and thus the derivative.
             wrt_inputs (bool): whether to calculate the derivate with respect to inputs or not, by default ``False``.
         Returns:
-            (ndarray): the calculated gradients.
+            (ArrayLike): the calculated gradients.
         """
 
         assert (
@@ -212,7 +213,7 @@ class Adjoint(Differentiation):
                     gate.gradient(backend=self.backend), mu, nqubits=nqubits
                 )
                 gradients.append(
-                    2 * self.backend.np.real(self.backend.np.vdot(lam, mu))
+                    2 * self.backend.real(self.backend.engine.vdot(lam, mu))
                 )
             lam = self.backend.apply_gate(gate.dagger(), lam, nqubits=nqubits)
         return self.backend.cast(gradients[::-1], dtype=parameters.dtype).reshape(
@@ -224,7 +225,7 @@ class Jax(Differentiation):
 
     def __post_init__(self):
         super().__post_init__()
-        self._jax = JaxBackend()
+        self._jax = construct_backend("qiboml", platform="jax")
 
     def _on_build(self):
         self._compile_jacobians()
@@ -274,19 +275,22 @@ class Jax(Differentiation):
         for g in self.non_trainable_gates:
             g.parameters = tgt_backend.cast(
                 np.array([src_backend.to_numpy(par) for par in g.parameters]),
-                dtype=tgt_backend.np.float64,
+                dtype=tgt_backend.float64,
             )
 
-    def evaluate(self, parameters, wrt_inputs: bool = False):
+    def evaluate(self, parameters: list[ArrayLike], wrt_inputs: bool = False):
         """
         Evaluate the jacobian of the internal quantum model (circuit + decoding) w.r.t to its ``parameters``,
-        i.e. the parameterized gates in the circuit.
+        *i.e.* the parameterized gates in the circuit.
+
         Args:
-            parameters (list[ndarray]): the parameters at which to evaluate the circuit, and thus the derivatives.
-            wrt_inputs (bool): whether to calculate the derivative with respect to, also, inputs (i.e. encoding angles)
-        or not, by default ``False``.
+            parameters (list[ArrayLike]): the parameters at which to evaluate the circuit,
+                and thus the derivatives.
+            wrt_inputs (bool): whether to calculate the derivative with respect to,
+                also, inputs (i.e. encoding angles) or not. Defaults to ``False``.
+
         Returns:
-            (ndarray): the calculated jacobian.
+            ArrayLike: The calculated jacobian.
         """
 
         assert (
@@ -297,7 +301,7 @@ class Jax(Differentiation):
         backend = self.decoding.backend
         # convert params to jax
         params = np.array(backend.to_numpy(parameters))
-        params = self._jax.cast(params, dtype=self._jax.np.float64)
+        params = self._jax.cast(params, dtype=self._jax.float64)
         if not wrt_inputs:
             self._cast_non_trainable_parameters(self.backend, self._jax)
         # set jax for running
@@ -320,11 +324,12 @@ class Jax(Differentiation):
         if not wrt_inputs:
             self._cast_non_trainable_parameters(self._jax, self.backend)
         self.circuit._final_state = None
+
         # transform back to the backend native array
-        return backend.cast(self._jax.to_numpy(jacobian).tolist(), backend.np.float64)
+        return backend.cast(self._jax.to_numpy(jacobian).tolist(), backend.float64)
 
 
-class QuimbJax(Jax):
+class QuimbJax(Jax):  # pragma: no cover
 
     def __init__(
         self,
@@ -378,14 +383,14 @@ class QuimbJax(Jax):
         )
 
     @staticmethod
-    def _run(circuit, decoding, *parameters):
+    def _run(circuit: Circuit, decoding: QuantumDecoding, *parameters):
         for g, p in zip(circuit.trainable_gates, parameters):
             g.parameters = p
         circuit._final_state = None
         return decoding(circuit)
 
     @staticmethod
-    def _run_with_inputs(circuit, decoding, *parameters):
+    def _run_with_inputs(circuit: Circuit, decoding: QuantumDecoding, *parameters):
         for g, p in zip(circuit.parametrized_gates, parameters):
             g.parameters = p
         circuit._final_state = None

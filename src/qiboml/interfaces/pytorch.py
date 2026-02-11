@@ -15,7 +15,7 @@ from qiboml.interfaces import utils
 from qiboml.interfaces.circuit_tracer import CircuitTracer
 from qiboml.models.decoding import QuantumDecoding
 from qiboml.models.encoding import QuantumEncoding
-from qiboml.operations.differentiation import PSR, Differentiation, Jax
+from qiboml.operations import PSR, Differentiation, Jax
 
 DEFAULT_DIFFERENTIATION = {
     "qiboml-pytorch": None,
@@ -36,7 +36,9 @@ class TorchCircuitTracer(CircuitTracer):
         return torch.func.jacfwd(f, argnums)
 
     @staticmethod
-    def jacrev(f: Callable, argnums: Union[int, Tuple[int]]) -> Callable:
+    def jacrev(
+        f: Callable, argnums: Union[int, Tuple[int]]
+    ) -> Callable:  # pragma: no cover
         return torch.func.jacrev(f, argnums)
 
     def identity(
@@ -56,22 +58,24 @@ class TorchCircuitTracer(CircuitTracer):
 @dataclass(eq=False)
 class QuantumModel(torch.nn.Module):
     """
-    The pytorch interface to qiboml models.
+    The ``pytorch`` interface to ``qiboml`` models.
 
     Args:
-        circuit_structure (Union[List[QuantumEncoding, Circuit, Callable], Circuit]):
+        circuit_structure (List[QuantumEncoding, Circuit, Callable or :class:`qibo.models.Circuit`]):
             a list of Qibo circuits and Qiboml encoding layers, which defines
             the complete structure of the model. The whole circuit will be mounted
             by sequentially stacking the elements of the given list. It is also possible
             to pass a single circuit, in the case a sequential structure is not needed.
         decoding (QuantumDecoding): the decoding layer.
-        parameters_initialization (Union[keras.initializers.Initializer, np.ndarray]]): if an initialiser is provided it will be used
-        either as the parameters or to sample the parameters of the model.
+        parameters_initialization (:class:`keras.initializers.Initializer` or ArrayLike):
+            if an initialiser is provided it will be used either as the parameters or to sample the
+            parameters of the model.
         differentiation (Differentiation, optional): the differentiation engine,
             if not provided a default one will be picked following what described in
             the :ref:`docs <_differentiation_engine>`.
-        circuit_tracer (CircuitTracer, optional): tracer used to build the circuit
-        and trace the operations performed upon construction. Defaults to ``TorchCircuitTracer``.
+        circuit_tracer (:class:`qiboml.interfacs.circuit_tracer.CircuitTracer`, optional):
+            tracer used to build the circuit and trace the operations performed upon
+            construction. Defaults to ``TorchCircuitTracer``.
     """
 
     circuit_structure: Union[Circuit, List[Union[Circuit, QuantumEncoding, Callable]]]
@@ -90,7 +94,20 @@ class QuantumModel(torch.nn.Module):
         params = utils.get_params_from_circuit_structure(
             self.circuit_structure,
         )
-        params = torch.as_tensor(self.backend.to_numpy(x=params)).ravel()
+        if (
+            isinstance(params, list)
+            and isinstance(params[0], torch.Tensor)
+            and self.backend.platform in ("tensorflow", "jax")
+        ):
+            aux = []
+            for param in params:
+                if param.requires_grad:
+                    aux.append(param.detach().cpu().numpy())
+                else:
+                    aux.append(param.cpu().numpy())  # pragma: no cover
+        else:
+            params = self.backend.to_numpy(params)
+        params = torch.as_tensor(params).ravel()
 
         if self.parameters_initialization is not None:
             if callable(self.parameters_initialization):
@@ -127,7 +144,11 @@ class QuantumModel(torch.nn.Module):
                 self.differentiation = utils.get_default_differentiation(
                     decoding=self.decoding,
                     instructions=DEFAULT_DIFFERENTIATION,
-                )()
+                )
+                self.differentiation = self.differentiation(
+                    self.circuit_tracer.build_circuit(self.circuit_parameters),
+                    self.decoding,
+                )
         elif isinstance(self.differentiation, type):
             self.differentiation = self.differentiation()
 
@@ -137,10 +158,14 @@ class QuantumModel(torch.nn.Module):
         in a quantum circuit, executes it and decodes it.
 
         Args:
-            x (Optional[torch.tensor]): the input data, if required. Default is None.
+            x (:class:`torch.tensor`, optional): the input data, if required. Default is ``None``.
+
         Returns:
-            (torch.tensor): the computed outputs.
+            :class:`torch.tensor`: The computed outputs.
         """
+        if x is None:
+            x = torch.empty(1, dtype=torch.float64)
+
         if self.differentiation is None:
             circuit = self.circuit_tracer.build_circuit(
                 params=list(self.parameters())[0],
@@ -246,7 +271,7 @@ class QuantumModelAutoGrad(torch.autograd.Function):
             ]
         )
         # convert the parameters to backend native arrays
-        dtype = getattr(decoding.backend.np, str(parameters.dtype).split(".")[-1])
+        dtype = getattr(decoding.backend.engine, str(parameters.dtype).split(".")[-1])
         angles = decoding.backend.cast(
             angles.detach().cpu().clone().numpy(), dtype=dtype
         )

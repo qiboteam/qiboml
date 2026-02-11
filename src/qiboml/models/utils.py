@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional, Union
 
+from numpy.typing import ArrayLike
 from qibo import Circuit
 from qibo.backends import Backend, CliffordBackend, _check_backend, get_transpiler
 from qibo.config import log
@@ -8,8 +9,6 @@ from qibo.hamiltonians import Hamiltonian, SymbolicHamiltonian
 from qibo.models import error_mitigation
 from qibo.noise import NoiseModel
 from qibo.transpiler.pipeline import Passes
-
-from qiboml import ndarray
 
 REF_CIRCUIT_SEED = 42
 
@@ -32,7 +31,7 @@ class Mitigator:
     def __post_init__(self):
 
         self.backend = _check_backend(self.backend)
-        self._mitigation_map: Callable[..., ndarray] = lambda x, a=1, b=0: a * x + b
+        self._mitigation_map: Callable[..., ArrayLike] = lambda x, a=1, b=0: a * x + b
 
         cfg = self.mitigation_config or {}
         self._threshold = cfg.get("threshold", 1e-1)
@@ -58,7 +57,7 @@ class Mitigator:
         self._mitigation_map_initial_popt = self.backend.cast(defaults, dtype="double")
         self._mitigation_map_popt = self.backend.cast(defaults, dtype="double")
         self._mitigation_function = getattr(error_mitigation, self._mitigation_method)
-        self._simulation_backend = CliffordBackend(engine="numpy")
+        self._simulation_backend = CliffordBackend(platform="numpy")
         self._reference_circuit = None
         self._reference_value = None
         self._training_data = None
@@ -75,7 +74,7 @@ class Mitigator:
 
     def calculate_reference_expval(
         self,
-        observable: Union[ndarray, Hamiltonian],
+        observable: Union[ArrayLike, Hamiltonian],
         circuit: Circuit,
     ):
         """Construct reference error sensitive circuit."""
@@ -91,27 +90,27 @@ class Mitigator:
         )
         observable.backend = original_backend
 
-    def map_is_reliable(self, noisy_reference_value: ndarray):
+    def map_is_reliable(self, noisy_reference_value: ArrayLike):
         """
         Check the distance between the reference value and the mitigated one.
 
         Args:
-            noisy_reference_value (ndarray): the noisy expectation value obtained
+            noisy_reference_value (ArrayLike): the noisy expectation value obtained
                 executing the reference circuit on a noisy engine.
 
         Returns:
             bool: ``True`` if the map is reliable, ``False`` if not.
         """
-        mitigated_ref_value = self.__call__(noisy_reference_value)
+        mitigated_ref_value = self(noisy_reference_value)
         if abs(mitigated_ref_value - self._reference_value) > self._threshold:
             return False
         return True
 
     def check_or_update_map(
         self,
-        noisy_reference_value: ndarray,
+        noisy_reference_value: ArrayLike,
         circuit: Circuit,
-        observable: Union[ndarray, Hamiltonian],
+        observable: Union[ArrayLike, Hamiltonian],
         noise_model: NoiseModel,
     ):
         """
@@ -130,7 +129,7 @@ class Mitigator:
     def data_regression(
         self,
         circuit: Circuit,
-        observable: Union[ndarray, Hamiltonian],
+        observable: Union[ArrayLike, Hamiltonian],
         noise_model: NoiseModel,
     ):
         """

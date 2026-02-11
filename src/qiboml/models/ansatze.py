@@ -3,7 +3,7 @@ from typing import Optional
 
 import numpy as np
 from qibo import Circuit, gates
-from qibo.backends import _check_backend
+from qibo.backends import NumpyBackend, _check_backend
 from qibo.config import raise_error
 from qibo.models.encodings import entangling_layer
 from qibo.quantum_info.random_ensembles import uniform_sampling_U3
@@ -72,8 +72,7 @@ def hardware_efficient(
 
     if single_block is None:
         backend = _check_backend(backend)
-        phases = uniform_sampling_U3(1, seed, backend=backend)[0]
-        phases = backend.to_numpy(phases)
+        phases = uniform_sampling_U3(1, seed, backend=NumpyBackend())[0]
         single_block = Circuit(1)
         single_block.add(gates.RY(0, theta=phases[0], trainable=True))
         single_block.add(gates.RZ(0, theta=phases[1], trainable=True))
