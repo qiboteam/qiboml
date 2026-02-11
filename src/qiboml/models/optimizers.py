@@ -11,7 +11,7 @@ from qibo.config import raise_error
 
 import numpy as np
 
-from scipy.sparse import csr_matrix
+from scipy.sparse import issparse
 from scipy.special import comb
 
 
@@ -34,12 +34,14 @@ class ExactGeodesicTransportCG:
             It can also be a Callable to be used as the loss function.
             First two arguments (mandatory) are circuit and backend for execution.
         loss_kwargs: (dict): Additional arguments to be passed to the loss function.
-            For VQE, include `hamiltonian: hamiltonian` and `type: "exp_val"`.
+            For VQE, include `hamiltonian: hamiltonian`, passed as scipy sparse or `ArrayLike`.
         backtrack_rate (float, optional): Backtracking rate for Wolfe condition
         line search. Defaults to :math:`0.9`.
         backtrack_multiplier (float, optional): Scaling factor applied to the initial learning
             rate for the backtrack. Usually, it's greater than 1 to guarantee a wider
             search space. Defaults to :math:`1.5`.
+        backtrack_min_lr (float, optional): Minimum learning rate to be tested in the backtrack.
+            Defaults to :math:`10^{-6}`.
         c1 (float, optional): Constant for Armijo condition (sufficient decrease) in
             Wolfe line search. Defaults to :math:`10^{-3}`.
         c2 (float, optional): Constant for curvature condition in Wolfe line search.
@@ -55,7 +57,7 @@ class ExactGeodesicTransportCG:
         ExactGeodesicTransportCG: Instantiated optimizer object.
 
     References:
-        A. J. Ferreira‑Martins, R. M. S. Farias, G. Camilo, T. O. Maciel, A. Tosta,
+        A. J. Ferreira-Martins, R. M. S. Farias, G. Camilo, T. O. Maciel, A. Tosta,
         R. Lin, A. Alhajri, T. Haug, and L. Aolita, *Quantum optimization
         with exact geodesic transport*, `arXiv:2506.17395 (2025)
         <https://arxiv.org/abs/2506.17395>`_.
@@ -101,6 +103,7 @@ class ExactGeodesicTransportCG:
                     )
                 ),
                 "diagonal",
+                backend=self.backend,
             )
             self.angles = self.backend.cast(self.angles, dtype=self.angles.dtype)
 
@@ -128,51 +131,90 @@ class ExactGeodesicTransportCG:
         if "hamiltonian" in loss_kwargs and loss_fn == "exp_val":
 
             def loss_func(circuit, backend, *, hamiltonian):
-                state = backend.execute_circuit(circuit).state()
-                # print()
-                # circuit.draw()
-                # print()
-                # print("parameters", circuit.get_parameters())
-                # print("\tstate:")
-                # print(backend.real(state))
-                return backend.real(backend.conj(state) @ hamiltonian @ state)
+                """
+                Backend-agnostic expectation value <psi|H|psi>.
+
+                Supports:
+                - NumPy / SciPy sparse
+                - JAX (BCOO)
+                - TensorFlow (tf.sparse.SparseTensor)
+                - PyTorch (sparse COO / CSR)
+
+                Assumes hamiltonian is sparse in the backend's native format
+                """
+                psi = backend.execute_circuit(circuit).state()
+                platform = backend.platform
+                if platform == "tensorflow":
+                    psi_col = backend.engine.reshape(psi, (-1, 1))
+                    Hpsi = backend.engine.sparse.sparse_dense_matmul(
+                        hamiltonian, psi_col
+                    )
+                    Hpsi = backend.engine.reshape(Hpsi, (-1,))
+                elif platform == "pytorch":
+                    Hpsi = backend.engine.sparse.mm(
+                        hamiltonian, psi.unsqueeze(1)
+                    ).squeeze(1)
+                else:
+                    Hpsi = hamiltonian @ psi
+                return backend.real(backend.sum(backend.conj(psi) * Hpsi))
 
             loss_fn = loss_func
 
-            hamiltonian = loss_kwargs.get("hamiltonian")
-            if not isinstance(hamiltonian, (csr_matrix, *self.backend.tensor_types)):
+            self.hamiltonian = loss_kwargs.get("hamiltonian")
+            if not (
+                isinstance(self.hamiltonian, self.backend.tensor_types)
+                or issparse(self.hamiltonian)
+            ):
                 raise_error(
-                    TypeError, "`hamiltonian` must be ArrayLike or scipy `csr_matrix`!"
+                    TypeError,
+                    f"For backend <{self.backend}>, `hamiltonian` must be scipy sparse matrix, "
+                    + f"or one of these: {self.backend.tensor_types}\n"
+                    + f"passed type: {type(self.hamiltonian)}!",
                 )
-            if not isinstance(hamiltonian, csr_matrix):
-                hamiltonian = csr_matrix(hamiltonian)
+            if issparse(self.hamiltonian):
+                self.hamiltonian = _scipy_sparse_to_backend_coo(
+                    self.hamiltonian, self.backend.platform
+                )
+            else:
+                self.hamiltonian = self.backend.coo_matrix(self.hamiltonian)
 
-            self.hamiltonian_subspace = self.get_subspace_hamiltonian(
-                hamiltonian,
-                self.nqubits,
-                self.weight,
-            )
+            self.hamiltonian_subspace = self.get_subspace_hamiltonian()
 
             self.riemannian_tangent = True
             self.gradient_func = None
-
-            if self.backend.platform == "pytorch":
-                coo = hamiltonian.tocoo()
-                indices = self.backend.engine.from_numpy(
-                    np.vstack((coo.row, coo.col))
-                ).long()
-                values = self.backend.engine.from_numpy(coo.data)
-                shape = self.backend.engine.Size(coo.shape)
-                loss_kwargs["hamiltonian"] = self.backend.engine.sparse_coo_tensor(
-                    indices, values, shape
-                )
+            loss_kwargs["hamiltonian"] = self.hamiltonian
 
         else:
             self.hamiltonian_subspace = None
-
+           
             def gradient_func_internal():
+                """
+                Compute the gradient of self.loss w.r.t the trainable parameters
+                stored inside self.circuit, using the backend specified by `platform`.
+
+                Returns:
+                    grad: gradient vector as an array of the backend platform
+                """
                 self.n_calls_gradient += 1
-                return self.geom_gradient()
+
+                platform = self.backend.platform
+                if platform == "jax":
+                    def loss_fn():
+                        return self.loss(self.circuit, self.backend, **self.loss_kwargs)
+                    params = self.circuit.get_parameters()
+                    grad = self.backend.engine.grad(loss_fn)(params)
+                    return grad
+                elif platform == "pytorch":
+                    params = self.circuit.get_parameters()
+                    loss = self.loss(self.circuit, self.backend, **self.loss_kwargs)
+                    loss.backward()
+                    return params.grad
+                elif platform == "tensorflow":
+                    params = self.circuit.get_parameters()
+                    with self.backend.engine.GradientTape() as tape:
+                        loss = self.loss(self.circuit, self.backend, **self.loss_kwargs)
+                    grad = tape.gradient(loss, params)
+                    return grad
 
             self.gradient_func = gradient_func_internal
 
@@ -186,165 +228,77 @@ class ExactGeodesicTransportCG:
         self.jacobian = None
         self.inverse_jacobian = None
 
-    def get_subspace_hamiltonian(
-        self,
-        hamiltonian_sparse,
-        nqubits,
-        weight,
-    ):
+    def get_subspace_hamiltonian(self):
         """
-        Returns the hamiltonian sliced on the (n_choose_k)-dimensional subspace.
+        Returns the Hamiltonian restricted to the fixed-weight subspace
+        and represented as a dense matrix in the active backend.
+        Assumes self.hamiltonian is in COO format.
         """
 
-        subspace_dim = int(comb(nqubits, weight))
+        if self.hamiltonian is None:
+            raise_error(
+                TypeError, "This method can only be executed if `hamiltonian != None`."
+            )
 
-        # initial_string = self.backend.cast([1] * weight + [0] * (nqubits - weight), dtype=self.backend.int64)
-        initial_string = [1] * weight + [0] * (nqubits - weight)
-
+        subspace_dim = int(comb(self.nqubits, self.weight))
+        initial_string = [1] * self.weight + [0] * (self.nqubits - self.weight)
         lexicographical_order = _ehrlich_algorithm(initial_string, False)
         lexicographical_order.sort()
-
-        coo_matrix = hamiltonian_sparse.tocoo()
-
-        sparse_hamilt_nonzero_elements = {}
-
-        for i, j, v in zip(coo_matrix.row, coo_matrix.col, coo_matrix.data):
-            if abs(v) > 1e-14:
-                if i not in sparse_hamilt_nonzero_elements:
-                    sparse_hamilt_nonzero_elements[i] = {j: v}
-                else:
-                    sparse_hamilt_nonzero_elements[i][j] = v
-
-        # ================================================
-
         basis_states_subspace = [
             int(bitstring, 2) for bitstring in lexicographical_order
         ]
+        full_to_sub = {full: i for i, full in enumerate(basis_states_subspace)}
 
-        # hamiltonian_subspace = self.backend.zeros(
-        #     (subspace_dim, subspace_dim), dtype=self.x.dtype
-        # )
+        Hsub = self.backend.zeros((subspace_dim, subspace_dim), dtype=self.x.dtype)
 
-        # for i in range(subspace_dim):
-
-        #     i_in_full_matrix = basis_states_subspace[i]
-
-        #     if i_in_full_matrix in sparse_hamilt_nonzero_elements:
-
-        #         for j in range(i, subspace_dim):
-
-        #             j_in_full_matrix = basis_states_subspace[j]
-
-        #             if j_in_full_matrix in sparse_hamilt_nonzero_elements.get(
-        #                 i_in_full_matrix
-        #             ):
-        #                 value = sparse_hamilt_nonzero_elements.get(
-        #                     i_in_full_matrix
-        #                 ).get(j_in_full_matrix)
-
-        #                 if self.backend.platform == "jax":
-        #                     hamiltonian_subspace = hamiltonian_subspace.at[
-        #                         (i, j), (j, i)
-        #                     ].set(value)
-
-        #                 else:
-        #                     hamiltonian_subspace[i][j] = value
-        #                     hamiltonian_subspace[j][i] = hamiltonian_subspace[i][j]
-
-        # hamiltonian_subspace = self.backend.zeros(
-        #     (subspace_dim, subspace_dim), dtype=self.x.dtype
-        # )
-
-        # if self.backend.platform == "jax":
-        #     for i in range(subspace_dim):
-        #         i_full = basis_states_subspace[i]
-        #         row = sparse_hamilt_nonzero_elements.get(i_full)
-        #         if row is None:
-        #             continue
-        #         for j in range(i, subspace_dim):
-        #             j_full = basis_states_subspace[j]
-        #             value = row.get(j_full)
-        #             if value is None:
-        #                 continue
-        #             hamiltonian_subspace = hamiltonian_subspace.at[(i, j), (j, i)].set(
-        #                 value
-        #             )
-        # else:
-        #     for i in range(subspace_dim):
-        #         i_full = basis_states_subspace[i]
-        #         row = sparse_hamilt_nonzero_elements.get(i_full)
-        #         if row is None:
-        #             continue
-
-        #         for j in range(i, subspace_dim):
-        #             j_full = basis_states_subspace[j]
-        #             value = row.get(j_full)
-        #             if value is None:
-        #                 continue
-
-        #             hamiltonian_subspace[i, j] = value
-        #             hamiltonian_subspace[j, i] = value
-
-        hamiltonian_subspace = self.backend.zeros(
-            (subspace_dim, subspace_dim), dtype=self.x.dtype
-        )
-
-        if self.backend.platform == "jax":
-            for i in range(subspace_dim):
-                i_full = basis_states_subspace[i]
-                row = sparse_hamilt_nonzero_elements.get(i_full)
-                if row is None:
-                    continue
-
-                for j in range(i, subspace_dim):
-                    j_full = basis_states_subspace[j]
-                    value = row.get(j_full)
-                    if value is None:
-                        continue
-
-                    hamiltonian_subspace = hamiltonian_subspace.at[(i, j), (j, i)].set(
-                        value
-                    )
-
-        elif self.backend.platform == "tensorflow":
-            for i in range(subspace_dim):
-                i_full = basis_states_subspace[i]
-                row = sparse_hamilt_nonzero_elements.get(i_full)
-                if row is None:
-                    continue
-
-                for j in range(i, subspace_dim):
-                    j_full = basis_states_subspace[j]
-                    value = row.get(j_full)
-                    if value is None:
-                        continue
-                    value = self.backend.cast(value, dtype=self.x.dtype)
-                    indices = self.backend.engine.constant(
-                        [[i, j], [j, i]], dtype=self.backend.int32
-                    )
-                    updates = self.backend.engine.stack([value, value])
-
-                    hamiltonian_subspace = self.backend.engine.tensor_scatter_nd_update(
-                        hamiltonian_subspace, indices, updates
-                    )
-
+        platform = self.backend.platform
+        if platform == "jax":
+            indices = self.hamiltonian.indices
+            data = self.hamiltonian.data
+            rows = indices[:, 0]
+            cols = indices[:, 1]
+        elif platform == "tensorflow":
+            indices = self.hamiltonian.indices.numpy()
+            data = self.hamiltonian.values.numpy()
+            rows = indices[:, 0]
+            cols = indices[:, 1]
+        elif platform == "pytorch":
+            H = self.hamiltonian.coalesce()
+            indices = H.indices()
+            values = H.values()
+            rows = indices[0].cpu().numpy()
+            cols = indices[1].cpu().numpy()
+            data = values.cpu().numpy()
         else:
-            for i in range(subspace_dim):
-                i_full = basis_states_subspace[i]
-                row = sparse_hamilt_nonzero_elements.get(i_full)
-                if row is None:
-                    continue
+            H = self.hamiltonian
+            rows = H.row
+            cols = H.col
+            data = H.data
 
-                for j in range(i, subspace_dim):
-                    j_full = basis_states_subspace[j]
-                    value = row.get(j_full)
-                    if value is None:
-                        continue
-
-                    hamiltonian_subspace[i, j] = value
-                    hamiltonian_subspace[j, i] = value
-
-        return hamiltonian_subspace
+        tol = 1e-14
+        for i_full, j_full, v in zip(rows, cols, data):
+            if abs(v) <= tol:
+                continue
+            i = full_to_sub.get(int(i_full))
+            j = full_to_sub.get(int(j_full))
+            if i is None or j is None:
+                continue
+            if platform == "jax":
+                Hsub = Hsub.at[(i, j), (j, i)].set(v)
+            elif platform == "tensorflow":
+                v = self.backend.cast(v, Hsub.dtype)
+                indices = self.backend.engine.constant(
+                    [[i, j], [j, i]],
+                    dtype=self.backend.int32,
+                )
+                updates = self.backend.engine.stack([v, v])
+                Hsub = self.backend.engine.tensor_scatter_nd_update(
+                    Hsub, indices, updates
+                )
+            else:
+                Hsub[i, j] = v
+                Hsub[j, i] = v
+        return Hsub
 
     def initialize_cg_state(self):
         """Initialize CG state.
@@ -354,7 +308,6 @@ class ExactGeodesicTransportCG:
         """
         self.v = self.tangent_vector()
         self.u = self.backend.cast(self.v, dtype=self.v.dtype, copy=True)
-        # Power method learning rate
         norm_u = self.backend.sqrt((self.u @ self.u))
         loss_prev = self.loss(self.circuit, self.backend, **self.loss_kwargs)
         self.eta = (1 / norm_u) * self.backend.arccos(
@@ -396,7 +349,6 @@ class ExactGeodesicTransportCG:
 
         grad = self.backend.zeros(d)
         for j in range(d):
-
             varphi_amps = g_diag[j] ** (-1 / 2) * self.jacobian[:, j]
             l_varphi = self.loss(
                 hamming_weight_encoder(
@@ -408,7 +360,6 @@ class ExactGeodesicTransportCG:
                 self.backend,
                 **self.loss_kwargs,
             )
-
             phi_amps = (psi_amps + varphi_amps) / math.sqrt(2)
             l_phi = self.loss(
                 hamming_weight_encoder(
@@ -420,7 +371,6 @@ class ExactGeodesicTransportCG:
                 self.backend,
                 **self.loss_kwargs,
             )
-
             grad[j] = self.backend.sqrt(g_diag[j]) * (2 * l_phi - l_varphi - l_psi)
 
         return grad
@@ -431,22 +381,6 @@ class ExactGeodesicTransportCG:
         Returns:
             ArrayLike: Jacobian matrix.
         """
-        # dim = len(self.angles)
-        # jacob = self.backend.zeros((dim + 1, dim), dtype=self.backend.float64)
-
-        # for j in range(dim):
-        #     reduced_params = self.backend.cast(
-        #         self.angles[j:], dtype=self.backend.float64, copy=True
-        #     )
-        #     reduced_params[0] += math.pi / 2
-
-        #     sins = self.backend.prod(self.backend.sin(self.angles[:j]))
-        #     amps = self.angles_to_amplitudes(reduced_params)
-
-        #     jacob[j:, j] = sins * amps
-
-        # return jacob
-
         dim = len(self.angles)
         jacob = self.backend.zeros((dim + 1, dim), dtype=self.backend.float64)
 
@@ -459,7 +393,9 @@ class ExactGeodesicTransportCG:
                     reduced_params, [[0]], [reduced_params[0] + math.pi / 2]
                 )
             elif self.backend.platform == "jax":
-                reduced_params = reduced_params.at[0].set(reduced_params[0] + math.pi / 2)
+                reduced_params = reduced_params.at[0].set(
+                    reduced_params[0] + math.pi / 2
+                )
             else:
                 reduced_params[0] += math.pi / 2
 
@@ -514,18 +450,7 @@ class ExactGeodesicTransportCG:
         return self.jacobian @ nat_grad
 
     def regularization(self, angles):
-
-        # print(angles)
-
-        # angles = angles % (2 * math.pi)
         condition = self.backend.abs(self.backend.sin(angles[:-1])) < 1e-3
-        # angles[:-1] = self.backend.where(condition, math.pi / 2, angles[:-1])
-        # return self.angles_to_amplitudes(angles)
-
-        # print(angles)
-        # print(self.backend.abs(self.backend.sin(angles[:-1])))
-        # print(condition)
-
         updated = self.backend.where(condition, math.pi / 2, angles[:-1])
         return self.angles_to_amplitudes(
             self.backend.concatenate([updated, angles[-1:]], axis=0)
@@ -558,26 +483,17 @@ class ExactGeodesicTransportCG:
                     self.exponential_map_with_direction(u_prev, eta)
                 )
             )
-
-            # redefine the circuit at new amps
             self.circuit = hamming_weight_encoder(
                 x_new,
                 self.nqubits,
                 self.weight,
                 backend=self.backend,
             )
-            # also, redefine the angles and amps - important for metric and jacobian
             self.angles = self.backend.cast(
                 [x[0] for x in self.circuit.get_parameters()],
                 dtype=self.backend.float64,
             )
             self.x = x_new
-
-            # print(x_prev)
-            # print(u_prev)
-            # print(x_new)
-            # print()
-
             loss_new = self.loss(self.circuit, self.backend, **self.loss_kwargs)
 
             condition_a_lhs = loss_new - loss_prev
@@ -590,7 +506,6 @@ class ExactGeodesicTransportCG:
 
                 condition_b_lhs = abs((-v_new @ transported_u))
                 condition_b_rhs = abs(self.c2 * (-v_prev @ u_prev))
-
                 condition_b = condition_b_lhs <= condition_b_rhs
 
                 if condition_a and condition_b:
@@ -600,12 +515,9 @@ class ExactGeodesicTransportCG:
 
             eta *= self.backtrack_rate
 
-            # reset original angles and amps, before looping again
-            # when return happens, the angles are set to the new ones, outside
             self.angles = angles_orig
             self.x = amps_orig
 
-        # Fallback to last tried point
         x_new = self.exponential_map_with_direction(u_prev, eta)
         self.circuit = hamming_weight_encoder(
             x_new,
@@ -629,14 +541,14 @@ class ExactGeodesicTransportCG:
         Returns:
             ArrayLike: New point on the hypersphere.
         """
-        if eta is None:  # pragma: no cover
+        if eta is None:
             eta = self.eta
 
         norm_dir = self.backend.sqrt((direction @ direction))
-        x_new =  self.backend.cos(eta * norm_dir) * self.x + self.backend.sin(
+        x_new = self.backend.cos(eta * norm_dir) * self.x + self.backend.sin(
             eta * norm_dir
         ) * (direction / norm_dir)
-        
+
         return x_new
 
     def amplitudes_to_angles(self, x):
@@ -648,16 +560,6 @@ class ExactGeodesicTransportCG:
         Returns:
             ArrayLike: Corresponding angles.
         """
-
-        # d = len(x)
-        # angles = self.backend.zeros(d - 1)
-        # for i in range(d - 2):
-        #     norm_tail = self.backend.vector_norm(x[i:])
-        #     angles[i] = 0.0 if norm_tail == 0 else self.backend.arccos(x[i] / norm_tail)
-
-        # angles[-1] = self.backend.arctan2(x[-1], x[-2])
-        # return angles
-
         d = len(x)
         angles = self.backend.zeros(d - 1, dtype=self.backend.float64)
         for elem in range(d - 2):
@@ -683,8 +585,6 @@ class ExactGeodesicTransportCG:
             angles = angles.at[-1].set(update)
         else:
             angles[-1] = update
-
-        # print("saida angles:", angles)
 
         return angles
 
@@ -763,21 +663,11 @@ class ExactGeodesicTransportCG:
         self.initialize_cg_state()
         losses = []
         for iter_num in range(steps):
-
-            # print(f"iter {iter_num}")
-            # print(self.x)
-            # print()
-
             loss_prev = self.loss(self.circuit, self.backend, **self.loss_kwargs)
             losses.append(loss_prev)
 
-            # print(f"angles: {self.circuit.get_parameters()}")
-            # print(loss_prev)
-
-            res = ((-self.v @ self.u) ** 2) / (
-                self.u @ self.u
-            )
-            if res < tolerance:  # pragma: no cover
+            res = ((-self.v @ self.u) ** 2) / (self.u @ self.u)
+            if res < tolerance:
                 print(f"\nOptimized converged at iteration {iter_num+1}!\n")
                 break
 
@@ -856,3 +746,85 @@ class ExactGeodesicTransportCG:
             tuple: Respectively, final loss, loss log, and final parameters.
         """
         return self.run_egt_cg(steps=steps, tolerance=tolerance)
+
+
+import scipy.sparse as sp
+
+
+def _scipy_sparse_to_backend_coo(mat, platform):
+    """
+    Convert a SciPy sparse matrix (CSR or COO) to the COO sparse
+    representation supported by JAX, TensorFlow, or PyTorch.
+
+    Parameters
+    ----------
+    mat : scipy.sparse.csr_matrix or scipy.sparse.coo_matrix
+    platform : str
+        One of {"jax", "tensorflow", "pytorch"}
+
+    Returns
+    -------
+    Backend-specific sparse tensor
+    """
+    if not sp.issparse(mat):
+        raise TypeError("Input must be a SciPy sparse matrix")
+
+    if platform == "jax":
+        try:
+            import jax.numpy as jnp
+            from jax.experimental.sparse import BCOO
+        except ImportError as e:
+            raise ImportError("JAX is not available") from e
+
+        if not sp.isspmatrix_coo(mat):
+            mat = mat.tocoo()
+
+        indices = np.stack([mat.row, mat.col], axis=1)
+        data = mat.data
+
+        return BCOO(
+            (jnp.asarray(data), jnp.asarray(indices)),
+            shape=mat.shape,
+        )
+
+    elif platform == "tensorflow":
+        try:
+            import tensorflow as tf
+        except ImportError as e:
+            raise ImportError("TensorFlow is not available") from e
+
+        if not sp.isspmatrix_coo(mat):
+            mat = mat.tocoo()
+
+        indices = np.stack([mat.row, mat.col], axis=1)
+        data = mat.data
+
+        return tf.sparse.SparseTensor(
+            indices=indices.astype(np.int64),
+            values=data,
+            dense_shape=mat.shape,
+        )
+
+    elif platform == "pytorch":
+        try:
+            import torch
+        except ImportError as e:
+            raise ImportError("PyTorch is not available") from e
+
+        if not sp.isspmatrix_coo(mat):
+            mat = mat.tocoo()
+
+        indices = np.vstack([mat.row, mat.col])
+        values = mat.data
+
+        return torch.sparse_coo_tensor(
+            torch.from_numpy(indices).long(),
+            torch.from_numpy(values),
+            size=mat.shape,
+        )
+
+    else:
+        raise ValueError(
+            f"Unknown platform '{platform}'. "
+            "Expected one of {'jax', 'tensorflow', 'pytorch'}."
+        )
