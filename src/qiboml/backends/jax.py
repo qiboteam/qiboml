@@ -7,13 +7,12 @@ import jax  # pylint: disable=import-error
 import jax.numpy as jnp  # pylint: disable=import-error
 import numpy as np
 from numpy.typing import ArrayLike, DTypeLike
-from qibo import __version__
 from qibo.backends import Backend, einsum_utils
 from qibo.backends.npmatrices import NumpyMatrices
 from qibo.config import raise_error
 from qibo.gates.abstract import Gate
 from qibo.result import CircuitResult, QuantumState
-from scipy.linalg import block_diag, expm, fractional_matrix_power, logm
+from scipy.linalg import block_diag, expm, logm
 from scipy.sparse import csr_matrix
 from scipy.sparse import eye as eye_sparse
 from scipy.sparse import issparse
@@ -24,16 +23,17 @@ from qiboml.quantum_info._quantum_info_jax import QINFO
 
 
 @partial(jax.jit, static_argnums=(0, 1, 2))
-def zero_state(nqubits: int, density_matrix: bool, dtype) -> ArrayLike:
+def zero_state(nqubits: int, density_matrix: bool, dtype: DTypeLike) -> ArrayLike:
     if density_matrix:
         state = jnp.zeros(2 * (2**nqubits,), dtype=dtype).at[0, 0].set(1)
     else:
         state = jnp.zeros(2**nqubits, dtype=dtype).at[0].set(1)
+
     return state
 
 
 @partial(jax.jit, static_argnames={"dtype"})
-def cast_matrix(array: ArrayLike, dtype) -> ArrayLike:
+def cast_matrix(array: ArrayLike, dtype: DTypeLike) -> ArrayLike:
     return jnp.asarray(array, dtype=dtype)
 
 
@@ -51,7 +51,7 @@ def _apply_gate(
     return jnp.reshape(state, (2**nqubits,))
 
 
-# @partial(jax.jit, static_argnums=(2, 3, 4, 5, 6))
+@partial(jax.jit, static_argnums=(2, 3, 4, 5, 6))
 def _apply_gate_controlled(
     matrix: ArrayLike,
     state: ArrayLike,
@@ -82,12 +82,12 @@ def _apply_gate_controlled(
 
 class JaxMatrices(NumpyMatrices):
 
-    def __init__(self, dtype):
+    def __init__(self, dtype: DTypeLike):
         super().__init__(dtype)
         self.engine = jnp
         self.dtype = dtype
 
-    def _cast(self, array: ArrayLike, dtype) -> ArrayLike:
+    def _cast(self, array: ArrayLike, dtype: DTypeLike) -> ArrayLike:
         return cast_matrix(array, dtype)
 
 
@@ -114,7 +114,9 @@ class JaxBackend(Backend):
         self.platform = "jax"
         self.tensor_types = (self.engine.ndarray,)
 
-    def cast(self, array: ArrayLike, dtype=None, copy: bool = False) -> ArrayLike:
+    def cast(
+        self, array: ArrayLike, dtype: Optional[DTypeLike] = None, copy: bool = False
+    ) -> ArrayLike:
         if dtype is None:
             dtype = self.dtype
 
@@ -157,8 +159,8 @@ class JaxBackend(Backend):
         array: ArrayLike,
         size: Optional[Union[int, Tuple[int, ...]]] = None,
         replace: bool = True,
-        p: ArrayLike = None,
-        seed=None,
+        p: Optional[ArrayLike] = None,
+        seed: Optional[int] = None,
         **kwargs,
     ) -> ArrayLike:
         dtype = kwargs.get("dtype", self.float64)
@@ -179,7 +181,7 @@ class JaxBackend(Backend):
         low: int,
         high: Optional[int] = None,
         size: Optional[Union[int, Tuple[int, ...]]] = None,
-        seed=None,
+        seed: Optional[int] = None,
     ) -> ArrayLike:
         if high is None:
             high = low
@@ -200,7 +202,7 @@ class JaxBackend(Backend):
         mean: Union[float, int],
         stddev: Union[float, int],
         size: Optional[Union[int, List[int], Tuple[int, ...]]] = None,
-        seed=None,
+        seed: Optional[int] = None,
         dtype: Optional[DTypeLike] = None,
     ) -> ArrayLike:
         if dtype is None:
@@ -218,7 +220,7 @@ class JaxBackend(Backend):
 
         return self.cast(np.random.normal(mean, stddev, size), dtype=dtype)
 
-    def random_sample(self, size: int, seed=None) -> ArrayLike:
+    def random_sample(self, size: int, seed: Optional[int] = None) -> ArrayLike:
         if seed is not None:
             local_state = self.default_rng(seed) if isinstance(seed, int) else seed
 
@@ -231,7 +233,7 @@ class JaxBackend(Backend):
         low: Union[float, int] = 0.0,
         high: Union[float, int] = 1.0,
         size: Optional[Union[int, Tuple[int, ...]]] = None,
-        seed=None,
+        seed: Optional[int] = None,
     ) -> ArrayLike:
         if seed is not None:
             local_state = self.default_rng(seed) if isinstance(seed, int) else seed
@@ -245,7 +247,7 @@ class JaxBackend(Backend):
     ########################################################################################
 
     def zero_state(
-        self, nqubits: int, density_matrix: bool = False, dtype=None
+        self, nqubits: int, density_matrix: bool = False, dtype: DTypeLike = None
     ) -> ArrayLike:
         if dtype is None:
             dtype = self.dtype
@@ -264,7 +266,7 @@ class JaxBackend(Backend):
 
         if gate.is_controlled_by:
             order, targets = einsum_utils.control_order(gate, nqubits)
-            order = {int(elem) for elem in order}
+            order = tuple(int(elem) for elem in order)
             return _apply_gate_controlled(
                 gate.matrix(self),
                 state,
@@ -336,6 +338,9 @@ class JaxBackend(Backend):
 
     def block_diag(self, *arrays: ArrayLike) -> ArrayLike:
         return block_diag(*arrays)
+
+    def coo_matrix(self, array: ArrayLike, **kwargs) -> ArrayLike:  # pragma: no cover
+        return self.jax.experimental.sparse.BCOO.fromdense(array, **kwargs)
 
     def csr_matrix(self, array: ArrayLike, **kwargs) -> ArrayLike:
         return csr_matrix(array, **kwargs)

@@ -168,6 +168,12 @@ class TensorflowBackend(Backend):
             return self.trace(state)
         return self.engine.norm(state, ord=order, **kwargs)
 
+    def max(self, array: ArrayLike, **kwargs) -> Union[float, int, ArrayLike]:  # pragma: no cover
+        return self.engine.math.reduce_max(array, **kwargs)
+
+    def min(self, array: ArrayLike, **kwargs) -> Union[float, int, ArrayLike]:  # pragma: no cover
+        return self.engine.math.reduce_min(array, **kwargs)
+
     def outer(self, array_1: ArrayLike, array_2: ArrayLike) -> ArrayLike:
         return self.tensordot(array_1, array_2, axes=0)
 
@@ -216,6 +222,9 @@ class TensorflowBackend(Backend):
 
         return self.engine.random.uniform(shape=shape, minval=low, maxval=high)
 
+    def ravel(self, array, **kwargs):  # pragma: no cover
+        return self.engine.keras.ops.ravel(array, **kwargs)  # pylint: disable=E1101
+
     def real(self, array: ArrayLike) -> ArrayLike:
         return self.engine.math.real(array)
 
@@ -230,6 +239,9 @@ class TensorflowBackend(Backend):
 
     def trace(self, array: ArrayLike) -> Union[int, float]:
         return self.engine.linalg.trace(array)
+
+    def var(self, array: ArrayLike, **kwargs) -> Union[float, int, ArrayLike]:  # pragma: no cover
+        return self.engine.math.reduce_variance(array, **kwargs)
 
     def vector_norm(
         self, state: ArrayLike, order: Union[int, float, str] = 2, dtype=None
