@@ -73,7 +73,6 @@ def hardware_efficient(
     if single_block is None:
         backend = _check_backend(backend)
         phases = uniform_sampling_U3(1, seed, backend=NumpyBackend())[0]
-        # phases = backend.to_numpy(phases)
         single_block = Circuit(1)
         single_block.add(gates.RY(0, theta=phases[0], trainable=True))
         single_block.add(gates.RZ(0, theta=phases[1], trainable=True))
