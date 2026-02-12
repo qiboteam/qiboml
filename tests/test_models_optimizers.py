@@ -23,6 +23,7 @@ def get_xxz_hamiltonian(nqubits, hamiltonian_type, backend):
 
     return hamiltonian, true_gs_energy
 
+
 @pytest.mark.parametrize("nqubits", [4, 6])
 @pytest.mark.parametrize("hamiltonian_type", ["sparse", "dense"])
 # @pytest.mark.parametrize("hamiltonian_type", ["dense", "sparse"])
@@ -31,6 +32,12 @@ def test_egt_cg(
     nqubits,
     hamiltonian_type,
 ):
+    if backend.platform in ["jax", "tensorflow"] and nqubits != 4:
+        pytest.skip(
+            "Tests too slow with Jax and TF, will test only small size."
+            + " Will test all sizes with torch."
+        )
+
     hamiltonian, true_gs_energy = get_xxz_hamiltonian(
         nqubits, hamiltonian_type, backend
     )
