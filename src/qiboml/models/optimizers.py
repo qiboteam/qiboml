@@ -163,6 +163,12 @@ class ExactGeodesicTransportCG:
             self.gradient_func = None
 
         else:
+            backends_autodiff = ["jax", "tensorflow", "pytorch"]
+            if self.backend.platform not in backends_autodiff:
+                raise_error(
+                    TypeError,
+                    f"To use autodiff, must use one of the following backends: {backends_autodiff}",
+                )
             self.hamiltonian_subspace = None
             self.gradient_func = self._gradient_func_internal
 
@@ -172,10 +178,16 @@ class ExactGeodesicTransportCG:
         self.jacobian = None
         self.inverse_jacobian = None
 
-        initial_string = initial_string = [1] * self.weight + [0] * (self.nqubits - self.weight)
+        initial_string = initial_string = [1] * self.weight + [0] * (
+            self.nqubits - self.weight
+        )
         bitstrings_ehrlich = _ehrlich_algorithm(initial_string, False)
         bitstrings_lex = sorted(bitstrings_ehrlich)
         self.reindex_list = [bitstrings_ehrlich.index(bs) for bs in bitstrings_lex]
+        if self.backend.platform == "jax":
+            self.reindex_list = self.backend.cast(
+                self.reindex_list, dtype=self.backend.int32
+            )
 
     def get_subspace_hamiltonian(self):
         """
@@ -259,7 +271,6 @@ class ExactGeodesicTransportCG:
         """
         self.v = self.tangent_vector()
         self.u = self.backend.cast(self.v, dtype=self.v.dtype, copy=True)
-        # norm_u = self.backend.sqrt((self.u @ self.u))
         norm_u = self.backend.vector_norm(self.u)
         loss_prev = self.loss(self.circuit, self.backend, **self.loss_kwargs)
         self.eta = (1 / norm_u) * self.backend.arccos(
@@ -337,7 +348,6 @@ class ExactGeodesicTransportCG:
             self.backend.prod(self.backend.sin(self.angles[:k]) ** 2)
             for k in range(len(self.angles))
         ]
-        # return self.backend.cast(g_diag, dtype="float64").reshape((-1, 1))
         return self.backend.cast(g_diag, dtype="float64")
 
     def tangent_vector(self):
@@ -371,6 +381,12 @@ class ExactGeodesicTransportCG:
 
         self.grad = self.gradient_func()
         inv_g = 1.0 / self.metric_tensor()
+
+        # print(inv_g)
+        # print(self.grad)
+        # print(type(inv_g))
+        # print(type(self.grad))
+
         nat_grad = -inv_g * self.grad
         self.jacobian = self.get_jacobian()
 
@@ -384,7 +400,7 @@ class ExactGeodesicTransportCG:
         # print(self.jacobian.shape)
         # print(nat_grad.shape)
 
-        # print("bbbbbbbbbbb") 
+        # print("bbbbbbbbbbb")
         # print((self.jacobian @ nat_grad))
         # print((self.jacobian @ nat_grad)[self.reindex_list])
         # print([x[0].item() for x in self.circuit.get_parameters()])
@@ -709,12 +725,10 @@ class ExactGeodesicTransportCG:
             tuple: Respectively, final loss, loss log, and final parameters.
         """
         return self.run_egt_cg(steps=steps, tolerance=tolerance)
-    
 
     def _loss_internal(self, circuit, backend, **kwargs):
         self.n_calls_loss += 1
         return self.loss_fn(circuit, backend, **kwargs)
-
 
     def _gradient_func_internal(self):
         """
@@ -728,11 +742,16 @@ class ExactGeodesicTransportCG:
 
         platform = self.backend.platform
         if platform == "jax":
-            def loss_fn():
+            def loss_fn(params):
+                self.circuit.set_parameters(params)
                 return self.loss(self.circuit, self.backend, **self.loss_kwargs)
-            params = self.circuit.get_parameters()
-            grad = self.backend.engine.grad(loss_fn)(params)
-            return grad
+            params = self.backend.cast(
+                self.circuit.get_parameters(),
+                dtype=self.backend.float64,
+            )
+            grad = self.backend.jax.grad(loss_fn)(params)
+            return grad.reshape(-1)
+
         elif platform == "pytorch":
             params = self.backend.cast(
                 self.circuit.get_parameters(), dtype=self.angles.dtype
@@ -743,11 +762,15 @@ class ExactGeodesicTransportCG:
             loss.backward()
             return params.grad.reshape(-1)
         elif platform == "tensorflow":
-            params = self.circuit.get_parameters()
+            params = self.backend.engine.Variable(
+                self.circuit.get_parameters(),
+                dtype=self.backend.float64,
+            )
             with self.backend.engine.GradientTape() as tape:
+                self.circuit.set_parameters(params)
                 loss = self.loss(self.circuit, self.backend, **self.loss_kwargs)
             grad = tape.gradient(loss, params)
-            return grad
+            return grad.reshape(-1)
 
 
 def _scipy_sparse_to_backend_coo(matrix, backend):
@@ -814,6 +837,7 @@ def _scipy_sparse_to_backend_coo(matrix, backend):
         "Expected one of {'jax', 'tensorflow', 'pytorch'}."
     )
 
+
 def _loss_func_expval(circuit, backend, *, hamiltonian):
     """
     Backend-agnostic expectation value <psi|H|psi>.
@@ -830,14 +854,10 @@ def _loss_func_expval(circuit, backend, *, hamiltonian):
     platform = backend.platform
     if platform == "tensorflow":
         psi_col = backend.engine.reshape(psi, (-1, 1))
-        h_psi = backend.engine.sparse.sparse_dense_matmul(
-            hamiltonian, psi_col
-        )
+        h_psi = backend.engine.sparse.sparse_dense_matmul(hamiltonian, psi_col)
         h_psi = backend.engine.reshape(h_psi, (-1,))
     elif platform == "pytorch":
-        h_psi = backend.engine.sparse.mm(
-            hamiltonian, psi.unsqueeze(1)
-        ).squeeze(1)
+        h_psi = backend.engine.sparse.mm(hamiltonian, psi.unsqueeze(1)).squeeze(1)
     else:
         h_psi = hamiltonian @ psi
     return backend.real(backend.sum(backend.conj(psi) * h_psi))
