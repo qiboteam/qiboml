@@ -39,15 +39,10 @@ def test_egt_cg(
             "Tests too slow with Jax and TF, will test only small size."
             + " Will test all sizes with torch."
         )
-    if backend.platform in ["jax"] and type_loss_grad != "exp_val":
-        pytest.skip(
-            "skipping for now, gotta fix!"
-        )
 
     hamiltonian, true_gs_energy = get_xxz_hamiltonian(
         nqubits, hamiltonian_type, backend
     )
-    print(f"backend: {backend}\nhamilt type: {type(hamiltonian)}")
     chem_acc = 0.03 / (27.2114 * backend.abs(true_gs_energy))
 
     if type_loss_grad == "callable":
