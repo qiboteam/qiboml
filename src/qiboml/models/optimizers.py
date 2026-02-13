@@ -742,6 +742,7 @@ class ExactGeodesicTransportCG:
 
         platform = self.backend.platform
         if platform == "jax":
+            circuit_orig = self.circuit.copy(deep=True)
             def loss_fn(params):
                 self.circuit.set_parameters(params)
                 return self.loss(self.circuit, self.backend, **self.loss_kwargs)
@@ -750,6 +751,7 @@ class ExactGeodesicTransportCG:
                 dtype=self.backend.float64,
             )
             grad = self.backend.jax.grad(loss_fn)(params)
+            self.circuit = circuit_orig.copy(deep=True)
             return grad.reshape(-1)
 
         elif platform == "pytorch":
@@ -800,9 +802,8 @@ def _scipy_sparse_to_backend_coo(matrix, backend):
         indices = backend.engine.stack([matrix.row, matrix.col], axis=1)
         data = matrix.data
 
-        # return backend.engine.experimental.sparse.BCOO(
+        # return backend.jax.experimental.sparse.BCOO(
         from jax.experimental.sparse import BCOO
-
         return BCOO(
             (backend.engine.asarray(data), backend.engine.asarray(indices)),
             shape=matrix.shape,
