@@ -161,7 +161,6 @@ class ExactGeodesicTransportCG:
             self.hamiltonian_subspace = self.get_subspace_hamiltonian()
             self.riemannian_tangent = True
             self.gradient_func = None
-
         else:
             backends_autodiff = ["jax", "tensorflow", "pytorch"]
             if self.backend.platform not in backends_autodiff:
@@ -195,11 +194,6 @@ class ExactGeodesicTransportCG:
         and represented as a dense matrix in the active backend.
         Assumes self.hamiltonian is in COO format.
         """
-
-        if self.hamiltonian is None:
-            raise_error(
-                TypeError, "This method can only be executed if `hamiltonian != None`."
-            )
 
         subspace_dim = int(comb(self.nqubits, self.weight))
         initial_string = [1] * self.weight + [0] * (self.nqubits - self.weight)
