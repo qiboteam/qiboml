@@ -3,25 +3,28 @@ import scipy
 
 from qiboml.models.optimizers import ExactGeodesicTransportCG
 from qibo import hamiltonians, set_backend
+
+from qibo.quantum_info import random_statevector
+from qibo.models.encodings import _generate_rbs_angles
+
 from scipy.sparse import csr_matrix
+from scipy.special import comb
 
 
 def test_egt_cg_errors(backend):
 
-    nqubits = 4 
-    hamiltonian, _ = _get_xxz_hamiltonian(
-        nqubits, "sparse", backend
-    )
+    nqubits = 4
+    hamiltonian, _ = _get_xxz_hamiltonian(nqubits, "sparse", backend)
 
     with pytest.raises(TypeError):
         # loss_fn must be callable or str
         loss_fn = 13
-        test = ExactGeodesicTransportCG(
+        _ = ExactGeodesicTransportCG(
             nqubits=nqubits,
             weight=int(nqubits / 2),
-            initial_parameters=None,
             loss_fn=loss_fn,
             loss_kwargs={"hamiltonian": hamiltonian},
+            initial_parameters=None,
             c1=0.485,
             c2=0.999,
             backtrack_rate=0.5,
@@ -33,12 +36,12 @@ def test_egt_cg_errors(backend):
     with pytest.raises(ValueError):
         # if loss_fn is str, it must be "exp_val"
         loss_fn = "expval"
-        test = ExactGeodesicTransportCG(
+        _ = ExactGeodesicTransportCG(
             nqubits=nqubits,
             weight=int(nqubits / 2),
-            initial_parameters=None,
             loss_fn=loss_fn,
             loss_kwargs={"hamiltonian": hamiltonian},
+            initial_parameters=None,
             c1=0.485,
             c2=0.999,
             backtrack_rate=0.5,
@@ -51,16 +54,16 @@ def test_egt_cg_errors(backend):
         # hamiltonian must be ArrayLike or sparse of the given backend
         loss_fn = "exp_val"
         hamiltonian = [
-            (1.0, "X"*nqubits),
-            (1.0, "Y"*nqubits),
-            (1.0, "Z"*nqubits),
+            (1.0, "X" * nqubits),
+            (1.0, "Y" * nqubits),
+            (1.0, "Z" * nqubits),
         ]
-        test = ExactGeodesicTransportCG(
+        _ = ExactGeodesicTransportCG(
             nqubits=nqubits,
             weight=int(nqubits / 2),
-            initial_parameters=None,
             loss_fn=loss_fn,
             loss_kwargs={"hamiltonian": hamiltonian},
+            initial_parameters=None,
             c1=0.485,
             c2=0.999,
             backtrack_rate=0.5,
@@ -73,12 +76,12 @@ def test_egt_cg_errors(backend):
         # if loss_fn is a callable, we must use a backend that has autodiff
         loss_fn = _loss_func_expval
         backend = set_backend("numpy")
-        test = ExactGeodesicTransportCG(
+        _ = ExactGeodesicTransportCG(
             nqubits=nqubits,
             weight=int(nqubits / 2),
-            initial_parameters=None,
             loss_fn=loss_fn,
             loss_kwargs={"hamiltonian": hamiltonian},
+            initial_parameters=None,
             c1=0.485,
             c2=0.999,
             backtrack_rate=0.5,
@@ -88,14 +91,17 @@ def test_egt_cg_errors(backend):
             backend=backend,
         )
 
+
 @pytest.mark.parametrize("nqubits", [4, 6])
 @pytest.mark.parametrize("hamiltonian_type", ["sparse", "dense"])
 @pytest.mark.parametrize("type_loss_grad", ["exp_val", "callable"])
+@pytest.mark.parametrize("initial_parameters", ["explicit_HR", None])
 def test_egt_cg(
     backend,
     nqubits,
     hamiltonian_type,
     type_loss_grad,
+    initial_parameters,
 ):
     if backend.platform in ["jax", "tensorflow"] and nqubits != 4:
         pytest.skip(
@@ -110,12 +116,23 @@ def test_egt_cg(
 
     loss_fn = _loss_func_expval if type_loss_grad == "callable" else type_loss_grad
 
+    if initial_parameters == "explicit_HR":
+        initial_parameters = _generate_rbs_angles(
+            backend.real(
+                random_statevector(
+                    int(comb(nqubits, int(nqubits / 2))), seed=13, backend=backend
+                )
+            ),
+            "diagonal",
+            backend=backend,
+        )
+
     optimizer = ExactGeodesicTransportCG(
         nqubits=nqubits,
         weight=int(nqubits / 2),
-        initial_parameters=None,
         loss_fn=loss_fn,
         loss_kwargs={"hamiltonian": hamiltonian},
+        initial_parameters=initial_parameters,
         c1=0.485,
         c2=0.999,
         backtrack_rate=0.5,
