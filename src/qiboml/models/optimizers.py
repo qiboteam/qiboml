@@ -1,6 +1,7 @@
 import math
-from typing import Callable, Any
+from typing import Callable, Any, Tuple
 
+from qibo import Circuit
 from qibo.models.encodings import hamming_weight_encoder, _ehrlich_algorithm
 from qibo.backends import _check_backend, Backend
 from qibo.quantum_info import random_statevector
@@ -9,6 +10,8 @@ from qibo.config import raise_error
 
 from scipy.sparse import issparse, isspmatrix_coo
 from scipy.special import comb
+
+from numpy.typing import ArrayLike
 
 
 class ExactGeodesicTransportCG:
@@ -24,15 +27,17 @@ class ExactGeodesicTransportCG:
     Args:
         nqubits (int): Number of qubits in the quantum circuit.
         weight (int): Hamming weight to encode.
-        initial_parameters (ArrayLike): Initial hyperspherical angles parameterizing the amplitudes.
-            If None, initializes from a Haar-random state.
-        loss_fn (str or Callable): if str, only possibility is `exp_val`, for expectation value loss.
+        loss_fn (str or Callable): if str, only possibility is `exp_val`,
+            for expectation value loss (i.e., running VQE).
             It can also be a Callable to be used as the loss function.
             First two arguments (mandatory) are circuit and backend for execution.
-        loss_kwargs: (dict): Additional arguments to be passed to the loss function.
-            For VQE, include `hamiltonian: hamiltonian`, passed as scipy sparse or `ArrayLike`.
+        loss_kwargs: (dict, optional): Additional arguments to be passed to the loss function.
+            For VQE (`loss_fn = "exp_val"`), include item `"hamiltonian": hamiltonian`,
+            where `hamiltonian` is passed as `ArrayLike`, scipy sparse or backend-specific sparse.
+        initial_parameters (ArrayLike, optional): Initial hyperspherical angles parameterizing
+            the amplitudes. If None, initializes from a Haar-random state.
         backtrack_rate (float, optional): Backtracking rate for Wolfe condition
-        line search. Defaults to :math:`0.9`.
+            line search. Defaults to :math:`0.9`.
         backtrack_multiplier (float, optional): Scaling factor applied to the initial learning
             rate for the backtrack. Usually, it's greater than 1 to guarantee a wider
             search space. Defaults to :math:`1.5`.
@@ -45,8 +50,8 @@ class ExactGeodesicTransportCG:
         callback (Callable, optinal): callback function. First two positional arguments are
             `iter_number` and `loss_value`.
         seed (int, optional): random seed. Controls initialization.
-        backend (:class:`qibo.backends.abstract.Backend`, optional): backend
-            to be used in the execution. If ``None``, it uses the current backend.
+        backend (:class:`qibo.backends.abstract.Backend`, optional): backend to be used
+            in the execution. If ``None``, it uses the current backend.
             Defaults to ``None``.
 
     Returns:
@@ -63,9 +68,9 @@ class ExactGeodesicTransportCG:
         self,
         nqubits: int,
         weight: int,
-        initial_parameters,
         loss_fn: Callable[..., tuple[float, Any]],
         loss_kwargs: dict | None = None,
+        initial_parameters: ArrayLike | None = None,
         backtrack_rate: float = 0.9,
         backtrack_multiplier: float = 1.5,
         backtrack_min_lr: float = 1e-6,
@@ -135,7 +140,6 @@ class ExactGeodesicTransportCG:
             )
 
         if "hamiltonian" in loss_kwargs:
-
             self.hamiltonian = loss_kwargs.get("hamiltonian")
             if not (
                 isinstance(self.hamiltonian, self.backend.tensor_types)
@@ -188,11 +192,14 @@ class ExactGeodesicTransportCG:
                 self.reindex_list, dtype=self.backend.int32
             )
 
-    def get_subspace_hamiltonian(self):
-        """
-        Returns the Hamiltonian restricted to the fixed-weight subspace
+    def get_subspace_hamiltonian(self) -> ArrayLike:
+        """Computes the Hamiltonian restricted to the fixed-weight subspace
         and represented as a dense matrix in the active backend.
-        Assumes self.hamiltonian is in COO format.
+
+        Assumes `self.hamiltonian` is in COO format of the respective backend.
+
+        Returns:
+            ArrayLike: Dense matrix representing the hamiltonian in the subspace.
         """
 
         subspace_dim = int(comb(self.nqubits, self.weight))
@@ -271,7 +278,7 @@ class ExactGeodesicTransportCG:
             (1 + (norm_u / (2 * loss_prev)) ** 2) ** -0.5
         )
 
-    def angles_to_amplitudes(self, angles):
+    def angles_to_amplitudes(self, angles: ArrayLike) -> ArrayLike:
         """Convert angles to amplitudes.
 
         Args:
@@ -290,7 +297,7 @@ class ExactGeodesicTransportCG:
         amps = self.backend.cast(amps, dtype=self.backend.float64)
         return amps
 
-    def get_jacobian(self):
+    def get_jacobian(self) -> ArrayLike:
         """Compute Jacobian of amplitudes wrt angles.
 
         Returns:
@@ -332,7 +339,7 @@ class ExactGeodesicTransportCG:
 
         return jacob
 
-    def metric_tensor(self):
+    def metric_tensor(self) -> ArrayLike:
         """Compute the diagonal metric tensor in hyperspherical coordinates.
 
         Returns:
@@ -344,8 +351,13 @@ class ExactGeodesicTransportCG:
         ]
         return self.backend.cast(g_diag, dtype="float64")
 
-    def tangent_vector(self):
+    def tangent_vector(self) -> ArrayLike:
         """Compute the Riemannian gradient (tangent vector) at the current point on the hypersphere.
+
+        If loss is expectation value, uses the analytical gradient computation from amplitudes.
+
+        If it is a generic loss, performs backpropagation in parameters space, then uses
+        the jacobian to go to amplitudes coordinates.
 
         Returns:
             ArrayLike: Tangent vector in the tangent space of the hypersphere.
@@ -355,69 +367,25 @@ class ExactGeodesicTransportCG:
             l_psi = self.loss(self.circuit, self.backend, **self.loss_kwargs)
             psi_amps = self.x
             self.n_calls_gradient += 1
-
-            # print("aaaaaaaaa")
-            # print(
-            #     self.backend.real(
-            #         2 * (l_psi * psi_amps - self.hamiltonian_subspace @ psi_amps)
-            #     )
-            # )
-            # # print([x[0].item() for x in self.circuit.get_parameters()])
-            # # print(self.angles)
-            # # print(self.x)
-            # # print(self.get_jacobian())
-            # print(self.metric_tensor())
-            # print()
-
             return self.backend.real(
                 2 * (l_psi * psi_amps - self.hamiltonian_subspace @ psi_amps)
             )
 
         self.grad = self.gradient_func()
         inv_g = 1.0 / self.metric_tensor()
-
-        # print(inv_g)
-        # print(self.grad)
-        # print(type(inv_g))
-        # print(type(self.grad))
-
         nat_grad = -inv_g * self.grad
         self.jacobian = self.get_jacobian()
-
-        # print(inv_g)
-        # print(self.grad)
-        # print(nat_grad)
-        # print((self.jacobian @ nat_grad).T)
-
-        # print(self.jacobian)
-        # print(nat_grad)
-        # print(self.jacobian.shape)
-        # print(nat_grad.shape)
-
-        # print("bbbbbbbbbbb")
-        # print((self.jacobian @ nat_grad))
-        # print((self.jacobian @ nat_grad)[self.reindex_list])
-        # print([x[0].item() for x in self.circuit.get_parameters()])
-        # print(self.angles)
-        # print(self.x)
-        # print(self.jacobian)
-        # print(nat_grad)
-        # print(self.geom_gradient())
-        # print(self.metric_tensor())
-        # print(1/self.metric_tensor())
-        # print(-self.grad/self.metric_tensor())
-        # print(nat_grad)
-        # print()
         return (self.jacobian @ nat_grad)[self.reindex_list]
 
-    def regularization(self, angles):
-        """_summary_
+    def regularization(self, angles: ArrayLike) -> ArrayLike:
+        """Applies regularization to vector of parameters after update,
+        effectively changing charts away from singularities.
+        Returns corresponding amplitudes directly.
 
         Args:
-            angles (_type_): _description_
-
+            angles ArrayLike: vector of parameters.
         Returns:
-            _type_: _description_
+            ArrayLike:vector of amplitudes post-regularization.
         """
         condition = self.backend.abs(self.backend.sin(angles[:-1])) < 1e-3
         updated = self.backend.where(condition, math.pi / 2, angles[:-1])
@@ -425,17 +393,20 @@ class ExactGeodesicTransportCG:
             self.backend.concatenate([updated, angles[-1:]], axis=0)
         )
 
-    def optimize_step_size(self, x_prev, u_prev, v_prev, loss_prev):
-        """Perform Wolfe line search to determine optimal step size eta.
+    def optimize_step_size(
+        self, x_prev: ArrayLike, u_prev: ArrayLike, v_prev: ArrayLike, loss_prev: float
+    ) -> Tuple[ArrayLike, ArrayLike, float]:
+        """Perform Wolfe line search to determine optimal step size eta via the satisfaction
+        of the Wolfe conditions.
 
         Args:
-            x_prev (ArrayLike): Previous position on the sphere.
-            u_prev (ArrayLike): Previous search direction.
-            v_prev (ArrayLike): Previous gradient vector.
-            loss_prev (float): Loss at previous position.
+            x_prev (ArrayLike): Previous amplitudes on the sphere.
+            u_prev (ArrayLike): Previous conjugate search direction.
+            v_prev (ArrayLike): Previous search direction.
+            loss_prev (float): Loss at previous amplitudes.
 
         Returns:
-            tuple: Respectively, updated position, angles, gradient, and step size.
+            Tuple: Respectively: updated amplitudes, new search direction, and optimal step size.
         """
 
         eta = self.backtrack_multiplier * self.eta
@@ -501,32 +472,31 @@ class ExactGeodesicTransportCG:
         v_new = self.tangent_vector()
         return x_new, v_new, eta
 
-    def exponential_map_with_direction(self, direction, eta=None):
-        """Exponential map from current point along specified direction.
+    def exponential_map_with_direction(
+        self, direction: ArrayLike, eta=None
+    ) -> ArrayLike:
+        """Applies xponential map from current point along specified direction.
 
         Args:
             direction (ArrayLike): Tangent vector direction.
             eta (float, optional): Step size. Defaults to current eta.
 
         Returns:
-            ArrayLike: New point on the hypersphere.
+            ArrayLike: Amplitudes of new point on the hypersphere.
         """
         if eta is None:
             eta = self.eta
-
-        # norm_dir = self.backend.sqrt((direction @ direction))
         norm_dir = self.backend.vector_norm(direction)
         x_new = self.backend.cos(eta * norm_dir) * self.x + self.backend.sin(
             eta * norm_dir
         ) * (direction / norm_dir)
-
         return x_new
 
-    def amplitudes_to_angles(self, x):
-        """Convert amplitude vector back to hyperspherical angles.
+    def amplitudes_to_angles(self, x: ArrayLike) -> ArrayLike:
+        """Computes the angles corresponding to a given amplitudes vector.
 
         Args:
-            x (ArrayLike): Amplitude vector.
+            x (ArrayLike): Amplitudes vector.
 
         Returns:
             ArrayLike: Corresponding angles.
@@ -559,7 +529,9 @@ class ExactGeodesicTransportCG:
 
         return angles
 
-    def parallel_transport(self, u, v, a, eta=None):
+    def parallel_transport(
+        self, u: ArrayLike, v: ArrayLike, a: ArrayLike, eta=None
+    ) -> ArrayLike:
         """Parallel transport a tangent vector u along geodesic defined by v.
 
         Args:
@@ -572,7 +544,7 @@ class ExactGeodesicTransportCG:
         Returns:
             ArrayLike: Transported vector.
         """
-        if eta == None:
+        if eta is None:
             eta = self.eta
         norm_v = self.backend.vector_norm(v)
         vu_dot = v @ u
@@ -583,7 +555,7 @@ class ExactGeodesicTransportCG:
         )
         return transported
 
-    def beta_dy(self, v_next, transported_u, st):
+    def beta_dy(self, v_next: ArrayLike, transported_u: ArrayLike, st: float) -> float:
         """Compute Dai and Yuan Beta.
 
         Args:
@@ -599,7 +571,14 @@ class ExactGeodesicTransportCG:
         denominator = (-v_next @ (st * transported_u)) - (-self.v @ self.u)
         return numerator / denominator
 
-    def beta_hs(self, v_next, transported_u, transported_v, lt, st):
+    def beta_hs(
+        self,
+        v_next: ArrayLike,
+        transported_u: ArrayLike,
+        transported_v: ArrayLike,
+        lt: float,
+        st: float,
+    ) -> float:
         """Compute Hestenes-Stiefel conjugate gradient beta.
 
         Args:
@@ -617,16 +596,18 @@ class ExactGeodesicTransportCG:
         denominator = (-v_next @ (st * transported_u)) - (-self.v @ self.u)
         return numerator / denominator
 
-    def run_egt_cg(self, steps: int = 10, tolerance: float = 1e-8):
+    def run_egt_cg(
+        self, steps: int = 100, tolerance: float = 1e-8
+    ) -> Tuple[float, ArrayLike, ArrayLike]:
         """Run the EGT-CG optimizer for a specified number of steps.
 
         Args:
-            steps (int, optional): Number of optimization iterations. Defaults to :math:`10`.
+            steps (int, optional): Number of optimization iterations. Defaults to :math:`100`.
             tolerance (float, optional): Maximum tolerance for the residue of the gradient update.
                 Defaults to :math:`10^{-8}`.
 
         Returns:
-            tuple: (final_loss, losses, final_parameters)
+            Tuple: (final_loss, losses, final_parameters)
                 final_loss (float): Final loss value.
                 losses (ArrayLike): Loss at each iteration.
                 final_parameters (ArrayLike): Final angles.
@@ -637,7 +618,6 @@ class ExactGeodesicTransportCG:
             loss_prev = self.loss(self.circuit, self.backend, **self.loss_kwargs)
             losses.append(loss_prev)
 
-            # norm_u = self.backend.sqrt((self.u @ self.u))
             norm_u = self.backend.vector_norm(self.u)
 
             res = ((-self.v @ self.u) ** 2) / norm_u
@@ -707,30 +687,46 @@ class ExactGeodesicTransportCG:
             self.backend.cast(final_parameters, dtype=final_parameters.dtype),
         )
 
-    def __call__(self, steps: int = 10, tolerance: float = 1e-8):
-        """Run the optimizer.
+    def __call__(
+        self, steps: int = 10, tolerance: float = 1e-8
+    ) -> Tuple[float, ArrayLike, ArrayLike]:
+        """Run the EGT-CG optimizer for a specified number of steps.
 
         Args:
-            steps (int): Number of optimization steps.
-            tolerance (float): Maximum tolerance for the residue of the gradient update.
-                Defaults to :math:`10^{-8}.`
+            steps (int, optional): Number of optimization iterations. Defaults to :math:`100`.
+            tolerance (float, optional): Maximum tolerance for the residue of the gradient update.
+                Defaults to :math:`10^{-8}`.
 
         Returns:
-            tuple: Respectively, final loss, loss log, and final parameters.
+            Tuple: (final_loss, losses, final_parameters)
+                final_loss (float): Final loss value.
+                losses (ArrayLike): Loss at each iteration.
+                final_parameters (ArrayLike): Final angles.
         """
         return self.run_egt_cg(steps=steps, tolerance=tolerance)
 
-    def _loss_internal(self, circuit, backend, **kwargs):
+    def _loss_internal(self, circuit: Circuit, backend: Backend, **kwargs) -> float:
+        """Wrapper function for the loss, used to update attribute `n_call_loss`
+        every time the loss is executed.
+
+        Args:
+            circuit (:class:`qibo.models.circuit.Circuit`): circuit used to compute the loss.
+            backend (:class:`qibo.backends.abstract.Backend`): backend for execution.
+
+        Returns:
+            float: value of loss function.
+        """
         self.n_calls_loss += 1
         return self.loss_fn(circuit, backend, **kwargs)
 
-    def _gradient_func_internal(self):
+    def _gradient_func_internal(self) -> ArrayLike:
         """
-        Compute the gradient of self.loss w.r.t the trainable parameters
-        stored inside self.circuit, using the backend specified by `platform`.
+        Compute the gradient of `self.loss` w.r.t the trainable parameters
+        stored inside self.circuit, using backpropagation of the backend specified by `platform`.
+        This is used if loss != `exp_val`.
 
         Returns:
-            grad: gradient vector as an array of the backend platform
+            ArrayLike: gradient vector as an array of the backend platform.
         """
         self.n_calls_gradient += 1
 
@@ -747,8 +743,7 @@ class ExactGeodesicTransportCG:
             grad = self.backend.jax.grad(loss_fn)(params)
             self.circuit = circuit_orig.copy(deep=True)
             return grad.reshape(-1)
-
-        elif platform == "pytorch":
+        if platform == "pytorch":
             params = self.backend.cast(
                 self.circuit.get_parameters(), dtype=self.angles.dtype
             )
@@ -757,7 +752,7 @@ class ExactGeodesicTransportCG:
             loss = self.loss(self.circuit, self.backend, **self.loss_kwargs)
             loss.backward()
             return params.grad.reshape(-1)
-        elif platform == "tensorflow":
+        if platform == "tensorflow":
             params = self.backend.engine.Variable(
                 self.circuit.get_parameters(),
                 dtype=self.backend.float64,
@@ -769,20 +764,16 @@ class ExactGeodesicTransportCG:
             return grad.reshape(-1)
 
 
-def _scipy_sparse_to_backend_coo(matrix, backend):
-    """
-    Convert a SciPy sparse matrix (CSR or COO) to the COO sparse
+def _scipy_sparse_to_backend_coo(matrix, backend: Backend):
+    """Convert a SciPy sparse matrix (CSR or COO) to the COO sparse
     representation supported by JAX, TensorFlow, or PyTorch.
 
-    Parameters
-    ----------
-    matrix : scipy.sparse.csr_matrix or scipy.sparse.coo_matrix
-    platform : str
-        One of {"jax", "tensorflow", "pytorch"}
+    Args:
+        matrix (scipy.sparse.csr_matrix or scipy.sparse.coo_matrix): input sparse matrix.
+        backend (:class:`qibo.backends.abstract.Backend`): backend used,
 
-    Returns
-    -------
-    Backend-specific sparse tensor
+    Returns:
+        Backend-specific sparse tensor.
     """
     if not issparse(matrix):
         raise TypeError("Input must be a SciPy sparse matrix")
@@ -796,8 +787,8 @@ def _scipy_sparse_to_backend_coo(matrix, backend):
         indices = backend.engine.stack([matrix.row, matrix.col], axis=1)
         data = matrix.data
 
-        # return backend.jax.experimental.sparse.BCOO(
         from jax.experimental.sparse import BCOO
+
         return BCOO(
             (backend.engine.asarray(data), backend.engine.asarray(indices)),
             shape=matrix.shape,
@@ -833,15 +824,19 @@ def _scipy_sparse_to_backend_coo(matrix, backend):
     )
 
 
-def _loss_func_expval(circuit, backend, *, hamiltonian):
-    """
-    Backend-agnostic expectation value <psi|H|psi>.
+def _loss_func_expval(circuit: Circuit, backend: Backend, *, hamiltonian) -> float:
+    """Backend-agnostic expectation value <psi|H|psi>.
 
     Supports:
     - NumPy / SciPy sparse
     - JAX (BCOO)
     - TensorFlow (tf.sparse.SparseTensor)
     - PyTorch (sparse COO / CSR)
+
+    Args:
+        circuit (:class:`qibo.models.circuit.Circuit`): quantum circuit used to compute the loss.
+        backend (:class:`qibo.backends.abstract.Backend`): backend for execution.
+        hamiltonian: sparse hamiltonian in the backend's format.
 
     Assumes hamiltonian is sparse in the backend's native format
     """
