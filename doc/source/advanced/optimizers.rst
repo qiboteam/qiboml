@@ -1,95 +1,105 @@
 Using the Exact Geodesic Transport with Conjugate Gradients(EGT-CG) Optimizer
 -------------------------------------------------------------------------------
 
-The Exact Geodesic Transport with Conjugate Gradients (EGT-CG) optimizer is a curvature-aware Riemannian optimizer designed specifically for variational circuits based on the Hamming-weight encoder (HWE) ansatze.
+The Exact Geodesic Transport with Conjugate Gradients (EGT-CG) optimizer is a curvature-aware Riemannian optimizer designed specifically for variational circuits based on the Hamming-weight encoder (HWE) ansatz (see  Farias et al., *Quantum encoder for fixed-Hamming-weight subspaces*, `Phys. Rev. Applied 23, 044014 (2025) <https://doi.org/10.1103/PhysRevApplied.23.044014>).
 
 It updates parameters along exact geodesic paths on the hyperspherical manifold defined by the HWE, combining analytic metric computation, conjugate-gradient memory, and dynamic learning rates for fast, globally convergent optimization.
 
 
 For more details, see:
 
-A. J. Ferreira‑Martins et al., *Variational quantum algorithms with exact geodesic transport*, 
+Ferreira-Martins et al., *Quantum optimization with exact geodesic transport*, `arXiv:2506.17395 (2025) <https://arxiv.org/abs/2506.17395>`_.
 
-`arXiv:2506.17395 (2025) <https://arxiv.org/abs/2506.17395>`_.
-
-
-The current configuration focuses on ground state estimation problems where given a variational state :math:`\ket{\psi(\boldsymbol{\theta})}` parameterized by hyperspherical angles :math:`\boldsymbol{\theta}`, 
-
-the loss function minimized is the energy expectation value of the given hamiltonian:
-
-.. math::
-    \mathcal{L}(\boldsymbol{\theta}) = \bra{\psi(\boldsymbol{\theta})} \, H \, \ket{\psi(\boldsymbol{\theta})} \, ,
-
-But it is important to note that this framework generalizes to arbitrary loss functions.
+The optimizer works with an ansatz :math:`\ket{\psi(\boldsymbol{\theta})}` parameterized by hyperspherical angles :math:`\boldsymbol{\theta}`, and the implementation allows one to work with arbitrary loss functions. VQE is achieved by specifying the loss function :math:`\mathcal{L}(\boldsymbol{\theta}) = \bra{\psi(\boldsymbol{\theta})} \, H \, \ket{\psi(\boldsymbol{\theta})}` and passing the hamiltonian as one of its arguments, as can be seen in the example below. 
 
 
 Defining and running the optimizer
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In `qiboml`, the EGT-CG optimizer is implemented in the class
-:class:`qiboml.models.optimizers.ExactGeodesicTransportCG`.
+In `qiboml`, the EGT-CG optimizer is implemented in the class :class:`qiboml.models.optimizers.ExactGeodesicTransportCG`.
 
 .. autoclass:: qiboml.models.optimizers.ExactGeodesicTransportCG
    :members:
    :undoc-members:
    :show-inheritance:
 
-It requires as inputs the number of qubits, the Hamming weight, a Hamiltonian, and your initial parameters.
-
-**Example usage:**
+Example usage - VQE
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
-    import numpy as np
-    from qibo import hamiltonians
-    from scipy.special import comb
+    from qibo import hamiltonians, set_backend, get_backend
     from qiboml.models.optimizers import ExactGeodesicTransportCG
 
+    set_backend("qiboml", platform="pytorch")
+    backend = get_backend()
+
     nqubits = 4
-    weight = 2
-    dim = int(comb(nqubits, weight))
-    np.random.seed(42)
+    weight = nqubits // 2
+    hamiltonian = hamiltonians.XXZ(nqubits=nqubits, delta=0.5, backend=backend).matrix
+    loss_fn = "exp_val"
 
-    # Initial angles in hyperspherical coordinates
-    theta_init = np.random.uniform(low=0, high=np.pi, size=dim - 1)
+    def make_callback(print_every):
+        def callback(
+            iter_num,
+            loss,
+            **kwargs,
+        ):
+            if iter_num % print_every == 0:
+                print(f"Iter {iter_num}: loss = {loss:.6f}")
 
-    # Define the Hamiltonian
-    hamiltonian = hamiltonians.XXZ(nqubits=nqubits)
+        return callback
 
-    # Instantiate the optimizer
     optimizer = ExactGeodesicTransportCG(
         nqubits=nqubits,
         weight=weight,
-        hamiltonian=hamiltonian,
-        angles=theta_init,
+        loss_fn=loss_fn,
+        loss_kwargs={"hamiltonian": hamiltonian},
+        initial_parameters=None,
+        backtrack_rate=0.5,
+        backtrack_multiplier=1.5,
+        backtrack_min_lr=1e-6,
+        c1=0.485,
+        c2=0.999,
+        callback=make_callback(print_every=1),
+        seed=13,
+        backend=backend,
     )
-
-    # Run optimization for 20 steps
     final_loss, losses, final_params = optimizer(steps=20)
 
-Available Arguments
+
+
+Available arguments
 ~~~~~~~~~~~~~~~~~~
 
 When constructing an :class:`ExactGeodesicTransportCG`, you may specify:
 
 - ``nqubits``: Number of qubits in the circuit.
-- ``weight``: Hamming weight of the state.
-- ``hamiltonian``: :class:`qibo.hamiltonians.Hamiltonian` instance.
-- ``angles``: Initial hyperspherical angles (numpy array).
-- ``backtrack_rate``: Backtracking factor for line search (default: ``0.5``).
-- ``geometric_gradient``: Whether to use geometric gradient or finite difference (default: ``False``).
-- ``multiplicative_factor``: Scaling of initial learning rate (default: ``1.0``).
-- ``c1``, ``c2``: Wolfe line search constants (defaults: ``1e-3``, ``0.9``).
-- ``backend``: Optional qibo backend (default: global backend)
+- ``weight``: Hamming weight of the state/desired subspace.
+- ``loss_fn``: Loss function to be optimized. It can be either a callable specifying the loss, or the string `"exp_val"`, which fixes the loss for the usual VQE. If it's a callable, make sure that the first two arguments are the circuit to be executed and the execution backend, respectively, as shown in the example below.
+- ``loss_kwargs``: Dictionary where you can pass arguments of the loss as kwargs, apart from the two mandatory (circuit and backend). If you set the loss `"exp_val"`, you must pass the hamiltonian here as an item `{'hamiltonian': hamiltonian}`. It may be expressed either as a dense or sparse matrix.
+- ``initial_parameters``: Initial hyperspherical angles (parameters of the circuit). If `None`, parameters are initialized from a Haar-random state (seed controls reproducibility).
+- ``backtrack_rate``: Backtracking factor for conjugate learning rate backtrack search.
+- ``backtrack_multiplier``: Scaling factor applied to the initial learning rate for the backtrack. Usually, it's greater than 1 to guarantee a wider search space.
+- ``backtrack_min_lr``: Minimum learning rate to be tested in the backtrack.
+- ``c1``, ``c2``: Wolfe line search constants.
+- ``callback``: Callable for callback.
+- ``seed``: Random seed.
+- ``backend``: Optional qibo backend (default: global backend). If you set `"exp_val"` as the loss, you can use the `numpy` backend, which will be the fastest option as backpropagation will not be needed. If a callable is passed for a generic loss, you must use `qiboml` backend with the prefered platform (`"pytorch"`, `"tensorflow"` or `"jax"`)for backpropagation.
+
+As an example, if you'd like to explicitly define the expectation value as the loss function, you could do as follows:
+
+.. code-block:: python
+
+    def loss_func_expval(circuit, backend, hamiltonian) -> float:
+        psi = backend.execute_circuit(circuit).state()
+        return backend.real(backend.conj(psi) @ hamiltonian @ psi)
+
+    loss_fn = loss_func_expval
   
-Implementation Details 
-~~~~~~~~~~~~~~~~~~~~~~~
-The optimizer constructs the state at each iteration using the :func:`qiboml.models.encodings.hamming_weight_encoder` circuit, computes the loss as the Hamiltonian expectation value, and updates the angles by:
+At the end of the run, the following objects are returned:
 
-1. Computing the Riemannian (natural) gradient.
-2. Performing a conjugate-gradient step along the geodesic direction, with the step size determined by a Wolfe condition line search
+- ``final_loss``: Loss at final parameters.
+- ``losses``: List of losses per epoch.
+- ``final_params``: Final parameters.
 
-At the end of the run, it returns:
-
-- ``final_loss``: Loss at optimal parameters.
-- ``losses``: List of losses per iteration.
-- ``final_params``: Optimal angles.
+Also, you can access the arttributes `n_calls_loss` and `n_calls_gradient`, which store respectively the number of times that the loss and the gradient were computed during the optimization.
