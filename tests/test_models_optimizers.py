@@ -2,31 +2,94 @@ import pytest
 import scipy
 
 from qiboml.models.optimizers import ExactGeodesicTransportCG
-from qibo import hamiltonians
+from qibo import hamiltonians, set_backend
 from scipy.sparse import csr_matrix
 
 
-def get_xxz_hamiltonian(nqubits, hamiltonian_type, backend):
-    delta = 0.5
-    if hamiltonian_type == "sparse":
-        hamiltonian = csr_matrix(
-            hamiltonians.XXZ(nqubits=nqubits, delta=delta, backend=backend).matrix
+def test_egt_cg_errors(backend):
+
+    nqubits = 4 
+    hamiltonian, _ = _get_xxz_hamiltonian(
+        nqubits, "sparse", backend
+    )
+
+    with pytest.raises(TypeError):
+        # loss_fn must be callable or str
+        loss_fn = 13
+        test = ExactGeodesicTransportCG(
+            nqubits=nqubits,
+            weight=int(nqubits / 2),
+            initial_parameters=None,
+            loss_fn=loss_fn,
+            loss_kwargs={"hamiltonian": hamiltonian},
+            c1=0.485,
+            c2=0.999,
+            backtrack_rate=0.5,
+            backtrack_multiplier=1.5,
+            callback=None,
+            seed=13,
+            backend=backend,
         )
-        eigenvalues = scipy.sparse.linalg.eigsh(hamiltonian, k=1)
-        true_gs_energy = backend.real(backend.cast(eigenvalues[0][0]))
-    elif hamiltonian_type == "dense":
-        hamiltonian = hamiltonians.XXZ(
-            nqubits=nqubits, delta=delta, backend=backend
-        ).matrix
-        eigenvalues = backend.eigenvalues(hamiltonian)
-        true_gs_energy = backend.real(backend.cast(eigenvalues[0]))
-
-    return hamiltonian, true_gs_energy
-
+    with pytest.raises(ValueError):
+        # if loss_fn is str, it must be "exp_val"
+        loss_fn = "expval"
+        test = ExactGeodesicTransportCG(
+            nqubits=nqubits,
+            weight=int(nqubits / 2),
+            initial_parameters=None,
+            loss_fn=loss_fn,
+            loss_kwargs={"hamiltonian": hamiltonian},
+            c1=0.485,
+            c2=0.999,
+            backtrack_rate=0.5,
+            backtrack_multiplier=1.5,
+            callback=None,
+            seed=13,
+            backend=backend,
+        )
+    with pytest.raises(TypeError):
+        # hamiltonian must be ArrayLike or sparse of the given backend
+        loss_fn = "exp_val"
+        hamiltonian = [
+            (1.0, "X"*nqubits),
+            (1.0, "Y"*nqubits),
+            (1.0, "Z"*nqubits),
+        ]
+        test = ExactGeodesicTransportCG(
+            nqubits=nqubits,
+            weight=int(nqubits / 2),
+            initial_parameters=None,
+            loss_fn=loss_fn,
+            loss_kwargs={"hamiltonian": hamiltonian},
+            c1=0.485,
+            c2=0.999,
+            backtrack_rate=0.5,
+            backtrack_multiplier=1.5,
+            callback=None,
+            seed=13,
+            backend=backend,
+        )
+    with pytest.raises(TypeError):
+        # if loss_fn is a callable, we must use a backend that has autodiff
+        loss_fn = _loss_func_expval
+        backend = set_backend("numpy")
+        test = ExactGeodesicTransportCG(
+            nqubits=nqubits,
+            weight=int(nqubits / 2),
+            initial_parameters=None,
+            loss_fn=loss_fn,
+            loss_kwargs={"hamiltonian": hamiltonian},
+            c1=0.485,
+            c2=0.999,
+            backtrack_rate=0.5,
+            backtrack_multiplier=1.5,
+            callback=None,
+            seed=13,
+            backend=backend,
+        )
 
 @pytest.mark.parametrize("nqubits", [4, 6])
 @pytest.mark.parametrize("hamiltonian_type", ["sparse", "dense"])
-# @pytest.mark.parametrize("hamiltonian_type", ["dense", "sparse"])
 @pytest.mark.parametrize("type_loss_grad", ["exp_val", "callable"])
 def test_egt_cg(
     backend,
@@ -40,15 +103,12 @@ def test_egt_cg(
             + " Will test all sizes with torch."
         )
 
-    hamiltonian, true_gs_energy = get_xxz_hamiltonian(
+    hamiltonian, true_gs_energy = _get_xxz_hamiltonian(
         nqubits, hamiltonian_type, backend
     )
     chem_acc = 0.03 / (27.2114 * backend.abs(true_gs_energy))
 
-    if type_loss_grad == "callable":
-        loss_fn = _loss_func_expval
-    else:
-        loss_fn = type_loss_grad
+    loss_fn = _loss_func_expval if type_loss_grad == "callable" else type_loss_grad
 
     optimizer = ExactGeodesicTransportCG(
         nqubits=nqubits,
@@ -93,3 +153,21 @@ def _loss_func_expval(circuit, backend, *, hamiltonian):
     else:
         h_psi = hamiltonian @ psi
     return backend.real(backend.sum(backend.conj(psi) * h_psi))
+
+
+def _get_xxz_hamiltonian(nqubits, hamiltonian_type, backend):
+    delta = 0.5
+    if hamiltonian_type == "sparse":
+        hamiltonian = csr_matrix(
+            hamiltonians.XXZ(nqubits=nqubits, delta=delta, backend=backend).matrix
+        )
+        eigenvalues = scipy.sparse.linalg.eigsh(hamiltonian, k=1)
+        true_gs_energy = backend.real(backend.cast(eigenvalues[0][0]))
+    elif hamiltonian_type == "dense":
+        hamiltonian = hamiltonians.XXZ(
+            nqubits=nqubits, delta=delta, backend=backend
+        ).matrix
+        eigenvalues = backend.eigenvalues(hamiltonian)
+        true_gs_energy = backend.real(backend.cast(eigenvalues[0]))
+
+    return hamiltonian, true_gs_energy
