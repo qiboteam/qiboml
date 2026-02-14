@@ -74,7 +74,7 @@ class ExactGeodesicTransportCG:
         backtrack_rate: float = 0.9,
         backtrack_multiplier: float = 1.5,
         backtrack_min_lr: float = 1e-6,
-        c1: float = 0.0001,
+        c1: float = 0.001,
         c2: float = 0.9,
         callback: Callable[..., None] | None = None,
         seed: int | None = None,
@@ -139,8 +139,9 @@ class ExactGeodesicTransportCG:
                 f"If str, `loss_fn` can only be `exp_val`. Passed {type(loss_fn)}.",
             )
 
+        self.hamiltonian = None
         if "hamiltonian" in loss_kwargs:
-            self.hamiltonian = loss_kwargs.get("hamiltonian")
+            self.hamiltonian = loss_kwargs.get("hamiltonian", None)
             if not (
                 isinstance(self.hamiltonian, self.backend.tensor_types)
                 or issparse(self.hamiltonian)
@@ -161,6 +162,12 @@ class ExactGeodesicTransportCG:
             loss_kwargs["hamiltonian"] = self.hamiltonian
 
         if loss_fn == "exp_val":
+            if self.hamiltonian is None:
+                raise_error(
+                    ValueError,
+                    "For `loss_fn='exp_val'`, you must pass the hamiltonian to `loss_kwargs` "
+                    + "via the dict item `{'hamiltonian': hamiltonian}`"
+                )
             self.loss_fn = _loss_func_expval
             self.hamiltonian_subspace = self.get_subspace_hamiltonian()
             self.riemannian_tangent = True
@@ -733,9 +740,11 @@ class ExactGeodesicTransportCG:
         platform = self.backend.platform
         if platform == "jax":
             circuit_orig = self.circuit.copy(deep=True)
+
             def loss_fn(params):
                 self.circuit.set_parameters(params)
                 return self.loss(self.circuit, self.backend, **self.loss_kwargs)
+
             params = self.backend.cast(
                 self.circuit.get_parameters(),
                 dtype=self.backend.float64,
