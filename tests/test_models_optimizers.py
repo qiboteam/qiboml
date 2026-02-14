@@ -72,6 +72,23 @@ def test_egt_cg_errors(backend):
             seed=13,
             backend=backend,
         )
+    with pytest.raises(ValueError):
+        # loss_kwargs must have `"hamiltonian": hamiltonian` item if `loss_fn = "exp_val"`
+        loss_fn = "exp_val"
+        _ = ExactGeodesicTransportCG(
+            nqubits=nqubits,
+            weight=int(nqubits / 2),
+            loss_fn=loss_fn,
+            loss_kwargs={"hamiltonian_wrong": hamiltonian},
+            initial_parameters=None,
+            c1=0.485,
+            c2=0.999,
+            backtrack_rate=0.5,
+            backtrack_multiplier=1.5,
+            callback=None,
+            seed=13,
+            backend=backend,
+        )
     with pytest.raises(TypeError):
         # if loss_fn is a callable, we must use a backend that has autodiff
         loss_fn = _loss_func_expval
