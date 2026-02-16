@@ -27,13 +27,13 @@ class ExactGeodesicTransportCG:
     Args:
         nqubits (int): Number of qubits in the quantum circuit.
         weight (int): Hamming weight to encode.
-        loss_fn (str or Callable): if str, only possibility is `exp_val`,
+        loss_fn (str or Callable): if str, only possibility is ``exp_val``,
             for expectation value loss (i.e., running VQE).
             It can also be a Callable to be used as the loss function.
             First two arguments (mandatory) are circuit and backend for execution.
         loss_kwargs: (dict, optional): Additional arguments to be passed to the loss function.
-            For VQE (`loss_fn = "exp_val"`), include item `"hamiltonian": hamiltonian`,
-            where `hamiltonian` is passed as `ArrayLike`, scipy sparse or backend-specific sparse.
+            For VQE (``loss_fn = "exp_val"``), include item ``"hamiltonian": hamiltonian``,
+            where ``hamiltonian`` is passed as ``ArrayLike``, scipy sparse or backend-specific sparse.
         initial_parameters (ArrayLike, optional): Initial hyperspherical angles parameterizing
             the amplitudes. If None, initializes from a Haar-random state.
         backtrack_rate (float, optional): Backtracking rate for Wolfe condition
@@ -48,7 +48,7 @@ class ExactGeodesicTransportCG:
         c2 (float, optional): Constant for curvature condition in Wolfe line search.
             It should satisfy ``c1 < c2 < 1``. Defaults to :math:`0.9`.
         callback (Callable, optinal): callback function. First two positional arguments are
-            `iter_number` and `loss_value`.
+            ``iter_number`` and ``loss_value``.
         seed (int, optional): random seed. Controls initialization.
         backend (:class:`qibo.backends.abstract.Backend`, optional): backend to be used
             in the execution. If ``None``, it uses the current backend.
@@ -126,12 +126,12 @@ class ExactGeodesicTransportCG:
         if not isinstance(loss_fn, (str, Callable)):
             raise_error(
                 TypeError,
-                f"`loss_fn` must be either the str `exp_val` or `Callable`. Passed {type(loss_fn)}",
+                f"``loss_fn`` must be either the str ``exp_val`` or ``Callable``. Passed {type(loss_fn)}",
             )
         elif isinstance(loss_fn, str) and loss_fn != "exp_val":
             raise_error(
                 ValueError,
-                f"If str, `loss_fn` can only be `exp_val`. Passed {type(loss_fn)}.",
+                f"If str, ``loss_fn`` can only be ``exp_val``. Passed {type(loss_fn)}.",
             )
 
         self.hamiltonian = None
@@ -143,7 +143,7 @@ class ExactGeodesicTransportCG:
             ):
                 raise_error(
                     TypeError,
-                    f"For backend <{self.backend}>, `hamiltonian` must be scipy sparse matrix, "
+                    f"For backend <{self.backend}>, ``hamiltonian`` must be scipy sparse matrix, "
                     + f"or one of these: {self.backend.tensor_types}\n"
                     + f"passed type: {type(self.hamiltonian)}!",
                 )
@@ -160,8 +160,8 @@ class ExactGeodesicTransportCG:
             if self.hamiltonian is None:
                 raise_error(
                     ValueError,
-                    "For `loss_fn='exp_val'`, you must pass the hamiltonian to `loss_kwargs` "
-                    + "via the dict item `{'hamiltonian': hamiltonian}`"
+                    "For ``loss_fn='exp_val'``, you must pass the hamiltonian to ``loss_kwargs`` "
+                    + "via the dict item ``{'hamiltonian': hamiltonian}``"
                 )
             self.loss_fn = _loss_func_expval
             self.hamiltonian_subspace = self.get_subspace_hamiltonian()
@@ -198,7 +198,7 @@ class ExactGeodesicTransportCG:
         """Computes the Hamiltonian restricted to the fixed-weight subspace
         and represented as a dense matrix in the active backend.
 
-        Assumes `self.hamiltonian` is in COO format of the respective backend.
+        Assumes ``self.hamiltonian`` is in COO format of the respective backend.
 
         Returns:
             ArrayLike: Dense matrix representing the hamiltonian in the subspace.
@@ -269,7 +269,7 @@ class ExactGeodesicTransportCG:
     def initialize_cg_state(self):
         """Initialize CG state.
 
-        Sets up the internal variables `x`, `u`, `v`, and initial step size `eta`
+        Sets up the internal variables ``x``, ``u``, ``v``, and initial step size ``eta``
         based on the current angles.
         """
         self.v = self.tangent_vector()
@@ -708,7 +708,7 @@ class ExactGeodesicTransportCG:
         return self.run_egt_cg(steps=steps, tolerance=tolerance)
 
     def _loss_internal(self, circuit: Circuit, backend: Backend, **kwargs) -> float:
-        """Wrapper function for the loss, used to update attribute `n_call_loss`
+        """Wrapper function for the loss, used to update attribute ``n_call_loss``
         every time the loss is executed.
 
         Args:
@@ -723,9 +723,9 @@ class ExactGeodesicTransportCG:
 
     def _gradient_func_internal(self) -> ArrayLike:
         """
-        Compute the gradient of `self.loss` w.r.t the trainable parameters
-        stored inside self.circuit, using backpropagation of the backend specified by `platform`.
-        This is used if loss != `exp_val`.
+        Compute the gradient of ``self.loss`` w.r.t the trainable parameters
+        stored inside self.circuit, using backpropagation of the backend specified by ``platform``.
+        This is used if loss != ``exp_val``.
 
         Returns:
             ArrayLike: gradient vector as an array of the backend platform.
