@@ -93,11 +93,6 @@ class ExactGeodesicTransportCG:
         self.n_calls_gradient = 0
         self.loss_fn = loss_fn
 
-        self.v = None
-        self.u = None
-        self.eta = None
-        self.grad = None
-
         if initial_parameters is not None:
             self.angles = self.backend.cast(
                 initial_parameters, dtype=initial_parameters.dtype
