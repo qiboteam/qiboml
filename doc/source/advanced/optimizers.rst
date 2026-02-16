@@ -16,7 +16,8 @@ Example usage - VQE for Heisenberg XXZ model
 
 .. code-block:: python
 
-    from qibo import hamiltonians, set_backend, get_backend
+    from qibo import get_backend, set_backend
+    from qibo.hamiltonians import XXZ
     from qiboml.models.optimizers import ExactGeodesicTransportCG
 
     set_backend("qiboml", platform="pytorch")
@@ -24,7 +25,7 @@ Example usage - VQE for Heisenberg XXZ model
 
     nqubits = 4
     weight = nqubits // 2
-    hamiltonian = hamiltonians.XXZ(nqubits=nqubits, delta=0.5, backend=backend).matrix
+    hamiltonian = XXZ(nqubits=nqubits, delta=0.5, backend=backend).matrix
     loss_fn = "exp_val"
 
     def make_callback(print_every):

@@ -56,7 +56,7 @@ class ExactGeodesicTransportCG:
             Defaults to ``None``.
 
     Returns:
-        ExactGeodesicTransportCG: Instantiated optimizer object.
+        :class:`qiboml.models.optimizers.ExactGeodesicTransportCG`: Instantiated optimizer object.
 
     References:
         A. J. Ferreira-Martins, R. M. S. Farias, G. Camilo, T. O. Maciel, A. Tosta,
@@ -823,7 +823,7 @@ def _scipy_sparse_to_backend_coo(matrix, backend: Backend) -> ArrayLike:
 
 
 def _loss_func_expval(circuit: Circuit, backend: Backend, *, hamiltonian) -> float:
-    """Backend-agnostic expectation value <psi|H|psi>.
+    """Backend-agnostic expectation value :math:`\\bra{\\psi} H \\ket{\\psi}`.
 
     Supports:
     - NumPy / SciPy sparse
@@ -834,7 +834,7 @@ def _loss_func_expval(circuit: Circuit, backend: Backend, *, hamiltonian) -> flo
     Args:
         circuit (:class:`qibo.models.circuit.Circuit`): quantum circuit used to compute the loss.
         backend (:class:`qibo.backends.abstract.Backend`): backend for execution.
-        hamiltonian: sparse hamiltonian in the backend's format.
+        hamiltonian (ArrayLike): sparse Hamiltonian in the backend's format.
 
     Assumes hamiltonian is sparse in the backend's native format
     """

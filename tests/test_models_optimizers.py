@@ -135,11 +135,9 @@ def test_egt_cg(
 
     if initial_parameters == "explicit_HR":
         initial_parameters = _generate_rbs_angles(
-            backend.real(
-                random_statevector(
-                    int(comb(nqubits, int(nqubits / 2))), seed=13, backend=backend
-                )
-            ),
+            random_statevector(
+                int(comb(nqubits, int(nqubits / 2))), dtype=backend.float64, seed=13, backend=backend
+            )
             "diagonal",
             backend=backend,
         )
