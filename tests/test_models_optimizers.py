@@ -2,7 +2,8 @@ import pytest
 import scipy
 
 from qiboml.models.optimizers import ExactGeodesicTransportCG
-from qibo import hamiltonians, set_backend
+from qibo import hamiltonians
+from qibo.backends import NumpyBackend
 
 from qibo.quantum_info import random_statevector
 from qibo.models.encodings import _generate_rbs_angles
@@ -92,7 +93,7 @@ def test_egt_cg_errors(backend):
     with pytest.raises(TypeError):
         # if loss_fn is a callable, we must use a backend that has autodiff
         loss_fn = _loss_func_expval
-        backend = set_backend("numpy")
+        backend = NumpyBackend()
         _ = ExactGeodesicTransportCG(
             nqubits=nqubits,
             weight=int(nqubits / 2),
@@ -136,8 +137,8 @@ def test_egt_cg(
     if initial_parameters == "explicit_HR":
         initial_parameters = _generate_rbs_angles(
             random_statevector(
-                int(comb(nqubits, int(nqubits / 2))), dtype=backend.float64, seed=13, backend=backend
-            )
+                int(comb(nqubits, nqubits // 2)), dtype=backend.float64, seed=13, backend=backend
+            ),
             "diagonal",
             backend=backend,
         )

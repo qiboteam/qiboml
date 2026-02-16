@@ -611,10 +611,10 @@ class ExactGeodesicTransportCG:
                 Defaults to :math:`10^{-8}`.
 
         Returns:
-            Tuple: (final_loss, losses, final_parameters)
-                final_loss (float): Final loss value.
-                losses (ArrayLike): Loss at each iteration.
-                final_parameters (ArrayLike): Final angles.
+            Tuple[float, ArrayLike, ArrayLike]:
+                final_loss: Final loss value.
+                losses: Loss at each iteration.
+                final_parameters: Final optimized parameters (angles).
         """
         self.initialize_cg_state()
         losses = []
@@ -702,10 +702,10 @@ class ExactGeodesicTransportCG:
                 Defaults to :math:`10^{-8}`.
 
         Returns:
-            Tuple: (final_loss, losses, final_parameters)
-                final_loss (float): Final loss value.
-                losses (ArrayLike): Loss at each iteration.
-                final_parameters (ArrayLike): Final angles.
+            Tuple[float, ArrayLike, ArrayLike]:
+                final_loss: Final loss value.
+                losses: Loss at each iteration.
+                final_parameters: Final optimized parameters (angles).
         """
         return self.run_egt_cg(steps=steps, tolerance=tolerance)
 
