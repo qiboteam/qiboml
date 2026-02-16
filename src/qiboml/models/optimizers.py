@@ -33,7 +33,8 @@ class ExactGeodesicTransportCG:
             First two arguments (mandatory) are circuit and backend for execution.
         loss_kwargs: (dict, optional): Additional arguments to be passed to the loss function.
             For VQE (``loss_fn = "exp_val"``), include item ``"hamiltonian": hamiltonian``,
-            where ``hamiltonian`` is passed as ``ArrayLike``, scipy sparse or backend-specific sparse.
+            where ``hamiltonian`` is passed as ``ArrayLike``, scipy sparse or
+            backend-specific sparse.
         initial_parameters (ArrayLike, optional): Initial hyperspherical angles parameterizing
             the amplitudes. If None, initializes from a Haar-random state.
         backtrack_rate (float, optional): Backtracking rate for Wolfe condition
@@ -126,7 +127,8 @@ class ExactGeodesicTransportCG:
         if not isinstance(loss_fn, (str, Callable)):
             raise_error(
                 TypeError,
-                f"``loss_fn`` must be either the str ``exp_val`` or ``Callable``. Passed {type(loss_fn)}",
+                "``loss_fn`` must be either the str ``exp_val`` or "
+                + f"``Callable``. Passed {type(loss_fn)}",
             )
         elif isinstance(loss_fn, str) and loss_fn != "exp_val":
             raise_error(
@@ -161,7 +163,7 @@ class ExactGeodesicTransportCG:
                 raise_error(
                     ValueError,
                     "For ``loss_fn='exp_val'``, you must pass the hamiltonian to ``loss_kwargs`` "
-                    + "via the dict item ``{'hamiltonian': hamiltonian}``"
+                    + "via the dict item ``{'hamiltonian': hamiltonian}``",
                 )
             self.loss_fn = _loss_func_expval
             self.hamiltonian_subspace = self.get_subspace_hamiltonian()
@@ -768,7 +770,7 @@ class ExactGeodesicTransportCG:
             return grad.reshape(-1)
 
 
-def _scipy_sparse_to_backend_coo(matrix, backend: Backend):
+def _scipy_sparse_to_backend_coo(matrix, backend: Backend) -> ArrayLike:
     """Convert a SciPy sparse matrix (CSR or COO) to the COO sparse
     representation supported by JAX, TensorFlow, or PyTorch.
 
@@ -777,10 +779,8 @@ def _scipy_sparse_to_backend_coo(matrix, backend: Backend):
         backend (:class:`qibo.backends.abstract.Backend`): backend used,
 
     Returns:
-        Backend-specific sparse tensor.
+        ArrayLike: Backend-specific sparse tensor.
     """
-    if not issparse(matrix):
-        raise TypeError("Input must be a SciPy sparse matrix")
 
     platform = backend.platform
 
@@ -791,7 +791,7 @@ def _scipy_sparse_to_backend_coo(matrix, backend: Backend):
         indices = backend.engine.stack([matrix.row, matrix.col], axis=1)
         data = matrix.data
 
-        from jax.experimental.sparse import BCOO
+        from jax.experimental.sparse import BCOO  # pylint: disable=C0415
 
         return BCOO(
             (backend.engine.asarray(data), backend.engine.asarray(indices)),
@@ -811,21 +811,15 @@ def _scipy_sparse_to_backend_coo(matrix, backend: Backend):
             dense_shape=matrix.shape,
         )
 
-    if platform == "pytorch":
-        if not isspmatrix_coo(matrix):
-            matrix = matrix.tocoo()
+    if not isspmatrix_coo(matrix):
+        matrix = matrix.tocoo()
 
-        row, col = matrix.row, matrix.col
-        indices = backend.vstack([backend.cast(row), backend.cast(col)])
-        values = matrix.data
-        values = backend.cast(values)
+    row, col = matrix.row, matrix.col
+    indices = backend.vstack([backend.cast(row), backend.cast(col)])
+    values = matrix.data
+    values = backend.cast(values)
 
-        return backend.engine.sparse_coo_tensor(indices, values, size=matrix.shape)
-
-    raise ValueError(
-        f"Unknown platform '{platform}'. "
-        "Expected one of {'jax', 'tensorflow', 'pytorch'}."
-    )
+    return backend.engine.sparse_coo_tensor(indices, values, size=matrix.shape)
 
 
 def _loss_func_expval(circuit: Circuit, backend: Backend, *, hamiltonian) -> float:
