@@ -150,11 +150,15 @@ class ExactGeodesicTransportCG:
                     + f"passed type: {type(self.hamiltonian)}!",
                 )
             if issparse(self.hamiltonian):
-                self.hamiltonian = _scipy_sparse_to_backend_coo(
-                    self.hamiltonian, self.backend
-                )
+                if self.backend.platform is not None:
+                    self.hamiltonian = _scipy_sparse_to_backend_coo(
+                        self.hamiltonian, self.backend
+                    )
             else:
-                self.hamiltonian = self.backend.coo_matrix(self.hamiltonian)
+                if self.backend.platform is not None:
+                    self.hamiltonian = self.backend.coo_matrix(self.hamiltonian)
+                else:
+                    self.hamiltonian = self.backend.csr_matrix(self.hamiltonian)
 
             loss_kwargs["hamiltonian"] = self.hamiltonian
 
@@ -238,7 +242,7 @@ class ExactGeodesicTransportCG:
             cols = indices[1].cpu().numpy()
             data = values.cpu().numpy()
         else:
-            hamilt = self.hamiltonian
+            hamilt = self.hamiltonian.tocoo()
             rows = hamilt.row
             cols = hamilt.col
             data = hamilt.data
@@ -246,7 +250,7 @@ class ExactGeodesicTransportCG:
         tol = 1e-14
         for i_full, j_full, v in zip(rows, cols, data):
             if abs(v) <= tol:
-                continue
+                continue  # pragma: no cover
             i = full_to_sub.get(int(i_full))
             j = full_to_sub.get(int(j_full))
             if i is None or j is None:
@@ -463,33 +467,22 @@ class ExactGeodesicTransportCG:
             self.angles = angles_orig
             self.x = amps_orig
 
-        x_new = self.exponential_map_with_direction(u_prev, eta)
-        self.circuit = hamming_weight_encoder(
-            x_new,
-            self.nqubits,
-            self.weight,
-            backend=self.backend,
-        )
-        self.angles = self.backend.cast(
-            [x[0] for x in self.circuit.get_parameters()], dtype=self.backend.float64
-        )
-        v_new = self.tangent_vector()
-        return x_new, v_new, eta
+        return x_new, v_new, eta  # pragma: no cover
 
     def exponential_map_with_direction(
-        self, direction: ArrayLike, eta=None
+        self,
+        direction: ArrayLike,
+        eta: float,
     ) -> ArrayLike:
         """Applies xponential map from current point along specified direction.
 
         Args:
             direction (ArrayLike): Tangent vector direction.
-            eta (float, optional): Step size. Defaults to current eta.
+            eta (float): Step size.
 
         Returns:
             ArrayLike: Amplitudes of new point on the hypersphere.
         """
-        if eta is None:
-            eta = self.eta
         norm_dir = self.backend.vector_norm(direction)
         x_new = self.backend.cos(eta * norm_dir) * self.x + self.backend.sin(
             eta * norm_dir

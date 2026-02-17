@@ -94,6 +94,7 @@ def test_egt_cg_errors(backend):
         # if loss_fn is a callable, we must use a backend that has autodiff
         loss_fn = _loss_func_expval
         backend = NumpyBackend()
+        hamiltonian, _ = _get_xxz_hamiltonian(nqubits, "sparse", backend)
         _ = ExactGeodesicTransportCG(
             nqubits=nqubits,
             weight=int(nqubits / 2),
@@ -137,11 +138,25 @@ def test_egt_cg(
     if initial_parameters == "explicit_HR":
         initial_parameters = _generate_rbs_angles(
             random_statevector(
-                int(comb(nqubits, nqubits // 2)), dtype=backend.float64, seed=13, backend=backend
+                int(comb(nqubits, nqubits // 2)),
+                dtype=backend.float64,
+                seed=13,
+                backend=backend,
             ),
             "diagonal",
             backend=backend,
         )
+
+    def make_callback(print_every):
+        def callback(
+            iter_num,
+            loss,
+            **kwargs,
+        ):
+            if iter_num % print_every == 0:
+                print(f"Iter {iter_num}: loss = {loss:.6f}")
+
+        return callback
 
     optimizer = ExactGeodesicTransportCG(
         nqubits=nqubits,
@@ -153,7 +168,7 @@ def test_egt_cg(
         c2=0.999,
         backtrack_rate=0.5,
         backtrack_multiplier=1.5,
-        callback=None,
+        callback=make_callback(1000),
         seed=13,
         backend=backend,
     )
@@ -186,6 +201,69 @@ def _loss_func_expval(circuit, backend, *, hamiltonian):
     else:
         h_psi = hamiltonian @ psi
     return backend.real(backend.sum(backend.conj(psi) * h_psi))
+
+
+@pytest.mark.parametrize("nqubits", [4, 6])
+@pytest.mark.parametrize("hamiltonian_type", ["sparse", "dense"])
+@pytest.mark.parametrize("type_loss_grad", ["exp_val"])
+@pytest.mark.parametrize("initial_parameters", ["explicit_HR", None])
+def test_egt_cg_numpy(
+    nqubits,
+    hamiltonian_type,
+    type_loss_grad,
+    initial_parameters,
+):
+
+    backend = NumpyBackend()
+
+    hamiltonian, true_gs_energy = _get_xxz_hamiltonian(
+        nqubits, hamiltonian_type, backend
+    )
+    chem_acc = 0.03 / (27.2114 * backend.abs(true_gs_energy))
+
+    loss_fn = type_loss_grad
+
+    if initial_parameters == "explicit_HR":
+        initial_parameters = _generate_rbs_angles(
+            random_statevector(
+                int(comb(nqubits, nqubits // 2)),
+                dtype=backend.float64,
+                seed=13,
+                backend=backend,
+            ),
+            "diagonal",
+            backend=backend,
+        )
+
+    def make_callback(print_every):
+        def callback(
+            iter_num,
+            loss,
+            **kwargs,
+        ):
+            if iter_num % print_every == 0:
+                print(f"Iter {iter_num}: loss = {loss:.6f}")
+
+        return callback
+
+    optimizer = ExactGeodesicTransportCG(
+        nqubits=nqubits,
+        weight=int(nqubits / 2),
+        loss_fn=loss_fn,
+        loss_kwargs={"hamiltonian": hamiltonian},
+        initial_parameters=initial_parameters,
+        c1=0.485,
+        c2=0.999,
+        backtrack_rate=0.5,
+        backtrack_multiplier=1.5,
+        callback=make_callback(1000),
+        seed=13,
+        backend=backend,
+    )
+    _, losses, _ = optimizer(steps=20)
+    rel_errors = backend.abs(1 - losses / true_gs_energy)
+
+    assert rel_errors[-1] < chem_acc
 
 
 def _get_xxz_hamiltonian(nqubits, hamiltonian_type, backend):
