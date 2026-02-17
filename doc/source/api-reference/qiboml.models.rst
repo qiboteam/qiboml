@@ -35,3 +35,11 @@ qiboml.models.decoding
    :undoc-members:
    :special-members: __call__,
    :show-inheritance:
+
+qiboml.models.optimizers
+------------------------
+
+.. autoclass:: qiboml.models.optimizers.ExactGeodesicTransportCG
+   :members:
+   :undoc-members:
+   :show-inheritance:
