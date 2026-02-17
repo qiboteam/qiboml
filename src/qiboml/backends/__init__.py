@@ -3,21 +3,19 @@ from qibo.config import raise_error
 
 PLATFORMS = ("jax", "pytorch", "tensorflow")
 
-# temporary: to remove once jax is fully working
-AVAILABLE_PLATFORMS = ("pytorch", "tensorflow")
-
 
 class MetaBackend:
-    """Meta-backend class which takes care of loading the qiboml backends."""
+    """Meta-backend class which takes care of loading the ``qiboml`` backends."""
 
     @staticmethod
     def load(platform: str) -> Backend:
-        """Load the qiboml backend.
+        """Load the ``qiboml`` backend.
 
         Args:
             platform (str): Name of the backend to load.
+        
         Returns:
-            qibo.backends.abstract.Backend: The loaded backend.
+            :class:`qibo.backends.abstract.Backend`: The loaded backend.
         """
 
         if platform not in PLATFORMS:
@@ -45,7 +43,7 @@ class MetaBackend:
     def list_available(self) -> dict:
         """List all the available qiboml backends."""
         available_backends = {}
-        for platform in AVAILABLE_PLATFORMS:
+        for platform in PLATFORMS:
             try:
                 MetaBackend.load(platform)
                 available = True

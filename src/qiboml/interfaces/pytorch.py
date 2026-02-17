@@ -67,7 +67,7 @@ class QuantumModel(torch.nn.Module):
             by sequentially stacking the elements of the given list. It is also possible
             to pass a single circuit, in the case a sequential structure is not needed.
         decoding (QuantumDecoding): the decoding layer.
-        parameters_initialization (:class:`keras.initializers.Initializer` or ArrayLike):
+        parameters_initialization (Callable or ArrayLike):
             if an initialiser is provided it will be used either as the parameters or to sample the
             parameters of the model.
         differentiation (Differentiation, optional): the differentiation engine,

@@ -51,7 +51,6 @@ def _apply_gate(
     return jnp.reshape(state, (2**nqubits,))
 
 
-@partial(jax.jit, static_argnums=(2, 3, 4, 5, 6))
 def _apply_gate_controlled(
     matrix: ArrayLike,
     state: ArrayLike,
