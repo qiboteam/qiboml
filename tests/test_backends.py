@@ -20,5 +20,6 @@ def test_metabackend_list_available():
     available_backends = {
         "tensorflow": tensorflow,
         "pytorch": True,
-    }  # TODO: restore this --> , "pytorch": True, "jax": True}
+        "jax": True,
+    }
     assert MetaBackend().list_available() == available_backends
