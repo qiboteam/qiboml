@@ -100,13 +100,10 @@ class ExactGeodesicTransportCG:
             )
         else:
             self.angles = _generate_rbs_angles(
-                self.backend.cast(
-                    random_statevector(
-                        int(comb(nqubits, weight)),
-                        seed=seed,
-                        backend=self.backend,
-                        dtype=self.backend.float64,
-                    ),
+                random_statevector(
+                    int(comb(nqubits, weight)),
+                    seed=seed,
+                    backend=self.backend,
                     dtype=self.backend.float64,
                 ),
                 "diagonal",
