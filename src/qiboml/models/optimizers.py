@@ -6,7 +6,7 @@ from qibo.models.encodings import hamming_weight_encoder, _ehrlich_algorithm
 from qibo.backends import _check_backend, Backend
 from qibo.quantum_info import random_statevector
 from qibo.models.encodings import _generate_rbs_angles
-from qibo.config import raise_error
+from qibo.config import raise_error, log
 
 from scipy.sparse import issparse, isspmatrix_coo
 from scipy.special import comb
@@ -100,10 +100,14 @@ class ExactGeodesicTransportCG:
             )
         else:
             self.angles = _generate_rbs_angles(
-                self.backend.real(
+                self.backend.cast(
                     random_statevector(
-                        int(comb(nqubits, weight)), seed=seed, backend=self.backend
-                    )
+                        int(comb(nqubits, weight)),
+                        seed=seed,
+                        backend=self.backend,
+                        dtype=self.backend.float64,
+                    ),
+                    dtype=self.backend.float64,
                 ),
                 "diagonal",
                 backend=self.backend,
@@ -834,9 +838,21 @@ def _loss_func_expval(circuit: Circuit, backend: Backend, *, hamiltonian) -> flo
     psi = backend.execute_circuit(circuit).state()
     platform = backend.platform
     if platform == "tensorflow":
-        psi_col = backend.engine.reshape(psi, (-1, 1))
-        h_psi = backend.engine.sparse.sparse_dense_matmul(hamiltonian, psi_col)
-        h_psi = backend.engine.reshape(h_psi, (-1,))
+        if "cpu" is backend.device.lower():
+            psi_col = backend.engine.reshape(psi, (-1, 1))
+            h_psi = backend.engine.sparse.sparse_dense_matmul(hamiltonian, psi_col)
+            h_psi = backend.engine.reshape(h_psi, (-1,))
+        else:
+            log.warning(
+                "For TensorFlow in GPU, matmul between sparse and dense is not implemented yet. "
+                + "Hamiltonian was to cast to dense for computation."
+            )
+            psi_col = backend.engine.reshape(psi, (-1, 1))
+            h_psi = backend.engine.matmul(
+                backend.engine.sparse.to_dense(hamiltonian), psi_col
+            )
+            h_psi = backend.engine.reshape(h_psi, (-1,))
+
     elif platform == "pytorch":
         h_psi = backend.engine.sparse.mm(hamiltonian, psi.unsqueeze(1)).squeeze(1)
     else:
