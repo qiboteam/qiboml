@@ -842,7 +842,7 @@ def _loss_func_expval(circuit: Circuit, backend: Backend, *, hamiltonian) -> flo
         else:  # pragma: no cover
             log.warning(
                 "For TensorFlow in GPU, matmul between sparse and dense is not implemented yet. "
-                + "Hamiltonian was to cast to dense for computation."
+                + "Hamiltonian has to be casted to dense for computation."
             )
             psi_col = backend.engine.reshape(psi, (-1, 1))
             h_psi = backend.engine.matmul(
