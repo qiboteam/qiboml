@@ -9,7 +9,6 @@ from qibo.config import raise_error
 from qibo.noise import NoiseModel, PauliError
 from qibo.symbols import Z
 from qibo.transpiler import NativeGates, Passes, Unroller
-from scipy.linalg import hadamard
 
 import qiboml.models.ansatze as ans
 import qiboml.models.decoding as dec

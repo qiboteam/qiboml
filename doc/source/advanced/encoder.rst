@@ -103,7 +103,7 @@ however, this means that the burden of the gradients calculation
 
    \frac{\partial \rm{Encoding}}{\partial x} = \frac{\partial \rm{Encoding}}{\partial g} \cdot \frac{\partial g}{\partial \theta} \cdot \frac{\partial \theta}{\partial x}
 
-belongs to the ``QuantumModel``, which is problematic when, for instance, you use expensive hardware-compatible differentiation methods such as :py:class:`qiboml.operations.differentiation.PSR`. It is far easier and completely equivalent, instead, to move the parametrization of the encoding outside of the ``QuantumModel``, thus making the encoding a fixed transformation:
+belongs to the ``QuantumModel``, which is problematic when, for instance, you use expensive hardware-compatible differentiation methods such as :py:class:`qiboml.differentiations.psr.PSR`. It is far easier and completely equivalent, instead, to move the parametrization of the encoding outside of the ``QuantumModel``, thus making the encoding a fixed transformation:
 
 .. math::
 

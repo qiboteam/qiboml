@@ -17,11 +17,13 @@ from qibo.backends import Backend
 from qibo.config import raise_error
 
 from qiboml.backends.tensorflow import TensorflowBackend
+from qiboml.differentiations.abstract import Differentiation
+from qiboml.differentiations.jax import Jax
+from qiboml.differentiations.psr import PSR
 from qiboml.interfaces import utils
 from qiboml.interfaces.circuit_tracer import CircuitTracer
 from qiboml.models.decoding import QuantumDecoding
 from qiboml.models.encoding import QuantumEncoding
-from qiboml.operations import PSR, Differentiation, Jax
 
 DEFAULT_DIFFERENTIATION = {
     "qiboml-pytorch": Jax,
@@ -183,7 +185,10 @@ class QuantumModel(keras.Model):  # pylint: disable=no-member
                     self.decoding,
                 )
         elif isinstance(self.differentiation, type):
-            self.differentiation = self.differentiation()
+            self.differentiation = self.differentiation(
+                self.circuit_tracer.build_circuit(self.circuit_parameters),
+                self.decoding,
+            )
         self.custom_gradient = None
 
     def compute_output_shape(self, input_shape):

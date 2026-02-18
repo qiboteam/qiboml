@@ -40,7 +40,7 @@ def get_default_differentiation(decoding: QuantumDecoding, instructions: Dict):
     )
 
     if not decoding.analytic or backend_string not in instructions.keys():
-        from qiboml.operations.differentiation import PSR  # pylint: disable=C0415
+        from qiboml.differentiations.psr import PSR  # pylint: disable=C0415
 
         differentiation = PSR
     else:

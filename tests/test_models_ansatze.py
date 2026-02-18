@@ -1,7 +1,6 @@
 import numpy as np
 import pytest
 from qibo import Circuit, gates
-from qibo.quantum_info import random_statevector
 from scipy.special import binom
 
 from qiboml.models.ansatze import brickwork_givens, hardware_efficient

@@ -15,7 +15,9 @@ from qiboml.interfaces import utils
 from qiboml.interfaces.circuit_tracer import CircuitTracer
 from qiboml.models.decoding import QuantumDecoding
 from qiboml.models.encoding import QuantumEncoding
-from qiboml.operations import PSR, Differentiation, Jax
+from qiboml.differentiations.abstract import Differentiation
+from qiboml.differentiations.jax import Jax
+from qiboml.differentiations.psr import PSR
 
 DEFAULT_DIFFERENTIATION = {
     "qiboml-pytorch": None,
@@ -150,7 +152,10 @@ class QuantumModel(torch.nn.Module):
                     self.decoding,
                 )
         elif isinstance(self.differentiation, type):
-            self.differentiation = self.differentiation()
+            self.differentiation = self.differentiation(
+                self.circuit_tracer.build_circuit(self.circuit_parameters),
+                self.decoding,
+            )
 
     def forward(self, x: Optional[torch.Tensor] = None):
         """
@@ -158,7 +163,8 @@ class QuantumModel(torch.nn.Module):
         in a quantum circuit, executes it and decodes it.
 
         Args:
-            x (:class:`torch.tensor`, optional): the input data, if required. Default is ``None``.
+            x (:class:`torch.tensor`, optional): the input data, if required.
+                Default is ``None``.
 
         Returns:
             :class:`torch.tensor`: The computed outputs.

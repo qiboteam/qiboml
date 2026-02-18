@@ -1,7 +1,7 @@
-qiboml.differentiation
-======================
+qiboml.differentiations
+=======================
 
-.. automodule:: qiboml.operations.differentiation
+.. automodule:: qiboml.differentiations
    :members:
    :undoc-members:
    :show-inheritance:

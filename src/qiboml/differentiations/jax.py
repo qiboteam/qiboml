@@ -8,7 +8,7 @@ from qibo import Circuit
 from qibo.backends.abstract import Backend
 from qiboml.backends.jax import JaxBackend
 from qiboml.models.decoding import QuantumDecoding
-from qiboml.operations.differentiation import Differentiation
+from qiboml.differentiations.abstract import Differentiation
 
 
 class Jax(Differentiation):
