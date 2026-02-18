@@ -168,10 +168,14 @@ class TensorflowBackend(Backend):
             return self.trace(state)
         return self.engine.norm(state, ord=order, **kwargs)
 
-    def max(self, array: ArrayLike, **kwargs) -> Union[float, int, ArrayLike]:  # pragma: no cover
+    def max(
+        self, array: ArrayLike, **kwargs
+    ) -> Union[float, int, ArrayLike]:  # pragma: no cover
         return self.engine.math.reduce_max(array, **kwargs)
 
-    def min(self, array: ArrayLike, **kwargs) -> Union[float, int, ArrayLike]:  # pragma: no cover
+    def min(
+        self, array: ArrayLike, **kwargs
+    ) -> Union[float, int, ArrayLike]:  # pragma: no cover
         return self.engine.math.reduce_min(array, **kwargs)
 
     def outer(self, array_1: ArrayLike, array_2: ArrayLike) -> ArrayLike:
@@ -240,7 +244,9 @@ class TensorflowBackend(Backend):
     def trace(self, array: ArrayLike) -> Union[int, float]:
         return self.engine.linalg.trace(array)
 
-    def var(self, array: ArrayLike, **kwargs) -> Union[float, int, ArrayLike]:  # pragma: no cover
+    def var(
+        self, array: ArrayLike, **kwargs
+    ) -> Union[float, int, ArrayLike]:  # pragma: no cover
         return self.engine.math.reduce_variance(array, **kwargs)
 
     def vector_norm(
@@ -405,9 +411,12 @@ class TensorflowBackend(Backend):
             gmatrix = self.reshape(gmatrix, original_shape)
             # fuse the individual gate matrix to the total ``FusedGate`` matrix
             # we are using sparse matrices to improve perfomances
-            matrix = self.engine.sparse.sparse_dense_matmul(
-                self.engine.sparse.from_dense(gmatrix), matrix
-            )
+            if "cpu" is self.device.lower():
+                matrix = self.engine.sparse.sparse_dense_matmul(
+                    self.engine.sparse.from_dense(gmatrix), matrix
+                )
+            else:  # pragma: no cover
+                matrix = self.matmul(gmatrix, matrix)
 
         return matrix
 
