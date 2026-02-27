@@ -4,8 +4,9 @@ import random
 
 import numpy as np
 import pytest
-from qibo import Circuit, construct_backend, gates, hamiltonians
+from qibo import Circuit, construct_backend, gates
 from qibo.config import raise_error
+from qibo.hamiltonians import TFIM, SymbolicHamiltonian
 from qibo.noise import NoiseModel, PauliError
 from qibo.symbols import Z
 from qibo.transpiler import NativeGates, Passes, Unroller
@@ -318,7 +319,7 @@ def test_encoding(backend, frontend, layer, seed):
     training_layer = ans.hardware_efficient(nqubits, qubits, nlayers, seed=seed)
 
     decoding_qubits = random_subset(nqubits, dim)
-    observable = hamiltonians.SymbolicHamiltonian(
+    observable = SymbolicHamiltonian(
         1 + np.prod([Z(int(i)) for i in decoding_qubits]),
         nqubits=nqubits,
         backend=backend,
@@ -376,7 +377,7 @@ def test_decoding(backend, frontend, layer, seed):
     kwargs = {"backend": backend}
     decoding_qubits = random_subset(nqubits, dim)
     if layer is dec.Expectation:
-        observable = hamiltonians.SymbolicHamiltonian(
+        observable = SymbolicHamiltonian(
             1 + np.prod([Z(int(i)) for i in decoding_qubits]),
             nqubits=nqubits,
             backend=backend,
@@ -464,7 +465,7 @@ def test_vqe(backend, frontend, dense, nshots):
     set_seed(frontend, seed)
     backend.set_seed(42)
 
-    tfim = hamiltonians.TFIM(nqubits=2, h=0.1, dense=dense, backend=backend)
+    tfim = TFIM(nqubits=2, h=0.1, dense=dense, backend=backend)
 
     nqubits = 2
     nlayers = 2
