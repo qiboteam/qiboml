@@ -39,6 +39,7 @@ def test_state_layer(backend, density_matrix):
         (real + 1j * im).ravel(), backend.execute_circuit(circuit).state().ravel()
     )
 
+
 @pytest.mark.parametrize("nshots", [None, 10000])
 @pytest.mark.parametrize(
     "observable",
@@ -51,7 +52,7 @@ def test_expectation_layer(backend, nshots, observable):
     circuit = comp_basis_encoder("1" * 5)
 
     if observable is not None:
-        observable = observable(nqubits, 0.1, False, backend)
+        observable = observable(nqubits, 0.1, dense=False, backend=backend)
     layer = dec.Expectation(
         nqubits,
         observable=observable,
