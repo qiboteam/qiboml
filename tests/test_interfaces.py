@@ -426,7 +426,7 @@ def test_composition(backend, frontend):
         nqubits
     )
     training_layer = ans.hardware_efficient(nqubits, nlayers=nlayers, seed=seed)
-    observable = hamiltonians.SymbolicHamiltonian(
+    observable = SymbolicHamiltonian(
         1 + np.prod([Z(int(i)) for i in range(nqubits)]),
         nqubits=nqubits,
         backend=backend,
