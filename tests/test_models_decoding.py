@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 import torch
 from qibo import Circuit, construct_backend, gates, hamiltonians
+from qibo.backends import NumpyBackend
 from qibo.models.encodings import comp_basis_encoder
 from qibo.quantum_info import random_clifford
 from qibo.symbols import X, Z
@@ -17,9 +18,9 @@ def test_probabilities_layer(backend):
     nqubits = 5
     qubits = np.random.choice(range(nqubits), size=(4,), replace=False)
     layer = dec.Probabilities(nqubits, qubits=qubits, backend=backend)
-    c = random_clifford(nqubits, backend=NPBACKEND)
+    circuit = random_clifford(nqubits, backend=NumpyBackend())
     backend.assert_allclose(
-        layer(c).ravel(), backend.execute_circuit(c).probabilities(qubits)
+        layer(circuit).ravel(), backend.execute_circuit(circuit).probabilities(qubits)
     )
 
 
@@ -27,12 +28,16 @@ def test_probabilities_layer(backend):
 def test_state_layer(backend, density_matrix):
     nqubits = 5
     layer = dec.State(nqubits, density_matrix=density_matrix, backend=backend)
-    c = random_clifford(nqubits, density_matrix=density_matrix, backend=NPBACKEND)
-    real, im = layer(c)
-    backend.assert_allclose(
-        (real + 1j * im).ravel(), backend.execute_circuit(c).state().ravel()
-    )
 
+    assert layer.analytic
+
+    circuit = random_clifford(
+        nqubits, density_matrix=density_matrix, backend=NumpyBackend()
+    )
+    real, im = layer(circuit)
+    backend.assert_allclose(
+        (real + 1j * im).ravel(), backend.execute_circuit(circuit).state().ravel()
+    )
 
 @pytest.mark.parametrize("nshots", [None, 10000])
 @pytest.mark.parametrize(
@@ -43,7 +48,7 @@ def test_expectation_layer(backend, nshots, observable):
     backend.set_seed(42)
     nqubits = 5
 
-    c = comp_basis_encoder("1" * 5)
+    circuit = comp_basis_encoder("1" * 5)
 
     if observable is not None:
         observable = observable(nqubits, 0.1, False, backend)
@@ -53,33 +58,36 @@ def test_expectation_layer(backend, nshots, observable):
         nshots=nshots,
         backend=backend,
     )
-    layer_expv = layer(c)
+    layer_expv = layer(circuit)
     if observable is None:
         observable = hamiltonians.Z(nqubits, dense=False, backend=backend)
-    expv = observable.expectation(c, nshots=nshots)
+    expv = observable.expectation(circuit, nshots=nshots)
     atol = 1e-8 if nshots is None else 1e-2
+
+    layer_expv = layer_expv[0, 0]
+
     backend.assert_allclose(layer_expv, expv, atol=atol)
 
 
 def test_decoding_with_transpiler(backend):
     seed = 42
     backend.set_seed(seed)
-    c = random_clifford(3, seed=seed, backend=NPBACKEND)
+    circuit = random_clifford(3, seed=seed, backend=NPBACKEND)
     transpiler = Passes(
         connectivity=[[0, 1], [0, 2]], passes=[Unroller(NativeGates.default(), Sabre())]
     )
     layer = dec.Probabilities(3, transpiler=transpiler, backend=backend)
-    backend.assert_allclose(
-        backend.execute_circuit(c).probabilities(), layer(c).ravel(), atol=1e-8
-    )
+    value = backend.execute_circuit(circuit).probabilities()
+    target = layer(circuit).ravel()
+    backend.assert_allclose(value, target)
 
 
 def test_decoding_wire_names(backend):
-    c = Circuit(3)
+    circuit = Circuit(3)
     wire_names = ["a", "b", "c"]
     layer = dec.Probabilities(3, wire_names=wire_names, backend=backend)
-    layer(c)
-    assert c.wire_names == wire_names
+    layer(circuit)
+    assert circuit.wire_names == wire_names
     assert list(layer.wire_names) == wire_names
     assert layer.circuit.wire_names == wire_names
 
@@ -88,14 +96,14 @@ def test_vqls_solver_basic(backend):
     """Test the VariationalQuantumLinearSolver on a 1-qubit system."""
     nqubits = 1
 
-    A = backend.cast([[1.0, 0.2], [0.2, 1.0]], dtype=backend.np.complex128)
-    target_state = backend.cast([1.0, 0.0], dtype=backend.np.complex128)
+    A = backend.cast([[1.0, 0.2], [0.2, 1.0]], dtype=backend.complex128)
+    target_state = backend.cast([1.0, 0.0], dtype=backend.complex128)
     circuit = Circuit(nqubits)
 
     solver = dec.VariationalQuantumLinearSolver(
         nqubits=nqubits,
         target_state=target_state,
-        A=A,
+        a_matrix=A,
         backend=backend,
     )
 

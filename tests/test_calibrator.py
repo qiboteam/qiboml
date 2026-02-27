@@ -4,19 +4,15 @@ from pathlib import Path
 import networkx as nx
 import numpy as np
 import torch
-from qibo import Circuit, gates, get_backend, get_transpiler, set_backend
-from qibo.backends import _Global
-from qibo.noise import NoiseModel, PauliError
-from qibo.transpiler import NativeGates, Passes, Unroller
+from qibo import Circuit, gates
 from qibocal.auto.runcard import Runcard
 from qibocal.auto.task import Action
-from qibocal.protocols.allxy import allxy
 from qibolab._core.backends import QibolabBackend
 
 from qiboml.interfaces.pytorch import QuantumModel
 from qiboml.models.calibrator import Calibrator
 from qiboml.models.decoding import Expectation
-from qiboml.operations.differentiation import PSR
+from qiboml.differentiations.psr import PSR
 
 NQUBITS = 5
 

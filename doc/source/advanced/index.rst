@@ -10,3 +10,4 @@ We provide here some more in detail description of the ingredients quickly intro
     decoder
     calibrator
     equivariant
+    optimizers

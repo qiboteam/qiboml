@@ -9,7 +9,6 @@ from qibo.config import raise_error
 from qibo.noise import NoiseModel, PauliError
 from qibo.symbols import Z
 from qibo.transpiler import NativeGates, Passes, Unroller
-from scipy.linalg import hadamard
 
 import qiboml.models.ansatze as ans
 import qiboml.models.decoding as dec
@@ -341,8 +340,7 @@ def test_encoding(backend, frontend, layer, seed):
         [
             activation,
             frontend.QuantumModel(
-                circuit_structure=circuit_structure,
-                decoding=decoding_layer,
+                circuit_structure=circuit_structure, decoding=decoding_layer
             ),
         ],
     )
@@ -359,7 +357,8 @@ def test_decoding(backend, frontend, layer, seed):
 
     if layer is dec.State:
         pytest.skip(
-            "Can't reliably pass for State decoder due to poor sensibility to the parameters probably..."
+            "Can't reliably pass for State decoder due to poor "
+            + "sensibility to the parameters probably..."
         )
 
     set_device(frontend)
@@ -485,12 +484,10 @@ def test_vqe(backend, frontend, dense, nshots):
         decoding=decoding_layer,
     )
 
-    none = np.array(
-        5
-        * [
-            None,
-        ]
-    )
+    assert q_model.nqubits == nqubits
+    assert q_model.output_shape == (1, 1)
+
+    none = np.array(5 * [None])
     grad = train_model(frontend, q_model, none, none, max_epochs=10)
     cost = q_model()
     backend.assert_allclose(float(cost), -2.0, atol=6e-2)
@@ -699,15 +696,15 @@ def test_equivariant(backend, frontend):
 
     # this defines 3 independent parameters
     def custom_circuit(th, phi, lam):
-        c = Circuit(2)
+        circuit = Circuit(2)
         delta = 2 * engine.cos(phi) + lam**2
         gamma = lam * engine.exp(th / 2)
-        c.add([gates.RZ(i, theta=th) for i in range(2)])
-        c.add([gates.RX(i, theta=lam) for i in range(2)])
-        c.add([gates.RY(i, theta=phi) for i in range(2)])
-        c.add(gates.RZ(0, theta=delta))
-        c.add(gates.RX(1, theta=gamma))
-        return c
+        circuit.add([gates.RZ(i, theta=th) for i in range(2)])
+        circuit.add([gates.RX(i, theta=lam) for i in range(2)])
+        circuit.add([gates.RY(i, theta=phi) for i in range(2)])
+        circuit.add(gates.RZ(0, theta=delta))
+        circuit.add(gates.RX(1, theta=gamma))
+        return circuit
 
     # these are 4 independent parameters
     nqubits = 2

@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import matplotlib
-import matplotlib.pyplot
 import numpy as np
 import pytest
 from qibo import Circuit, gates

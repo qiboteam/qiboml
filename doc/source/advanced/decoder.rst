@@ -82,7 +82,7 @@ In case you needed an even more fine-grained customization, you could always get
 
 * A boolean ``analytic`` property:
 
-  for differentiation purposes, it is important to know whether the decoding step is `analytically` differentiable, i.e. if any sampling is involved in practice. If no sampling is involved, all the operations can be easily tracked and the gradients can be analitically calculated via standard differentiation methods (native ``pytorch`` or ``jax`` for example). Otherwise, we must recurr to different ways for obtaining the gradients, such as the :py:class:`qiboml.operations.differentiation.PSR`. For this purpose, each decoding object has a ``analytic`` property that is set to ``True`` by default:
+  for differentiation purposes, it is important to know whether the decoding step is `analytically` differentiable, i.e. if any sampling is involved in practice. If no sampling is involved, all the operations can be easily tracked and the gradients can be analitically calculated via standard differentiation methods (native ``pytorch`` or ``jax`` for example). Otherwise, we must recurr to different ways for obtaining the gradients, such as the :py:class:`qiboml.differentiations.psr.PSR`. For this purpose, each decoding object has a ``analytic`` property that is set to ``True`` by default:
 
 .. code::
 

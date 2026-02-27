@@ -1,18 +1,17 @@
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional, Tuple, Union
 
-from qibo import Circuit, gates, get_transpiler, transpiler
-from qibo.backends import Backend, NumpyBackend, _check_backend
+from numpy.typing import ArrayLike
+from qibo import Circuit, gates
+from qibo.backends import Backend, _check_backend
 from qibo.config import log, raise_error
-from qibo.hamiltonians import Hamiltonian, SymbolicHamiltonian, Z
-from qibo.models.error_mitigation import error_sensitive_circuit
+from qibo.hamiltonians import Hamiltonian, Z
 from qibo.noise import NoiseModel
 from qibo.quantum_info.metrics import infidelity
 from qibo.result import CircuitResult, MeasurementOutcomes, QuantumState
 from qibo.transpiler import Passes
 
-from qiboml import ndarray
 from qiboml.models.calibrator import Calibrator
 from qiboml.models.utils import Mitigator
 
@@ -24,32 +23,36 @@ class QuantumDecoding:
 
     Args:
         nqubits (int): total number of qubits.
-        qubits (tuple[int], optional): set of qubits it acts on, by default ``range(nqubits)``.
-        wire_names (tuple[int] | tuple[str], optional): names to be given to the wires, this has to
-            have ``len`` equal to ``nqubits``. Additionally, this is mostly useful when executing
-            on hardware to select which qubits to make use of. Namely, if the chip has qubits named:
+        qubits (Tuple[int], optional): set of qubits it acts on, by default ``range(nqubits)``.
+        wire_names (Tuple[int] or Tuple[str], optional): names to be given to the wires,
+            this has to have ``len`` equal to ``nqubits``. Additionally, this is mostly useful
+            when executing on hardware to select which qubits to make use of.
+            Namely, if the chip has qubits named:
             ```
             ("a", "b", "c", "d")
             ```
-            and we wish to deploy a two qubits circuit on the first and last qubits you have to build it as:
+            and we wish to deploy a two qubits circuit on the first and last qubits you have
+            to build it as:
             ```
             decoding = QuantumDecoding(nqubits=2, wire_names=("a", "d"))
             ```
         nshots (int, optional): number of shots used for circuit execution and sampling.
-        backend (Backend, optional): backend used for computation, by default the globally-set backend is used.
-        transpiler (Passes, optional): transpiler to run before circuit execution, by default no transpilation
-            is performed on the circuit (``transpiler=None``).
-        noise_model (NoiseModel): a ``NoiseModel`` of Qibo, which is applied to the
-            given circuit to perform noisy simulations. In case a `transpiler` is
-            passed, the noise model is applied to the transpiled circuit.
-            Default is ``None`` and no noise is added.
-        density_matrix (bool): if ``True``, density matrix simulation is performed
+        backend (:class:`qibo.backends.Backend`, optional): backend used for computation,
+            by default the globally-set backend is used.
+        transpiler (:class:`qibo.transpiler.Passes`, optional): transpiler to run before
+            circuit execution, by default no transpilation is performed on the circuit
+            (``transpiler=None``).
+        noise_model (:class:`qibo.noise.NoiseModel`, optional): a ``NoiseModel`` of Qibo,
+            which is applied to the given circuit to perform noisy simulations.
+            In case a `transpiler` is passed, the noise model is applied to the transpiled
+            circuit. Defaults to ``None``, and no noise is added.
+        density_matrix (bool, optional): if ``True``, density matrix simulation is performed
             instead of state-vector simulation.
     """
 
     nqubits: int
-    qubits: Optional[tuple[int]] = None
-    wire_names: Optional[Union[tuple[int], Union[tuple[str]]]] = None
+    qubits: Optional[Tuple[int]] = None
+    wire_names: Optional[Union[Tuple[int], Union[Tuple[str]]]] = None
     nshots: Optional[int] = None
     backend: Optional[Backend] = None
     transpiler: Optional[Passes] = None
@@ -59,52 +62,60 @@ class QuantumDecoding:
 
     def __post_init__(self):
         """Ancillary post initialization operations."""
-        if self.qubits is None:
-            self.qubits = tuple(range(self.nqubits))
-        else:
-            self.qubits = tuple(self.qubits)
+        self.backend = _check_backend(self.backend)
+
+        self.qubits = (
+            tuple(range(self.nqubits)) if self.qubits is None else tuple(self.qubits)
+        )
+
         if self.wire_names is not None:
             # self.wire_names has to be a tuple to make the decoder hashable
             # and thus usable in Jax differentiation
             self.wire_names = tuple(self.wire_names)
         # I have to convert to list because qibo does not accept a tuple
         wire_names = list(self.wire_names) if self.wire_names is not None else None
+
         self._circuit = Circuit(
             self.nqubits, wire_names=wire_names, density_matrix=self.density_matrix
         )
-        self.backend = _check_backend(self.backend)
         self._circuit.add(gates.M(*self.qubits))
 
     def __call__(
-        self, x: Circuit
+        self, circuit: Circuit
     ) -> Union[CircuitResult, QuantumState, MeasurementOutcomes]:
-        """Combine the input circuir with the internal one and execute them with the internal backend.
+        """Combine the input and internal circuits and execute them with the internal backend.
 
         Args:
-            x (Circuit): input circuit.
+            circuit (:class:`qibo.models.circuit.Circuit`): Input circuit.
 
         Returns:
-            (CircuitResult | QuantumState | MeasurementOutcomes): the execution ``qibo.result`` object.
+            :class:`qibo.result.CircuitResult` or :class:`qibo.result.QuantumState`
+            or :class:`qibo.result.MeasurementOutcomes`: Resulting object storing results
+            of circuit execution.
         """
-        x = self.preprocessing(x)
+        circuit = self.preprocessing(circuit)
 
-        return self.backend.execute_circuit(x + self._circuit, nshots=self.nshots)
+        return self.backend.execute_circuit(circuit + self._circuit, nshots=self.nshots)
 
     def preprocessing(self, x: Circuit) -> Circuit:
-        """Perform some preprocessing on the input circuit to run with the settings specified by the decoder. In detail, transpilation and noise application on the input circuit is performed."""
+        """Perform some preprocessing on the input circuit to run with the settings
+        specified by the decoder. In detail, transpilation and noise application on
+        the input circuit is performed."""
         self.align_circuits(x)
         x = self.transpile(x)
         x = self.apply_noise(x)
         return x
 
     def align_circuits(self, x: Circuit):
-        """Align some attributes of the input circuit with the internal one, e.g. sets the density_matrix and wire_names."""
+        """Align some attributes of the input circuit with the internal one, e.g. sets
+        the density_matrix and wire_names."""
         # Standardize the density matrix attribute
         self._align_density_matrix(x)
         self._align_wire_names(x)
 
     def transpile(self, x: Circuit) -> Circuit:
-        """Transpile a given circuit ``x`` using the instructions provided by the ``transpiler`` attribute."""
+        """Transpile a given circuit ``x`` using the instructions provided by the
+        ``transpiler`` attribute."""
         if self.transpiler is not None:
             x, _ = self.transpiler(x)
         return x
@@ -135,7 +146,7 @@ class QuantumDecoding:
         self.backend = backend
 
     @property
-    def output_shape(self):
+    def output_shape(self):  # pragma: no cover
         """The shape of the decoded outputs."""
         raise_error(NotImplementedError)
 
@@ -169,7 +180,7 @@ class QuantumDecoding:
         x.init_kwargs["wire_names"] = wire_names
 
     @contextmanager
-    def _temporary_nshots(self, nshots):
+    def _temporary_nshots(self, nshots):  # pragma: no cover
         """Context manager to execute the decoder with a custom number of shots."""
         original = self.nshots
         self.nshots = nshots
@@ -187,25 +198,25 @@ class Probabilities(QuantumDecoding):
 
     # TODO: collapse on ExpectationDecoding if not analytic
 
-    def __call__(self, x: Circuit) -> ndarray:
+    def __call__(self, x: Circuit) -> ArrayLike:
         """Computes the final state probabilities.
 
         Args:
-            x (Circuit): input circuit.
+            x (:class:`qibo.models.circuit.Circuit`): Input circuit.
 
         Returns:
-            (ndarray): the final probabilities.
+            ArrayLike: the final probabilities.
         """
-        return self.backend.np.reshape(
+        return self.backend.reshape(
             super().__call__(x).probabilities(self.qubits), self.output_shape
         )
 
     @property
-    def output_shape(self) -> tuple[int, int]:
+    def output_shape(self) -> Tuple[int, int]:
         """Shape of the output probabilities.
 
         Returns:
-            (tuple[int, int]): a ``(1, 2**nqubits)`` shape.
+            Tuple[int, int]: A ``(1, 2**nqubits)`` shape.
         """
         n = 2 ** len(self.qubits)
         return (1, n)
@@ -217,25 +228,24 @@ class Probabilities(QuantumDecoding):
 
 @dataclass
 class Expectation(QuantumDecoding):
-    r"""The expectation value decoder.
+    """The expectation value decoder.
 
     Args:
-        observable (Hamiltonian | ndarray): the observable to calculate the expectation value of,
-            by default :math:`Z_0 + Z_1 + ... + Z_n` is used.
+        observable (ArrayLike or :class:`qibo.hamiltonians.Hamiltonian`): The observable
+            to calculate the expectation value of. Defaults to :math:`Z_0 + Z_1 + ... + Z_n`.
         mitigation_config (dict): configuration of the real-time quantum error mitigation
-            method in case it is desired.
-            The real-time quantum error mitigation algorithm is proposed in https://arxiv.org/abs/2311.05680
-            and consists in performing a real-time check of the reliability of a learned mitigation map.
-            This is done by constructing a reference error-sensitive Clifford circuit,
-            which preserves the size of the original, target one. When the decoder is called,
-            the reliability of the mitigation map is checked by computing
-            a simple metric :math:`D = |E_{\rm noisy} - E_{\rm mitigated}|`. If
-            the metric is found exceeding an arbitrary threshold value :math:`\delta`,
+            method in case it is desired. The real-time quantum error mitigation algorithm
+            from Ref. [1] is proposed, and consists in performing a real-time check
+            of the reliability of a learned mitigation map. This is done by constructing
+            a reference error-sensitive Clifford circuit, which preserves the size of the original,
+            target one. When the decoder is called, the reliability of the mitigation map is
+            checked by computing a simple metric :math:`D = |E_{\rm noisy} - E_{\rm mitigated}|`.
+            If the metric is found exceeding an arbitrary threshold value :math:`\\delta`,
             then a chosen data-driven error mitigation technique is executed to
             retrieve the mitigation map.
             To successfully check the reliability of the mitigation map or computing
             the map itself, it is recommended to use a number of shots which leads
-            to a statistical noise (due to measurements) :math:`\varepsilon << \delta`.
+            to a statistical noise (due to measurements) :math:`\varepsilon << \\delta`.
             For this reason, the real-time error mitigation algorithm can be customized
             by passing also a `min_iterations` argument, which will define the minimum
             number of decoding calls which have to happen before the mitigation map
@@ -254,12 +264,17 @@ class Expectation(QuantumDecoding):
             The given example is performing real-time error mitigation with the
             request of computing the mitigation map via Clifford Data Regression
             whenever the reference expectation value differs from the mitigated
-            one of :math:`\delta > 0.2`. This check is performed every 500 iterations and,
+            one of :math:`\\delta > 0.2`. This check is performed every 500 iterations and,
             in case it is required, the mitigation map is computed executing circuits
             with `nshots=10000`.
+
+    References:
+        1. M. Robbiati, A. Sopena, A. Papaluca, and S. Carrazza, *Real-time error mitigation
+        for variational optimization on quantum hardware*, `arxiv:2311.05680 (2023)
+        <https://arxiv.org/abs/2311.05680>`_.
     """
 
-    observable: Union[ndarray, Hamiltonian] = None
+    observable: Union[ArrayLike, Hamiltonian] = None
     mitigation_config: Optional[Dict[str, Any]] = None
     calibrator: Optional[Calibrator] = None
 
@@ -277,16 +292,16 @@ class Expectation(QuantumDecoding):
                 backend=self.backend,
             )
 
-    def __call__(self, x: Circuit) -> ndarray:
+    def __call__(self, x: Circuit) -> ArrayLike:
         """
         Execute the input circuit and calculate the expectation value of
         the internal observable on the final state.
 
         Args:
-            x (Circuit): input Circuit.
+            x (:class:`qibo.models.circuit.Circuit`): input circuit.
 
         Returns:
-            (ndarray): the calculated expectation value.
+            ArrayLike: the calculated expectation value.
         """
         if self.mitigation_config is not None:
             # In this case it is required before the super.call
@@ -302,28 +317,28 @@ class Expectation(QuantumDecoding):
         if self.mitigation_config is not None:
             expval = self.backend.cast(
                 self.mitigator(expval),
-                dtype=self.backend.np.float64,
+                dtype=self.backend.float64,
             )
 
         if self.calibrator is not None:
             self.calibrator()
 
-        return self.backend.np.reshape(expval, (1, 1))
+        return self.backend.reshape(expval, (1, 1))
 
     @property
-    def output_shape(self) -> tuple[int, int]:
+    def output_shape(self) -> Tuple[int, int]:
         """Shape of the output expectation value.
 
         Returns:
-            (tuple[int, int]): a ``(1, 1)`` shape.
+            Tuple[int, int]: A ``(1, 1)`` shape.
         """
         return (1, 1)
 
-    def set_backend(self, backend: Backend):
+    def set_backend(self, backend: Backend) -> None:
         """Set the internal and observable's backends.
 
         Args:
-            backend (Backend): backend to be set.
+            backend (:class:`qibo.backends.Backend`): backend to be set.
         """
         if isinstance(self.observable, Hamiltonian):
             matrix = self.backend.to_numpy(self.observable.matrix)
@@ -344,30 +359,30 @@ class Expectation(QuantumDecoding):
 class State(QuantumDecoding):
     """The state decoder."""
 
-    def __call__(self, x: Circuit) -> ndarray:
+    def __call__(self, x: Circuit) -> ArrayLike:
         """Compute the final state of the input circuit and separates it in its real and
         imaginary parts stacked on top of each other.
 
         Args:
-            x (Circuit): input Circuit.
+            x (:class:`qibo.models.circuit.Circuit`): input Circuit.
 
         Returns:
-            (ndarray): the final state.
+            ArrayLike: The final state.
         """
         state = super().__call__(x).state()
-        return self.backend.np.vstack(  # pylint: disable=no-member
+        return self.backend.vstack(  # pylint: disable=no-member
             (
-                self.backend.np.real(state),  # pylint: disable=no-member
-                self.backend.np.imag(state),  # pylint: disable=no-member
+                self.backend.real(state),  # pylint: disable=no-member
+                self.backend.imag(state),  # pylint: disable=no-member
             )
         ).reshape(self.output_shape)
 
     @property
-    def output_shape(self) -> tuple[int, int, int]:
+    def output_shape(self) -> Tuple[int, int, int]:
         """Shape of the output state.
 
         Returns:
-            (tuple[int, int, int]): a ``(2, 1, 2**nqubits)`` shape.
+            Tuple[int, int, int]: A ``(2, 1, 2**nqubits)`` shape.
         """
         n = 2 ** len(self.qubits)
         if self.density_matrix:
@@ -379,34 +394,34 @@ class State(QuantumDecoding):
         return True
 
 
-class Samples(QuantumDecoding):
+class Samples(QuantumDecoding):  # pragma: no cover
     """The samples decoder."""
 
     def __post_init__(self):
         super().__post_init__()
 
-    def __call__(self, x: Circuit) -> ndarray:
+    def __call__(self, x: Circuit) -> ArrayLike:
         """Sample the final state of the circuit.
 
         Args:
-            x (Circuit): input Circuit.
+            x (:class:`qibo.models.circuit.Circuit`): input circuit.
 
         Returns:
-            ndarray: Generated samples.
+            ArrayLike: Generated samples.
         """
-        return self.backend.cast(super().__call__(x).samples(), self.backend.np.float64)
+        return self.backend.cast(super().__call__(x).samples(), self.backend.float64)
 
     @property
-    def output_shape(self) -> tuple[int, int]:
+    def output_shape(self) -> Tuple[int, int]:
         """Shape of the output samples.
 
         Returns:
-            (tuple[int, int]): a ``(nshots, nqubits)`` shape.
+            Tuple[int, int]: A ``(nshots, nqubits)`` shape.
         """
         return (self.nshots, len(self.qubits))
 
     @property
-    def analytic(self) -> bool:  # pragma: no cover
+    def analytic(self) -> bool:
         return False
 
 
@@ -415,8 +430,8 @@ class VariationalQuantumLinearSolver(QuantumDecoding):
     """Decoder for the Variational Quantum Linear Solver (VQLS).
 
     Args:
-        target_state (ndarray): Target solution vector :math:`\\ket{b}`.
-        A (ndarray): The matrix ``A`` in the linear system :math:`A \\, \\ket{x} = \\ket{b}`.
+        target_state (ArrayLike): Target solution vector :math:`\\ket{b}`.
+        A (ArrayLike): The matrix ``A`` in the linear system :math:`A \\, \\ket{x} = \\ket{b}`.
 
     Reference:
         C. Bravo-Prieto, R. LaRose, M. Cerezo, Y. Subasi, L. Cincio, and P. J. Coles,
@@ -424,28 +439,26 @@ class VariationalQuantumLinearSolver(QuantumDecoding):
         `Quantum 7, 1188 (2023) <https://doi.org/10.22331/q-2023-11-22-1188>`_.
     """
 
-    target_state: ndarray
-    A: ndarray
+    target_state: ArrayLike
+    a_matrix: ArrayLike
 
     def __post_init__(self):
         super().__post_init__()
         self.target_state = self.backend.cast(
-            self.target_state, dtype=self.backend.np.complex128
+            self.target_state, dtype=self.backend.complex128
         )
-        self.A = self.backend.cast(self.A, dtype=self.backend.np.complex128)
+        self.a_matrix = self.backend.cast(self.a_matrix, dtype=self.backend.complex128)
 
     def __call__(self, circuit: Circuit):
         result = super().__call__(circuit)
         state = result.state()
-        final_state = self.A @ state
-        normalized = final_state / self.backend.calculate_vector_norm(final_state)
+        final_state = self.a_matrix @ state
+        normalized = final_state / self.backend.vector_norm(final_state)
         cost = infidelity(normalized, self.target_state, backend=self.backend)
-        return self.backend.cast(
-            self.backend.np.real(cost), dtype=self.backend.np.float64
-        )
+        return self.backend.cast(self.backend.real(cost), dtype=self.backend.float64)
 
     @property
-    def output_shape(self) -> tuple[int, int]:
+    def output_shape(self) -> Tuple[int, int]:
         return (1, 1)
 
     @property
@@ -453,26 +466,29 @@ class VariationalQuantumLinearSolver(QuantumDecoding):
         return True
 
 
-def _real_time_mitigation_check(decoder: Expectation, x: Circuit):
+def _real_time_mitigation_check(decoder: Expectation, circuit: Circuit):
     """
     Helper function to execute the real time mitigation check
     and, if necessary, to compute the reference circuit expectation value.
     """
     # At first iteration, compute the reference value (exact)
-    if decoder.mitigator._reference_value is None:
+    if decoder.mitigator._reference_value is None:  # pylint: disable=protected-access
         decoder.mitigator.calculate_reference_expval(
             observable=decoder.observable,
-            circuit=x,
+            circuit=circuit,
         )
         # Trigger the mechanism at first iteration
-        _check_or_recompute_map(decoder, x)
+        _check_or_recompute_map(decoder, circuit)
 
-    if decoder.mitigator._iteration_counter == decoder.mitigator._min_iterations:
+    if (
+        decoder.mitigator._iteration_counter  # pylint: disable=protected-access
+        == decoder.mitigator._min_iterations  # pylint: disable=protected-access
+    ):
         log.info("Checking map since max iterations reached.")
-        _check_or_recompute_map(decoder, x)
-        decoder.mitigator._iteration_counter = 0
+        _check_or_recompute_map(decoder, circuit)
+        decoder.mitigator._iteration_counter = 0  # pylint: disable=protected-access
     else:
-        decoder.mitigator._iteration_counter += 1
+        decoder.mitigator._iteration_counter += 1  # pylint: disable=protected-access
 
 
 def _check_or_recompute_map(decoder: Expectation, x: Circuit):

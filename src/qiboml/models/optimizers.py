@@ -1,7 +1,17 @@
-from typing import Optional
+import math
+from typing import Callable, Any, Tuple
 
-from qibo.backends import _check_backend
-from qibo.models.encodings import hamming_weight_encoder
+from qibo import Circuit
+from qibo.models.encodings import hamming_weight_encoder, _ehrlich_algorithm
+from qibo.backends import _check_backend, Backend
+from qibo.quantum_info import random_statevector
+from qibo.models.encodings import _generate_rbs_angles
+from qibo.config import raise_error, log
+
+from scipy.sparse import issparse, isspmatrix_coo
+from scipy.special import comb
+
+from numpy.typing import ArrayLike
 
 
 class ExactGeodesicTransportCG:
@@ -15,519 +25,837 @@ class ExactGeodesicTransportCG:
     convergent optimization.
 
     Args:
-      nqubits (int): Number of qubits in the quantum circuit.
-      weight (int): Hamming weight to encode.
-      hamiltonian (:class:'qibo.hamiltonians.Hamiltonian'): Hamiltonian whose expectation
-        value defines the loss to minimize.
-      angles (ndarray): Initial hyperspherical angles parameterizing the amplitudes.
-      backtrack_rate (float, optional): Backtracking rate for Wolfe condition
-        line search. If ``None``, defaults to :math:`0.5`. Defaults to ``None``.
-      geometric_gradient (bool, optional): If ``True``, uses the geometric gradient
-          estimator instead of numerical finite differences. Defaults to ``False``.
-      multiplicative_factor (float, optional): Scaling factor applied to the initial learning
-          rate during optimization. Defaults to :math:`1`.
-      c1 (float, optional): Constant for Armijo condition (sufficient decrease) in
-          Wolfe line search. Defaults to :math:`10^{-3}`.
-      c2 (float, optional): Constant for curvature condition in Wolfe line search.
-          It should satisfy ``c1 < c2 < 1``. Defaults to :math:`0.9`.
-      backend (:class:`qibo.backends.abstract.Backend`, optional): backend
-          to be used in the execution. If ``None``, it uses the current backend.
-          Defaults to ``None``.
+        nqubits (int): Number of qubits in the quantum circuit.
+        weight (int): Hamming weight to encode.
+        loss_fn (str or Callable): if str, only possibility is ``exp_val``,
+            for expectation value loss (i.e., running VQE).
+            It can also be a Callable to be used as the loss function.
+            First two arguments (mandatory) are circuit and backend for execution.
+        loss_kwargs: (dict, optional): Additional arguments to be passed to the loss function.
+            For VQE (``loss_fn = "exp_val"``), include item ``"hamiltonian": hamiltonian``,
+            where ``hamiltonian`` is passed as ``ArrayLike``, scipy sparse or
+            backend-specific sparse.
+        initial_parameters (ArrayLike, optional): Initial hyperspherical angles parameterizing
+            the amplitudes. If None, initializes from a Haar-random state.
+        backtrack_rate (float, optional): Backtracking rate for Wolfe condition
+            line search. Defaults to :math:`0.9`.
+        backtrack_multiplier (float, optional): Scaling factor applied to the initial learning
+            rate for the backtrack. Usually, it's greater than 1 to guarantee a wider
+            search space. Defaults to :math:`1.5`.
+        backtrack_min_lr (float, optional): Minimum learning rate to be tested in the backtrack.
+            Defaults to :math:`10^{-6}`.
+        c1 (float, optional): Constant for Armijo condition (sufficient decrease) in
+            Wolfe line search. Defaults to :math:`10^{-3}`.
+        c2 (float, optional): Constant for curvature condition in Wolfe line search.
+            It should satisfy ``c1 < c2 < 1``. Defaults to :math:`0.9`.
+        callback (Callable, optinal): callback function. First two positional arguments are
+            ``iter_number`` and ``loss_value``.
+        seed (int, optional): random seed. Controls initialization.
+        backend (:class:`qibo.backends.abstract.Backend`, optional): backend to be used
+            in the execution. If ``None``, it uses the current backend.
+            Defaults to ``None``.
 
     Returns:
-      ExactGeodesicTransportCG: Instantiated optimizer object.
+        :class:`qiboml.models.optimizers.ExactGeodesicTransportCG`: Instantiated optimizer object.
 
     References:
-        A. J. Ferreira‑Martins, R. M. S. Farias, G. Camilo, T. O. Maciel, A. Tosta, R. Lin, A. Alhajri, T. Haug, and L. Aolita,
-        *Variational quantum algorithms with exact geodesic transport*,
-        `arXiv:2506.17395 (2025) <https://arxiv.org/abs/2506.17395>`_.
+        A. J. Ferreira-Martins, R. M. S. Farias, G. Camilo, T. O. Maciel, A. Tosta,
+        R. Lin, A. Alhajri, T. Haug, and L. Aolita, *Quantum optimization
+        with exact geodesic transport*, `arXiv:2506.17395 (2025)
+        <https://arxiv.org/abs/2506.17395>`_.
     """
 
     def __init__(
         self,
         nqubits: int,
         weight: int,
-        hamiltonian,
-        angles,
-        backtrack_rate: Optional[float] = None,
-        geometric_gradient: bool = False,
-        multiplicative_factor: float = 1.0,
-        c1: float = 0.0001,
+        loss_fn: Callable[..., tuple[float, Any]],
+        loss_kwargs: dict | None = None,
+        initial_parameters: ArrayLike | None = None,
+        backtrack_rate: float = 0.9,
+        backtrack_multiplier: float = 1.5,
+        backtrack_min_lr: float = 1e-6,
+        c1: float = 0.001,
         c2: float = 0.9,
-        backend=None,
+        callback: Callable[..., None] | None = None,
+        seed: int | None = None,
+        backend: Backend = None,
     ):
         self.nqubits = nqubits
         self.weight = weight
-        self.hamiltonian = hamiltonian
-        self.angles = angles
         self.backtrack_rate = backtrack_rate
-        self.geometric_gradient = geometric_gradient
-        self.multiplicative_factor = multiplicative_factor
+        self.backtrack_multiplier = backtrack_multiplier
+        self.backtrack_min_lr = backtrack_min_lr
         self.c1 = c1
         self.c2 = c2
         self.backend = _check_backend(backend)
+        self.callback = callback
+        self.n_calls_loss = 0
+        self.n_calls_gradient = 0
+        self.loss_fn = loss_fn
+
+        if initial_parameters is not None:
+            self.angles = self.backend.cast(
+                initial_parameters, dtype=initial_parameters.dtype
+            )
+        else:
+            self.angles = _generate_rbs_angles(
+                random_statevector(
+                    int(comb(nqubits, weight)),
+                    seed=seed,
+                    backend=self.backend,
+                    dtype=self.backend.float64,
+                ),
+                "diagonal",
+                backend=self.backend,
+            )
+            self.angles = self.backend.cast(self.angles, dtype=self.angles.dtype)
+
+        self.x = self.angles_to_amplitudes(self.angles)
+        self.circuit = hamming_weight_encoder(
+            self.x,
+            self.nqubits,
+            self.weight,
+            backend=self.backend,
+        )
+        self.angles = self.backend.cast(
+            [x[0] for x in self.circuit.get_parameters()],
+            dtype=self.backend.float64,
+        )
+
+        self.riemannian_tangent = False
+
+        if not isinstance(loss_fn, (str, Callable)):
+            raise_error(
+                TypeError,
+                "``loss_fn`` must be either the str ``exp_val`` or "
+                + f"``Callable``. Passed {type(loss_fn)}",
+            )
+        elif isinstance(loss_fn, str) and loss_fn != "exp_val":
+            raise_error(
+                ValueError,
+                f"If str, ``loss_fn`` can only be ``exp_val``. Passed {type(loss_fn)}.",
+            )
+
+        self.hamiltonian = None
+        if "hamiltonian" in loss_kwargs:
+            self.hamiltonian = loss_kwargs.get("hamiltonian", None)
+            if not (
+                isinstance(self.hamiltonian, self.backend.tensor_types)
+                or issparse(self.hamiltonian)
+            ):
+                raise_error(
+                    TypeError,
+                    f"For backend <{self.backend}>, ``hamiltonian`` must be scipy sparse matrix, "
+                    + f"or one of these: {self.backend.tensor_types}\n"
+                    + f"passed type: {type(self.hamiltonian)}!",
+                )
+            if issparse(self.hamiltonian):
+                if self.backend.platform is not None:
+                    self.hamiltonian = _scipy_sparse_to_backend_coo(
+                        self.hamiltonian, self.backend
+                    )
+            else:
+                if self.backend.platform is not None:
+                    self.hamiltonian = self.backend.coo_matrix(self.hamiltonian)
+                else:
+                    self.hamiltonian = self.backend.csr_matrix(self.hamiltonian)
+
+            loss_kwargs["hamiltonian"] = self.hamiltonian
+
+        if loss_fn == "exp_val":
+            if self.hamiltonian is None:
+                raise_error(
+                    ValueError,
+                    "For ``loss_fn='exp_val'``, you must pass the hamiltonian to ``loss_kwargs`` "
+                    + "via the dict item ``{'hamiltonian': hamiltonian}``",
+                )
+            self.loss_fn = _loss_func_expval
+            self.hamiltonian_subspace = self.get_subspace_hamiltonian()
+            self.riemannian_tangent = True
+            self.gradient_func = None
+        else:
+            backends_autodiff = ["jax", "tensorflow", "pytorch"]
+            if self.backend.platform not in backends_autodiff:
+                raise_error(
+                    TypeError,
+                    f"To use autodiff, must use one of the following backends: {backends_autodiff}",
+                )
+            self.hamiltonian_subspace = None
+            self.gradient_func = self._gradient_func_internal
+
+        self.loss = self._loss_internal
+        self.loss_kwargs = loss_kwargs
+
+        self.jacobian = None
+        self.inverse_jacobian = None
+
+        initial_string = initial_string = [1] * self.weight + [0] * (
+            self.nqubits - self.weight
+        )
+        bitstrings_ehrlich = _ehrlich_algorithm(initial_string, False)
+        bitstrings_lex = sorted(bitstrings_ehrlich)
+        self.reindex_list = [bitstrings_ehrlich.index(bs) for bs in bitstrings_lex]
+        if self.backend.platform == "jax":
+            self.reindex_list = self.backend.cast(
+                self.reindex_list, dtype=self.backend.int32
+            )
+
+    def get_subspace_hamiltonian(self) -> ArrayLike:
+        """Computes the Hamiltonian restricted to the fixed-weight subspace
+        and represented as a dense matrix in the active backend.
+
+        Assumes ``self.hamiltonian`` is in COO format of the respective backend.
+
+        Returns:
+            ArrayLike: Dense matrix representing the hamiltonian in the subspace.
+        """
+
+        subspace_dim = int(comb(self.nqubits, self.weight))
+        initial_string = [1] * self.weight + [0] * (self.nqubits - self.weight)
+        lexicographical_order = _ehrlich_algorithm(initial_string, False)
+        lexicographical_order.sort()
+        basis_states_subspace = [
+            int(bitstring, 2) for bitstring in lexicographical_order
+        ]
+        full_to_sub = {full: i for i, full in enumerate(basis_states_subspace)}
+
+        hamilt_subspace = self.backend.zeros(
+            (subspace_dim, subspace_dim), dtype=self.x.dtype
+        )
+
+        platform = self.backend.platform
+        if platform == "jax":
+            indices = self.hamiltonian.indices
+            data = self.hamiltonian.data
+            rows = indices[:, 0]
+            cols = indices[:, 1]
+        elif platform == "tensorflow":
+            indices = self.hamiltonian.indices.numpy()
+            data = self.hamiltonian.values.numpy()
+            rows = indices[:, 0]
+            cols = indices[:, 1]
+        elif platform == "pytorch":
+            hamilt = self.hamiltonian.coalesce()
+            indices = hamilt.indices()
+            values = hamilt.values()
+            rows = indices[0].cpu().numpy()
+            cols = indices[1].cpu().numpy()
+            data = values.cpu().numpy()
+        else:
+            hamilt = self.hamiltonian.tocoo()
+            rows = hamilt.row
+            cols = hamilt.col
+            data = hamilt.data
+
+        tol = 1e-14
+        for i_full, j_full, v in zip(rows, cols, data):
+            if abs(v) <= tol:
+                continue  # pragma: no cover
+            i = full_to_sub.get(int(i_full))
+            j = full_to_sub.get(int(j_full))
+            if i is None or j is None:
+                continue
+            if platform == "jax":
+                hamilt_subspace = hamilt_subspace.at[(i, j), (j, i)].set(v)
+            elif platform == "tensorflow":
+                v = self.backend.cast(v, hamilt_subspace.dtype)
+                indices = self.backend.engine.constant(
+                    [[i, j], [j, i]],
+                    dtype=self.backend.int32,
+                )
+                updates = self.backend.engine.stack([v, v])
+                hamilt_subspace = self.backend.engine.tensor_scatter_nd_update(
+                    hamilt_subspace, indices, updates
+                )
+            else:
+                hamilt_subspace[i, j] = v
+                hamilt_subspace[j, i] = v
+        return hamilt_subspace
 
     def initialize_cg_state(self):
         """Initialize CG state.
 
-        Sets up the internal variables `x`, `u`, `v`, and initial step size `eta`
+        Sets up the internal variables ``x``, ``u``, ``v``, and initial step size ``eta``
         based on the current angles.
         """
-        self.x = self.angles_to_amplitudes(self.angles)
         self.v = self.tangent_vector()
-        self.u = self.v.copy()
-        # Power method learning rate
-        norm_u = self.backend.np.sqrt(self.sphere_inner_product(self.u, self.u, self.x))
-        loss_prev = self.loss()
-        self.eta = (
-            (1 / norm_u)
-            * self.backend.np.arccos((1 + (norm_u / (2 * loss_prev)) ** 2) ** -0.5)
-        ) * self.multiplicative_factor
+        self.u = self.backend.cast(self.v, dtype=self.v.dtype, copy=True)
+        norm_u = self.backend.vector_norm(self.u)
+        loss_prev = self.loss(self.circuit, self.backend, **self.loss_kwargs)
+        self.eta = (1 / norm_u) * self.backend.arccos(
+            (1 + (norm_u / (2 * loss_prev)) ** 2) ** -0.5
+        )
 
-    def angles_to_amplitudes(self, angles):
+    def angles_to_amplitudes(self, angles: ArrayLike) -> ArrayLike:
         """Convert angles to amplitudes.
 
         Args:
-           angles (ndarray): Angles in hyperspherical coordinates.
+           angles (ArrayLike): Angles in hyperspherical coordinates.
 
         Returns:
-            ndarray: Amplitudes calculated from the hyperspherical coordinates.
+            ArrayLike: Amplitudes calculated from the hyperspherical coordinates.
         """
         d = len(angles) + 1
-        amps = self.backend.np.zeros(d)
+        amps = []
         for k in range(d):
-            prod = self.backend.np.prod(self.backend.np.sin(angles[:k]))
+            prod = self.backend.prod(self.backend.sin(angles[:k]))
             if k < d - 1:
-                prod *= self.backend.np.cos(angles[k])
-            amps[k] = prod
+                prod *= self.backend.cos(angles[k])
+            amps.append(prod)
+        amps = self.backend.cast(amps, dtype=self.backend.float64)
         return amps
 
-    def encoder(self):
-        """Build and return the Hamming-weight encoder circuit for the given amplitudes.
-
-        Returns:
-            circuit (qibo.models.hamming_weight_encoder): Circuit prepared with current amplitudes.
-        """
-        amps = self.angles_to_amplitudes(self.angles)
-        self.circuit = hamming_weight_encoder(
-            amps, self.nqubits, self.weight, backend=self.backend
-        )
-
-    def state(self, initial_state=None, nshots=1000):
-        """Return the statevector after encoding.
-
-        Args:
-            initial_state (ndarray, optional): Initial statevector. Defaults to None.
-            nshots (int, optional): Number of measurement shots. Defaults to 1000.
-
-        Returns:
-            statevector (ndarray): Statevector of the encoded quantum state.
-        """
-        self.encoder()
-        result = self.backend.execute_circuit(
-            self.circuit, initial_state=initial_state, nshots=nshots
-        )
-        return result.state()
-
-    def loss(self):
-        """Loss function to be minimized.
-
-        Given a quantum state :math:`\\ket{\\psi}` and a Hamiltonian :math:`H`, the loss
-        function is defined as
-
-        .. math::
-            \\mathcal{L} = \\bra{\\psi} \\, H \\, \\ket{\\psi} \\, .
-
-        Returns:
-            float: Expectation value of ``hamiltonain``.
-        """
-        state = self.state()
-        return self.hamiltonian.expectation_from_state(state)
-
-    def gradient(self, epsilon=1e-8):
-        """Numerically compute gradient of loss wrt angles.
-
-        Returns:
-            ndarray: Gradient of loss w.r.t. ``angles``.
-        """
-        grad = self.backend.np.zeros_like(self.angles)
-        for idx in range(len(self.angles)):
-            angles_forward = self.angles.copy()
-            angles_backward = self.angles.copy()
-            angles_forward[idx] += epsilon
-            angles_backward[idx] -= epsilon
-            loss_forward = self.__class__(
-                self.nqubits, self.weight, self.hamiltonian, angles_forward
-            ).loss()
-            loss_backward = self.__class__(
-                self.nqubits, self.weight, self.hamiltonian, angles_backward
-            ).loss()
-            grad[idx] = (loss_forward - loss_backward) / (2 * epsilon)
-        return grad
-
-    def amplitudes_to_full_state(self, amps):
-        """Convert amplitudes to the full quantum statevector.
-
-        Args:
-            amps (ndarray): Amplitude vector.
-
-        Returns:
-            ndarray: Statevector corresponding to the given amplitudes.
-        """
-        circuit = hamming_weight_encoder(amps, self.nqubits, self.weight)
-        return circuit().state()
-
-    def geom_gradient(self):
-        """Compute geometric gradient using the diagonal metric tensor and Jacobian.
-
-        Returns:
-            ndarray: Geometric gradient vector.
-        """
-        d = len(self.angles)
-        grad = self.backend.np.zeros(d)
-        l_psi = self.loss()
-        jacobian = self.jacobian()
-        g_diag = self.metric_tensor()
-        psi = self.angles_to_amplitudes(self.angles)
-        for j in range(d):
-            varphi = g_diag[j] ** (-1 / 2) * jacobian[:, j]
-            full_varphi = self.amplitudes_to_full_state(varphi)
-            l_varphi = self.hamiltonian.expectation_from_state(full_varphi)
-            phi = (psi + varphi) / self.backend.np.sqrt(2)
-            full_phi = self.amplitudes_to_full_state(phi)
-            l_phi = self.hamiltonian.expectation_from_state(full_phi)
-            grad[j] = self.backend.np.sqrt(g_diag[j]) * (2 * l_phi - l_varphi - l_psi)
-        return grad
-
-    def jacobian(self):
+    def get_jacobian(self) -> ArrayLike:
         """Compute Jacobian of amplitudes wrt angles.
 
         Returns:
-            ndarray: Jacobian matrix.
+            ArrayLike: Jacobian matrix.
         """
         dim = len(self.angles)
-        jacob = self.backend.np.zeros((dim + 1, dim), dtype=self.backend.np.float64)
+        jacob = self.backend.zeros((dim + 1, dim), dtype=self.backend.float64)
 
         for j in range(dim):
-            reduced_params = self.backend.np.array(
-                self.angles[j:], dtype=self.backend.np.float64, copy=True
+            reduced_params = self.backend.cast(
+                self.angles[j:], dtype=self.backend.float64, copy=True
             )
-            reduced_params[0] += self.backend.np.pi / 2
+            if self.backend.platform == "tensorflow":
+                reduced_params = self.backend.engine.tensor_scatter_nd_update(
+                    reduced_params, [[0]], [reduced_params[0] + math.pi / 2]
+                )
+            elif self.backend.platform == "jax":
+                reduced_params = reduced_params.at[0].set(
+                    reduced_params[0] + math.pi / 2
+                )
+            else:
+                reduced_params[0] += math.pi / 2
 
-            sins = self.backend.np.prod(self.backend.np.sin(self.angles[:j]))
+            sins = self.backend.prod(self.backend.sin(self.angles[:j]))
             amps = self.angles_to_amplitudes(reduced_params)
 
-            jacob[j:, j] = sins * amps
+            updates = self.backend.real(sins * amps)
+
+            if self.backend.platform == "tensorflow":
+                indices = list(range(j, jacob.shape[0]))
+                indices = list(zip(indices, [j] * len(indices)))
+                jacob = self.backend.engine.tensor_scatter_nd_update(
+                    jacob, indices, updates
+                )
+            elif self.backend.platform == "jax":
+                jacob = jacob.at[j:, j].set(updates)
+            else:
+                jacob[j:, j] = updates
 
         return jacob
 
-    def metric_tensor(self):
+    def metric_tensor(self) -> ArrayLike:
         """Compute the diagonal metric tensor in hyperspherical coordinates.
 
         Returns:
-            ndarray: Diagonal elements of the metric tensor.
+            ArrayLike: Diagonal elements of the metric tensor.
         """
-        angles = self.angles
         g_diag = [
-            self.backend.np.prod(self.backend.np.sin(self.angles[:k]) ** 2)
+            self.backend.prod(self.backend.sin(self.angles[:k]) ** 2)
             for k in range(len(self.angles))
         ]
         return self.backend.cast(g_diag, dtype="float64")
 
-    def tangent_vector(self):
+    def tangent_vector(self) -> ArrayLike:
         """Compute the Riemannian gradient (tangent vector) at the current point on the hypersphere.
 
-        Returns:
-            ndarray: Tangent vector in the tangent space of the hypersphere.
-        """
-        # Compute gradient(either finite difference or geometric)
-        grad = self.geom_gradient() if self.geometric_gradient else self.gradient()
-        # Compute inverse metric
-        inv_g = 1.0 / self.metric_tensor()
-        # Compute natural gradient
-        nat_grad = -inv_g * grad
-        jacobian = self.jacobian()
-        return jacobian @ nat_grad
+        If loss is expectation value, uses the analytical gradient computation from amplitudes.
 
-    def optimize_step_size(self, x_prev, u_prev, v_prev, loss_prev):
-        """Perform Wolfe line search to determine optimal step size eta.
+        If it is a generic loss, performs backpropagation in parameters space, then uses
+        the jacobian to go to amplitudes coordinates.
+
+        Returns:
+            ArrayLike: Tangent vector in the tangent space of the hypersphere.
+        """
+
+        if self.riemannian_tangent:
+            l_psi = self.loss(self.circuit, self.backend, **self.loss_kwargs)
+            psi_amps = self.x
+            self.n_calls_gradient += 1
+            return self.backend.real(
+                2 * (l_psi * psi_amps - self.hamiltonian_subspace @ psi_amps)
+            )
+
+        self.grad = self.gradient_func()
+        inv_g = 1.0 / self.metric_tensor()
+        nat_grad = -inv_g * self.grad
+        self.jacobian = self.get_jacobian()
+        return (self.jacobian @ nat_grad)[self.reindex_list]
+
+    def regularization(self, angles: ArrayLike) -> ArrayLike:
+        """Applies regularization to vector of parameters after update,
+        effectively changing charts away from singularities.
+        Returns corresponding amplitudes directly.
 
         Args:
-            x_prev (ndarray): Previous position on the sphere.
-            u_prev (ndarray): Previous search direction.
-            v_prev (ndarray): Previous gradient vector.
-            loss_prev (float): Loss at previous position.
+            angles ArrayLike: vector of parameters.
+        Returns:
+            ArrayLike:vector of amplitudes post-regularization.
+        """
+        condition = self.backend.abs(self.backend.sin(angles[:-1])) < 1e-3
+        updated = self.backend.where(condition, math.pi / 2, angles[:-1])
+        return self.angles_to_amplitudes(
+            self.backend.concatenate([updated, angles[-1:]], axis=0)
+        )
+
+    def optimize_step_size(
+        self, x_prev: ArrayLike, u_prev: ArrayLike, v_prev: ArrayLike, loss_prev: float
+    ) -> Tuple[ArrayLike, ArrayLike, float]:
+        """Perform Wolfe line search to determine optimal step size eta via the satisfaction
+        of the Wolfe conditions.
+
+        Args:
+            x_prev (ArrayLike): Previous amplitudes on the sphere.
+            u_prev (ArrayLike): Previous conjugate search direction.
+            v_prev (ArrayLike): Previous search direction.
+            loss_prev (float): Loss at previous amplitudes.
 
         Returns:
-            tuple: Respectively, updated position, angles, gradient, and step size.
+            Tuple: Respectively: updated amplitudes, new search direction, and optimal step size.
         """
-        backtrack_rate = self.backtrack_rate
-        if backtrack_rate is None:
-            backtrack_rate = 0.5
-        norm_u = self.backend.np.sqrt(self.sphere_inner_product(self.u, self.u, self.x))
-        eta = self.eta
-        count = 0
 
-        while eta > 1e-6:
+        eta = self.backtrack_multiplier * self.eta
+
+        angles_orig = self.angles
+        amps_orig = self.x
+
+        while eta > self.backtrack_min_lr:
+
             transported_u = self.parallel_transport(u_prev, u_prev, x_prev, eta)
-            x_new = self.exponential_map_with_direction(u_prev, eta)
-            angles_trial = self.amplitudes_to_angles(x_new)
 
-            angles_orig = self.angles
-            self.angles = angles_trial
-            v_new = self.tangent_vector()
-            loss_new = self.loss()
-            self.angles = angles_orig
+            x_new = self.regularization(
+                self.amplitudes_to_angles(
+                    self.exponential_map_with_direction(u_prev, eta)
+                )
+            )
+
+            self.circuit = hamming_weight_encoder(
+                x_new,
+                self.nqubits,
+                self.weight,
+                backend=self.backend,
+            )
+            self.angles = self.backend.cast(
+                [x[0] for x in self.circuit.get_parameters()],
+                dtype=self.backend.float64,
+            )
+            self.x = x_new
+            loss_new = self.loss(self.circuit, self.backend, **self.loss_kwargs)
 
             condition_a_lhs = loss_new - loss_prev
-            condition_a_rhs = (
-                self.c1 * eta * self.sphere_inner_product(-v_prev, u_prev, x_prev)
-            )
-
+            condition_a_rhs = self.c1 * eta * (-v_prev @ u_prev)
             condition_a = condition_a_lhs <= condition_a_rhs
 
-            condition_b_lhs = abs(
-                self.sphere_inner_product(-v_new, transported_u, x_new)
-            )
-            condition_b_rhs = abs(
-                self.c2 * self.sphere_inner_product(-v_prev, u_prev, x_prev)
-            )
+            if condition_a:
 
-            condition_b = condition_b_lhs <= condition_b_rhs
+                v_new = self.tangent_vector()
 
-            if condition_a and condition_b:
-                # Accept step
-                return x_new, angles_trial, v_new, eta
+                condition_b_lhs = abs((-v_new @ transported_u))
+                condition_b_rhs = abs(self.c2 * (-v_prev @ u_prev))
+                condition_b = condition_b_lhs <= condition_b_rhs
 
-            if True:  # pragma: no cover
-                eta *= backtrack_rate
-                count += 1
+                if condition_a and condition_b:
 
-        if True:  # pragma: no cover
-            # Fallback to last tried point
-            x_new = self.exponential_map_with_direction(u_prev, eta)
-            angles_trial = self.amplitudes_to_angles(x_new)
-            self.angles = angles_trial
-            v_new = self.tangent_vector()
+                    self.x = amps_orig
+                    return x_new, v_new, eta
 
-            return x_new, angles_trial, v_new, eta
+            eta *= self.backtrack_rate
 
-    def exponential_map_with_direction(self, direction, eta=None):
-        """Exponential map from current point along specified direction.
+            self.angles = angles_orig
+            self.x = amps_orig
+
+        return x_new, v_new, eta  # pragma: no cover
+
+    def exponential_map_with_direction(
+        self,
+        direction: ArrayLike,
+        eta: float,
+    ) -> ArrayLike:
+        """Applies xponential map from current point along specified direction.
 
         Args:
-            direction (ndarray): Tangent vector direction.
-            eta (float, optional): Step size. Defaults to current eta.
+            direction (ArrayLike): Tangent vector direction.
+            eta (float): Step size.
 
         Returns:
-            ndarray: New point on the hypersphere.
+            ArrayLike: Amplitudes of new point on the hypersphere.
         """
-        if eta is None:  # pragma: no cover
-            eta = self.eta
-
-        norm_dir = self.backend.np.sqrt(
-            self.sphere_inner_product(direction, direction, self.x)
-        )
-        return self.backend.np.cos(eta * norm_dir) * self.x + self.backend.np.sin(
+        norm_dir = self.backend.vector_norm(direction)
+        x_new = self.backend.cos(eta * norm_dir) * self.x + self.backend.sin(
             eta * norm_dir
         ) * (direction / norm_dir)
+        return x_new
 
-    def amplitudes_to_angles(self, x):
-        """Convert amplitude vector back to hyperspherical angles.
+    def amplitudes_to_angles(self, x: ArrayLike) -> ArrayLike:
+        """Computes the angles corresponding to a given amplitudes vector.
 
         Args:
-            x (ndarray): Amplitude vector.
+            x (ArrayLike): Amplitudes vector.
 
         Returns:
-            ndarray: Corresponding angles.
+            ArrayLike: Corresponding angles.
         """
         d = len(x)
-        angles = self.backend.np.zeros(d - 1)
-        for i in range(d - 2):
-            norm_tail = self.backend.np.linalg.norm(x[i:])
-            angles[i] = (
-                0.0 if norm_tail == 0 else self.backend.np.arccos(x[i] / norm_tail)
+        angles = self.backend.zeros(d - 1, dtype=self.backend.float64)
+        for elem in range(d - 2):
+            norm_tail = self.backend.vector_norm(x[elem:])
+            updates = (
+                0.0 if norm_tail == 0 else self.backend.arccos(x[elem] / norm_tail)
             )
-        angles[-1] = self.backend.np.arctan2(x[-1], x[-2])
+            if self.backend.platform == "tensorflow":
+                angles = self.backend.engine.tensor_scatter_nd_update(
+                    angles, [[elem]], [updates]
+                )
+            elif self.backend.platform == "jax":
+                angles = angles.at[elem].set(updates)
+            else:
+                angles[elem] = updates
+
+        update = self.backend.arctan2(x[-1], x[-2])
+        if self.backend.platform == "tensorflow":
+            angles = self.backend.engine.tensor_scatter_nd_update(
+                angles, [[len(angles) - 1]], [update]
+            )
+        elif self.backend.platform == "jax":
+            angles = angles.at[-1].set(update)
+        else:
+            angles[-1] = update
+
         return angles
 
-    def parallel_transport(self, u, v, a, eta=None):
+    def parallel_transport(
+        self, u: ArrayLike, v: ArrayLike, a: ArrayLike, eta=None
+    ) -> ArrayLike:
         """Parallel transport a tangent vector u along geodesic defined by v.
 
         Args:
-            u (ndarray): Vector to transport.
-            v (ndarray): Direction of geodesic.
-            a (ndarray): Starting point on sphere.
+            u (ArrayLike): Vector to transport.
+            v (ArrayLike): Direction of geodesic.
+            a (ArrayLike): Starting point on sphere.
             eta (float, optional): Step size. If ``None``, defaults to current ``eta``.
                 Defaults to ``None``.
 
         Returns:
-            ndarray: Transported vector.
+            ArrayLike: Transported vector.
         """
-        if eta == None:
+        if eta is None:
             eta = self.eta
-        norm_v = self.backend.np.linalg.norm(v)
-        vu_dot = self.backend.np.dot(v, u)
+        norm_v = self.backend.vector_norm(v)
+        vu_dot = v @ u
         transported = (
             u
-            - self.backend.np.sin(eta * norm_v) * (vu_dot / norm_v) * a
-            + (self.backend.np.cos(eta * norm_v) - 1) * (vu_dot / (norm_v**2)) * v
+            - self.backend.sin(eta * norm_v) * (vu_dot / norm_v) * a
+            + (self.backend.cos(eta * norm_v) - 1) * (vu_dot / (norm_v**2)) * v
         )
         return transported
 
-    def sphere_inner_product(self, u, v, x):
-        """Compute inner product on tangent space at x on the sphere.
-
-        Args:
-            u (ndarray): First tangent vector.
-            v (ndarray): Second tangent vector.
-            x (ndarray): Base point on the sphere.
-
-        Returns:
-            float: Inner product value.
-        """
-        return self.backend.np.dot(u, v) - self.backend.np.dot(
-            x, u
-        ) * self.backend.np.dot(x, v)
-
-    def beta_dy(self, v_next, x_next, transported_u, st):
+    def beta_dy(self, v_next: ArrayLike, transported_u: ArrayLike, st: float) -> float:
         """Compute Dai and Yuan Beta.
 
         Args:
-            v_next (ndarray): Next gradient.
-            x_next (ndarray): Next point.
-            transported_u (ndarray): Parallel-transported u.
+            v_next (ArrayLike): Next gradient.
+            x_next (ArrayLike): Next point.
+            transported_u (ArrayLike): Parallel-transported u.
             st (float): Scaling factor.
 
         Returns:
             float: Dai-Yuan beta value.
         """
-        st_scaled_u = st * transported_u
-        numerator = self.sphere_inner_product(-v_next, -v_next, x_next)
-        denominator = self.sphere_inner_product(
-            -v_next, st_scaled_u, x_next
-        ) - self.sphere_inner_product(-self.v, self.u, self.x)
+        numerator = -v_next @ -v_next
+        denominator = (-v_next @ (st * transported_u)) - (-self.v @ self.u)
         return numerator / denominator
 
-    def beta_hs(self, v_next, x_next, transported_u, transported_v, lt, st):
+    def beta_hs(
+        self,
+        v_next: ArrayLike,
+        transported_u: ArrayLike,
+        transported_v: ArrayLike,
+        lt: float,
+        st: float,
+    ) -> float:
         """Compute Hestenes-Stiefel conjugate gradient beta.
 
         Args:
-            v_next (ndarray): Next gradient.
-            x_next (ndarray): Next point.
-            transported_u (ndarray): Parallel-transported u.
-            transported_v (ndarray): Parallel-transported v.
+            v_next (ArrayLike): Next gradient.
+            x_next (ArrayLike): Next point.
+            transported_u (ArrayLike): Parallel-transported u.
+            transported_v (ArrayLike): Parallel-transported v.
             lt (float): Scaling factor.
             st (float): Scaling factor.
 
         Returns:
             float: Hestenes-Stiefel beta value.
         """
-        numerator = self.sphere_inner_product(
-            -v_next, -v_next, x_next
-        ) - self.sphere_inner_product(-self.v, lt * transported_v, x_next)
-        denominator = self.sphere_inner_product(
-            -v_next, st * transported_u, x_next
-        ) - self.sphere_inner_product(-self.v, self.u, self.x)
+        numerator = (-v_next @ -v_next) - (-v_next @ (lt * transported_v))
+        denominator = (-v_next @ (st * transported_u)) - (-self.v @ self.u)
         return numerator / denominator
 
-    def run_egt_cg(self, steps: int = 10, tolerance: float = 1e-8):
+    def run_egt_cg(
+        self, steps: int = 100, tolerance: float = 1e-8
+    ) -> Tuple[float, ArrayLike, ArrayLike]:
         """Run the EGT-CG optimizer for a specified number of steps.
 
         Args:
-            steps (int, optional): Number of optimization iterations. Defaults to :math:`10`.
+            steps (int, optional): Number of optimization iterations. Defaults to :math:`100`.
             tolerance (float, optional): Maximum tolerance for the residue of the gradient update.
                 Defaults to :math:`10^{-8}`.
 
         Returns:
-            tuple: (final_loss, losses, final_parameters)
-            final_loss (float): Final loss value.
-            losses (list): Loss at each iteration.
-            final_parameters (ndarray): Final angles.
+            Tuple[float, ArrayLike, ArrayLike]:
+                final_loss: Final loss value.
+                losses: Loss at each iteration.
+                final_parameters: Final optimized parameters (angles).
         """
         self.initialize_cg_state()
         losses = []
-
-        for i in range(steps):
-            loss_prev = self.loss()
+        for iter_num in range(steps):
+            loss_prev = self.loss(self.circuit, self.backend, **self.loss_kwargs)
             losses.append(loss_prev)
-            # Terminating Condition
-            res = (
-                self.sphere_inner_product(-self.v, self.u, self.x) ** 2
-            ) / self.sphere_inner_product(self.u, self.u, self.x)
-            if res < tolerance:  # pragma: no cover
+
+            norm_u = self.backend.vector_norm(self.u)
+
+            res = ((-self.v @ self.u) ** 2) / norm_u
+            if res < tolerance:
+                print(f"\nOptimized converged at iteration {iter_num+1}!\n")
                 break
 
-            # Save current state
-            x_prev = self.x.copy()
-            u_prev = self.u.copy()
+            if self.callback is not None:
+                self.callback(iter_num=iter_num + 1, loss=loss_prev, x=self.x)
 
-            # Power method eta
-            norm_u = self.backend.np.sqrt(
-                self.sphere_inner_product(self.u, self.u, self.x)
-            )
-            self.eta = (
-                (1 / norm_u)
-                * self.backend.np.arccos((1 + (norm_u / (2 * loss_prev)) ** 2) ** -0.5)
-                * self.multiplicative_factor
+            x_prev = self.backend.cast(self.x, dtype=self.x.dtype, copy=True)
+            u_prev = self.backend.cast(self.u, dtype=self.u.dtype, copy=True)
+
+            self.eta = (1 / norm_u) * self.backend.arccos(
+                (1 + (norm_u / (2 * loss_prev)) ** 2) ** -0.5
             )
 
-            # Line search via Wolfe conditions
-            x_new, angles_trial, v_new, new_eta = self.optimize_step_size(
+            x_new, v_new, new_eta = self.optimize_step_size(
                 x_prev=x_prev, u_prev=u_prev, v_prev=self.v, loss_prev=loss_prev
             )
-
-            # Calculate Beta
             transported_u = self.parallel_transport(self.u, self.u, self.x)
+
             st = min(
                 1,
-                self.backend.np.sqrt(self.sphere_inner_product(self.u, self.u, self.x))
-                / self.backend.np.sqrt(
-                    self.sphere_inner_product(transported_u, transported_u, x_new)
-                ),
+                self.backend.sqrt((self.u @ self.u))
+                / self.backend.sqrt((transported_u @ transported_u)),
             )
-            transported_v = self.parallel_transport(self.v, self.v, self.x)
+            transported_v = self.parallel_transport(self.u, -self.v, self.x)
             lt = min(
                 1,
-                self.backend.np.sqrt(self.sphere_inner_product(self.v, self.v, self.x))
-                / self.backend.np.sqrt(
-                    self.sphere_inner_product(transported_v, transported_v, x_new)
-                ),
+                self.backend.sqrt((self.v @ self.v))
+                / self.backend.sqrt((transported_v @ transported_v)),
             )
-            beta_dy = self.beta_dy(
-                v_next=v_new, x_next=x_new, transported_u=transported_u, st=st
-            )
+            beta_dy = self.beta_dy(v_next=v_new, transported_u=transported_u, st=st)
             beta_hs = self.beta_hs(
                 v_next=v_new,
-                x_next=x_new,
                 transported_u=transported_u,
                 transported_v=transported_v,
                 lt=lt,
                 st=st,
             )
+
             beta_val = max(0, min(beta_dy, beta_hs))
 
-            # Accept step
             self.x = x_new
-            self.angles = angles_trial
             self.v = v_new
             self.eta = new_eta
-
-            # Update u
             self.u = v_new + beta_val * st * transported_u
-        final_loss = self.loss()
-        final_parameters = self.angles
-        return final_loss, losses, final_parameters
 
-    def __call__(self, steps: int = 10, tolerance: float = 1e-8):
-        """Run the optimizer.
+            self.circuit = hamming_weight_encoder(
+                self.x,
+                self.nqubits,
+                self.weight,
+                backend=self.backend,
+            )
+            self.angles = self.backend.cast(
+                [x[0] for x in self.circuit.get_parameters()],
+                dtype=self.backend.float64,
+            )
+
+        final_loss = self.loss(self.circuit, self.backend, **self.loss_kwargs)
+        losses.append(final_loss)
+        final_parameters = self.angles
+        return (
+            final_loss,
+            self.backend.cast(losses),
+            self.backend.cast(final_parameters, dtype=final_parameters.dtype),
+        )
+
+    def __call__(
+        self, steps: int = 10, tolerance: float = 1e-8
+    ) -> Tuple[float, ArrayLike, ArrayLike]:
+        """Run the EGT-CG optimizer for a specified number of steps.
 
         Args:
-            steps (int): Number of optimization steps.
-            tolerance (float): Maximum tolerance for the residue of the gradient update.
-                Defaults to :math:`10^{-8}.`
+            steps (int, optional): Number of optimization iterations. Defaults to :math:`100`.
+            tolerance (float, optional): Maximum tolerance for the residue of the gradient update.
+                Defaults to :math:`10^{-8}`.
 
         Returns:
-            tuple: Respectively, final loss, loss log, and final parameters.
+            Tuple[float, ArrayLike, ArrayLike]:
+                final_loss: Final loss value.
+                losses: Loss at each iteration.
+                final_parameters: Final optimized parameters (angles).
         """
         return self.run_egt_cg(steps=steps, tolerance=tolerance)
+
+    def _loss_internal(self, circuit: Circuit, backend: Backend, **kwargs) -> float:
+        """Wrapper function for the loss, used to update attribute ``n_call_loss``
+        every time the loss is executed.
+
+        Args:
+            circuit (:class:`qibo.models.circuit.Circuit`): circuit used to compute the loss.
+            backend (:class:`qibo.backends.abstract.Backend`): backend for execution.
+
+        Returns:
+            float: value of loss function.
+        """
+        self.n_calls_loss += 1
+        return self.loss_fn(circuit, backend, **kwargs)
+
+    def _gradient_func_internal(self) -> ArrayLike:
+        """
+        Compute the gradient of ``self.loss`` w.r.t the trainable parameters
+        stored inside self.circuit, using backpropagation of the backend specified by ``platform``.
+        This is used if loss != ``exp_val``.
+
+        Returns:
+            ArrayLike: gradient vector as an array of the backend platform.
+        """
+        self.n_calls_gradient += 1
+
+        platform = self.backend.platform
+        if platform == "jax":
+            circuit_orig = self.circuit.copy(deep=True)
+
+            def loss_fn(params):
+                self.circuit.set_parameters(params)
+                return self.loss(self.circuit, self.backend, **self.loss_kwargs)
+
+            params = self.backend.cast(
+                self.circuit.get_parameters(),
+                dtype=self.backend.float64,
+            )
+            grad = self.backend.jax.grad(loss_fn)(params)
+            self.circuit = circuit_orig.copy(deep=True)
+            return grad.reshape(-1)
+        if platform == "pytorch":
+            params = self.backend.cast(
+                self.circuit.get_parameters(), dtype=self.angles.dtype
+            )
+            params.requires_grad = True
+            self.circuit.set_parameters(params)
+            loss = self.loss(self.circuit, self.backend, **self.loss_kwargs)
+            loss.backward()
+            return params.grad.reshape(-1)
+        if platform == "tensorflow":
+            params = self.backend.engine.Variable(
+                self.circuit.get_parameters(),
+                dtype=self.backend.float64,
+            )
+            with self.backend.engine.GradientTape() as tape:
+                self.circuit.set_parameters(params)
+                loss = self.loss(self.circuit, self.backend, **self.loss_kwargs)
+            grad = tape.gradient(loss, params)
+            return grad.reshape(-1)
+
+
+def _scipy_sparse_to_backend_coo(matrix, backend: Backend) -> ArrayLike:
+    """Convert a SciPy sparse matrix (CSR or COO) to the COO sparse
+    representation supported by JAX, TensorFlow, or PyTorch.
+
+    Args:
+        matrix (scipy.sparse.csr_matrix or scipy.sparse.coo_matrix): input sparse matrix.
+        backend (:class:`qibo.backends.abstract.Backend`): backend used,
+
+    Returns:
+        ArrayLike: Backend-specific sparse tensor.
+    """
+
+    platform = backend.platform
+
+    if platform == "jax":
+        if not isspmatrix_coo(matrix):
+            matrix = matrix.tocoo()
+
+        indices = backend.engine.stack([matrix.row, matrix.col], axis=1)
+        data = matrix.data
+
+        from jax.experimental.sparse import BCOO  # pylint: disable=C0415
+
+        return BCOO(
+            (backend.engine.asarray(data), backend.engine.asarray(indices)),
+            shape=matrix.shape,
+        )
+
+    if platform == "tensorflow":
+        if not isspmatrix_coo(matrix):
+            matrix = matrix.tocoo()
+
+        indices = backend.engine.stack([matrix.row, matrix.col], axis=1)
+        data = matrix.data
+
+        return backend.engine.sparse.SparseTensor(
+            indices=indices.astype(backend.engine.int64),
+            values=data,
+            dense_shape=matrix.shape,
+        )
+
+    if not isspmatrix_coo(matrix):
+        matrix = matrix.tocoo()
+
+    row, col = matrix.row, matrix.col
+    indices = backend.vstack([backend.cast(row), backend.cast(col)])
+    values = matrix.data
+    values = backend.cast(values)
+
+    return backend.engine.sparse_coo_tensor(indices, values, size=matrix.shape)
+
+
+def _loss_func_expval(circuit: Circuit, backend: Backend, *, hamiltonian) -> float:
+    """Backend-agnostic expectation value :math:`\\bra{\\psi} H \\ket{\\psi}`.
+
+    Supports:
+    - NumPy / SciPy sparse
+    - JAX (BCOO)
+    - TensorFlow (tf.sparse.SparseTensor)
+    - PyTorch (sparse COO / CSR)
+
+    Assumes Hamiltonian is sparse in the backend's native format
+
+    Args:
+        circuit (:class:`qibo.models.circuit.Circuit`): quantum circuit used to compute the loss.
+        backend (:class:`qibo.backends.abstract.Backend`): backend for execution.
+        hamiltonian (ArrayLike): sparse Hamiltonian in the backend's format.
+
+    Returns:
+        float: Expectation value.    
+    """
+    psi = backend.execute_circuit(circuit).state()
+    platform = backend.platform
+    if platform == "tensorflow":
+        if "cpu" is backend.device.lower():
+            psi_col = backend.reshape(psi, (-1, 1))
+            h_psi = backend.engine.sparse.sparse_dense_matmul(hamiltonian, psi_col)
+            h_psi = backend.reshape(h_psi, (-1,))
+        else:  # pragma: no cover
+            log.warning(
+                "For TensorFlow in GPU, matmul between sparse and dense is not implemented yet. "
+                + "Hamiltonian has to be casted to dense for computation."
+            )
+            psi_col = backend.reshape(psi, (-1, 1))
+            h_psi = backend.matmul(
+                backend.engine.sparse.to_dense(hamiltonian), psi_col
+            )
+            h_psi = backend.reshape(h_psi, (-1,))
+
+    elif platform == "pytorch":
+        h_psi = backend.engine.sparse.mm(hamiltonian, psi.unsqueeze(1)).squeeze(1)
+    else:
+        h_psi = hamiltonian @ psi
+
+    return backend.real(backend.sum(backend.conj(psi) * h_psi))

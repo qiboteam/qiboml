@@ -2,15 +2,12 @@ import datetime
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from qibo.backends import Backend, NumpyBackend, _check_backend
+from qibo.backends import Backend
 
 try:
     from qibocal.auto.history import History
     from qibocal.auto.mode import AUTOCALIBRATION
     from qibocal.auto.runcard import Runcard
-    from qibocal.auto.task import Data, Results
-    from qibocal.protocols import single_shot_classification
-    from qibocal.update import QubitId
 
     @dataclass
     class Calibrator:

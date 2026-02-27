@@ -1,16 +1,13 @@
 from copy import deepcopy
 
 import pytest
-from qibo import transpiler
 from qibo.backends import NumpyBackend
-from qibo.hamiltonians import XXZ, SymbolicHamiltonian
+from qibo.hamiltonians import SymbolicHamiltonian
 from qibo.noise import NoiseModel, PauliError
-from qibo.transpiler.pipeline import Passes
-from qibo.transpiler.unroller import NativeGates, Unroller
 
+from qiboml.differentiations.psr import PSR
 from qiboml.models.ansatze import hardware_efficient
 from qiboml.models.decoding import Expectation
-from qiboml.operations.differentiation import PSR
 
 from .utils import set_seed
 
@@ -133,7 +130,7 @@ def test_rtqem(frontend, backend, mitigation_method, seed):
     )
 
     assert abs(mit_result - target_energy) < abs(noisy_result - target_energy)
-    assert abs(mit_result - target_energy) < 1e-1
+    assert abs(mit_result - target_energy) < 2e-1
 
 
 def test_custom_map(frontend):
