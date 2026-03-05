@@ -16,7 +16,7 @@ packages = [{ include = "qiboml", from = "src" }]
 [tool.poetry.dependencies]
 python = ">=3.11,<3.14"
 numpy = "^2.0.0"
-qibo = { git = "https://github.com/qiboteam/qibo" }
+qibo = "^0.3.0"
 qibocal = { git = "https://github.com/qiboteam/qibocal" , branch = "backends", optional = true }
 jax = { version = "^0.4.25", optional = true }
 jaxlib = { version = "^0.4.25", optional = true }
@@ -59,7 +59,6 @@ pytest = "^7.2.1"
 pylint = "3.1.0"
 pytest-cov = "4.0.0"
 matplotlib = "^3.7.0"
-# qibojit = { git = "https://github.com/qiboteam/qibojit" }
 qibocal = { git = "https://github.com/qiboteam/qibocal", branch = "backends" }
 qibolab = { git = "https://github.com/qiboteam/qibolab", extras = ["emulator"] }
 jax = "^0.4.25"
