@@ -4454,8 +4454,8 @@ qulacs = ["qulacs (>=0.6.4,<0.7.0) ; python_version < \"3.13\""]
 [package.source]
 type = "git"
 url = "https://github.com/qiboteam/qibo"
-reference = "pygridsynth"
-resolved_reference = "c8a4de1965b8a1d3bf88d7988b8b746567e0b283"
+reference = "HEAD"
+resolved_reference = "f0eb6435722b670c229e905102a3d53e07297d22"
 
 [[package]]
 name = "qibocal"
@@ -4475,7 +4475,7 @@ numpy = ">=1.26.4,<3"
 pandas = {version = "^2.2.2", extras = ["html"]}
 plotly = "^5.22.0"
 pydantic = "^2.8.0"
-qibo = {git = "https://github.com/qiboteam/qibo", branch = "pygridsynth"}
+qibo = {git = "https://github.com/qiboteam/qibo"}
 qibolab = {git = "https://github.com/qiboteam/qibolab"}
 scipy = "^1.10.1"
 skops = ">=0.11,<0.14"
@@ -4484,7 +4484,7 @@ skops = ">=0.11,<0.14"
 type = "git"
 url = "https://github.com/qiboteam/qibocal"
 reference = "backends"
-resolved_reference = "8302d8cd519fa54dba10a69079ef514682a40c2a"
+resolved_reference = "3160105ab4801bdb3be58198f4af2d5a69097cbb"
 
 [[package]]
 name = "qibojit"
@@ -6033,4 +6033,4 @@ torch = ["torch"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.14"
-content-hash = "4de4b571fc38a65b6371a26a1dbc02f1e4f07313740321d0925fc3c944bf9d08"
+content-hash = "b984b2b490b329f206e9977eccb62c557bdee3f214bbcfc845acf7efdebbb4bf"
