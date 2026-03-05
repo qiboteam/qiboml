@@ -4455,7 +4455,7 @@ qulacs = ["qulacs (>=0.6.4,<0.7.0) ; python_version < \"3.13\""]
 type = "git"
 url = "https://github.com/qiboteam/qibo"
 reference = "pygridsynth"
-resolved_reference = "b0364904f0805e55837ae940567c77ec3f76ff36"
+resolved_reference = "c8a4de1965b8a1d3bf88d7988b8b746567e0b283"
 
 [[package]]
 name = "qibocal"
