@@ -411,7 +411,7 @@ class TensorflowBackend(Backend):
             gmatrix = self.reshape(gmatrix, original_shape)
             # fuse the individual gate matrix to the total ``FusedGate`` matrix
             # we are using sparse matrices to improve perfomances
-            if "cpu" is self.device.lower():
+            if "cpu" in self.device.lower():
                 matrix = self.engine.sparse.sparse_dense_matmul(
                     self.engine.sparse.from_dense(gmatrix), matrix
                 )

@@ -59,7 +59,6 @@ pytest = "^7.2.1"
 pylint = "3.1.0"
 pytest-cov = "4.0.0"
 matplotlib = "^3.7.0"
-# qibojit = { git = "https://github.com/qiboteam/qibojit" }
 qibocal = { git = "https://github.com/qiboteam/qibocal", branch = "backends" }
 qibolab = { git = "https://github.com/qiboteam/qibolab", extras = ["emulator"] }
 jax = "^0.4.25"

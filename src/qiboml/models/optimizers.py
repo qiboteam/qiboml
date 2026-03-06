@@ -1,17 +1,18 @@
 import math
-from typing import Callable, Any, Tuple
-
-from qibo import Circuit
-from qibo.models.encodings import hamming_weight_encoder, _ehrlich_algorithm
-from qibo.backends import _check_backend, Backend
-from qibo.quantum_info import random_statevector
-from qibo.models.encodings import _generate_rbs_angles
-from qibo.config import raise_error, log
-
-from scipy.sparse import issparse, isspmatrix_coo
-from scipy.special import comb
+from typing import Any, Callable, Tuple
 
 from numpy.typing import ArrayLike
+from qibo import Circuit
+from qibo.backends import Backend, _check_backend
+from qibo.config import log, raise_error
+from qibo.models.encodings import (
+    _ehrlich_algorithm,
+    _generate_rbs_angles,
+    hamming_weight_encoder,
+)
+from qibo.quantum_info import random_statevector
+from scipy.sparse import issparse, isspmatrix_coo
+from scipy.special import comb
 
 
 class ExactGeodesicTransportCG:
@@ -454,7 +455,7 @@ class ExactGeodesicTransportCG:
 
                 v_new = self.tangent_vector()
 
-                condition_b_lhs = abs((-v_new @ transported_u))
+                condition_b_lhs = abs(-v_new @ transported_u)
                 condition_b_rhs = abs(self.c2 * (-v_prev @ u_prev))
                 condition_b = condition_b_lhs <= condition_b_rhs
 
@@ -640,14 +641,14 @@ class ExactGeodesicTransportCG:
 
             st = min(
                 1,
-                self.backend.sqrt((self.u @ self.u))
-                / self.backend.sqrt((transported_u @ transported_u)),
+                self.backend.sqrt(self.u @ self.u)
+                / self.backend.sqrt(transported_u @ transported_u),
             )
             transported_v = self.parallel_transport(self.u, -self.v, self.x)
             lt = min(
                 1,
-                self.backend.sqrt((self.v @ self.v))
-                / self.backend.sqrt((transported_v @ transported_v)),
+                self.backend.sqrt(self.v @ self.v)
+                / self.backend.sqrt(transported_v @ transported_v),
             )
             beta_dy = self.beta_dy(v_next=v_new, transported_u=transported_u, st=st)
             beta_hs = self.beta_hs(
@@ -833,12 +834,12 @@ def _loss_func_expval(circuit: Circuit, backend: Backend, *, hamiltonian) -> flo
         hamiltonian (ArrayLike): sparse Hamiltonian in the backend's format.
 
     Returns:
-        float: Expectation value.    
+        float: Expectation value.
     """
     psi = backend.execute_circuit(circuit).state()
     platform = backend.platform
     if platform == "tensorflow":
-        if "cpu" is backend.device.lower():
+        if "cpu" in backend.device.lower():
             psi_col = backend.reshape(psi, (-1, 1))
             h_psi = backend.engine.sparse.sparse_dense_matmul(hamiltonian, psi_col)
             h_psi = backend.reshape(h_psi, (-1,))
@@ -848,9 +849,7 @@ def _loss_func_expval(circuit: Circuit, backend: Backend, *, hamiltonian) -> flo
                 + "Hamiltonian has to be casted to dense for computation."
             )
             psi_col = backend.reshape(psi, (-1, 1))
-            h_psi = backend.matmul(
-                backend.engine.sparse.to_dense(hamiltonian), psi_col
-            )
+            h_psi = backend.matmul(backend.engine.sparse.to_dense(hamiltonian), psi_col)
             h_psi = backend.reshape(h_psi, (-1,))
 
     elif platform == "pytorch":
