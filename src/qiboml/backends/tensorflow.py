@@ -149,7 +149,7 @@ class TensorflowBackend(Backend):
         return self.engine.math.imag(array)
 
     def isnan(self, array: ArrayLike, **kwargs) -> ArrayLike:
-        return selg.engine.math.is_nan(array, **kwargs)
+        return self.engine.math.is_nan(array, **kwargs)
 
     def kron(self, array_1: ArrayLike, array_2: ArrayLike) -> ArrayLike:
         return self.engine.experimental.numpy.kron(array_1, array_2)
