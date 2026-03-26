@@ -245,6 +245,9 @@ class PyTorchBackend(Backend):
     def flatnonzero(self, array: ArrayLike) -> ArrayLike:
         return self.engine.nonzero(array).flatten()
 
+    def mod(self, dividend: ArrayLike, divisor: ArrayLike, **kwargs) -> ArrayLike:
+        return self.engine.fmod(dividend, divisor, **kwargs)
+
     def nonzero(self, array: ArrayLike) -> ArrayLike:
         rows_cols = self.engine.nonzero(array)
         return rows_cols[:, 0], rows_cols[:, 1]
