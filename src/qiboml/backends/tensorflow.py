@@ -107,11 +107,14 @@ class TensorflowBackend(Backend):
     ######## Methods related to array manipulation                                  ########
     ########################################################################################
 
+    def all(self, array: ArrayLike, **kwargs) -> Union[ArrayLike, bool]:
+        return self.engine.reduce_all(array, **kwargs)
+
     def arccos(self, array, **kwargs):
         return self.engine.math.acos(array, **kwargs)
 
-    def all(self, array: ArrayLike, **kwargs) -> Union[ArrayLike, bool]:
-        return self.engine.reduce_all(array, **kwargs)
+    def arcsin(self, array, **kwargs):
+        return self.engine.math.asin(array, **kwargs)
 
     def arctan2(self, array_1, array_2, **kwargs) -> ArrayLike:
         return self.engine.math.atan2(array_1, array_2, **kwargs)
