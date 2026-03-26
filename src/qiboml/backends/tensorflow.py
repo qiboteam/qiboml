@@ -132,7 +132,7 @@ class TensorflowBackend(Backend):
         return self.engine.identity(array, **kwargs)
 
     def cumsum(self, array: ArrayLike, **kwargs) -> ArrayLike:
-        return self.engine.cumsum(array, **kwargs)
+        return self.engine.math.cumsum(array, **kwargs)
 
     def default_rng(self, seed: Optional[int] = None):
         if seed is None:
