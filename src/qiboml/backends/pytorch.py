@@ -19,7 +19,7 @@ class TorchMatrices(NumpyMatrices):
         dtype (torch.dtype): Data type of the matrices.
     """
 
-    def __init__(self, dtype, device):
+    def __init__(self, dtype: DTypeLike, device: str):
         import torch  # pylint: disable=import-outside-toplevel  # type: ignore
 
         super().__init__(dtype)
@@ -27,7 +27,9 @@ class TorchMatrices(NumpyMatrices):
         self.dtype = dtype
         self.device = device
 
-    def _cast(self, array: ArrayLike, dtype, device: Optional[str] = None):
+    def _cast(
+        self, array: ArrayLike, dtype: DTypeLike, device: Optional[str] = None
+    ) -> ArrayLike:
         if device is None:
             device = self.device
 
@@ -39,10 +41,10 @@ class TorchMatrices(NumpyMatrices):
 
         return self.engine.stack(tensor_list).reshape(len(array), len(array))
 
-    def I(self, n: int = 2):
+    def I(self, n: int = 2) -> ArrayLike:
         return self.engine.eye(n, dtype=self.dtype, device=self.device)
 
-    def Unitary(self, u: ArrayLike):
+    def Unitary(self, u: ArrayLike) -> ArrayLike:
         return self._cast(u, dtype=self.dtype, device=self.device)
 
 
@@ -80,7 +82,7 @@ class PyTorchBackend(Backend):
     def cast(
         self,
         array: ArrayLike,
-        dtype=None,
+        dtype: Optional[DTypeLike] = None,
         copy: bool = False,
         device: Optional[str] = None,
     ) -> ArrayLike:
@@ -211,14 +213,14 @@ class PyTorchBackend(Backend):
     ######## Methods related to array manipulation                                  ########
     ########################################################################################
 
-    def coo_matrix(self, array, **kwargs):  # pragma: no cover
+    def coo_matrix(self, array: ArrayLike, **kwargs) -> ArrayLike:  # pragma: no cover
         array = self.cast(array, dtype=array.dtype)
         return array.to_sparse_coo(**kwargs)
 
     def copy(self, array: ArrayLike, **kwargs) -> ArrayLike:
         return self.engine.clone(array, **kwargs)
 
-    def csr_matrix(self, array, **kwargs):  # pragma: no cover
+    def csr_matrix(self, array: ArrayLike, **kwargs):  # pragma: no cover
         array = self.cast(array, dtype=array.dtype)
         return array.to_sparse_csr(**kwargs)
 
@@ -257,8 +259,8 @@ class PyTorchBackend(Backend):
         array: ArrayLike,
         size: Optional[Union[int, Tuple[int, ...]]] = None,
         replace: bool = True,
-        p: ArrayLike = None,
-        seed=None,
+        p: Optional[ArrayLike] = None,
+        seed: Optional[int] = None,
         **kwargs,
     ) -> ArrayLike:
         dtype = kwargs.get("dtype", self.float64)
@@ -284,7 +286,7 @@ class PyTorchBackend(Backend):
         low: int,
         high: Optional[int] = None,
         size: Optional[Union[int, Tuple[int, ...]]] = None,
-        seed=None,
+        seed: Optional[int] = None,
     ) -> ArrayLike:
         if high is None:
             high = low
@@ -307,7 +309,7 @@ class PyTorchBackend(Backend):
         mean: Union[float, int],
         stddev: Union[float, int],
         size: Optional[Union[int, List[int], Tuple[int, ...]]] = None,
-        seed=None,
+        seed: Optional[int] = None,
         dtype: Optional[DTypeLike] = None,
     ) -> ArrayLike:
         if isinstance(size, int):
@@ -341,7 +343,7 @@ class PyTorchBackend(Backend):
         low: Union[float, int] = 0.0,
         high: Union[float, int] = 1.0,
         size: Optional[Union[int, Tuple[int, ...]]] = None,
-        seed=None,
+        seed: Optional[DTypeLike] = None,
     ) -> ArrayLike:
 
         if seed is not None:
@@ -387,8 +389,8 @@ class PyTorchBackend(Backend):
     def jacobian(
         self,
         circuit: Circuit,
-        parameters: ArrayLike = None,
-        initial_state: ArrayLike = None,
+        parameters: Optional[ArrayLike] = None,
+        initial_state: Optional[ArrayLike] = None,
         return_complex: bool = True,
     ) -> ArrayLike:
         copied = circuit.copy(deep=True)
@@ -408,7 +410,7 @@ class PyTorchBackend(Backend):
         matrix: ArrayLike,
         power: Union[float, int],
         precision_singularity: float = 1e-14,
-        dtype=None,
+        dtype: Optional[DTypeLike] = None,
     ) -> ArrayLike:
         if not isinstance(power, (float, int)):
             raise_error(
@@ -506,7 +508,7 @@ class PyTorchBackend(Backend):
     ########################################################################################
 
     def assert_allclose(
-        self, value, target, rtol: float = 1e-7, atol: float = 0.0
+        self, value: ArrayLike, target: ArrayLike, rtol: float = 1e-7, atol: float = 0.0
     ) -> None:  # pragma: no cover
         if isinstance(value, (CircuitResult, QuantumState)):
             value = value.state()
@@ -543,7 +545,7 @@ class PyTorchBackend(Backend):
             param, dtype=self.dtype, requires_grad=trainable, device=self.device
         )
 
-    def _test_regressions(self, name):
+    def _test_regressions(self, name: str):
         if name == "test_measurementresult_apply_bitflips":
             return [
                 [0, 0, 0, 0, 2, 3, 0, 0, 0, 0],
