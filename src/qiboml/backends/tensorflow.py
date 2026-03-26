@@ -131,6 +131,9 @@ class TensorflowBackend(Backend):
     def copy(self, array: ArrayLike, **kwargs) -> ArrayLike:
         return self.engine.identity(array, **kwargs)
 
+    def cumsum(self, array: ArrayLike, **kwargs) -> ArrayLike:
+        return self.engine.cumsum(array, **kwargs)
+
     def default_rng(self, seed: Optional[int] = None):
         if seed is None:
             return self.engine.random.Generator.from_non_deterministic_state()
