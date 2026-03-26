@@ -229,7 +229,7 @@ class TensorflowBackend(Backend):
         low: Union[float, int] = 0.0,
         high: Union[float, int] = 1.0,
         size: Optional[Union[int, Tuple[int, ...]]] = None,
-        seed: Optiona[int] = None,
+        seed: Optional[int] = None,
     ) -> ArrayLike:
         shape = (size,) if isinstance(size, int) else size
 
