@@ -189,7 +189,7 @@ class TensorflowBackend(Backend):
     ) -> Union[float, int, ArrayLike]:  # pragma: no cover
         return self.engine.math.reduce_min(array, **kwargs)
 
-    def mod(dividend: ArrayLike, divisor: ArrayLike, **kwargs) -> ArrayLike:
+    def mod(self, dividend: ArrayLike, divisor: ArrayLike, **kwargs) -> ArrayLike:
         return self.engine.math.floormod(dividend, divisor, **kwargs)
 
     def outer(self, array_1: ArrayLike, array_2: ArrayLike) -> ArrayLike:
