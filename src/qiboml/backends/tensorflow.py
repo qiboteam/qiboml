@@ -11,7 +11,7 @@ from qibo.backends import Backend
 from qibo.backends.npmatrices import NumpyMatrices
 from qibo.config import TF_LOG_LEVEL, log, raise_error
 from qibo.gates.abstract import Gate
-from qibo.result import CircuitResult, QuantumState
+from qibo.result import CircuitResult, MeasurementOutcomes, QuantumState
 
 
 class TensorflowMatrices(NumpyMatrices):
@@ -67,7 +67,9 @@ class TensorflowBackend(Backend):
         elif cpu_devices:
             self.device = cpu_devices[0].name
 
-    def cast(self, array: ArrayLike, dtype=None, copy: bool = False) -> ArrayLike:
+    def cast(
+        self, array: ArrayLike, dtype: Optional[DTypeLike] = None, copy: bool = False
+    ) -> ArrayLike:
         if dtype is None:
             dtype = self.dtype
 
@@ -78,7 +80,7 @@ class TensorflowBackend(Backend):
 
         return array
 
-    def compile(self, func):
+    def compile(self, func: callable):
         return self.engine.function(func)
 
     def is_sparse(self, array: ArrayLike) -> bool:
@@ -107,26 +109,32 @@ class TensorflowBackend(Backend):
     ######## Methods related to array manipulation                                  ########
     ########################################################################################
 
-    def arccos(self, array, **kwargs):
-        return self.engine.math.acos(array, **kwargs)
-
     def all(self, array: ArrayLike, **kwargs) -> Union[ArrayLike, bool]:
         return self.engine.reduce_all(array, **kwargs)
 
-    def arctan2(self, array_1, array_2, **kwargs) -> ArrayLike:
+    def arccos(self, array: ArrayLike, **kwargs) -> ArrayLike:
+        return self.engine.math.acos(array, **kwargs)
+
+    def arcsin(self, array: ArrayLike, **kwargs) -> ArrayLike:
+        return self.engine.math.asin(array, **kwargs)
+
+    def arctan2(self, array_1: ArrayLike, array_2: ArrayLike, **kwargs) -> ArrayLike:
         return self.engine.math.atan2(array_1, array_2, **kwargs)
 
-    def concatenate(self, tup, **kwargs):
+    def concatenate(self, tup: Tuple[ArrayLike, ...], **kwargs) -> ArrayLike:
         return self.engine.concat(tup, **kwargs)
 
     def conj(self, array: ArrayLike) -> ArrayLike:
         return self.engine.math.conj(array)
 
-    def coo_matrix(self, array, **kwargs):  # pragma: no cover
+    def coo_matrix(self, array: ArrayLike, **kwargs) -> ArrayLike:  # pragma: no cover
         return self.engine.sparse.from_dense(array, **kwargs)
 
     def copy(self, array: ArrayLike, **kwargs) -> ArrayLike:
         return self.engine.identity(array, **kwargs)
+
+    def cumsum(self, array: ArrayLike, **kwargs) -> ArrayLike:
+        return self.engine.math.cumsum(array, **kwargs)
 
     def default_rng(self, seed: Optional[int] = None):
         if seed is None:
@@ -181,10 +189,13 @@ class TensorflowBackend(Backend):
     ) -> Union[float, int, ArrayLike]:  # pragma: no cover
         return self.engine.math.reduce_min(array, **kwargs)
 
+    def mod(self, dividend: ArrayLike, divisor: ArrayLike, **kwargs) -> ArrayLike:
+        return self.engine.math.floormod(dividend, divisor, **kwargs)
+
     def outer(self, array_1: ArrayLike, array_2: ArrayLike) -> ArrayLike:
         return self.tensordot(array_1, array_2, axes=0)
 
-    def prod(self, array, **kwargs) -> ArrayLike:
+    def prod(self, array: ArrayLike, **kwargs) -> ArrayLike:
         return self.engine.math.reduce_prod(array, **kwargs)
 
     def random_normal(
@@ -192,7 +203,7 @@ class TensorflowBackend(Backend):
         mean: Union[float, int],
         stddev: Union[float, int],
         size: Optional[Union[int, List[int], Tuple[int, ...]]] = None,
-        seed=None,
+        seed: Optional[int] = None,
         dtype: Optional[DTypeLike] = None,
     ) -> ArrayLike:
         if isinstance(size, int):
@@ -218,7 +229,7 @@ class TensorflowBackend(Backend):
         low: Union[float, int] = 0.0,
         high: Union[float, int] = 1.0,
         size: Optional[Union[int, Tuple[int, ...]]] = None,
-        seed=None,
+        seed: Optional[int] = None,
     ) -> ArrayLike:
         shape = (size,) if isinstance(size, int) else size
 
@@ -229,19 +240,21 @@ class TensorflowBackend(Backend):
 
         return self.engine.random.uniform(shape=shape, minval=low, maxval=high)
 
-    def ravel(self, array, **kwargs):  # pragma: no cover
+    def ravel(self, array: ArrayLike, **kwargs) -> ArrayLike:  # pragma: no cover
         return self.engine.keras.ops.ravel(array, **kwargs)  # pylint: disable=E1101
 
     def real(self, array: ArrayLike) -> ArrayLike:
         return self.engine.math.real(array)
 
-    def sin(self, array, **kwargs):
+    def sin(self, array: ArrayLike, **kwargs) -> ArrayLike:
         return self.engine.math.sin(array, **kwargs)
 
-    def sqrt(self, array):
+    def sqrt(self, array: ArrayLike) -> ArrayLike:
         return self.engine.math.sqrt(array)
 
-    def sum(self, array: ArrayLike, axis=None, **kwargs) -> ArrayLike:
+    def sum(
+        self, array: ArrayLike, axis: Optional[Tuple[int, ...]] = None, **kwargs
+    ) -> ArrayLike:
         return self.engine.math.reduce_sum(array, axis, **kwargs)
 
     def trace(self, array: ArrayLike) -> Union[int, float]:
@@ -253,7 +266,10 @@ class TensorflowBackend(Backend):
         return self.engine.math.reduce_variance(array, **kwargs)
 
     def vector_norm(
-        self, state: ArrayLike, order: Union[int, float, str] = 2, dtype=None
+        self,
+        state: ArrayLike,
+        order: Union[int, float, str] = 2,
+        dtype: Optional[DTypeLike] = None,
     ) -> Union[ArrayLike, float, int]:
         if dtype is None:
             dtype = self.dtype
@@ -273,8 +289,8 @@ class TensorflowBackend(Backend):
         self,
         matrix: ArrayLike,
         phase: Union[float, int, complex] = 1,
-        eigenvectors=None,
-        eigenvalues=None,
+        eigenvectors: Optional[ArrayLike] = None,
+        eigenvalues: Optional[ArrayLike] = None,
     ) -> ArrayLike:
         if eigenvectors is None or self.is_sparse(matrix):
             return self.expm(phase * matrix)
@@ -285,7 +301,7 @@ class TensorflowBackend(Backend):
         matrix: ArrayLike,
         power: Union[float, int],
         precision_singularity: float = 1e-14,
-        dtype=None,
+        dtype: Optional[DTypeLike] = None,
     ) -> ArrayLike:
         if not isinstance(power, (float, int)):
             raise_error(
@@ -314,8 +330,8 @@ class TensorflowBackend(Backend):
     def jacobian(
         self,
         circuit: Circuit,
-        parameters: ArrayLike = None,
-        initial_state: ArrayLike = None,
+        parameters: Optional[ArrayLike] = None,
+        initial_state: Optional[ArrayLike] = None,
         return_complex: bool = True,
     ) -> ArrayLike:
         copied = circuit.copy(deep=True)
@@ -336,7 +352,10 @@ class TensorflowBackend(Backend):
         return tape.jacobian(real, parameters)
 
     def zero_state(
-        self, nqubits: int, density_matrix: bool = False, dtype=None
+        self,
+        nqubits: int,
+        density_matrix: bool = False,
+        dtype: Optional[DTypeLike] = None,
     ) -> ArrayLike:
         if dtype is None:
             dtype = self.dtype
@@ -362,13 +381,13 @@ class TensorflowBackend(Backend):
         circuit: Circuit,
         initial_state: Optional[ArrayLike] = None,
         nshots: int = 1000,
-    ):
+    ) -> Union[CircuitResult, MeasurementOutcomes, QuantumState]:
         with self.engine.device(self.device):
             return super().execute_circuit(circuit, initial_state, nshots)
 
     def execute_circuit_repeated(
         self, circuit: Circuit, nshots: int, initial_state: Optional[ArrayLike] = None
-    ):
+    ) -> Union[CircuitResult, MeasurementOutcomes, QuantumState]:
         with self.engine.device(self.device):
             return super().execute_circuit_repeated(circuit, nshots, initial_state)
 
@@ -466,7 +485,7 @@ class TensorflowBackend(Backend):
         return frequencies
 
     def assert_allclose(
-        self, value, target, rtol: float = 1e-7, atol: float = 0.0
+        self, value: ArrayLike, target: ArrayLike, rtol: float = 1e-7, atol: float = 0.0
     ) -> None:  # pragma: no cover
         if isinstance(value, (CircuitResult, QuantumState)):
             value = value.state()
