@@ -96,21 +96,25 @@ class ExactGeodesicTransportCG:
         self.loss_fn = loss_fn
 
         if initial_parameters is not None:
-            self.angles = self.backend.cast(
-                initial_parameters, dtype=initial_parameters.dtype
+            dtype = (
+                initial_parameters[0].dtype
+                if isinstance(initial_parameters, list)
+                else initial_parameters.dtype
             )
+            self.angles = self.backend.cast(initial_parameters, dtype=dtype)
         else:
-            self.angles = _generate_rbs_angles(
-                random_statevector(
-                    int(comb(nqubits, weight)),
-                    seed=seed,
-                    backend=self.backend,
-                    dtype=self.backend.float64,
-                ),
-                "diagonal",
+            self.angles = random_statevector(
+                int(comb(nqubits, weight)),
+                seed=seed,
                 backend=self.backend,
+                dtype=self.backend.float64,
             )
-            self.angles = self.backend.cast(self.angles, dtype=self.angles.dtype)
+            self.angles = _generate_rbs_angles(
+                self.angles,
+                architecture="diagonal",
+                backend=self.backend,
+            )  # returns a list
+            self.angles = self.backend.cast(self.angles, dtype=self.angles[0].dtype)
 
         self.x = self.angles_to_amplitudes(self.angles)
         self.circuit = hamming_weight_encoder(
