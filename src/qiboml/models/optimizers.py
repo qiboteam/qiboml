@@ -5,8 +5,11 @@ from numpy.typing import ArrayLike
 from qibo import Circuit
 from qibo.backends import Backend, _check_backend
 from qibo.config import log, raise_error
-from qibo.models._encodings import _ehrlich_algorithm, _generate_rbs_angles
-from qibo.models.encodings import hamming_weight_encoder
+from qibo.models.encodings import (
+    _ehrlich_algorithm,
+    _generate_rbs_angles,
+    hamming_weight_encoder,
+)
 from qibo.quantum_info import random_statevector
 from scipy.sparse import issparse, isspmatrix_coo
 from scipy.special import comb
@@ -93,25 +96,21 @@ class ExactGeodesicTransportCG:
         self.loss_fn = loss_fn
 
         if initial_parameters is not None:
-            dtype = (
-                initial_parameters[0].dtype
-                if isinstance(initial_parameters, list)
-                else initial_parameters.dtype
+            self.angles = self.backend.cast(
+                initial_parameters, dtype=initial_parameters.dtype
             )
-            self.angles = self.backend.cast(initial_parameters, dtype=dtype)
         else:
-            self.angles = random_statevector(
-                int(comb(nqubits, weight)),
-                dtype=self.backend.float64,
-                seed=seed,
-                backend=self.backend,
-            )
             self.angles = _generate_rbs_angles(
-                self.angles,
-                architecture="diagonal",
+                random_statevector(
+                    int(comb(nqubits, weight)),
+                    seed=seed,
+                    backend=self.backend,
+                    dtype=self.backend.float64,
+                ),
+                "diagonal",
                 backend=self.backend,
             )
-            self.angles = self.backend.cast(self.angles, dtype=self.angles[0].dtype)
+            self.angles = self.backend.cast(self.angles, dtype=self.angles.dtype)
 
         self.x = self.angles_to_amplitudes(self.angles)
         self.circuit = hamming_weight_encoder(
