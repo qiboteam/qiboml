@@ -118,9 +118,9 @@ class ExactGeodesicTransportCG:
 
         self.x = self.angles_to_amplitudes(self.angles)
         self.circuit = hamming_weight_encoder(
-            self.x,
             self.nqubits,
             self.weight,
+            self.x,
             backend=self.backend,
         )
         self.angles = self.backend.cast(
@@ -437,11 +437,10 @@ class ExactGeodesicTransportCG:
                     self.exponential_map_with_direction(u_prev, eta)
                 )
             )
-
             self.circuit = hamming_weight_encoder(
-                x_new,
                 self.nqubits,
                 self.weight,
+                x_new,
                 backend=self.backend,
             )
             self.angles = self.backend.cast(
@@ -671,9 +670,9 @@ class ExactGeodesicTransportCG:
             self.u = v_new + beta_val * st * transported_u
 
             self.circuit = hamming_weight_encoder(
-                self.x,
                 self.nqubits,
                 self.weight,
+                self.x,
                 backend=self.backend,
             )
             self.angles = self.backend.cast(
