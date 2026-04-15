@@ -253,7 +253,7 @@ class TensorflowBackend(Backend):
         return self.engine.math.real(array)
 
     def round(self, array: ArrayLike, decimals: int = 0) -> ArrayLike:
-        return self.engine.experimental.numpy.around(array, decimals)
+        return self.engine.experimental.numpy.around(array, decimals=decimals)
 
     def sin(self, array: ArrayLike, **kwargs) -> ArrayLike:
         return self.engine.math.sin(array, **kwargs)
