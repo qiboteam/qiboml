@@ -251,8 +251,7 @@ class PyTorchBackend(Backend):
         return self.engine.fmod(dividend, divisor, **kwargs)
 
     def nonzero(self, array: ArrayLike) -> ArrayLike:
-        rows_cols = self.engine.nonzero(array)
-        return rows_cols[:, 0], rows_cols[:, 1]
+        return self.engine.nonzero(array, as_tuple=True)
 
     def random_choice(
         self,
