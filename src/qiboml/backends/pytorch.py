@@ -251,8 +251,7 @@ class PyTorchBackend(Backend):
         return self.engine.fmod(dividend, divisor, **kwargs)
 
     def nonzero(self, array: ArrayLike) -> ArrayLike:
-        rows_cols = self.engine.nonzero(array)
-        return rows_cols[:, 0], rows_cols[:, 1]
+        return self.engine.nonzero(array, as_tuple=True)
 
     def random_choice(
         self,
@@ -352,6 +351,16 @@ class PyTorchBackend(Backend):
             return low + (high - low) * self.engine.rand(size, generator=local_state)
 
         return low + (high - low) * self.engine.rand(size)
+
+    def round(self, array: ArrayLike, decimals: int = 0) -> ArrayLike:
+        len_size = len(array.size())
+        dtype = array.dtype if len_size == 0 else array[0].dtype
+        if "complex" in str(dtype):
+            return self.engine.round(
+                self.real(array), decimals=decimals
+            ) + 1j * self.engine.round(self.imag(array), decimals=decimals)
+
+        return super().round(array, decimals=decimals)
 
     def right_shift(self, *args, **kwargs) -> ArrayLike:
         return self.engine.bitwise_right_shift(*args, **kwargs)

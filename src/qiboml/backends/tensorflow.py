@@ -184,10 +184,16 @@ class TensorflowBackend(Backend):
     ) -> Union[float, int, ArrayLike]:  # pragma: no cover
         return self.engine.math.reduce_max(array, **kwargs)
 
+    def maximum(self, array_1: ArrayLike, array_2: ArrayLike, **kwargs) -> ArrayLike:
+        return self.engine.math.maximum(array_1, array_2, **kwargs)
+
     def min(
         self, array: ArrayLike, **kwargs
     ) -> Union[float, int, ArrayLike]:  # pragma: no cover
         return self.engine.math.reduce_min(array, **kwargs)
+
+    def minimum(self, array_1: ArrayLike, array_2: ArrayLike, **kwargs) -> ArrayLike:
+        return self.engine.math.minimum(array_1, array_2, **kwargs)
 
     def mod(self, dividend: ArrayLike, divisor: ArrayLike, **kwargs) -> ArrayLike:
         return self.engine.math.floormod(dividend, divisor, **kwargs)
@@ -245,6 +251,9 @@ class TensorflowBackend(Backend):
 
     def real(self, array: ArrayLike) -> ArrayLike:
         return self.engine.math.real(array)
+
+    def round(self, array: ArrayLike, decimals: int = 0) -> ArrayLike:
+        return self.engine.experimental.numpy.around(array, decimals=decimals)
 
     def sin(self, array: ArrayLike, **kwargs) -> ArrayLike:
         return self.engine.math.sin(array, **kwargs)
