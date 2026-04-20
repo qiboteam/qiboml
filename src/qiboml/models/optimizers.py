@@ -118,9 +118,9 @@ class ExactGeodesicTransportCG:
 
         self.x = self.angles_to_amplitudes(self.angles)
         self.circuit = hamming_weight_encoder(
-            self.nqubits,
-            self.weight,
-            self.x,
+            nqubits=self.nqubits,
+            weight=self.weight,
+            data=self.x,
             backend=self.backend,
         )
         self.angles = self.backend.cast(
