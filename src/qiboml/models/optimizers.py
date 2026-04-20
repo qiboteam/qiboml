@@ -438,9 +438,9 @@ class ExactGeodesicTransportCG:
                 )
             )
             self.circuit = hamming_weight_encoder(
-                self.nqubits,
-                self.weight,
-                x_new,
+                nqubits=self.nqubits,
+                weight=self.weight,
+                data=x_new,
                 backend=self.backend,
             )
             self.angles = self.backend.cast(
@@ -670,9 +670,9 @@ class ExactGeodesicTransportCG:
             self.u = v_new + beta_val * st * transported_u
 
             self.circuit = hamming_weight_encoder(
-                self.nqubits,
-                self.weight,
-                self.x,
+                nqubits=self.nqubits,
+                weight=self.weight,
+                data=self.x,
                 backend=self.backend,
             )
             self.angles = self.backend.cast(
