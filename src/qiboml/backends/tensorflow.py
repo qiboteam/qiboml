@@ -153,6 +153,14 @@ class TensorflowBackend(Backend):
     def flatnonzero(self, array: ArrayLike) -> ArrayLike:
         return np.flatnonzero(array)
 
+    def full(
+        self,
+        shape: Union[int, Tuple[int, ...], List[int]],
+        fill_value: Union[complex, float, int],
+        **kwargs,
+    ) -> ArrayLike:
+        return self.engine.fill(shape, fill_value, **kwargs)
+
     def imag(self, array: ArrayLike) -> Union[int, float, ArrayLike]:
         return self.engine.math.imag(array)
 
