@@ -278,6 +278,24 @@ class JaxBackend(Backend):
 
         return _apply_gate(gate.matrix(self), state, gate.qubits, nqubits)
 
+    def jacobian(
+        self,
+        circuit,
+        parameters: Optional[ArrayLike] = None,
+        initial_state: Optional[ArrayLike] = None,
+        return_complex: bool = True,
+    ) -> ArrayLike:
+        copied = circuit.copy(deep=True)
+
+        def func(parameters):
+            copied.set_parameters(parameters)
+            state = self.execute_circuit(copied, initial_state=initial_state).state()
+            if return_complex:
+                return self.real(state), self.imag(state)
+            return self.real(state)
+
+        return self.jax.jacobian(func)(parameters)
+
     def matrix(self, gate: Gate) -> ArrayLike:
         matrix = super().matrix(gate)
         if isinstance(matrix, self.jax.core.Tracer):

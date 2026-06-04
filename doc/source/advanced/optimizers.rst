@@ -1,5 +1,47 @@
+Using the Quantum Natural Gradient Optimizer
+--------------------------------------------
+
+The Quantum Natural Gradient (QNG) optimizer updates variational-circuit
+parameters using the quantum Fisher information matrix as a local metric tensor.
+In ``qiboml``, it is implemented in
+:class:`qiboml.models.optimizers.QuantumNaturalGradient`.
+
+The optimizer works with any parametrized :class:`qibo.Circuit`, a callable loss
+function, and either a user-provided Euclidean gradient function or a central
+finite-difference gradient. The QFIM itself is calculated with
+``qibo.quantum_info.quantum_fisher_information_matrix`` and therefore requires a
+backend that supports the QFIM Jacobian calculation.
+
+Example usage
+~~~~~~~~~~~~~
+
+.. code-block:: python
+
+    from qibo import Circuit, gates, get_backend, set_backend
+    from qiboml.models.optimizers import QuantumNaturalGradient
+
+    set_backend("qiboml", platform="pytorch")
+    backend = get_backend()
+
+    circuit = Circuit(1)
+    circuit.add(gates.RY(0, theta=0.2))
+
+    def loss_fn(circuit, backend):
+        state = backend.execute_circuit(circuit).state()
+        return backend.real(backend.conj(state[1]) * state[1])
+
+    optimizer = QuantumNaturalGradient(
+        circuit,
+        loss_fn=loss_fn,
+        learning_rate=0.05,
+        regularization=1e-8,
+        backend=backend,
+    )
+    final_loss, losses, final_params = optimizer(steps=20)
+
+
 Using the Exact Geodesic Transport with Conjugate Gradients(EGT-CG) Optimizer
--------------------------------------------------------------------------------
+-----------------------------------------------------------------------------
 
 The Exact Geodesic Transport with Conjugate Gradients (EGT-CG) optimizer is a curvature-aware Riemannian optimizer designed specifically for variational circuits based on the Hamming-weight encoder (HWE) ansatz (see  Farias et al., *Quantum encoder for fixed-Hamming-weight subspaces*, `Phys. Rev. Applied 23, 044014 (2025) <https://doi.org/10.1103/PhysRevApplied.23.044014>`_).
 
