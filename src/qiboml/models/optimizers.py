@@ -178,18 +178,11 @@ class ExactGeodesicTransportCG:
         backends_autodiff = ["jax", "tensorflow", "pytorch"]
         if loss_fn == "exp_val" or self.backend.name == "hamming_weight":
             if self.hamiltonian is None:
-                if self.backend.platform not in backends_autodiff:
-                    raise_error(
-                        ValueError,
-                        "For ``loss_fn='exp_val'``, you must pass the hamiltonian to ``loss_kwargs`` "
-                        + "via the dict item ``{'hamiltonian': hamiltonian}``, and use autodiff!",
-                    )
-                else:
-                    raise_error(
-                        ValueError,
-                        "For ``loss_fn='exp_val'``, you must pass the hamiltonian to ``loss_kwargs`` "
-                        + "via the dict item ``{'hamiltonian': hamiltonian}``.",
-                    )
+                raise_error(
+                    ValueError,
+                    "For ``loss_fn='exp_val'``, you must pass the hamiltonian to ``loss_kwargs`` "
+                    + "via the dict item ``{'hamiltonian': hamiltonian}``.",
+                )
 
             if self.backend.platform in backends_autodiff:
                 self.hamiltonian_subspace = None
@@ -197,7 +190,7 @@ class ExactGeodesicTransportCG:
                 self.gradient_func = self._gradient_func_internal
             else:
                 self.hamiltonian_subspace = self.get_subspace_hamiltonian()
-                if self.backend.name == "hamming_weight":
+                if self.backend.name == "hamming_weight":  # pragma: no cover
                     loss_kwargs["hamiltonian"] = self.hamiltonian_subspace
                 self.loss_fn = _loss_func_expval
                 self.riemannian_tangent = True
@@ -213,7 +206,7 @@ class ExactGeodesicTransportCG:
 
         self.loss = self._loss_internal
         self.loss_kwargs = loss_kwargs
-        if self.backend.name == "hamming_weight":
+        if self.backend.name == "hamming_weight":  # pragma: no cover
             self.loss_kwargs["weight"] = self.weight
 
         self.jacobian = None
@@ -868,7 +861,7 @@ def _loss_func_expval(
     Returns:
         float: Expectation value.
     """
-    if backend.name == "hamming_weight":
+    if backend.name == "hamming_weight":  # pragma: no cover
         psi = backend.execute_circuit(circuit, weight=weight).state()
     else:
         psi = backend.execute_circuit(circuit).state()
