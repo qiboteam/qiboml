@@ -89,7 +89,7 @@ class ExactGeodesicTransportCG:
         self.backtrack_min_lr = backtrack_min_lr
         self.c1 = c1
         self.c2 = c2
-        if backend is None:
+        if backend is None:  # pragma: no cover
             backend = HammingWeightBackend("numpy")
         self.backend = _check_backend(backend)
         self.callback = callback
