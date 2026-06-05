@@ -3,7 +3,7 @@ from typing import Any, Callable, Tuple
 
 from numpy.typing import ArrayLike
 from qibo import Circuit
-from qibo.backends import Backend, _check_backend
+from qibo.backends import Backend, HammingWeightBackend, _check_backend
 from qibo.config import log, raise_error
 from qibo.models.encodings import (
     _ehrlich_algorithm,
@@ -89,6 +89,8 @@ class ExactGeodesicTransportCG:
         self.backtrack_min_lr = backtrack_min_lr
         self.c1 = c1
         self.c2 = c2
+        if backend is None:
+            backend = HammingWeightBackend("numpy")
         self.backend = _check_backend(backend)
         self.callback = callback
         self.n_calls_loss = 0
