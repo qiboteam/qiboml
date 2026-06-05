@@ -113,7 +113,7 @@ class ExactGeodesicTransportCG:
                 self.angles,
                 architecture="diagonal",
                 backend=self.backend,
-            )  # returns a list
+            )
             self.angles = self.backend.cast(self.angles, dtype=self.angles[0].dtype)
 
         self.x = self.angles_to_amplitudes(self.angles)
@@ -188,6 +188,7 @@ class ExactGeodesicTransportCG:
                 )
             if self.backend.platform in backends_autodiff:
                 self.hamiltonian_subspace = None
+                self.loss_fn = _loss_func_expval
                 self.gradient_func = self._gradient_func_internal
             else:
                 self.hamiltonian_subspace = self.get_subspace_hamiltonian()
