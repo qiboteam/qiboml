@@ -7,7 +7,7 @@ It updates parameters along exact geodesic paths on the hyperspherical manifold 
 
 For more details, see: Ferreira-Martins et al., *Quantum optimization with exact geodesic transport*, `arXiv:2506.17395 (2025) <https://arxiv.org/abs/2506.17395>`_.
 
-The optimizer works with an ansatz :math:`\ket{\psi(\boldsymbol{\theta})}` parameterized by hyperspherical angles :math:`\boldsymbol{\theta}`, and the implementation allows one to work with arbitrary loss functions. VQE is achieved by specifying the loss function :math:`\mathcal{L}(\boldsymbol{\theta}) = \bra{\psi(\boldsymbol{\theta})} \, H \, \ket{\psi(\boldsymbol{\theta})}` and passing the hamiltonian as one of its arguments, as can be seen in the example below. 
+The optimizer works with an ansatz :math:`\ket{\psi(\boldsymbol{\theta})}` parameterized by hyperspherical angles :math:`\boldsymbol{\theta}`, and the implementation allows one to work with arbitrary loss functions. VQE is achieved by specifying the loss function :math:`\mathcal{L}(\boldsymbol{\theta}) = \bra{\psi(\boldsymbol{\theta})} \, H \, \ket{\psi(\boldsymbol{\theta})}` and passing the hamiltonian as one of its arguments, as can be seen in the example below.
 
 In ``qiboml``, the EGT-CG optimizer is implemented in the class :class:`qiboml.models.optimizers.ExactGeodesicTransportCG`.
 
@@ -74,7 +74,7 @@ When constructing an :class:`qiboml.models.optimizers.ExactGeodesicTransportCG` 
 - ``c1``, ``c2``: Wolfe line search constants.
 - ``callback``: Callable for callback.
 - ``seed``: Random seed.
-- ``backend``: Optional qibo backend (default: global backend). If one sets ``"exp_val"`` as the loss, the ``numpy`` backend can be used, which will be the fastest option as backpropagation will not be needed. If a callable is passed for a generic loss, one must use the ``qiboml`` backend with the prefered platform (``"pytorch"``, ``"tensorflow"`` or ``"jax"``) for backpropagation.
+- ``backend``: Optional qibo backend (default: global backend). If one sets ``"exp_val"`` as the loss, the ``numpy`` backend (in particular, via the  `Hamming-weight simulator <https://https://qibo.science/qibo/stable/api-reference/qibo.html#simulation-of-hamming-weight-preserving-circuits>`_) can be used, which will be the fastest option as backpropagation will not be needed. If a callable is passed for a generic loss, one must use the ``qiboml`` backend with the prefered platform (``"pytorch"``, ``"tensorflow"`` or ``"jax"``) for backpropagation. We still recommend the use of the Hamming-weight Backend for increased efficiency.
 
 As an example, if one wishes to explicitly define the expectation value as the loss function, one does as follows:
 
@@ -85,11 +85,11 @@ As an example, if one wishes to explicitly define the expectation value as the l
         return backend.real(backend.conj(psi) @ hamiltonian @ psi)
 
     loss_fn = loss_func_expval
-  
+
 At the end of the run, the following objects are returned:
 
 - ``final_loss``: Loss at final parameters.
 - ``losses``: List of losses per epoch.
 - ``final_params``: Final parameters.
 
-Also, one can access the arttributes ``n_calls_loss`` and ``n_calls_gradient``, which store respectively the number of times that the loss and the gradient were computed during the optimization.
+Also, one can access the attributes ``n_calls_loss`` and ``n_calls_gradient``, which store respectively the number of times that the loss and the gradient were computed during the optimization.
