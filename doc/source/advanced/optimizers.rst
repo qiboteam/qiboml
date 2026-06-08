@@ -2,7 +2,7 @@ Using the Quantum Natural Gradient Optimizer
 --------------------------------------------
 
 The Quantum Natural Gradient (QNG) optimizer updates variational-circuit
-parameters using the quantum Fisher information matrix as a local metric tensor.
+parameters using the quantum Fisher information matrix (QFIM) as a local metric tensor.
 In ``qiboml``, it is implemented in
 :class:`qiboml.models.optimizers.QuantumNaturalGradient`.
 
@@ -10,7 +10,7 @@ The optimizer works with any parametrized :class:`qibo.Circuit`, a callable loss
 function, and either a user-provided Euclidean gradient function or a central
 finite-difference gradient. The QFIM itself is calculated with
 ``qibo.quantum_info.quantum_fisher_information_matrix`` and therefore requires a
-backend that supports the QFIM Jacobian calculation.
+backend that supports the QFIM's Jacobian calculation.
 
 Example usage
 ~~~~~~~~~~~~~
@@ -18,17 +18,24 @@ Example usage
 .. code-block:: python
 
     from qibo import Circuit, gates, get_backend, set_backend
+    from qibo.hamiltonians import XXZ
     from qiboml.models.optimizers import QuantumNaturalGradient
 
     set_backend("qiboml", platform="pytorch")
     backend = get_backend()
 
+    nqubits = 2
+
+    hamiltonian = XXZ(nqubits, backend=backend).matrix
+
     circuit = Circuit(1)
-    circuit.add(gates.RY(0, theta=0.2))
+    circuit.add(gates.RY(qubit, theta=backend.random_sample(1)) for qubit in range(nqubits))
+    circuit.add(gates.CNOT(qubit, qubit + 1) for qubit in range(nqubits - 1))
+    circuit.add(gates.RY(qubit, theta=backend.random_sample(1)) for qubit in range(nqubits))
 
     def loss_fn(circuit, backend):
         state = backend.execute_circuit(circuit).state()
-        return backend.real(backend.conj(state[1]) * state[1])
+        return backend.real(backend.conj(state) @ hamiltonian @ state)
 
     optimizer = QuantumNaturalGradient(
         circuit,
@@ -134,4 +141,4 @@ At the end of the run, the following objects are returned:
 - ``losses``: List of losses per epoch.
 - ``final_params``: Final parameters.
 
-Also, one can access the arttributes ``n_calls_loss`` and ``n_calls_gradient``, which store respectively the number of times that the loss and the gradient were computed during the optimization.
+Also, one can access the attributes ``n_calls_loss`` and ``n_calls_gradient``, which store respectively the number of times that the loss and the gradient were computed during the optimization.
