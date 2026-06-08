@@ -28,7 +28,7 @@ Example usage
 
     hamiltonian = XXZ(nqubits, backend=backend).matrix
 
-    circuit = Circuit(1)
+    circuit = Circuit(nqubits)
     circuit.add(gates.RY(qubit, theta=backend.random_sample(1)) for qubit in range(nqubits))
     circuit.add(gates.CNOT(qubit, qubit + 1) for qubit in range(nqubits - 1))
     circuit.add(gates.RY(qubit, theta=backend.random_sample(1)) for qubit in range(nqubits))
