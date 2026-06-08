@@ -1,5 +1,5 @@
 import math
-from typing import Any, Callable, Tuple
+from typing import Any, Callable, Optional, Tuple
 
 from numpy.typing import ArrayLike
 from qibo import Circuit
@@ -123,7 +123,7 @@ class ExactGeodesicTransportCG:
             nqubits=self.nqubits,
             weight=self.weight,
             data=self.x,
-            full_hwp = bool(self.backend.name == "hamming_weight"),
+            full_hwp=bool(self.backend.name == "hamming_weight"),
             backend=self.backend,
         )
         self.angles = self.backend.cast(
@@ -842,7 +842,11 @@ def _scipy_sparse_to_backend_coo(matrix, backend: Backend) -> ArrayLike:
 
 
 def _loss_func_expval(
-    circuit: Circuit, backend: Backend, *, hamiltonian: ArrayLike, weight: Optional[int] = None
+    circuit: Circuit,
+    backend: Backend,
+    *,
+    hamiltonian: ArrayLike,
+    weight: Optional[int] = None,
 ) -> float:
     """Backend-agnostic expectation value :math:`\\bra{\\psi} H \\ket{\\psi}`.
 
