@@ -457,7 +457,7 @@ class ExactGeodesicTransportCG:
                 nqubits=self.nqubits,
                 weight=self.weight,
                 data=x_new,
-                full_hwp=self.backend.name == "hamming_weight",
+                full_hwp=bool(self.backend.name == "hamming_weight"),
                 backend=self.backend,
             )
             self.angles = self.backend.cast(
@@ -690,7 +690,7 @@ class ExactGeodesicTransportCG:
                 nqubits=self.nqubits,
                 weight=self.weight,
                 data=self.x,
-                full_hwp=self.backend.name == "hamming_weight",
+                full_hwp=bool(self.backend.name == "hamming_weight"),
                 backend=self.backend,
             )
             self.angles = self.backend.cast(
