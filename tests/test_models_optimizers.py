@@ -177,10 +177,8 @@ def test_egt_cg(
 
 
 def _loss_func_expval(circuit, backend, *, hamiltonian, weight=None):
-    if backend.name == "hamming_weight":
-        psi = backend.execute_circuit(circuit, weight=weight).state()
-    else:
-        psi = backend.execute_circuit(circuit).state()
+    kwargs = {"weight": weight} if backend.name == "hamming_weight" else {}
+    psi = backend.execute_circuit(circuit, **kwargs).state()
     platform = backend.platform
     if platform == "tensorflow":
         if "cpu" in backend.device.lower():
