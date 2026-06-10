@@ -7,7 +7,7 @@ It updates parameters along exact geodesic paths on the hyperspherical manifold 
 
 For more details, see: Ferreira-Martins et al., *Quantum optimization with exact geodesic transport*, `arXiv:2506.17395 (2025) <https://arxiv.org/abs/2506.17395>`_.
 
-The optimizer works with an ansatz :math:`\ket{\psi(\boldsymbol{\theta})}` parameterized by hyperspherical angles :math:`\boldsymbol{\theta}`, and the implementation allows one to work with arbitrary loss functions. VQE is achieved by specifying the loss function :math:`\mathcal{L}(\boldsymbol{\theta}) = \bra{\psi(\boldsymbol{\theta})} \, H \, \ket{\psi(\boldsymbol{\theta})}` and passing the hamiltonian as one of its arguments, as can be seen in the example below. 
+The optimizer works with an ansatz :math:`\ket{\psi(\boldsymbol{\theta})}` parameterized by hyperspherical angles :math:`\boldsymbol{\theta}`, and the implementation allows one to work with arbitrary loss functions. VQE is achieved by specifying the loss function :math:`\mathcal{L}(\boldsymbol{\theta}) = \bra{\psi(\boldsymbol{\theta})} \, H \, \ket{\psi(\boldsymbol{\theta})}` and passing the hamiltonian as one of its arguments, as can be seen in the example below.
 
 In ``qiboml``, the EGT-CG optimizer is implemented in the class :class:`qiboml.models.optimizers.ExactGeodesicTransportCG`.
 
@@ -85,7 +85,7 @@ As an example, if one wishes to explicitly define the expectation value as the l
         return backend.real(backend.conj(psi) @ hamiltonian @ psi)
 
     loss_fn = loss_func_expval
-  
+
 At the end of the run, the following objects are returned:
 
 - ``final_loss``: Loss at final parameters.
@@ -93,3 +93,81 @@ At the end of the run, the following objects are returned:
 - ``final_params``: Final parameters.
 
 Also, one can access the arttributes ``n_calls_loss`` and ``n_calls_gradient``, which store respectively the number of times that the loss and the gradient were computed during the optimization.
+
+
+Using the Quantum Natural Gradient Optimizer
+--------------------------------------------
+
+The Quantum Natural Gradient (QNG) optimizer is a geometry-aware first-order optimizer for
+generic parametrized circuits. It rescales the gradient using the Fubini-Study metric tensor,
+which in ``qiboml`` is computed from Qibo's Quantum Fisher Information Matrix (QFIM)
+implementation.
+
+For more details, see: Stokes et al., *Quantum Natural Gradient*,
+`arXiv:1909.02108 <https://arxiv.org/abs/1909.02108>`_.
+
+In ``qiboml``, QNG is implemented in the class
+:class:`qiboml.models.optimizers.QuantumNaturalGradient`.
+
+Example usage - VQE with a generic parametrized circuit
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: python
+
+    from qibo import Circuit, gates, get_backend, set_backend
+    from qibo.hamiltonians import Z
+    from qiboml.models.optimizers import QuantumNaturalGradient
+
+    set_backend("qiboml", platform="pytorch")
+    backend = get_backend()
+
+    circuit = Circuit(2)
+    circuit.add(gates.RY(0, theta=0.1))
+    circuit.add(gates.RY(1, theta=0.2))
+    circuit.add(gates.CZ(0, 1))
+    circuit.add(gates.RY(0, theta=0.3))
+    circuit.add(gates.RY(1, theta=0.4))
+
+    optimizer = QuantumNaturalGradient(
+        circuit=circuit,
+        loss_fn="exp_val",
+        loss_kwargs={"hamiltonian": Z(2, backend=backend).matrix},
+        learning_rate=0.1,
+        regularization=1e-3,
+        backend=backend,
+    )
+    final_loss, losses, final_params = optimizer(steps=50)
+
+
+Available arguments
+~~~~~~~~~~~~~~~~~~
+
+When constructing a :class:`qiboml.models.optimizers.QuantumNaturalGradient` object,
+the arguments are:
+
+- ``circuit``: Parametrized circuit to optimize.
+- ``loss_fn``: Loss function to be optimized. It can be either a callable specifying the
+  loss, or the string ``"exp_val"`` for the standard VQE objective.
+- ``loss_kwargs``: Dictionary of keyword arguments passed to the loss function. If one sets
+  the loss as ``"exp_val"``, the hamiltonian must be passed as
+  ``{'hamiltonian': hamiltonian}``.
+- ``initial_parameters``: Initial circuit parameters. If ``None``, parameters are read from
+  the circuit directly.
+- ``learning_rate``: Step size multiplying the natural-gradient direction.
+- ``regularization``: Diagonal regularization added to the metric tensor before solving the
+  linear system.
+- ``callback``: Callable for callback.
+- ``seed``: Present for API compatibility.
+- ``backend``: Optional qibo backend (default: global backend). Since the metric tensor is
+  computed from Qibo's QFIM implementation, QNG should be used with autodiff-capable backends
+  such as ``qiboml`` with platform ``"pytorch"``, ``"tensorflow"``, or ``"jax"``.
+
+At the end of the run, the following objects are returned:
+
+- ``final_loss``: Loss at final parameters.
+- ``losses``: List of losses per epoch.
+- ``final_params``: Final parameters.
+
+Also, one can access the attributes ``n_calls_loss`` and ``n_calls_gradient``, which store
+respectively the number of times that the loss and the gradient were computed during the
+optimization.

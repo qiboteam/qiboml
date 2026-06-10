@@ -39,6 +39,11 @@ qiboml.models.decoding
 qiboml.models.optimizers
 ------------------------
 
+.. autoclass:: qiboml.models.optimizers.QuantumNaturalGradient
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 .. autoclass:: qiboml.models.optimizers.ExactGeodesicTransportCG
    :members:
    :undoc-members:

@@ -1,13 +1,44 @@
+import numpy as np
 import pytest
 import scipy
-from qibo import hamiltonians
+from qibo import Circuit, gates, hamiltonians
 from qibo.backends import NumpyBackend
 from qibo.models.encodings import _generate_rbs_angles
-from qibo.quantum_info import random_statevector
+from qibo.quantum_info import quantum_fisher_information_matrix, random_statevector
 from scipy.sparse import csr_matrix
 from scipy.special import comb
 
-from qiboml.models.optimizers import ExactGeodesicTransportCG
+from qiboml.models.optimizers import ExactGeodesicTransportCG, QuantumNaturalGradient
+
+
+def _get_autodiff_backend(name):
+    if name == "jax":
+        from qiboml.backends.jax import JaxBackend
+
+        return JaxBackend()
+    if name == "tensorflow":
+        from qiboml.backends.tensorflow import TensorflowBackend
+
+        return TensorflowBackend()
+    if name == "pytorch":
+        from qiboml.backends.pytorch import PyTorchBackend
+
+        return PyTorchBackend()
+    raise RuntimeError(f"Unknown backend {name}.")
+
+
+AUTODIFF_BACKENDS = []
+for _backend_name in ("tensorflow", "pytorch", "jax"):
+    try:
+        _ = _get_autodiff_backend(_backend_name)
+        AUTODIFF_BACKENDS.append(_backend_name)
+    except (ModuleNotFoundError, ImportError):
+        pass
+
+
+@pytest.fixture(params=AUTODIFF_BACKENDS)
+def autodiff_backend(request):
+    yield _get_autodiff_backend(request.param)
 
 
 def test_egt_cg_errors(backend):
@@ -274,3 +305,202 @@ def _get_xxz_hamiltonian(nqubits, hamiltonian_type, backend):
         true_gs_energy = backend.real(backend.cast(eigenvalues[0]))
 
     return hamiltonian, true_gs_energy
+
+
+def _build_ry_cz_ansatz(nqubits):
+    circuit = Circuit(nqubits)
+    for qubit in range(nqubits):
+        circuit.add(gates.RY(qubit, theta=0.0))
+    for qubit in range(nqubits - 1):
+        circuit.add(gates.CZ(qubit, qubit + 1))
+    for qubit in range(nqubits):
+        circuit.add(gates.RY(qubit, theta=0.0))
+    return circuit
+
+
+@pytest.mark.parametrize("nqubits", [2, 3])
+def test_quantum_natural_gradient_vqe(autodiff_backend, nqubits):
+    backend = autodiff_backend
+    circuit = _build_ry_cz_ansatz(nqubits)
+    hamiltonian = hamiltonians.Z(nqubits, backend=backend).matrix
+    initial_parameters = backend.cast(
+        np.linspace(0.1, 0.6, len(circuit.get_parameters())),
+        dtype=backend.float64,
+    )
+
+    optimizer = QuantumNaturalGradient(
+        circuit=circuit,
+        loss_fn="exp_val",
+        loss_kwargs={"hamiltonian": hamiltonian},
+        initial_parameters=initial_parameters,
+        learning_rate=0.2,
+        regularization=1e-3,
+        backend=backend,
+    )
+    final_loss, losses, final_parameters = optimizer(steps=40, tolerance=1e-10)
+    circuit_parameters = backend.cast(
+        np.asarray(
+            backend.to_numpy(circuit.get_parameters()), dtype=np.float64
+        ).reshape(-1),
+        dtype=backend.float64,
+    )
+
+    assert optimizer.n_calls_loss >= len(losses)
+    assert optimizer.n_calls_gradient >= 1
+    backend.assert_allclose(final_parameters, circuit_parameters, atol=1e-7)
+    assert backend.abs(final_loss + nqubits) < 1e-5
+
+
+def test_quantum_natural_gradient_metric_tensor(autodiff_backend):
+    backend = autodiff_backend
+    circuit = _build_ry_cz_ansatz(3)
+    parameters = backend.cast(
+        [0.17, -0.31, 0.29, 0.12, -0.44, 0.08], dtype=backend.float64
+    )
+    circuit.set_parameters(parameters)
+
+    optimizer = QuantumNaturalGradient(
+        circuit=circuit,
+        loss_fn="exp_val",
+        loss_kwargs={"hamiltonian": hamiltonians.Z(3, backend=backend).matrix},
+        backend=backend,
+    )
+    metric = optimizer.metric_tensor()
+    qfim = quantum_fisher_information_matrix(
+        circuit,
+        parameters=parameters,
+        backend=optimizer.qibo_backend,
+    )
+    expected = backend.cast(backend.real(qfim) / 4.0, dtype=backend.float64)
+    metric_transpose = backend.cast(
+        np.transpose(backend.to_numpy(metric)),
+        dtype=backend.float64,
+    )
+
+    backend.assert_allclose(metric, expected, atol=1e-7)
+    backend.assert_allclose(metric, metric_transpose, atol=1e-7)
+
+
+def test_quantum_natural_gradient_callable_loss(autodiff_backend):
+    backend = autodiff_backend
+    circuit = _build_ry_cz_ansatz(2)
+    initial_parameters = backend.cast([0.2, -0.1, 0.3, 0.4], dtype=backend.float64)
+
+    def callable_loss(circuit, backend):
+        state = backend.execute_circuit(circuit).state()
+        return backend.real(state[0] * backend.conj(state[0]))
+
+    optimizer = QuantumNaturalGradient(
+        circuit=circuit,
+        loss_fn=callable_loss,
+        initial_parameters=initial_parameters,
+        learning_rate=0.05,
+        regularization=1e-3,
+        backend=backend,
+    )
+    loss = optimizer.step()
+
+    assert optimizer.n_calls_gradient == 1
+    assert optimizer.n_calls_loss >= 1
+    assert np.isfinite(np.asarray(backend.to_numpy(loss), dtype=np.float64)).all()
+
+
+def test_quantum_natural_gradient_callable_loss_errors():
+    backend = NumpyBackend()
+    circuit = _build_ry_cz_ansatz(2)
+
+    def callable_loss(circuit, backend):
+        state = backend.execute_circuit(circuit).state()
+        return backend.real(state[0] * backend.conj(state[0]))
+
+    with pytest.raises(TypeError):
+        _ = QuantumNaturalGradient(
+            circuit=circuit,
+            loss_fn=callable_loss,
+            backend=backend,
+        )
+
+
+def test_quantum_natural_gradient_errors(autodiff_backend):
+    backend = autodiff_backend
+    circuit = _build_ry_cz_ansatz(2)
+
+    with pytest.raises(TypeError):
+        _ = QuantumNaturalGradient(
+            circuit=circuit,
+            loss_fn=13,
+            loss_kwargs={"hamiltonian": hamiltonians.Z(2, backend=backend).matrix},
+            backend=backend,
+        )
+
+    with pytest.raises(ValueError):
+        _ = QuantumNaturalGradient(
+            circuit=circuit,
+            loss_fn="expval",
+            loss_kwargs={"hamiltonian": hamiltonians.Z(2, backend=backend).matrix},
+            backend=backend,
+        )
+
+    with pytest.raises(TypeError):
+        _ = QuantumNaturalGradient(
+            circuit=circuit,
+            loss_fn="exp_val",
+            loss_kwargs={"hamiltonian": [("bad", "hamiltonian")]},
+            backend=backend,
+        )
+
+    with pytest.raises(ValueError):
+        _ = QuantumNaturalGradient(
+            circuit=circuit,
+            loss_fn="exp_val",
+            loss_kwargs={},
+            backend=backend,
+        )
+
+
+def test_quantum_natural_gradient_sparse_hamiltonian_callback_and_tolerance(
+    autodiff_backend,
+):
+    backend = autodiff_backend
+    circuit = _build_ry_cz_ansatz(2)
+    hamiltonian = csr_matrix(hamiltonians.Z(2, backend=backend).matrix)
+    callback_calls = []
+
+    optimizer = QuantumNaturalGradient(
+        circuit=circuit,
+        loss_fn="exp_val",
+        loss_kwargs={"hamiltonian": hamiltonian},
+        initial_parameters=backend.cast([0.2, -0.1, 0.3, 0.4], dtype=backend.float64),
+        callback=lambda **kwargs: callback_calls.append(kwargs),
+        backend=backend,
+    )
+    optimizer.gradient = lambda: backend.cast(
+        np.zeros(len(optimizer.parameters)),
+        dtype=backend.float64,
+    )
+
+    final_loss, losses, _ = optimizer.run_qng(steps=5, tolerance=1e-12)
+
+    assert len(losses) == 1
+    assert len(callback_calls) == 1
+    assert np.isfinite(np.asarray(backend.to_numpy(final_loss), dtype=np.float64)).all()
+
+
+def test_quantum_natural_gradient_linear_solve_fallback(autodiff_backend, monkeypatch):
+    backend = autodiff_backend
+    circuit = _build_ry_cz_ansatz(2)
+    optimizer = QuantumNaturalGradient(
+        circuit=circuit,
+        loss_fn="exp_val",
+        loss_kwargs={"hamiltonian": hamiltonians.Z(2, backend=backend).matrix},
+        initial_parameters=backend.cast([0.2, -0.1, 0.3, 0.4], dtype=backend.float64),
+        backend=backend,
+    )
+
+    def fail_solve(*args, **kwargs):
+        raise np.linalg.LinAlgError()
+
+    monkeypatch.setattr(np.linalg, "solve", fail_solve)
+    loss = optimizer.step()
+
+    assert np.isfinite(np.asarray(backend.to_numpy(loss), dtype=np.float64)).all()
