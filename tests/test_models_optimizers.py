@@ -319,8 +319,7 @@ def _build_ry_cz_ansatz(nqubits):
 
 
 @pytest.mark.parametrize("nqubits", [2, 3])
-def test_quantum_natural_gradient_vqe(autodiff_backend, nqubits):
-    backend = autodiff_backend
+def test_quantum_natural_gradient_vqe(backend, nqubits):
     circuit = _build_ry_cz_ansatz(nqubits)
     hamiltonian = hamiltonians.Z(nqubits, backend=backend).matrix
     initial_parameters = backend.cast(
@@ -351,8 +350,7 @@ def test_quantum_natural_gradient_vqe(autodiff_backend, nqubits):
     assert backend.abs(final_loss + nqubits) < 1e-5
 
 
-def test_quantum_natural_gradient_metric_tensor(autodiff_backend):
-    backend = autodiff_backend
+def test_quantum_natural_gradient_metric_tensor(backend):
     circuit = _build_ry_cz_ansatz(3)
     parameters = backend.cast(
         [0.17, -0.31, 0.29, 0.12, -0.44, 0.08], dtype=backend.float64
@@ -369,13 +367,10 @@ def test_quantum_natural_gradient_metric_tensor(autodiff_backend):
     qfim = quantum_fisher_information_matrix(
         circuit,
         parameters=parameters,
-        backend=optimizer.qibo_backend,
+        backend=backend,
     )
-    expected = backend.cast(backend.real(qfim) / 4.0, dtype=backend.float64)
-    metric_transpose = backend.cast(
-        np.transpose(backend.to_numpy(metric)),
-        dtype=backend.float64,
-    )
+    expected = backend.real(qfim) / 4.0
+    metric_transpose = backend.transpose(metric)
 
     backend.assert_allclose(metric, expected, atol=1e-7)
     backend.assert_allclose(metric, metric_transpose, atol=1e-7)
@@ -388,7 +383,7 @@ def test_quantum_natural_gradient_callable_loss(autodiff_backend):
 
     def callable_loss(circuit, backend):
         state = backend.execute_circuit(circuit).state()
-        return backend.real(state[0] * backend.conj(state[0]))
+        return backend.real(state * backend.conj(state))
 
     optimizer = QuantumNaturalGradient(
         circuit=circuit,
@@ -411,7 +406,7 @@ def test_quantum_natural_gradient_callable_loss_errors():
 
     def callable_loss(circuit, backend):
         state = backend.execute_circuit(circuit).state()
-        return backend.real(state[0] * backend.conj(state[0]))
+        return backend.real(state * backend.conj(state))
 
     with pytest.raises(TypeError):
         _ = QuantumNaturalGradient(
@@ -423,7 +418,7 @@ def test_quantum_natural_gradient_callable_loss_errors():
 
 def test_quantum_natural_gradient_errors(autodiff_backend):
     backend = autodiff_backend
-    circuit = _build_ry_cz_ansatz(2)
+def test_quantum_natural_gradient_errors(backend):
 
     with pytest.raises(TypeError):
         _ = QuantumNaturalGradient(
@@ -459,9 +454,8 @@ def test_quantum_natural_gradient_errors(autodiff_backend):
 
 
 def test_quantum_natural_gradient_sparse_hamiltonian_callback_and_tolerance(
-    autodiff_backend,
+    backend,
 ):
-    backend = autodiff_backend
     circuit = _build_ry_cz_ansatz(2)
     hamiltonian = csr_matrix(hamiltonians.Z(2, backend=backend).matrix)
     callback_calls = []
@@ -486,8 +480,7 @@ def test_quantum_natural_gradient_sparse_hamiltonian_callback_and_tolerance(
     assert np.isfinite(np.asarray(backend.to_numpy(final_loss), dtype=np.float64)).all()
 
 
-def test_quantum_natural_gradient_linear_solve_fallback(autodiff_backend, monkeypatch):
-    backend = autodiff_backend
+def test_quantum_natural_gradient_linear_solve_fallback(backend):
     circuit = _build_ry_cz_ansatz(2)
     optimizer = QuantumNaturalGradient(
         circuit=circuit,

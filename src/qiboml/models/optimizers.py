@@ -88,7 +88,6 @@ class QuantumNaturalGradient:
         del seed  # API compatibility; initialization comes from circuit parameters.
 
         self.backend = _check_backend(backend)
-        self.qibo_backend = _BackendCastAdapter(self.backend)
         self.circuit = circuit
         self.learning_rate = learning_rate
         self.regularization = regularization
@@ -114,7 +113,7 @@ class QuantumNaturalGradient:
                 "``loss_fn`` must be either the str ``exp_val`` or "
                 + f"``Callable``. Passed {type(loss_fn)}",
             )
-        elif isinstance(loss_fn, str) and loss_fn != "exp_val":
+        if isinstance(loss_fn, str) and loss_fn != "exp_val":
             raise_error(
                 ValueError,
                 f"If str, ``loss_fn`` can only be ``exp_val``. Passed {type(loss_fn)}.",
@@ -158,7 +157,7 @@ class QuantumNaturalGradient:
             self.parameter_shift_hamiltonian = Hamiltonian(
                 self.circuit.nqubits,
                 self._hamiltonian_to_dense(),
-                backend=self.qibo_backend,
+                backend=self.backend,
             )
             self.gradient_func = None
         else:
@@ -179,7 +178,7 @@ class QuantumNaturalGradient:
         qfim = quantum_fisher_information_matrix(
             self.circuit,
             parameters=self.parameters,
-            backend=self.qibo_backend,
+            backend=self.backend,
         )
         return self.backend.cast(
             self.backend.real(qfim) / 4.0, dtype=self.backend.float64
