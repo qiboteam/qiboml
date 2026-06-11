@@ -176,12 +176,16 @@ class QuantumNaturalGradient:
                     pass
             return original_cast(array, dtype=dtype, copy=copy, **kwargs)
 
-        def jax_jacobian(backend, circuit, parameters, initial_state=None, return_complex=True):
+        def jax_jacobian(
+            backend, circuit, parameters, initial_state=None, return_complex=True
+        ):
             copied = circuit.copy(deep=True)
 
             def state_components(params):
                 copied.set_parameters(params)
-                state = backend.execute_circuit(copied, initial_state=initial_state).state()
+                state = backend.execute_circuit(
+                    copied, initial_state=initial_state
+                ).state()
                 if return_complex:
                     return backend.real(state), backend.imag(state)
                 return backend.real(state)

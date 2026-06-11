@@ -1,3 +1,5 @@
+from types import MethodType
+
 import numpy as np
 import pytest
 import scipy
@@ -7,7 +9,6 @@ from qibo.models.encodings import _generate_rbs_angles
 from qibo.quantum_info import quantum_fisher_information_matrix, random_statevector
 from scipy.sparse import csr_matrix
 from scipy.special import comb
-from types import MethodType
 
 from qiboml.models.optimizers import ExactGeodesicTransportCG, QuantumNaturalGradient
 
@@ -24,7 +25,9 @@ def _qibo_qfim(circuit, parameters, backend):
                 pass
         return original_cast(array, dtype=dtype, copy=copy, **kwargs)
 
-    def jax_jacobian(bound_backend, copied_circuit, params, initial_state=None, return_complex=True):
+    def jax_jacobian(
+        bound_backend, copied_circuit, params, initial_state=None, return_complex=True
+    ):
         copied = copied_circuit.copy(deep=True)
 
         def state_components(local_params):
@@ -185,17 +188,6 @@ def test_egt_cg(
             backend=backend,
         )
 
-    def make_callback(print_every):
-        def callback(
-            iter_num,
-            loss,
-            **kwargs,
-        ):
-            if iter_num % print_every == 0:
-                print(f"Iter {iter_num}: loss = {loss:.6f}")
-
-        return callback
-
     optimizer = ExactGeodesicTransportCG(
         nqubits=nqubits,
         weight=int(nqubits / 2),
@@ -206,7 +198,7 @@ def test_egt_cg(
         c2=0.999,
         backtrack_rate=0.5,
         backtrack_multiplier=1.5,
-        callback=make_callback(1000),
+        callback=None,
         seed=13,
         backend=backend,
     )
@@ -267,17 +259,6 @@ def test_egt_cg_numpy(
             backend=backend,
         )
 
-    def make_callback(print_every):
-        def callback(
-            iter_num,
-            loss,
-            **kwargs,
-        ):
-            if iter_num % print_every == 0:
-                print(f"Iter {iter_num}: loss = {loss:.6f}")
-
-        return callback
-
     optimizer = ExactGeodesicTransportCG(
         nqubits=nqubits,
         weight=int(nqubits / 2),
@@ -288,7 +269,7 @@ def test_egt_cg_numpy(
         c2=0.999,
         backtrack_rate=0.5,
         backtrack_multiplier=1.5,
-        callback=make_callback(1000),
+        callback=None,
         seed=13,
         backend=backend,
     )
@@ -425,7 +406,7 @@ def test_quantum_natural_gradient_callable_loss_errors():
 
     def callable_loss(circuit, backend):
         state = backend.execute_circuit(circuit).state()
-        return backend.real(state * backend.conj(state))
+        return 1.0 - backend.real(backend.conj(state[0]) * state[0])
 
     with pytest.raises(TypeError):
         _ = QuantumNaturalGradient(
@@ -495,4 +476,10 @@ def test_quantum_natural_gradient_sparse_hamiltonian_callback_and_tolerance(
 
     assert len(losses) == 1
     assert len(callback_calls) == 1
+    assert callback_calls[0]["iter_num"] == 1
+    backend.assert_allclose(callback_calls[0]["loss"], losses[0], atol=1e-7)
+    backend.assert_allclose(
+        callback_calls[0]["parameters"], optimizer.parameters, atol=1e-7
+    )
+    assert optimizer.n_calls_loss == 1
     backend.assert_allclose(final_loss, losses[0], atol=1e-7)
