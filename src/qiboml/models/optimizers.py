@@ -246,17 +246,17 @@ class ExactGeodesicTransportCG:
         )
 
         platform = self.backend.platform
-        if platform == "jax":
+        if platform == "jax":  # pragma: no cover
             indices = self.hamiltonian.indices
             data = self.hamiltonian.data
             rows = indices[:, 0]
             cols = indices[:, 1]
-        elif platform == "tensorflow":
+        elif platform == "tensorflow":  # pragma: no cover
             indices = self.hamiltonian.indices.numpy()
             data = self.hamiltonian.values.numpy()
             rows = indices[:, 0]
             cols = indices[:, 1]
-        elif platform == "pytorch":
+        elif platform == "pytorch":  # pragma: no cover
             hamilt = self.hamiltonian.coalesce()
             indices = hamilt.indices()
             values = hamilt.values()
@@ -277,9 +277,9 @@ class ExactGeodesicTransportCG:
             j = full_to_sub.get(int(j_full))
             if i is None or j is None:
                 continue
-            if platform == "jax":
+            if platform == "jax":  # pragma: no cover
                 hamilt_subspace = hamilt_subspace.at[(i, j), (j, i)].set(v)
-            elif platform == "tensorflow":
+            elif platform == "tensorflow":  # pragma: no cover
                 v = self.backend.cast(v, hamilt_subspace.dtype)
                 indices = self.backend.engine.constant(
                     [[i, j], [j, i]],
