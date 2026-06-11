@@ -1,4 +1,5 @@
 import math
+from types import MethodType
 from typing import Any, Callable, Tuple
 
 import numpy as np
@@ -16,24 +17,6 @@ from qibo.models.encodings import (
 from qibo.quantum_info import quantum_fisher_information_matrix, random_statevector
 from scipy.sparse import issparse, isspmatrix_coo
 from scipy.special import comb
-
-
-class _BackendCastAdapter:
-    """Proxy backend normalizing NumPy dtypes for Qibo internals."""
-
-    def __init__(self, backend: Backend):
-        self._backend = backend
-
-    def cast(self, array, dtype=None, *args, **kwargs):
-        if dtype is not None:
-            try:
-                dtype = getattr(self._backend, np.dtype(dtype).name)
-            except (AttributeError, TypeError):
-                pass
-        return self._backend.cast(array, dtype=dtype, *args, **kwargs)
-
-    def __getattr__(self, name):
-        return getattr(self._backend, name)
 
 
 class QuantumNaturalGradient:
@@ -121,8 +104,10 @@ class QuantumNaturalGradient:
 
         self.loss_fn = loss_fn
         self.hamiltonian = None
+        self.parameter_shift_hamiltonian_matrix = None
         if "hamiltonian" in self.loss_kwargs:
             self.hamiltonian = self.loss_kwargs.get("hamiltonian", None)
+            self.parameter_shift_hamiltonian_matrix = self.hamiltonian
             if not (
                 isinstance(self.hamiltonian, self.backend.tensor_types)
                 or issparse(self.hamiltonian)
@@ -139,9 +124,9 @@ class QuantumNaturalGradient:
                         self.hamiltonian, self.backend
                     )
             else:
-                if self.backend.platform is not None:
+                if self.backend.platform in {"pytorch", "tensorflow"}:
                     self.hamiltonian = self.backend.coo_matrix(self.hamiltonian)
-                else:
+                elif self.backend.platform is None:
                     self.hamiltonian = self.backend.csr_matrix(self.hamiltonian)
 
             self.loss_kwargs["hamiltonian"] = self.hamiltonian
@@ -154,9 +139,16 @@ class QuantumNaturalGradient:
                     + "via the dict item ``{'hamiltonian': hamiltonian}``",
                 )
             self.loss_fn = _loss_func_expval
+            parameter_shift_hamiltonian = self.parameter_shift_hamiltonian_matrix
+            if issparse(parameter_shift_hamiltonian):
+                parameter_shift_hamiltonian = parameter_shift_hamiltonian.toarray()
+                if self.backend.platform is not None:
+                    parameter_shift_hamiltonian = self.backend.cast(
+                        parameter_shift_hamiltonian, dtype=self.backend.dtype
+                    )
             self.parameter_shift_hamiltonian = Hamiltonian(
                 self.circuit.nqubits,
-                self._hamiltonian_to_dense(),
+                parameter_shift_hamiltonian,
                 backend=self.backend,
             )
             self.gradient_func = None
@@ -170,16 +162,49 @@ class QuantumNaturalGradient:
             self.parameter_shift_hamiltonian = None
             self.gradient_func = self._gradient_func_internal
 
-        self.loss = self._loss_internal
-
     def metric_tensor(self) -> ArrayLike:
         """Compute Fubini-Study metric tensor for current circuit parameters."""
 
-        qfim = quantum_fisher_information_matrix(
-            self.circuit,
-            parameters=self.parameters,
-            backend=self.backend,
-        )
+        original_cast = self.backend.cast
+        original_jacobian = getattr(self.backend, "jacobian", None)
+
+        def cast_with_numpy_dtypes(backend, array, dtype=None, copy=False, **kwargs):
+            if dtype is not None:
+                try:
+                    dtype = getattr(backend, np.dtype(dtype).name)
+                except (AttributeError, TypeError):
+                    pass
+            return original_cast(array, dtype=dtype, copy=copy, **kwargs)
+
+        def jax_jacobian(backend, circuit, parameters, initial_state=None, return_complex=True):
+            copied = circuit.copy(deep=True)
+
+            def state_components(params):
+                copied.set_parameters(params)
+                state = backend.execute_circuit(copied, initial_state=initial_state).state()
+                if return_complex:
+                    return backend.real(state), backend.imag(state)
+                return backend.real(state)
+
+            return backend.jax.jacobian(state_components)(parameters)
+
+        self.backend.cast = MethodType(cast_with_numpy_dtypes, self.backend)
+        if self.backend.platform == "jax":
+            self.backend.jacobian = MethodType(jax_jacobian, self.backend)
+
+        try:
+            qfim = quantum_fisher_information_matrix(
+                self.circuit,
+                parameters=self.parameters,
+                backend=self.backend,
+            )
+        finally:
+            self.backend.cast = original_cast
+            if self.backend.platform == "jax":
+                self.backend.jacobian = original_jacobian
+            elif original_jacobian is not None:
+                self.backend.jacobian = original_jacobian
+
         return self.backend.cast(
             self.backend.real(qfim) / 4.0, dtype=self.backend.float64
         )
@@ -227,8 +252,8 @@ class QuantumNaturalGradient:
             dtype=self.backend.float64,
         )
         self.circuit.set_parameters(self.parameters)
-
-        return self.loss(self.circuit, self.backend, **self.loss_kwargs)
+        self.n_calls_loss += 1
+        return self.loss_fn(self.circuit, self.backend, **self.loss_kwargs)
 
     def run_qng(
         self, steps: int = 100, tolerance: float = 1e-8
@@ -264,8 +289,10 @@ class QuantumNaturalGradient:
         final_loss = (
             losses[-1]
             if losses
-            else self.loss(self.circuit, self.backend, **self.loss_kwargs)
+            else self.loss_fn(self.circuit, self.backend, **self.loss_kwargs)
         )
+        if not losses:
+            self.n_calls_loss += 1
         final_parameters = self.parameters
         return (
             self.backend.cast(final_loss, dtype=self.backend.float64),
@@ -280,12 +307,6 @@ class QuantumNaturalGradient:
 
         return self.run_qng(steps=steps, tolerance=tolerance)
 
-    def _loss_internal(self, circuit: Circuit, backend: Backend, **kwargs) -> float:
-        """Wrapper around loss function updating ``n_calls_loss``."""
-
-        self.n_calls_loss += 1
-        return self.loss_fn(circuit, backend, **kwargs)
-
     def _gradient_func_internal(self) -> ArrayLike:
         """Compute backend autodiff gradient for generic callable losses."""
 
@@ -293,18 +314,18 @@ class QuantumNaturalGradient:
 
         platform = self.backend.platform
         if platform == "jax":
-            circuit_orig = self.circuit.copy(deep=True)
+            circuit_copy = self.circuit.copy(deep=True)
 
             def loss_fn(params):
-                self.circuit.set_parameters(params)
-                return self.loss(self.circuit, self.backend, **self.loss_kwargs)
+                circuit_copy.set_parameters(params)
+                self.n_calls_loss += 1
+                return self.loss_fn(circuit_copy, self.backend, **self.loss_kwargs)
 
             params = self.backend.cast(
                 self.circuit.get_parameters(),
                 dtype=self.backend.float64,
             )
             grad = self.backend.jax.grad(loss_fn)(params)
-            self.circuit = circuit_orig.copy(deep=True)
             return grad.reshape(-1)
         if platform == "pytorch":
             params = self.backend.cast(
@@ -312,7 +333,8 @@ class QuantumNaturalGradient:
             )
             params.requires_grad = True
             self.circuit.set_parameters(params)
-            loss = self.loss(self.circuit, self.backend, **self.loss_kwargs)
+            self.n_calls_loss += 1
+            loss = self.loss_fn(self.circuit, self.backend, **self.loss_kwargs)
             loss.backward()
             return params.grad.reshape(-1)
         if platform == "tensorflow":
@@ -322,32 +344,10 @@ class QuantumNaturalGradient:
             )
             with self.backend.engine.GradientTape() as tape:
                 self.circuit.set_parameters(params)
-                loss = self.loss(self.circuit, self.backend, **self.loss_kwargs)
+                self.n_calls_loss += 1
+                loss = self.loss_fn(self.circuit, self.backend, **self.loss_kwargs)
             grad = tape.gradient(loss, params)
             return grad.reshape(-1)
-
-    def _hamiltonian_to_dense(self):
-        """Convert validated Hamiltonian storage to dense array for PSR."""
-
-        if issparse(self.hamiltonian):
-            return self.hamiltonian.toarray()
-
-        if self.backend.platform == "jax" and hasattr(self.hamiltonian, "todense"):
-            return np.asarray(self.hamiltonian.todense())
-
-        if self.backend.platform == "tensorflow" and isinstance(
-            self.hamiltonian, self.backend.engine.sparse.SparseTensor
-        ):
-            return self.backend.to_numpy(
-                self.backend.engine.sparse.to_dense(self.hamiltonian)
-            )
-
-        if self.backend.platform == "pytorch" and getattr(
-            self.hamiltonian, "is_sparse", False
-        ):
-            return self.hamiltonian.to_dense().cpu().numpy(force=True)
-
-        return np.asarray(self.backend.to_numpy(self.hamiltonian))
 
 
 class ExactGeodesicTransportCG:

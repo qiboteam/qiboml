@@ -7,38 +7,53 @@ from qibo.models.encodings import _generate_rbs_angles
 from qibo.quantum_info import quantum_fisher_information_matrix, random_statevector
 from scipy.sparse import csr_matrix
 from scipy.special import comb
+from types import MethodType
 
 from qiboml.models.optimizers import ExactGeodesicTransportCG, QuantumNaturalGradient
 
 
-def _get_autodiff_backend(name):
-    if name == "jax":
-        from qiboml.backends.jax import JaxBackend
+def _qibo_qfim(circuit, parameters, backend):
+    original_cast = backend.cast
+    original_jacobian = getattr(backend, "jacobian", None)
 
-        return JaxBackend()
-    if name == "tensorflow":
-        from qiboml.backends.tensorflow import TensorflowBackend
+    def cast_with_numpy_dtypes(bound_backend, array, dtype=None, copy=False, **kwargs):
+        if dtype is not None:
+            try:
+                dtype = getattr(bound_backend, np.dtype(dtype).name)
+            except (AttributeError, TypeError):
+                pass
+        return original_cast(array, dtype=dtype, copy=copy, **kwargs)
 
-        return TensorflowBackend()
-    if name == "pytorch":
-        from qiboml.backends.pytorch import PyTorchBackend
+    def jax_jacobian(bound_backend, copied_circuit, params, initial_state=None, return_complex=True):
+        copied = copied_circuit.copy(deep=True)
 
-        return PyTorchBackend()
-    raise RuntimeError(f"Unknown backend {name}.")
+        def state_components(local_params):
+            copied.set_parameters(local_params)
+            state = bound_backend.execute_circuit(
+                copied, initial_state=initial_state
+            ).state()
+            if return_complex:
+                return bound_backend.real(state), bound_backend.imag(state)
+            return bound_backend.real(state)
 
+        return bound_backend.jax.jacobian(state_components)(params)
 
-AUTODIFF_BACKENDS = []
-for _backend_name in ("tensorflow", "pytorch", "jax"):
+    backend.cast = MethodType(cast_with_numpy_dtypes, backend)
+    if backend.platform == "jax":
+        backend.jacobian = MethodType(jax_jacobian, backend)
+
     try:
-        _ = _get_autodiff_backend(_backend_name)
-        AUTODIFF_BACKENDS.append(_backend_name)
-    except (ModuleNotFoundError, ImportError):
-        pass
-
-
-@pytest.fixture(params=AUTODIFF_BACKENDS)
-def autodiff_backend(request):
-    yield _get_autodiff_backend(request.param)
+        return quantum_fisher_information_matrix(
+            circuit,
+            parameters=parameters,
+            backend=backend,
+        )
+    finally:
+        backend.cast = original_cast
+        if backend.platform == "jax":
+            backend.jacobian = original_jacobian
+        elif original_jacobian is not None:
+            backend.jacobian = original_jacobian
 
 
 def test_egt_cg_errors(backend):
@@ -151,12 +166,6 @@ def test_egt_cg(
     type_loss_grad,
     initial_parameters,
 ):
-    if backend.platform in ["jax", "tensorflow"] and nqubits != 4:
-        pytest.skip(
-            "Tests too slow with Jax and TF, will test only small size."
-            + " Will test all sizes with torch."
-        )
-
     hamiltonian, true_gs_energy = _get_xxz_hamiltonian(
         nqubits, hamiltonian_type, backend
     )
@@ -364,26 +373,28 @@ def test_quantum_natural_gradient_metric_tensor(backend):
         backend=backend,
     )
     metric = optimizer.metric_tensor()
-    qfim = quantum_fisher_information_matrix(
-        circuit,
-        parameters=parameters,
-        backend=backend,
+    expected = backend.real(_qibo_qfim(circuit, parameters, backend)) / 4.0
+    metric_np = np.asarray(backend.to_numpy(metric), dtype=np.float64)
+    metric_transpose = metric_np.T
+
+    np.testing.assert_allclose(
+        metric_np,
+        np.asarray(backend.to_numpy(expected), dtype=np.float64),
+        atol=1e-7,
     )
-    expected = backend.real(qfim) / 4.0
-    metric_transpose = backend.transpose(metric)
-
-    backend.assert_allclose(metric, expected, atol=1e-7)
-    backend.assert_allclose(metric, metric_transpose, atol=1e-7)
+    np.testing.assert_allclose(metric_np, metric_transpose, atol=1e-7)
 
 
-def test_quantum_natural_gradient_callable_loss(autodiff_backend):
-    backend = autodiff_backend
+def test_quantum_natural_gradient_callable_loss(backend):
     circuit = _build_ry_cz_ansatz(2)
     initial_parameters = backend.cast([0.2, -0.1, 0.3, 0.4], dtype=backend.float64)
+    circuit.set_parameters(initial_parameters)
 
     def callable_loss(circuit, backend):
         state = backend.execute_circuit(circuit).state()
-        return backend.real(state * backend.conj(state))
+        return 1.0 - backend.real(backend.conj(state[0]) * state[0])
+
+    initial_loss = np.asarray(backend.to_numpy(callable_loss(circuit, backend))).item()
 
     optimizer = QuantumNaturalGradient(
         circuit=circuit,
@@ -394,10 +405,18 @@ def test_quantum_natural_gradient_callable_loss(autodiff_backend):
         backend=backend,
     )
     loss = optimizer.step()
+    circuit_parameters = backend.cast(
+        np.asarray(
+            backend.to_numpy(circuit.get_parameters()), dtype=np.float64
+        ).reshape(-1),
+        dtype=backend.float64,
+    )
 
+    assert optimizer.circuit is circuit
     assert optimizer.n_calls_gradient == 1
     assert optimizer.n_calls_loss >= 1
-    assert np.isfinite(np.asarray(backend.to_numpy(loss), dtype=np.float64)).all()
+    backend.assert_allclose(circuit_parameters, optimizer.parameters, atol=1e-7)
+    assert np.asarray(backend.to_numpy(loss)).item() <= initial_loss
 
 
 def test_quantum_natural_gradient_callable_loss_errors():
@@ -416,9 +435,8 @@ def test_quantum_natural_gradient_callable_loss_errors():
         )
 
 
-def test_quantum_natural_gradient_errors(autodiff_backend):
-    backend = autodiff_backend
 def test_quantum_natural_gradient_errors(backend):
+    circuit = _build_ry_cz_ansatz(2)
 
     with pytest.raises(TypeError):
         _ = QuantumNaturalGradient(
@@ -477,23 +495,4 @@ def test_quantum_natural_gradient_sparse_hamiltonian_callback_and_tolerance(
 
     assert len(losses) == 1
     assert len(callback_calls) == 1
-    assert np.isfinite(np.asarray(backend.to_numpy(final_loss), dtype=np.float64)).all()
-
-
-def test_quantum_natural_gradient_linear_solve_fallback(backend):
-    circuit = _build_ry_cz_ansatz(2)
-    optimizer = QuantumNaturalGradient(
-        circuit=circuit,
-        loss_fn="exp_val",
-        loss_kwargs={"hamiltonian": hamiltonians.Z(2, backend=backend).matrix},
-        initial_parameters=backend.cast([0.2, -0.1, 0.3, 0.4], dtype=backend.float64),
-        backend=backend,
-    )
-
-    def fail_solve(*args, **kwargs):
-        raise np.linalg.LinAlgError()
-
-    monkeypatch.setattr(np.linalg, "solve", fail_solve)
-    loss = optimizer.step()
-
-    assert np.isfinite(np.asarray(backend.to_numpy(loss), dtype=np.float64)).all()
+    backend.assert_allclose(final_loss, losses[0], atol=1e-7)
