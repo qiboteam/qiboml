@@ -1,13 +1,13 @@
 import pytest
 import scipy
-from qibo import hamiltonians
+from qibo import Circuit, gates, hamiltonians
 from qibo.backends import NumpyBackend
 from qibo.models.encodings import _generate_rbs_angles
 from qibo.quantum_info import random_statevector
 from scipy.sparse import csr_matrix
 from scipy.special import comb
 
-from qiboml.models.optimizers import ExactGeodesicTransportCG
+from qiboml.models.optimizers import ExactGeodesicTransportCG, QuantumNaturalGradient
 
 
 def test_egt_cg_errors(backend):
@@ -107,6 +107,51 @@ def test_egt_cg_errors(backend):
             seed=13,
             backend=backend,
         )
+
+
+def test_qng_errors():
+    circuit = Circuit(1)
+    circuit.add(gates.RY(0, theta=0.2))
+
+    with pytest.raises(TypeError):
+        _ = QuantumNaturalGradient(
+            circuit=circuit,
+            loss_fn="exp_val",
+            backend=NumpyBackend(),
+        )
+
+
+def test_qng_exp_val_loss_decreases():
+    try:
+        from qiboml.backends.pytorch import PyTorchBackend  # pylint: disable=C0415
+    except (ImportError, ModuleNotFoundError):
+        pytest.skip("PyTorch backend is not available.")
+
+    backend = PyTorchBackend()
+    circuit = Circuit(1)
+    circuit.add(gates.RY(0, theta=0.2))
+
+    hamiltonian = hamiltonians.Z(nqubits=1, backend=backend).matrix
+    optimizer = QuantumNaturalGradient(
+        circuit=circuit,
+        loss_fn="exp_val",
+        loss_kwargs={"hamiltonian": hamiltonian},
+        learning_rate=0.4,
+        regularization=1e-8,
+        backend=backend,
+    )
+
+    qfim = optimizer.metric_tensor()
+    backend.assert_allclose(qfim, backend.cast([[1.0]], dtype=backend.float64))
+
+    initial_loss = optimizer.loss(
+        optimizer.circuit, optimizer.backend, **optimizer.loss_kwargs
+    )
+    final_loss, losses, final_params = optimizer(steps=4)
+
+    assert float(backend.to_numpy(final_loss)) < float(backend.to_numpy(initial_loss))
+    assert losses.shape == (5,)
+    assert final_params.shape == (1,)
 
 
 @pytest.mark.parametrize("nqubits", [4, 6])
