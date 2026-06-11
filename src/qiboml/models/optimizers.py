@@ -1,15 +1,12 @@
 import math
-from typing import Any, Callable, Tuple
+from typing import Any, Callable, Optional, Tuple
 
 from numpy.typing import ArrayLike
 from qibo import Circuit
-from qibo.backends import Backend, _check_backend
+from qibo.backends import Backend, HammingWeightBackend, _check_backend
 from qibo.config import log, raise_error
-from qibo.models.encodings import (
-    _ehrlich_algorithm,
-    _generate_rbs_angles,
-    hamming_weight_encoder,
-)
+from qibo.models._encodings import _ehrlich_algorithm, _generate_rbs_angles
+from qibo.models.encodings import hamming_weight_encoder
 from qibo.quantum_info import random_statevector
 from scipy.sparse import issparse, isspmatrix_coo
 from scipy.special import comb
@@ -89,6 +86,8 @@ class ExactGeodesicTransportCG:
         self.backtrack_min_lr = backtrack_min_lr
         self.c1 = c1
         self.c2 = c2
+        if backend is None:  # pragma: no cover
+            backend = HammingWeightBackend("numpy")
         self.backend = _check_backend(backend)
         self.callback = callback
         self.n_calls_loss = 0
@@ -113,7 +112,7 @@ class ExactGeodesicTransportCG:
                 self.angles,
                 architecture="diagonal",
                 backend=self.backend,
-            )  # returns a list
+            )
             self.angles = self.backend.cast(self.angles, dtype=self.angles[0].dtype)
 
         self.x = self.angles_to_amplitudes(self.angles)
@@ -121,6 +120,7 @@ class ExactGeodesicTransportCG:
             nqubits=self.nqubits,
             weight=self.weight,
             data=self.x,
+            full_hwp=bool(self.backend.name == "hamming_weight"),
             backend=self.backend,
         )
         self.angles = self.backend.cast(
@@ -156,31 +156,45 @@ class ExactGeodesicTransportCG:
                     + f"passed type: {type(self.hamiltonian)}!",
                 )
             if issparse(self.hamiltonian):
-                if self.backend.platform is not None:
+                if (
+                    self.backend.platform is not None
+                    and self.backend.platform != "numpy"
+                ):
                     self.hamiltonian = _scipy_sparse_to_backend_coo(
                         self.hamiltonian, self.backend
                     )
             else:
-                if self.backend.platform is not None:
+                if (
+                    self.backend.platform is not None
+                    and self.backend.platform != "numpy"
+                ):
                     self.hamiltonian = self.backend.coo_matrix(self.hamiltonian)
                 else:
                     self.hamiltonian = self.backend.csr_matrix(self.hamiltonian)
 
             loss_kwargs["hamiltonian"] = self.hamiltonian
 
-        if loss_fn == "exp_val":
+        backends_autodiff = ["jax", "tensorflow", "pytorch"]
+        if loss_fn == "exp_val" or self.backend.name == "hamming_weight":
             if self.hamiltonian is None:
                 raise_error(
                     ValueError,
                     "For ``loss_fn='exp_val'``, you must pass the hamiltonian to ``loss_kwargs`` "
-                    + "via the dict item ``{'hamiltonian': hamiltonian}``",
+                    + "via the dict item ``{'hamiltonian': hamiltonian}``.",
                 )
-            self.loss_fn = _loss_func_expval
-            self.hamiltonian_subspace = self.get_subspace_hamiltonian()
-            self.riemannian_tangent = True
-            self.gradient_func = None
+
+            if self.backend.platform in backends_autodiff:
+                self.hamiltonian_subspace = None
+                self.loss_fn = _loss_func_expval
+                self.gradient_func = self._gradient_func_internal
+            else:
+                self.hamiltonian_subspace = self.get_subspace_hamiltonian()
+                if self.backend.name == "hamming_weight":  # pragma: no cover
+                    loss_kwargs["hamiltonian"] = self.hamiltonian_subspace
+                self.loss_fn = _loss_func_expval
+                self.riemannian_tangent = True
+                self.gradient_func = None
         else:
-            backends_autodiff = ["jax", "tensorflow", "pytorch"]
             if self.backend.platform not in backends_autodiff:
                 raise_error(
                     TypeError,
@@ -191,6 +205,8 @@ class ExactGeodesicTransportCG:
 
         self.loss = self._loss_internal
         self.loss_kwargs = loss_kwargs
+        if self.backend.name == "hamming_weight":  # pragma: no cover
+            self.loss_kwargs["weight"] = self.weight
 
         self.jacobian = None
         self.inverse_jacobian = None
@@ -230,17 +246,17 @@ class ExactGeodesicTransportCG:
         )
 
         platform = self.backend.platform
-        if platform == "jax":
+        if platform == "jax":  # pragma: no cover
             indices = self.hamiltonian.indices
             data = self.hamiltonian.data
             rows = indices[:, 0]
             cols = indices[:, 1]
-        elif platform == "tensorflow":
+        elif platform == "tensorflow":  # pragma: no cover
             indices = self.hamiltonian.indices.numpy()
             data = self.hamiltonian.values.numpy()
             rows = indices[:, 0]
             cols = indices[:, 1]
-        elif platform == "pytorch":
+        elif platform == "pytorch":  # pragma: no cover
             hamilt = self.hamiltonian.coalesce()
             indices = hamilt.indices()
             values = hamilt.values()
@@ -261,9 +277,9 @@ class ExactGeodesicTransportCG:
             j = full_to_sub.get(int(j_full))
             if i is None or j is None:
                 continue
-            if platform == "jax":
+            if platform == "jax":  # pragma: no cover
                 hamilt_subspace = hamilt_subspace.at[(i, j), (j, i)].set(v)
-            elif platform == "tensorflow":
+            elif platform == "tensorflow":  # pragma: no cover
                 v = self.backend.cast(v, hamilt_subspace.dtype)
                 indices = self.backend.engine.constant(
                     [[i, j], [j, i]],
@@ -441,6 +457,7 @@ class ExactGeodesicTransportCG:
                 nqubits=self.nqubits,
                 weight=self.weight,
                 data=x_new,
+                full_hwp=bool(self.backend.name == "hamming_weight"),
                 backend=self.backend,
             )
             self.angles = self.backend.cast(
@@ -673,6 +690,7 @@ class ExactGeodesicTransportCG:
                 nqubits=self.nqubits,
                 weight=self.weight,
                 data=self.x,
+                full_hwp=bool(self.backend.name == "hamming_weight"),
                 backend=self.backend,
             )
             self.angles = self.backend.cast(
@@ -820,7 +838,13 @@ def _scipy_sparse_to_backend_coo(matrix, backend: Backend) -> ArrayLike:
     return backend.engine.sparse_coo_tensor(indices, values, size=matrix.shape)
 
 
-def _loss_func_expval(circuit: Circuit, backend: Backend, *, hamiltonian) -> float:
+def _loss_func_expval(
+    circuit: Circuit,
+    backend: Backend,
+    *,
+    hamiltonian: ArrayLike,
+    weight: Optional[int] = None,
+) -> float:
     """Backend-agnostic expectation value :math:`\\bra{\\psi} H \\ket{\\psi}`.
 
     Supports:
@@ -835,11 +859,13 @@ def _loss_func_expval(circuit: Circuit, backend: Backend, *, hamiltonian) -> flo
         circuit (:class:`qibo.models.circuit.Circuit`): quantum circuit used to compute the loss.
         backend (:class:`qibo.backends.abstract.Backend`): backend for execution.
         hamiltonian (ArrayLike): sparse Hamiltonian in the backend's format.
+        weight (int): integer indicating subspace HW, useful for HW backend simulation.
 
     Returns:
         float: Expectation value.
     """
-    psi = backend.execute_circuit(circuit).state()
+    kwargs = {"weight": weight} if backend.name == "hamming_weight" else {}
+    psi = backend.execute_circuit(circuit, **kwargs).state()
     platform = backend.platform
     if platform == "tensorflow":
         if "cpu" in backend.device.lower():

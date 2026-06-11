@@ -176,8 +176,9 @@ def test_egt_cg(
     assert rel_errors[-1] < chem_acc
 
 
-def _loss_func_expval(circuit, backend, *, hamiltonian):
-    psi = backend.execute_circuit(circuit).state()
+def _loss_func_expval(circuit, backend, *, hamiltonian, weight=None):
+    kwargs = {"weight": weight} if backend.name == "hamming_weight" else {}
+    psi = backend.execute_circuit(circuit, **kwargs).state()
     platform = backend.platform
     if platform == "tensorflow":
         if "cpu" in backend.device.lower():
@@ -188,10 +189,12 @@ def _loss_func_expval(circuit, backend, *, hamiltonian):
             psi_col = backend.reshape(psi, (-1, 1))
             h_psi = backend.matmul(backend.engine.sparse.to_dense(hamiltonian), psi_col)
             h_psi = backend.reshape(h_psi, (-1,))
+
     elif platform == "pytorch":
         h_psi = backend.engine.sparse.mm(hamiltonian, psi.unsqueeze(1)).squeeze(1)
     else:
         h_psi = hamiltonian @ psi
+
     return backend.real(backend.sum(backend.conj(psi) * h_psi))
 
 
