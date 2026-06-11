@@ -93,3 +93,39 @@ At the end of the run, the following objects are returned:
 - ``final_params``: Final parameters.
 
 Also, one can access the attributes ``n_calls_loss`` and ``n_calls_gradient``, which store respectively the number of times that the loss and the gradient were computed during the optimization.
+
+
+Using the Quantum Natural Gradient Optimizer
+--------------------------------------------
+
+The :class:`qiboml.models.optimizers.QuantumNaturalGradient` optimizer updates
+the parameters of an arbitrary parametrized circuit using the real
+Fubini--Study metric obtained from one quarter of Qibo's quantum Fisher
+information matrix. A small diagonal regularization is added before solving the
+natural-gradient system, which improves stability when the metric is close to
+singular.
+
+The optimizer requires the ``qiboml`` JAX, PyTorch, or TensorFlow backend
+because the QFIM and loss gradient use automatic differentiation.
+
+.. code-block:: python
+
+    from qibo import Circuit, gates, get_backend, set_backend
+    from qiboml.models.optimizers import QuantumNaturalGradient
+
+    set_backend("qiboml", platform="pytorch")
+    backend = get_backend()
+
+    circuit = Circuit(1)
+    circuit.add(gates.RY(0, theta=0.4))
+    hamiltonian = backend.cast([[1, 0], [0, -1]], dtype=backend.complex128)
+
+    optimizer = QuantumNaturalGradient(
+        circuit=circuit,
+        loss_fn="exp_val",
+        loss_kwargs={"hamiltonian": hamiltonian},
+        learning_rate=0.2,
+        regularization=1e-6,
+        backend=backend,
+    )
+    final_loss, losses, final_params = optimizer(steps=30)

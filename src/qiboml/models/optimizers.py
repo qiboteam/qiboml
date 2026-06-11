@@ -7,9 +7,256 @@ from qibo.backends import Backend, HammingWeightBackend, _check_backend
 from qibo.config import log, raise_error
 from qibo.models._encodings import _ehrlich_algorithm, _generate_rbs_angles
 from qibo.models.encodings import hamming_weight_encoder
-from qibo.quantum_info import random_statevector
+from qibo.quantum_info import quantum_fisher_information_matrix, random_statevector
 from scipy.sparse import issparse, isspmatrix_coo
 from scipy.special import comb
+
+
+class QuantumNaturalGradient:
+    """Quantum natural-gradient optimizer for parametrized circuits.
+
+    The optimizer preconditions the loss gradient with the quantum Fisher
+    information matrix (QFIM), using Qibo's implementation of the QFIM. It
+    supports the Qiboml JAX, PyTorch, and TensorFlow backends, which provide
+    the automatic differentiation required by the QFIM calculation. The metric
+    tensor is the real Fubini--Study metric, ``QFIM / 4``.
+
+    Args:
+        circuit (:class:`qibo.models.Circuit`): Parametrized circuit to optimize.
+        loss_fn (str or Callable): Loss function. If a string, the only accepted
+            value is ``"exp_val"`` for an expectation-value loss. A callable
+            receives ``circuit`` and ``backend`` as its first two arguments.
+        loss_kwargs (dict, optional): Keyword arguments passed to ``loss_fn``.
+            For ``loss_fn="exp_val"``, this must contain ``"hamiltonian"``.
+        initial_parameters (ArrayLike, optional): Initial circuit parameters. If
+            omitted, the circuit's current parameters are used.
+        learning_rate (float, optional): Natural-gradient step size. Defaults to
+            ``0.01``.
+        regularization (float, optional): Diagonal regularization added to the
+            QFIM before solving the natural-gradient system. Defaults to
+            ``1e-6``.
+        callback (Callable, optional): Called after each update with the keyword
+            arguments ``iter_num``, ``loss``, ``parameters``, ``gradient``,
+            ``natural_gradient``, and ``metric``.
+        backend (:class:`qibo.backends.abstract.Backend`, optional): Qiboml
+            autodifferentiation backend. Defaults to the active backend.
+
+    Returns:
+        :class:`qiboml.models.optimizers.QuantumNaturalGradient`: Instantiated
+        optimizer object.
+
+    References:
+        J. Stokes, J. Izaac, N. Killoran, and G. Carleo, *Quantum Natural
+        Gradient*, `Quantum 4, 269 (2020)
+        <https://doi.org/10.22331/q-2020-05-25-269>`_.
+    """
+
+    def __init__(
+        self,
+        circuit: Circuit,
+        loss_fn: str | Callable[..., float],
+        loss_kwargs: dict | None = None,
+        initial_parameters: ArrayLike | None = None,
+        learning_rate: float = 0.01,
+        regularization: float = 1e-6,
+        callback: Callable[..., None] | None = None,
+        backend: Backend = None,
+    ):
+        self.backend = _check_backend(backend)
+        if self.backend.platform not in ("jax", "pytorch", "tensorflow"):
+            raise_error(
+                TypeError,
+                "QuantumNaturalGradient requires a JAX, PyTorch, or "
+                + "TensorFlow backend.",
+            )
+        if learning_rate <= 0:
+            raise_error(ValueError, "``learning_rate`` must be positive.")
+        if regularization < 0:
+            raise_error(ValueError, "``regularization`` must be non-negative.")
+        if not isinstance(loss_fn, (str, Callable)):
+            raise_error(
+                TypeError,
+                "``loss_fn`` must be either the str ``exp_val`` or a Callable.",
+            )
+        if isinstance(loss_fn, str) and loss_fn != "exp_val":
+            raise_error(
+                ValueError,
+                "If str, ``loss_fn`` can only be ``exp_val``.",
+            )
+
+        self.circuit = circuit.copy(deep=True)
+        self.learning_rate = learning_rate
+        self.regularization = regularization
+        self.callback = callback
+        self.loss_kwargs = dict(loss_kwargs or {})
+        self.n_calls_loss = 0
+        self.n_calls_gradient = 0
+
+        parameters = (
+            self.circuit.get_parameters()
+            if initial_parameters is None
+            else initial_parameters
+        )
+        self.parameters = self.backend.cast(
+            parameters, dtype=self.backend.float64
+        ).flatten()
+        if len(self.parameters) == 0:
+            raise_error(ValueError, "``circuit`` must contain trainable parameters.")
+        self.circuit.set_parameters(self.parameters)
+
+        self.loss_fn = loss_fn
+        if loss_fn == "exp_val":
+            if "hamiltonian" not in self.loss_kwargs:
+                raise_error(
+                    ValueError,
+                    "For ``loss_fn='exp_val'``, ``loss_kwargs`` must contain "
+                    + "``{'hamiltonian': hamiltonian}``.",
+                )
+            hamiltonian = self.loss_kwargs["hamiltonian"]
+            if not (
+                isinstance(hamiltonian, self.backend.tensor_types)
+                or issparse(hamiltonian)
+            ):
+                raise_error(
+                    TypeError,
+                    f"For backend <{self.backend}>, ``hamiltonian`` must be an "
+                    + "array or scipy sparse matrix.",
+                )
+            if issparse(hamiltonian):
+                hamiltonian = _scipy_sparse_to_backend_coo(hamiltonian, self.backend)
+            else:
+                hamiltonian = self.backend.coo_matrix(hamiltonian)
+            self.loss_kwargs["hamiltonian"] = hamiltonian
+            self.loss_fn = _loss_func_expval
+
+    def _loss_internal(self, parameters: ArrayLike) -> float:
+        """Evaluate the loss at ``parameters`` and update the call counter."""
+        self.circuit.set_parameters(parameters)
+        self.n_calls_loss += 1
+        return self.loss_fn(self.circuit, self.backend, **self.loss_kwargs)
+
+    def _loss_and_gradient(self) -> Tuple[float, ArrayLike]:
+        """Return the current loss and its gradient."""
+        self.n_calls_gradient += 1
+
+        if self.backend.platform == "jax":
+            circuit = self.circuit.copy(deep=True)
+
+            def loss_fn(parameters):
+                self.circuit.set_parameters(parameters)
+                return self._loss_internal(parameters)
+
+            loss, gradient = self.backend.jax.value_and_grad(loss_fn)(self.parameters)
+            self.circuit = circuit
+            self.circuit.set_parameters(self.parameters)
+            return loss, gradient
+
+        if self.backend.platform == "pytorch":
+            parameters = self.parameters.detach().clone().requires_grad_(True)
+            loss = self._loss_internal(parameters)
+            gradient = self.backend.engine.autograd.grad(loss, parameters)[0]
+            return loss.detach(), gradient.detach()
+
+        parameters = self.backend.engine.Variable(self.parameters)
+        with self.backend.engine.GradientTape() as tape:
+            loss = self._loss_internal(parameters)
+        gradient = tape.gradient(loss, parameters)
+        return self.backend.engine.stop_gradient(
+            loss
+        ), self.backend.engine.stop_gradient(gradient)
+
+    def _stop_gradient(self, value: ArrayLike) -> ArrayLike:
+        """Detach a value from the active autodifferentiation graph."""
+        if self.backend.platform == "jax":
+            return self.backend.jax.lax.stop_gradient(value)
+        if self.backend.platform == "pytorch":
+            return value.detach()
+        return self.backend.engine.stop_gradient(value)
+
+    def _natural_gradient(self, gradient: ArrayLike, metric: ArrayLike) -> ArrayLike:
+        """Solve the regularized Fubini--Study system."""
+        identity = self.backend.identity(len(self.parameters), dtype=metric.dtype)
+        regularized_metric = metric + self.regularization * identity
+        gradient_column = self.backend.reshape(gradient, (-1, 1))
+        natural_gradient = self.backend.engine.linalg.solve(
+            regularized_metric, gradient_column
+        )
+        return self.backend.reshape(natural_gradient, (-1,))
+
+    def metric_tensor(self) -> ArrayLike:
+        """Calculate the real Fubini--Study metric for current parameters."""
+        qfim = quantum_fisher_information_matrix(
+            self.circuit,
+            parameters=self.parameters,
+            backend=self.backend,
+        )
+        return self.backend.real(qfim) / 4.0
+
+    def step(self) -> Tuple[float, ArrayLike, ArrayLike, ArrayLike]:
+        """Perform one quantum natural-gradient update.
+
+        Returns:
+            Tuple: Loss before the update, Euclidean gradient, natural gradient,
+            and Fubini--Study metric.
+        """
+        loss, gradient = self._loss_and_gradient()
+        metric = self.metric_tensor()
+        natural_gradient = self._natural_gradient(gradient, metric)
+        self.parameters = self._stop_gradient(
+            self.parameters - self.learning_rate * natural_gradient
+        )
+        self.circuit.set_parameters(self.parameters)
+        return loss, gradient, natural_gradient, metric
+
+    def run(
+        self, steps: int = 100, tolerance: float = 1e-8
+    ) -> Tuple[float, ArrayLike, ArrayLike]:
+        """Optimize the circuit parameters.
+
+        Args:
+            steps (int, optional): Maximum number of updates. Defaults to ``100``.
+            tolerance (float, optional): Stop when the Euclidean gradient norm is
+                below this value. Defaults to ``1e-8``.
+
+        Returns:
+            Tuple: Final loss, loss history, and final parameters.
+        """
+        if steps < 0:
+            raise_error(ValueError, "``steps`` must be non-negative.")
+        if tolerance < 0:
+            raise_error(ValueError, "``tolerance`` must be non-negative.")
+
+        losses = []
+        for iter_num in range(steps):
+            loss, gradient, natural_gradient, metric = self.step()
+            losses.append(loss)
+
+            if self.callback is not None:
+                self.callback(
+                    iter_num=iter_num + 1,
+                    loss=loss,
+                    parameters=self.parameters,
+                    gradient=gradient,
+                    natural_gradient=natural_gradient,
+                    metric=metric,
+                )
+
+            if self.backend.vector_norm(gradient) < tolerance:
+                break
+
+        final_loss = self._stop_gradient(self._loss_internal(self.parameters))
+        losses.append(final_loss)
+        return (
+            final_loss,
+            self.backend.cast(losses, dtype=self.backend.float64),
+            self.parameters,
+        )
+
+    def __call__(
+        self, steps: int = 100, tolerance: float = 1e-8
+    ) -> Tuple[float, ArrayLike, ArrayLike]:
+        """Run quantum natural-gradient optimization."""
+        return self.run(steps=steps, tolerance=tolerance)
 
 
 class ExactGeodesicTransportCG:

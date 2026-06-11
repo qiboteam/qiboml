@@ -1,13 +1,108 @@
+import math
+
 import pytest
 import scipy
-from qibo import hamiltonians
+from qibo import Circuit, gates, hamiltonians
 from qibo.backends import NumpyBackend
 from qibo.models.encodings import _generate_rbs_angles
 from qibo.quantum_info import random_statevector
 from scipy.sparse import csr_matrix
 from scipy.special import comb
 
-from qiboml.models.optimizers import ExactGeodesicTransportCG
+from qiboml.models.optimizers import ExactGeodesicTransportCG, QuantumNaturalGradient
+
+
+def _z_expectation(circuit, backend):
+    state = backend.execute_circuit(circuit).state()
+    pauli_z = backend.cast([[1, 0], [0, -1]], dtype=backend.complex128)
+    return backend.real(backend.sum(backend.conj(state) * (pauli_z @ state)))
+
+
+def test_quantum_natural_gradient(backend):
+    circuit = Circuit(1)
+    circuit.add(gates.RY(0, theta=0.4))
+    callback_steps = []
+
+    optimizer = QuantumNaturalGradient(
+        circuit=circuit,
+        loss_fn=_z_expectation,
+        learning_rate=0.2,
+        regularization=1e-8,
+        callback=lambda iter_num, **_: callback_steps.append(iter_num),
+        backend=backend,
+    )
+    final_loss, losses, final_parameters = optimizer(steps=30)
+
+    assert final_loss < -0.99
+    assert losses[-1] < losses[0]
+    assert final_parameters.shape == (1,)
+    assert callback_steps == list(range(1, len(callback_steps) + 1))
+    assert 0 < len(callback_steps) <= 30
+
+
+def test_quantum_natural_gradient_step_matches_expected_update(backend):
+    circuit = Circuit(1)
+    circuit.add(gates.RY(0, theta=0.4))
+    learning_rate = 0.1
+    optimizer = QuantumNaturalGradient(
+        circuit=circuit,
+        loss_fn=_z_expectation,
+        learning_rate=learning_rate,
+        regularization=0.0,
+        backend=backend,
+    )
+
+    _, gradient, natural_gradient, metric = optimizer.step()
+
+    backend.assert_allclose(
+        metric, backend.cast([[0.25]], dtype=backend.float64), atol=1e-7
+    )
+    backend.assert_allclose(natural_gradient, 4.0 * gradient, atol=1e-7)
+    backend.assert_allclose(
+        optimizer.parameters,
+        backend.cast(
+            [0.4 + 4.0 * learning_rate * math.sin(0.4)],
+            dtype=backend.float64,
+        ),
+        atol=1e-7,
+    )
+
+
+def test_quantum_natural_gradient_expectation_value_loss(backend):
+    circuit = Circuit(1)
+    circuit.add(gates.RY(0, theta=0.4))
+    hamiltonian = backend.cast([[1, 0], [0, -1]], dtype=backend.complex128)
+    optimizer = QuantumNaturalGradient(
+        circuit=circuit,
+        loss_fn="exp_val",
+        loss_kwargs={"hamiltonian": hamiltonian},
+        learning_rate=0.2,
+        backend=backend,
+    )
+
+    final_loss, losses, _ = optimizer(steps=30)
+
+    assert final_loss < -0.99
+    assert losses[-1] < losses[0]
+
+
+def test_quantum_natural_gradient_errors(backend):
+    circuit = Circuit(1)
+    circuit.add(gates.RY(0, theta=0.4))
+
+    with pytest.raises(TypeError):
+        QuantumNaturalGradient(circuit, _z_expectation, backend=NumpyBackend())
+
+    with pytest.raises(ValueError):
+        QuantumNaturalGradient(
+            circuit, _z_expectation, learning_rate=0, backend=backend
+        )
+    with pytest.raises(ValueError):
+        QuantumNaturalGradient(
+            circuit, _z_expectation, regularization=-1, backend=backend
+        )
+    with pytest.raises(ValueError):
+        QuantumNaturalGradient(circuit, "exp_val", backend=backend)
 
 
 def test_egt_cg_errors(backend):
