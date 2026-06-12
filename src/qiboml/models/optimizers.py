@@ -38,6 +38,8 @@ class QuantumNaturalGradient:
         callback (Callable, optional): Called after each update with the keyword
             arguments ``iter_num``, ``loss``, ``parameters``, ``gradient``,
             ``natural_gradient``, and ``metric``.
+        seed (int, optional): Random seed. Present for API compatibility with
+            :class:`ExactGeodesicTransportCG`.
         backend (:class:`qibo.backends.abstract.Backend`, optional): Qiboml
             autodifferentiation backend. Defaults to the active backend.
 
@@ -60,8 +62,10 @@ class QuantumNaturalGradient:
         learning_rate: float = 0.01,
         regularization: float = 1e-6,
         callback: Callable[..., None] | None = None,
+        seed: int | None = None,
         backend: Backend = None,
     ):
+        del seed
         self.backend = _check_backend(backend)
         if self.backend.platform not in ("jax", "pytorch", "tensorflow"):
             raise_error(
@@ -84,7 +88,7 @@ class QuantumNaturalGradient:
                 "If str, ``loss_fn`` can only be ``exp_val``.",
             )
 
-        self.circuit = circuit.copy(deep=True)
+        self.circuit = circuit
         self.learning_rate = learning_rate
         self.regularization = regularization
         self.callback = callback
@@ -129,37 +133,33 @@ class QuantumNaturalGradient:
             self.loss_kwargs["hamiltonian"] = hamiltonian
             self.loss_fn = _loss_func_expval
 
-    def _loss_internal(self, parameters: ArrayLike) -> float:
-        """Evaluate the loss at ``parameters`` and update the call counter."""
-        self.circuit.set_parameters(parameters)
-        self.n_calls_loss += 1
-        return self.loss_fn(self.circuit, self.backend, **self.loss_kwargs)
-
     def _loss_and_gradient(self) -> Tuple[float, ArrayLike]:
         """Return the current loss and its gradient."""
         self.n_calls_gradient += 1
+        self.n_calls_loss += 1
 
         if self.backend.platform == "jax":
             circuit = self.circuit.copy(deep=True)
 
             def loss_fn(parameters):
-                self.circuit.set_parameters(parameters)
-                return self._loss_internal(parameters)
+                circuit.set_parameters(parameters)
+                return self.loss_fn(circuit, self.backend, **self.loss_kwargs)
 
             loss, gradient = self.backend.jax.value_and_grad(loss_fn)(self.parameters)
-            self.circuit = circuit
             self.circuit.set_parameters(self.parameters)
             return loss, gradient
 
         if self.backend.platform == "pytorch":
             parameters = self.parameters.detach().clone().requires_grad_(True)
-            loss = self._loss_internal(parameters)
+            self.circuit.set_parameters(parameters)
+            loss = self.loss_fn(self.circuit, self.backend, **self.loss_kwargs)
             gradient = self.backend.engine.autograd.grad(loss, parameters)[0]
             return loss.detach(), gradient.detach()
 
         parameters = self.backend.engine.Variable(self.parameters)
         with self.backend.engine.GradientTape() as tape:
-            loss = self._loss_internal(parameters)
+            self.circuit.set_parameters(parameters)
+            loss = self.loss_fn(self.circuit, self.backend, **self.loss_kwargs)
         gradient = tape.gradient(loss, parameters)
         return self.backend.engine.stop_gradient(
             loss
@@ -208,7 +208,7 @@ class QuantumNaturalGradient:
         self.circuit.set_parameters(self.parameters)
         return loss, gradient, natural_gradient, metric
 
-    def run(
+    def run_qng(
         self, steps: int = 100, tolerance: float = 1e-8
     ) -> Tuple[float, ArrayLike, ArrayLike]:
         """Optimize the circuit parameters.
@@ -244,7 +244,11 @@ class QuantumNaturalGradient:
             if self.backend.vector_norm(gradient) < tolerance:
                 break
 
-        final_loss = self._stop_gradient(self._loss_internal(self.parameters))
+        self.n_calls_loss += 1
+        self.circuit.set_parameters(self.parameters)
+        final_loss = self._stop_gradient(
+            self.loss_fn(self.circuit, self.backend, **self.loss_kwargs)
+        )
         losses.append(final_loss)
         return (
             final_loss,
@@ -252,11 +256,17 @@ class QuantumNaturalGradient:
             self.parameters,
         )
 
+    def run(
+        self, steps: int = 100, tolerance: float = 1e-8
+    ) -> Tuple[float, ArrayLike, ArrayLike]:
+        """Alias for :meth:`run_qng`."""
+        return self.run_qng(steps=steps, tolerance=tolerance)
+
     def __call__(
         self, steps: int = 100, tolerance: float = 1e-8
     ) -> Tuple[float, ArrayLike, ArrayLike]:
         """Run quantum natural-gradient optimization."""
-        return self.run(steps=steps, tolerance=tolerance)
+        return self.run_qng(steps=steps, tolerance=tolerance)
 
 
 class ExactGeodesicTransportCG:

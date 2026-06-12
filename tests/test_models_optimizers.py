@@ -68,22 +68,31 @@ def test_quantum_natural_gradient_step_matches_expected_update(backend):
     )
 
 
-def test_quantum_natural_gradient_expectation_value_loss(backend):
-    circuit = Circuit(1)
-    circuit.add(gates.RY(0, theta=0.4))
-    hamiltonian = backend.cast([[1, 0], [0, -1]], dtype=backend.complex128)
+@pytest.mark.parametrize("nqubits", [2, 3])
+def test_quantum_natural_gradient_vqe(backend, nqubits):
+    circuit = Circuit(nqubits)
+    for qubit in range(nqubits):
+        circuit.add(gates.RY(qubit, theta=0.1 + 0.2 * qubit))
+    for qubit in range(nqubits - 1):
+        circuit.add(gates.CZ(qubit, qubit + 1))
+
     optimizer = QuantumNaturalGradient(
         circuit=circuit,
         loss_fn="exp_val",
-        loss_kwargs={"hamiltonian": hamiltonian},
+        loss_kwargs={"hamiltonian": hamiltonians.Z(nqubits, backend=backend).matrix},
         learning_rate=0.2,
         backend=backend,
     )
 
-    final_loss, losses, _ = optimizer(steps=30)
+    final_loss, losses, final_parameters = optimizer.run_qng(steps=25)
 
-    assert final_loss < -0.99
+    assert final_loss < -nqubits + 1e-7
     assert losses[-1] < losses[0]
+    backend.assert_allclose(
+        final_parameters,
+        backend.cast(circuit.get_parameters(), dtype=backend.float64).flatten(),
+        atol=1e-7,
+    )
 
 
 def test_quantum_natural_gradient_errors(backend):
