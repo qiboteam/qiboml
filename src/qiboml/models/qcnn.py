@@ -156,7 +156,9 @@ class QuantumCNN:
             diff_idxs = [ abs(a-b) for a, b in zip(f_idxs,i_idxs)]
             assert all ( v < 1.0e-6 for v in diff_idxs), f"Mismatch: f={f_idxs}, i={i_idxs}, diff={diff_idxs}"
             self.idxs = idxs
-            params = [torch.rand(1).item() * torch.pi for i in range(nparams)]
+            g1 = torch.Generator()
+            g1.manual_seed(42)
+            params = [torch.randn(1, generator=g1).item() * torch.pi for i in range(nparams)]
             params_expanded = [params[i-1] if i >= 1 else -params[-i-1] for i in idxs ]
             self._circuit.set_parameters(params_expanded)
 
