@@ -8,6 +8,7 @@ The QuantumCNN class in this module provides methods to construct the QCNN.
 
 import numpy as np
 import torch
+import sys
 
 from qibo import gates
 from qibo.backends import get_backend
