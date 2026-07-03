@@ -88,9 +88,6 @@ class QuantumCNN:
             ValueError: If nqubits is not larger than 1.
         """
 
-
-        # assert False, 'stop here!'
-
         self.quantum_model = quantum_model
         self.nqubits = nqubits
         if self.nqubits <= 1:
@@ -99,8 +96,6 @@ class QuantumCNN:
         self.nclasses = nclasses
         self.nlayers = nlayers
 
-
-        twoqubitansatz = None
         if quantum_model == 'QCNNRY': # special handling
           twoqubitansatz = Circuit(2)
           twoqubitansatz.add( gates.RY(0,0))
@@ -340,7 +335,7 @@ class QuantumCNN:
 
         self._circuit.set_parameters(expanded_params)
 
-    def Classifier_circuit(self, theta):
+    def classifier_circuit(self, theta):
         """
         Args:
             theta: list or numpy.array with the biases and the angles to be used in the circuit.
@@ -353,7 +348,7 @@ class QuantumCNN:
         self.set_circuit_params(angles)
         return self._circuit
 
-    def Predictions(self, circuit, theta, init_state, nshots=10000):
+    def circuit_predictions(self, circuit, theta, init_state, nshots=10000):
         """
         Args:
             theta: list or numpy.array with the biases to be used in the circuit.
@@ -394,7 +389,7 @@ class QuantumCNN:
 
         return loss / len(labels)
 
-    def Cost_function(self, theta, data=None, labels=None, nshots=10000):
+    def cost_function(self, theta, data=None, labels=None, nshots=10000):
         """
         Args:
             theta: list or numpy.array with the biases and the angles to be used in the circuit.
@@ -404,13 +399,13 @@ class QuantumCNN:
         Returns:
             numpy.float32 with the value of the square-loss function.
         """
-        circ = self.Classifier_circuit(theta)
+        circ = self.classifier_circuit(theta)
 
         Bias = np.array(theta[0 : self.measured_qubits])
         predictions = np.zeros(shape=(len(data), self.measured_qubits))
 
         for i, text in enumerate(data):
-            predictions[i] = self.Predictions(circ, Bias, text.astype(complex), nshots)
+            predictions[i] = self.circuit_predictions(circ, Bias, text.astype(complex), nshots)
 
         s = self.square_loss(labels, predictions)
 
@@ -432,7 +427,7 @@ class QuantumCNN:
         from qibo.optimizers import optimize
 
         loss, optimal_angles, result = optimize(
-            self.Cost_function, init_theta, args=(data, labels, nshots), method=method
+            self.cost_function, init_theta, args=(data, labels, nshots), method=method
         )
 
         self._optimal_angles = optimal_angles
@@ -473,6 +468,6 @@ class QuantumCNN:
         Returns:
             numpy.array() with predictions for each qubit, for the initial state.
         """
-        return self.Predictions(
+        return self.circuit_predictions(
             self._circuit, self._optimal_angles, init_state, nshots=nshots
         )
