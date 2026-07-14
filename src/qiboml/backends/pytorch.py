@@ -86,18 +86,22 @@ class PyTorchBackend(Backend):
         copy: bool = False,
         device: Optional[str] = None,
     ) -> ArrayLike:
-        """Casts input as a Torch tensor of the specified dtype.
-
-        This method supports casting of single tensors or lists of tensors
-        as for the :class:`qibo.backends.PyTorchBackend`.
+        """Cast an object as the array type of the current backend.
 
         Args:
-            array: Input to be casted.
-            dtype (Union[str, torch.dtype, np.dtype, type]): Target data type.
-                If ``None``, the default dtype of the backend is used.
+            array (ArrayLike): Object to cast to array.
+            dtype (str or type, optional): data type of ``array`` after casting.
+                Options are ``"complex128"``, ``"complex64"``, ``"float64"``,
+                or ``"float32"``. If ``None``, defaults to ``Backend.dtype``.
                 Defaults to ``None``.
-            copy (bool, optional): If ``True``, the input tensor is copied before casting.
+            copy (bool, optional): If ``True`` a copy of the object is created in memory.
                 Defaults to ``False``.
+            device (str, optional): used to switch ``torch.Tensor`` to and from CPUs and GPUs.
+                Please see the official ``pytorch`` documentation. If ``None``, uses the default
+                ``Backend`` device. Defaults to ``None``.
+
+        Returns:
+            ArrayLike: ``array`` casted to ``dtype`` and ``device``, possibly copied in memory.
         """
 
         if dtype is None:
@@ -123,12 +127,26 @@ class PyTorchBackend(Backend):
         return array.to(device)
 
     def is_sparse(self, array: ArrayLike) -> bool:
+        """Determine if a given array is a sparse tensor.
+
+        Args:
+            array (ArrayLike): array to determine the sparsity of.
+
+        Returns:
+            bool: ``True`` if ``array`` is sparse, ``False`` otherwise.
+        """
         if isinstance(array, self.engine.Tensor):
             return array.is_sparse
 
         return super().is_sparse(array)
 
     def set_device(self, device: str) -> None:  # pragma: no cover
+        """Set simulation device. Works in-place.
+
+        Args:
+            device (str): Device index, *e.g.* ``/CPU:0`` for CPU, or ``/GPU:1`` for
+                the second GPU in a multi-GPU environment.
+        """
         if "CPU" in device:
             self.device = "cpu"
         else:
@@ -185,6 +203,11 @@ class PyTorchBackend(Backend):
                 )
 
     def set_seed(self, seed: int) -> None:
+        """Set the seed of the random number generator. Works in-place.
+
+        Args:
+            seed (int or None): seed to be set. If ``None``, seed is random.
+        """
         if seed is None:
             seed = self.engine.seed()
         self.engine.manual_seed(seed)
@@ -198,6 +221,14 @@ class PyTorchBackend(Backend):
         self.engine.set_num_threads(nthreads)
 
     def to_numpy(self, array: ArrayLike) -> ArrayLike:
+        """Convert ``array`` to a ``numpy.ndarray``.
+
+        Args:
+            array (ArrayLike): array to be converted to ``numpy.ndarray``.
+
+        Returns:
+            ArrayLike: Original array converted to ``numpy.ndarray``.
+        """
         if isinstance(array, list):
             return np.asarray([self.to_numpy(i) for i in array])
 
@@ -214,17 +245,58 @@ class PyTorchBackend(Backend):
     ########################################################################################
 
     def coo_matrix(self, array: ArrayLike, **kwargs) -> ArrayLike:  # pragma: no cover
+        """Return the sparse version of ``array`` in coordinate format.
+
+        Also known as the ``ijv`` or ``triplet`` format.
+
+        Args:
+            array (ArrayLike): input array.
+            kwargs (optional): additional options for this function.
+                For more details, see the corresponding engine's documentation.
+
+        Returns:
+            ArrayLike: The coordinate-format version of ``array``.
+        """
         array = self.cast(array, dtype=array.dtype)
         return array.to_sparse_coo(**kwargs)
 
     def copy(self, array: ArrayLike, **kwargs) -> ArrayLike:
+        """Return a copy of ``array``.
+
+        Args:
+            array (ArrayLike): input array.
+            kwargs (optional): additional options for this function.
+                For more details, see the corresponding engine's documentation.
+
+        Returns:
+            ArrayLike: The copied array.
+        """
         return self.engine.clone(array, **kwargs)
 
     def csr_matrix(self, array: ArrayLike, **kwargs):  # pragma: no cover
+        """Return the sparse version of ``array`` in compressed sparse row format.
+
+        Args:
+            array (ArrayLike): input array.
+            kwargs (optional): additional options for this function.
+                For more details, see the corresponding engine's documentation.
+
+        Returns:
+            ArrayLike: The compressed-sparse-row version of ``array``.
+        """
         array = self.cast(array, dtype=array.dtype)
         return array.to_sparse_csr(**kwargs)
 
     def default_rng(self, seed: Optional[int] = None):
+        """Create a new random number Generator using the engine's default setting.
+
+        Args:
+            seed (int, optional): a seed to initialize the generator. If ``None``,
+            a random integer is chosen. Defaults to ``None``.
+
+        Returns:
+            ArrayLike: The initialized random number generator.
+        """
         if seed is not None:
             if isinstance(seed, int):
                 default_rng = self.engine.Generator()
@@ -239,18 +311,66 @@ class PyTorchBackend(Backend):
     def expand_dims(
         self, array: ArrayLike, axis: Union[int, Tuple[int, ...]]
     ) -> ArrayLike:
+        """Expand the shape of an ``array`` along an ``axis``.
+
+        Insert a new ``axis`` that will appear at the ``axis`` position in the expanded
+        ``array`` shape.
+
+        Args:
+            array (ArrayLike): input array.
+            axis (int or Tuple[int, ...]): Position in the expanded axes where the new axis
+                (or axes) is placed.
+
+        Returns:
+            ArrayLike: Copy of ``array`` with expanded dimensions along ``axis``.
+        """
         return self.engine.unsqueeze(array, axis)
 
     def expm(self, array: ArrayLike) -> ArrayLike:
+        """Compute the matrix exponential of an ``array``.
+
+        Args:
+            array (ArrayLike): input array.
+
+        Returns:
+            ArrayLike: The resulting matrix exponential.
+        """
         return self.engine.linalg.matrix_exp(array)  # pylint: disable=not-callable
 
     def flatnonzero(self, array: ArrayLike) -> ArrayLike:
+        """Return indices that are non-zero in the flattened version of ``array``.
+
+        Args:
+            array (ArrayLike): input array.
+
+        Returns:
+            ArrayLike: Indices of the nonzero elements of flattened ``array``.
+        """
         return self.engine.nonzero(array).flatten()
 
     def mod(self, dividend: ArrayLike, divisor: ArrayLike, **kwargs) -> ArrayLike:
+        """Return the element-wise remainder of division.
+
+        Args:
+            dividend (ArrayLike): dividend array.
+            divisor (float or int or ArrayLike): divisir array.
+            kwargs (optional): additional options for this function.
+                For more details, see the corresponding engine's documentation.
+
+        Returns:
+            ArrayLike: The element-wise remainder of the quotient ``dividend / divisor``.
+        """
         return self.engine.fmod(dividend, divisor, **kwargs)
 
     def nonzero(self, array: ArrayLike) -> ArrayLike:
+        """Return the indices of the elements of ``array`` that are non-zero.
+
+        Args:
+            array (ArrayLike): input array.
+
+        Returns:
+            ArrayLike: Array with the indices of the non-zero elements of ``array``.
+        """
         return self.engine.nonzero(array, as_tuple=True)
 
     def random_choice(
@@ -262,6 +382,28 @@ class PyTorchBackend(Backend):
         seed: Optional[int] = None,
         **kwargs,
     ) -> ArrayLike:
+        """Generate random sample(s) from a given one-dimensional ``array``
+        over the probability distribution ``p``.
+
+        Args:
+            array (ArrayLike): If a tensor, a random sample is generated from its elements.
+                If an ``int``, the random sample is generated as if it were
+                ``Backend.arange(array)``.
+            size (int or Tuple[int, ...], optional): output shape. If ``None``,
+                a single sample is returned. Defaults to ``None``.
+            replace (bool, optional): If ``True``, the values in ``array`` can be
+                sampled multiple times. If ``False``, values are only sampled once.
+                Defaults to ``True``.
+            p (ArrayLike, optional): probabilities associated with each entry in ``array``.
+                If ``None``, defaults to the uniform distribution. Defaults to ``None``.
+            seed (int, optional): a seed to initialize the random number generator. If ``None``,
+                a random integer is chosen. Defaults to ``None``.
+            kwargs (optional): additional options for this function.
+                For more details, see the corresponding engine's documentation.
+
+        Returns:
+            ArrayLike: The generated random sample(s).
+        """
         dtype = kwargs.get("dtype", self.float64)
 
         if size is None:
@@ -286,7 +428,28 @@ class PyTorchBackend(Backend):
         high: Optional[int] = None,
         size: Optional[Union[int, Tuple[int, ...]]] = None,
         seed: Optional[int] = None,
+        **kwargs,
     ) -> ArrayLike:
+        """Generate random integers in the interval ``[low, high)`` over the uniform distribution.
+
+        Args:
+            low (int): lower integer in the interval (inclusive). If ``high`` is ``None``,
+                then ``high`` :math:`\\leftarrow` ``low``, and ``low`` defaults to :math:`0`.
+            high (Optional[int], optional): if not ``None``, then highest integer in the interval
+                (exclusive). If ``None``, then ``high`` :math:`\\leftarrow` ``low``, and ``low``
+                defaults to :math:`0`. Defaults to ``None``.
+            size (int or Tuple[int, ...], optional): output shape. If ``None``,
+                a single sample is returned. Defaults to ``None``.
+            seed (int, optional): a seed to initialize the random number generator. If ``None``,
+                a random integer is chosen. Defaults to ``None``.
+            kwargs (optional): additional options for this function.
+                For more details, see the corresponding engine's documentation.
+
+        Returns:
+            ArrayLike: The generated random sample(s).
+        """
+        dtype = kwargs.get("dtype", self.int64)
+
         if high is None:
             high = low
             low = 0
@@ -299,9 +462,11 @@ class PyTorchBackend(Backend):
         if seed is not None:
             local_state = self.default_rng(seed) if isinstance(seed, int) else seed
 
-            return self.engine.randint(low, high, size, generator=local_state)
+            return self.cast(
+                self.engine.randint(low, high, size, generator=local_state), dtype=dtype
+            )
 
-        return self.engine.randint(low, high, size)
+        return self.cast(self.engine.randint(low, high, size), dtype=dtype)
 
     def random_normal(
         self,
@@ -311,6 +476,21 @@ class PyTorchBackend(Backend):
         seed: Optional[int] = None,
         dtype: Optional[DTypeLike] = None,
     ) -> ArrayLike:
+        """Generate random numbers from a normal (Gaussian) distribution.
+
+        Args:
+            mean (float or int): mean value of the Gaussian distribution.
+            stddev (float or int): standard deviation of the Gaussian distribution.
+            size (int or List[int] or Tuple[int, ...], optional): output shape. If ``None``,
+                a single sample is returned. Defaults to ``None``.
+            seed (int, optional): a seed to initialize the random number generator. If ``None``,
+                a random integer is chosen. Defaults to ``None``.
+            dtype (DTypeLike, optional): data type of the resulting array. If ``None``,
+                defaults to the global data type of the ``Backend``. Defaults to ``None``.
+
+        Returns:
+            ArrayLike: The generated random sample(s).
+        """
         if isinstance(size, int):
             size = (size,)
 
@@ -329,13 +509,30 @@ class PyTorchBackend(Backend):
 
         return self.cast(self.engine.normal(mean, stddev, size), dtype=dtype)
 
-    def random_sample(self, size: Union[int, Tuple[int, ...]], seed=None) -> ArrayLike:
+    def random_sample(
+        self, size: Union[int, Tuple[int, ...]], seed=None, **kwargs
+    ) -> ArrayLike:
+        """Generate random numbers in the interval :math:`[0.0, \\, 1.0)``
+        over the uniform distribution.
+
+        Args:
+            size (int or List[int] or Tuple[int, ...], optional): output shape.
+            seed (int, optional): a seed to initialize the random number generator. If ``None``,
+                a random integer is chosen. Defaults to ``None``.
+            kwargs (optional): additional options for this function.
+                For more details, see the corresponding engine's documentation.
+
+        Returns:
+            ArrayLike: The generated random sample(s).
+        """
+        dtype = kwargs.get("dtype", self.float64)
+
         if seed is not None:
             local_state = self.default_rng(seed) if isinstance(seed, int) else seed
         else:
             local_state = None
 
-        return self.engine.rand(size, generator=local_state)
+        return self.cast(self.engine.rand(size, generator=local_state), dtype=dtype)
 
     def random_uniform(
         self,
@@ -343,36 +540,103 @@ class PyTorchBackend(Backend):
         high: Union[float, int] = 1.0,
         size: Optional[Union[int, Tuple[int, ...]]] = None,
         seed: Optional[int] = None,
+        **kwargs,
     ) -> ArrayLike:
+        """Generate random numbers in the interval ``[low, high)`` over the uniform distribution.
+
+        Args:
+            low (float or int, optional):  lower integer in the interval (inclusive).
+                Defaults to :math:`0.0`.
+            high (float or int, optional): highest integer in the interval (exclusive).
+                Defaults to :math:`1.0`.
+            size (int or Tuple[int, ...], optional): output shape. If ``None``,
+                a single sample is returned. Defaults to ``None``.
+            seed (int, optional): a seed to initialize the random number generator. If ``None``,
+                a random integer is chosen. Defaults to ``None``.
+            kwargs (optional): additional options for this function.
+                For more details, see the corresponding engine's documentation.
+
+        Returns:
+            ArrayLike: The generated random sample(s).
+        """
+        dtype = kwargs.get("dtype", self.float64)
 
         if seed is not None:
             local_state = self.default_rng(seed) if isinstance(seed, int) else seed
 
-            return low + (high - low) * self.engine.rand(size, generator=local_state)
+            return self.cast(
+                low + (high - low) * self.engine.rand(size, generator=local_state),
+                dtype=dtype,
+            )
 
-        return low + (high - low) * self.engine.rand(size)
+        return self.cast(low + (high - low) * self.engine.rand(size), dtype=dtype)
 
-    def round(self, array: ArrayLike, decimals: int = 0) -> ArrayLike:
+    def right_shift(self, *args, **kwargs) -> ArrayLike:
+        """Shift the bits of an integer to the right
+
+        Args:
+            args (int): positional arguments for this function.
+                For more details, see the corresponding engine's documentation.
+            kwargs (optional): additional options for this function.
+                For more details, see the corresponding engine's documentation.
+
+        Returns:
+            ArrayLike: The right-shifted array.
+        """
+        return self.engine.bitwise_right_shift(*args, **kwargs)
+
+    def round(self, array: ArrayLike, decimals: int = 0, **kwargs) -> ArrayLike:
+        """Return element-wise evenly round ``array`` to the given number of ``decimals``.
+
+        Args:
+            array (ArrayLike): input array.
+            decimals (int, optional): number of decimal places to round to. Defaults to :math:`0`.
+            kwargs (optional): additional options for this function.
+                For more details, see the corresponding engine's documentation.
+
+        Returns:
+            ArrayLike: The rounded array.
+        """
         len_size = len(array.size())
         dtype = array.dtype if len_size == 0 else array[0].dtype
         if "complex" in str(dtype):
             return self.engine.round(
-                self.real(array), decimals=decimals
-            ) + 1j * self.engine.round(self.imag(array), decimals=decimals)
+                self.real(array), decimals=decimals, **kwargs
+            ) + 1j * self.engine.round(self.imag(array), decimals=decimals, **kwargs)
 
-        return super().round(array, decimals=decimals)
-
-    def right_shift(self, *args, **kwargs) -> ArrayLike:
-        return self.engine.bitwise_right_shift(*args, **kwargs)
+        return super().round(array, decimals, **kwargs)
 
     def transpose(
         self, array: ArrayLike, axes: Union[Tuple[int, ...], List[int]] = None
     ) -> ArrayLike:
+        """Return an ``array`` with ``axes`` transposed.
+
+        Args:
+            array (ArrayLike): input array.
+            axes (Tuple[int, ...] or List[int], optional): axes to be transposed.
+                Defaults to ``None``.
+
+        Returns:
+            ArrayLike: The resulting transposed array.
+        """
         return self.engine.permute(array, axes)
 
     def tril_indices(
         self, row: int, offset: int = 0, col: Optional[int] = None, **kwargs
     ) -> ArrayLike:
+        """Return the indices for the lower-triangle of an ``(row, col)``-dimensional ``array``.
+
+        Args:
+            row (int): the row dimension of the arrays for which the returned indices will be valid.
+            offset (int, optional): diagonal offset (see :meth:`qibo.backends.Backend.tril`
+                for details). Defaults to :math:`0`.
+            col (int, optional): the column dimension of the arrays for which the returned arrays
+                will be valid. If ``None``, defaults to the same value as ``row``.
+                Defaults to ``None``.
+
+        Returns:
+            Tuple[ArrayLike, ArrayLike]: The row and column indices, respectively.
+        """
         if col is None:
             col = row
         return self.engine.tril_indices(row, col, offset, **kwargs)
