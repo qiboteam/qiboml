@@ -116,6 +116,20 @@ class JaxBackend(Backend):
     def cast(
         self, array: ArrayLike, dtype: Optional[DTypeLike] = None, copy: bool = False
     ) -> ArrayLike:
+        """Cast an object as the array type of the current backend.
+
+        Args:
+            array (ArrayLike): Object to cast to array.
+            dtype (str or type, optional): data type of ``array`` after casting.
+                Options are ``"complex128"``, ``"complex64"``, ``"float64"``,
+                or ``"float32"``. If ``None``, defaults to ``Backend.dtype``.
+                Defaults to ``None``.
+            copy (bool, optional): If ``True`` a copy of the object is created in memory.
+                Defaults to ``False``.
+
+        Returns:
+            ArrayLike: ``array`` casted to ``dtype``, possibly copied in memory.
+        """
         if dtype is None:
             dtype = self.dtype
 
@@ -128,30 +142,140 @@ class JaxBackend(Backend):
         return self.engine.array(array, dtype=dtype, copy=copy)
 
     def is_sparse(self, array: ArrayLike) -> bool:
-        """Determine if a given array is a sparse tensor."""
+        """Determine if a given array is a sparse tensor.
+
+        Args:
+            array (ArrayLike): array to determine the sparsity of.
+
+        Returns:
+            bool: ``True`` if ``array`` is sparse, ``False`` otherwise.
+        """
         return issparse(array)
 
+    # TODO: using numpy's rng for now. Shall we use Jax's?
+    def set_seed(self, seed: int) -> None:
+        """Set the seed of the random number generator. Works in-place.
+
+        Args:
+            seed (int or None): seed to be set. If ``None``, seed is random.
+        """
+        np.random.seed(seed)
+
     def set_threads(self, nthreads: int) -> None:
+        """Set number of threads for CPU backend simulations that accept it. Works in-place.
+
+        Args:
+            nthreads (int): Number of threads.
+        """
         if nthreads > 1:
             raise_error(ValueError, "``numpy`` does not support more than one thread.")
 
     def to_numpy(self, array: ArrayLike) -> ArrayLike:
+        """Convert ``array`` to a ``numpy.ndarray``.
 
+        Args:
+            array (ArrayLike): array to be converted to ``numpy.ndarray``.
+
+        Returns:
+            ArrayLike: Original array converted to ``numpy.ndarray``.
+        """
         if isinstance(array, (list, tuple)):
             return np.asarray([self.to_numpy(elem) for elem in array])
 
         return np.asarray(array)
 
-    # TODO: using numpy's rng for now. Shall we use Jax's?
-    def set_seed(self, seed: int) -> None:
-        np.random.seed(seed)
-
     ########################################################################################
     ######## Methods related to array manipulation                                  ########
     ########################################################################################
 
+    def block_diag(self, *arrays: ArrayLike) -> ArrayLike:
+        """Create a block diagonal array from provided ``arrays``.
+
+        Args:
+            arrays (ArrayLike): input arrays.
+
+        Returns:
+            ArrayLike: Array with ``arrays`` on the diagonal of the last two dimensions.
+        """
+        return block_diag(*arrays)
+
+    def coo_matrix(self, array: ArrayLike, **kwargs) -> ArrayLike:  # pragma: no cover
+        """Return the sparse version of ``array`` in coordinate format.
+
+        Also known as the ``ijv`` or ``triplet`` format.
+
+        Args:
+            array (ArrayLike): input array.
+            kwargs (optional): additional options for this function.
+                For more details, see the corresponding engine's documentation.
+
+        Returns:
+            ArrayLike: The coordinate-format version of ``array``.
+        """
+        return self.jax.experimental.sparse.BCOO.fromdense(array, **kwargs)
+
+    def csr_matrix(self, array: ArrayLike, **kwargs) -> ArrayLike:
+        """Return the sparse version of ``array`` in compressed sparse row format.
+
+        Args:
+            array (ArrayLike): input array.
+            kwargs (optional): additional options for this function.
+                For more details, see the corresponding engine's documentation.
+
+        Returns:
+            ArrayLike: The compressed-sparse-row version of ``array``.
+        """
+        return csr_matrix(array, **kwargs)
+
     def default_rng(self, seed: Optional[int] = None) -> None:
+        """Create a new random number Generator using the engine's default setting.
+
+        Args:
+            seed (int, optional): a seed to initialize the generator. If ``None``,
+            a random integer is chosen. Defaults to ``None``.
+
+        Returns:
+            ArrayLike: The initialized random number generator.
+        """
         return np.random.default_rng(seed)
+
+    def eigsh(self, array: ArrayLike, **kwargs) -> Tuple[ArrayLike, ArrayLike]:
+        """Compute the eigenvalues and right eigenvectors of a two-dimensional sparse ``array``
+        that is assumed to be Hermitian.
+
+        Args:
+            array (ArrayLike): input sparse array.
+            kwargs (optional): additional options for this function.
+                For more details, see the corresponding engine's documentation.
+
+        Returns:
+            Tuple[ArrayLike, ArrayLike]: Tuple with, respectively, array of eigenvalues and
+            array of column-stacked eigenvectors.
+        """
+        return eigsh(array, **kwargs)
+
+    def expm(self, array: ArrayLike) -> ArrayLike:
+        """Compute the matrix exponential of an ``array``.
+
+        Args:
+            array (ArrayLike): input array.
+
+        Returns:
+            ArrayLike: The resulting matrix exponential.
+        """
+        func = expm_sparse if self.is_sparse(array) else expm
+        return func(array)
+
+    def logm(self, array: ArrayLike, **kwargs) -> ArrayLike:
+        """Compute the matrix logarithm of an ``array``.
+
+        Args:
+            array (ArrayLike): input array.
+
+        Returns:
+            ArrayLike: The resulting matrix logarithm.
+        """
+        return logm(array, **kwargs)
 
     def random_choice(
         self,
@@ -162,6 +286,28 @@ class JaxBackend(Backend):
         seed: Optional[int] = None,
         **kwargs,
     ) -> ArrayLike:
+        """Generate random sample(s) from a given one-dimensional ``array``
+        over the probability distribution ``p``.
+
+        Args:
+            array (ArrayLike): If a tensor, a random sample is generated from its elements.
+                If an ``int``, the random sample is generated as if it were
+                ``Backend.arange(array)``.
+            size (int or Tuple[int, ...], optional): output shape. If ``None``,
+                a single sample is returned. Defaults to ``None``.
+            replace (bool, optional): If ``True``, the values in ``array`` can be
+                sampled multiple times. If ``False``, values are only sampled once.
+                Defaults to ``True``.
+            p (ArrayLike, optional): probabilities associated with each entry in ``array``.
+                If ``None``, defaults to the uniform distribution. Defaults to ``None``.
+            seed (int, optional): a seed to initialize the random number generator. If ``None``,
+                a random integer is chosen. Defaults to ``None``.
+            kwargs (optional): additional options for this function.
+                For more details, see the corresponding engine's documentation.
+
+        Returns:
+            ArrayLike: The generated random sample(s).
+        """
         dtype = kwargs.get("dtype", self.float64)
 
         if seed is not None:
@@ -181,7 +327,28 @@ class JaxBackend(Backend):
         high: Optional[int] = None,
         size: Optional[Union[int, Tuple[int, ...]]] = None,
         seed: Optional[int] = None,
+        **kwargs,
     ) -> ArrayLike:
+        """Generate random integers in the interval ``[low, high)`` over the uniform distribution.
+
+        Args:
+            low (int): lower integer in the interval (inclusive). If ``high`` is ``None``,
+                then ``high`` :math:`\\leftarrow` ``low``, and ``low`` defaults to :math:`0`.
+            high (Optional[int], optional): if not ``None``, then highest integer in the interval
+                (exclusive). If ``None``, then ``high`` :math:`\\leftarrow` ``low``, and ``low``
+                defaults to :math:`0`. Defaults to ``None``.
+            size (int or Tuple[int, ...], optional): output shape. If ``None``,
+                a single sample is returned. Defaults to ``None``.
+            seed (int, optional): a seed to initialize the random number generator. If ``None``,
+                a random integer is chosen. Defaults to ``None``.
+            kwargs (optional): additional options for this function.
+                For more details, see the corresponding engine's documentation.
+
+        Returns:
+            ArrayLike: The generated random sample(s).
+        """
+        dtype = kwargs.get("dtype", self.int64)
+
         if high is None:
             high = low
             low = 0
@@ -192,9 +359,9 @@ class JaxBackend(Backend):
         if seed is not None:
             local_state = self.default_rng(seed) if isinstance(seed, int) else seed
 
-            return local_state.integers(low, high, size)
+            return self.cast(local_state.integers(low, high, size), dtype=dtype)
 
-        return np.random.randint(low, high, size)
+        return self.cast(np.random.randint(low, high, size), dtype=dtype)
 
     def random_normal(
         self,
@@ -204,6 +371,21 @@ class JaxBackend(Backend):
         seed: Optional[int] = None,
         dtype: Optional[DTypeLike] = None,
     ) -> ArrayLike:
+        """Generate random numbers from a normal (Gaussian) distribution.
+
+        Args:
+            mean (float or int): mean value of the Gaussian distribution.
+            stddev (float or int): standard deviation of the Gaussian distribution.
+            size (int or List[int] or Tuple[int, ...], optional): output shape. If ``None``,
+                a single sample is returned. Defaults to ``None``.
+            seed (int, optional): a seed to initialize the random number generator. If ``None``,
+                a random integer is chosen. Defaults to ``None``.
+            dtype (DTypeLike, optional): data type of the resulting array. If ``None``,
+                defaults to the global data type of the ``Backend``. Defaults to ``None``.
+
+        Returns:
+            ArrayLike: The generated random sample(s).
+        """
         if dtype is None:
             dtype = self.float64
 
@@ -219,13 +401,30 @@ class JaxBackend(Backend):
 
         return self.cast(np.random.normal(mean, stddev, size), dtype=dtype)
 
-    def random_sample(self, size: int, seed: Optional[int] = None) -> ArrayLike:
+    def random_sample(
+        self, size: int, seed: Optional[int] = None, **kwargs
+    ) -> ArrayLike:
+        """Generate random numbers in the interval :math:`[0.0, \\, 1.0)``
+        over the uniform distribution.
+
+        Args:
+            size (int or List[int] or Tuple[int, ...], optional): output shape.
+            seed (int, optional): a seed to initialize the random number generator. If ``None``,
+                a random integer is chosen. Defaults to ``None``.
+            kwargs (optional): additional options for this function.
+                For more details, see the corresponding engine's documentation.
+
+        Returns:
+            ArrayLike: The generated random sample(s).
+        """
+        dtype = kwargs.get("dtype", self.float64)
+
         if seed is not None:
             local_state = self.default_rng(seed) if isinstance(seed, int) else seed
 
-            return local_state.random(size)
+            return self.cast(local_state.random(size), dtype=dtype)
 
-        return np.random.random(size)
+        return self.cast(np.random.random(size), dtype=dtype)
 
     def random_uniform(
         self,
@@ -233,13 +432,33 @@ class JaxBackend(Backend):
         high: Union[float, int] = 1.0,
         size: Optional[Union[int, Tuple[int, ...]]] = None,
         seed: Optional[int] = None,
+        **kwargs,
     ) -> ArrayLike:
+        """Generate random numbers in the interval ``[low, high)`` over the uniform distribution.
+
+        Args:
+            low (float or int, optional):  lower integer in the interval (inclusive).
+                Defaults to :math:`0.0`.
+            high (float or int, optional): highest integer in the interval (exclusive).
+                Defaults to :math:`1.0`.
+            size (int or Tuple[int, ...], optional): output shape. If ``None``,
+                a single sample is returned. Defaults to ``None``.
+            seed (int, optional): a seed to initialize the random number generator. If ``None``,
+                a random integer is chosen. Defaults to ``None``.
+            kwargs (optional): additional options for this function.
+                For more details, see the corresponding engine's documentation.
+
+        Returns:
+            ArrayLike: The generated random sample(s).
+        """
+        dtype = kwargs.get("dtype", self.float64)
+
         if seed is not None:
             local_state = self.default_rng(seed) if isinstance(seed, int) else seed
 
-            return local_state.uniform(low, high, size)
+            return self.cast(local_state.uniform(low, high, size), dtype=dtype)
 
-        return np.random.uniform(low, high, size)
+        return self.cast(np.random.uniform(low, high, size), dtype=dtype)
 
     ########################################################################################
     ######## Methods related to the creation and manipulation of quantum objects    ########
@@ -330,29 +549,6 @@ class JaxBackend(Backend):
         res, counts = self.unique(samples, return_counts=True)
         frequencies = frequencies.at[res].add(counts)
         return frequencies
-
-    ########################################################################################
-    ######## Methods related to array manipulation                                  ########
-    ########################################################################################
-
-    def block_diag(self, *arrays: ArrayLike) -> ArrayLike:
-        return block_diag(*arrays)
-
-    def coo_matrix(self, array: ArrayLike, **kwargs) -> ArrayLike:  # pragma: no cover
-        return self.jax.experimental.sparse.BCOO.fromdense(array, **kwargs)
-
-    def csr_matrix(self, array: ArrayLike, **kwargs) -> ArrayLike:
-        return csr_matrix(array, **kwargs)
-
-    def eigsh(self, array: ArrayLike, **kwargs) -> Tuple[ArrayLike, ArrayLike]:
-        return eigsh(array, **kwargs)
-
-    def expm(self, array: ArrayLike) -> ArrayLike:
-        func = expm_sparse if self.is_sparse(array) else expm
-        return func(array)
-
-    def logm(self, array: ArrayLike, **kwargs) -> ArrayLike:
-        return logm(array, **kwargs)
 
     ########################################################################################
     ######## Helper methods for testing                                             ########
