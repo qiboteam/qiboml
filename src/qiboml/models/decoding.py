@@ -1,6 +1,6 @@
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from numpy.typing import ArrayLike
 from qibo import Circuit, gates
@@ -326,6 +326,106 @@ class Expectation(QuantumDecoding):
         return self.backend.reshape(expval, (1, 1))
 
     @property
+    def supports_batching(self) -> bool:
+        """Whether :meth:`batch` can be used with the current settings.
+
+        Two conditions: the decoder has to sample, ``nshots`` being what makes
+        the expectation values recoverable from frequencies, and the observable
+        has to be diagonal in the computational basis. Note that
+        :meth:`qibo.hamiltonians.SymbolicHamiltonian.expectation_from_samples`
+        does not check the latter itself, it silently returns a wrong value.
+
+        Returns:
+            (bool): ``True`` if batched decoding is available.
+        """
+        if self.nshots is None:
+            return False
+        terms = getattr(self.observable, "terms", None)
+        if terms is None:  # pragma: no cover
+            # a dense Hamiltonian, with no symbolic factors to inspect
+            return False
+        return all(
+            factor.__class__.__name__ in ("I", "Z")
+            for term in terms
+            for factor in term.factors
+        )
+
+    def batched_expectations(self, circuits: List[Circuit]) -> List[float]:
+        """Measure the raw expectation values of several circuits in one round trip.
+
+        No mitigation map is applied, which is what makes this usable to *fit*
+        the map: the Clifford Data Regression training circuits have to be
+        measured as the backend returns them.
+
+        Args:
+            circuits (list(:class:`qibo.models.circuit.Circuit`)): input circuits.
+
+        Returns:
+            list(float): one expectation value per circuit, in the same order.
+        """
+        prepared = []
+        for circuit in circuits:
+            circuit._final_state = None
+            prepared.append(self.preprocessing(circuit) + self.circuit)
+
+        results = self.backend.execute_circuits(prepared, nshots=self.nshots)
+        return [result.expectation_from_samples(self.observable) for result in results]
+
+    def batch(self, circuits: List[Circuit]) -> ArrayLike:
+        """Decode several circuits with a single backend round trip.
+
+        Equivalent to calling the decoder on each circuit in turn, except that
+        the circuits are handed to
+        :meth:`qibo.backends.abstract.Backend.execute_circuits` together, so a
+        hardware backend pays the connection and upload overhead once for the
+        whole batch instead of once per circuit -- ``qibolab``, for instance,
+        opens and closes the connection to the control electronics around every
+        single ``execute_circuit``.
+
+        The batch counts as *one* execution as far as the real-time mitigation
+        is concerned: the map reliability check runs once, against the first
+        circuit of the batch, and the resulting map is applied to every value.
+
+        The measurements cannot be left to
+        :meth:`qibo.hamiltonians.SymbolicHamiltonian.expectation`, which copies
+        the circuit, adds them to the copy and executes that: each circuit has
+        to be complete before the batch is handed over, so the expectation
+        values are reconstructed from the measured frequencies instead. Hence
+        the conditions in :attr:`supports_batching`.
+
+        Args:
+            circuits (list(:class:`qibo.models.circuit.Circuit`)): input circuits.
+
+        Returns:
+            ArrayLike: the expectation values, of shape
+            ``(len(circuits), *output_shape)``.
+        """
+        if not self.supports_batching:
+            raise_error(
+                RuntimeError,
+                "Batched decoding requires `nshots` to be set and the observable "
+                "to be diagonal in the computational basis. Call the decoder on "
+                "one circuit at a time instead.",
+            )
+
+        if self.mitigation_config is not None:
+            self.align_circuits(circuits[0])
+            _real_time_mitigation_check(self, self.transpile(circuits[0]))
+
+        expvals = self.batched_expectations(circuits)
+
+        if self.mitigation_config is not None:
+            expvals = [self.mitigator(expval) for expval in expvals]
+
+        if self.calibrator is not None:  # pragma: no cover
+            self.calibrator()
+
+        return self.backend.reshape(
+            self.backend.cast(expvals, dtype=self.backend.float64),
+            (len(circuits),) + self.output_shape,
+        )
+
+    @property
     def output_shape(self) -> Tuple[int, int]:
         """Shape of the output expectation value.
 
@@ -497,10 +597,14 @@ def _check_or_recompute_map(decoder: Expectation, x: Circuit):
     reference_expval = decoder.observable.expectation(
         decoder.mitigator._reference_circuit, nshots=decoder.mitigator._nshots
     )
-    # Check or update noise map
+    # Check or update noise map, measuring the training circuits in one round
+    # trip where the decoder can do it
     decoder.mitigator.check_or_update_map(
         noisy_reference_value=reference_expval,
         circuit=x,
         observable=decoder.observable,
         noise_model=decoder.noise_model,
+        batched_expectations=(
+            decoder.batched_expectations if decoder.supports_batching else None
+        ),
     )
