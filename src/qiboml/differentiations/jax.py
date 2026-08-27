@@ -1,14 +1,15 @@
 from functools import partial
 from typing import Callable
 
+import jax  # pylint: disable=import-error
 import numpy as np
 from numpy.typing import ArrayLike
-import jax  # pylint: disable=import-error
 from qibo import Circuit
 from qibo.backends.abstract import Backend
+
 from qiboml.backends.jax import JaxBackend
-from qiboml.models.decoding import QuantumDecoding
 from qiboml.differentiations.abstract import Differentiation
+from qiboml.models.decoding import QuantumDecoding
 
 
 class Jax(Differentiation):

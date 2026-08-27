@@ -1,10 +1,11 @@
 import math
 from dataclasses import dataclass
 from typing import Tuple
-from numpy.typing import ArrayLike
 
+from numpy.typing import ArrayLike
 from qibo import Circuit
 from qibo.config import raise_error
+
 from qiboml.differentiations.abstract import Differentiation
 
 
