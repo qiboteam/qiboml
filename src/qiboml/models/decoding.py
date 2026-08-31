@@ -366,7 +366,17 @@ class Expectation(QuantumDecoding):
         prepared = []
         for circuit in circuits:
             circuit._final_state = None
-            prepared.append(self.preprocessing(circuit) + self.circuit)
+            # The measurement gates MUST be deep copies, one set per circuit.
+            # `self.circuit` is a shallow copy, so every circuit in the batch
+            # would share a single gate object and therefore a single
+            # `MeasurementResult`: hardware backends deliver a batch by
+            # registering the samples of each circuit onto its measurement gates
+            # in turn (see `QibolabBackend.execute_circuits`), so a shared result
+            # is overwritten N times and every circuit reports the values of the
+            # last one -- an expectation value that is flat across the batch.
+            # Simulation backends hide this, their results carrying their own
+            # state rather than reading the gate back.
+            prepared.append(self.preprocessing(circuit) + self._circuit.copy(deep=True))
 
         results = self.backend.execute_circuits(prepared, nshots=self.nshots)
         return [result.expectation_from_samples(self.observable) for result in results]
