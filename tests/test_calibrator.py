@@ -9,10 +9,10 @@ from qibocal.auto.runcard import Runcard
 from qibocal.auto.task import Action
 from qibolab._core.backends import QibolabBackend
 
+from qiboml.differentiations.psr import PSR
 from qiboml.interfaces.pytorch import QuantumModel
 from qiboml.models.calibrator import Calibrator
 from qiboml.models.decoding import Expectation
-from qiboml.differentiations.psr import PSR
 
 NQUBITS = 5
 

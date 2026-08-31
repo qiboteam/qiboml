@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from functools import cached_property, partial
-from typing import Callable, Optional
+from functools import cached_property
+from typing import Optional
 
 import numpy as np
 from numpy.typing import ArrayLike

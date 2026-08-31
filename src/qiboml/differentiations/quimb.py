@@ -1,9 +1,10 @@
 import math
-from typing import Optional, Callable
+from typing import Callable, Optional
 
 import jax
 from qibo import Circuit
 from qibo.backends import construct_backend
+
 from qiboml.differentiations.jax import Jax
 from qiboml.models.decoding import QuantumDecoding
 

@@ -1,10 +1,11 @@
 import math
 from dataclasses import dataclass
 from typing import Tuple
-from numpy.typing import ArrayLike
 
+from numpy.typing import ArrayLike
 from qibo import Circuit
 from qibo.config import raise_error
+
 from qiboml.differentiations.abstract import Differentiation
 
 
@@ -45,11 +46,17 @@ class PSR(Differentiation):
             circuits.extend([forward, backward])
             eigvals.append(eigval)
 
-        # TODO: parallelize when decoding will support
-        # the parallel execution of multiple circuits
-        expvals = self.backend.cast(
-            [self.decoding(circ) for circ in circuits], dtype=parameters.dtype
-        )
+        # All the shifted circuits are known up front and none depends on the
+        # others, so hand them over together where the decoder can take them:
+        # on hardware that turns 2 * nparams round trips into one.
+        if getattr(self.decoding, "supports_batching", False):
+            expvals = self.backend.cast(
+                self.decoding.batch(circuits), dtype=parameters.dtype
+            )
+        else:
+            expvals = self.backend.cast(
+                [self.decoding(circ) for circ in circuits], dtype=parameters.dtype
+            )
         forwards = expvals[::2]
         backwards = expvals[1::2]
         eigvals = self.backend.reshape(

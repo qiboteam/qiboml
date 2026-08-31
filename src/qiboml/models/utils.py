@@ -112,29 +112,107 @@ class Mitigator:
         circuit: Circuit,
         observable: Union[ArrayLike, Hamiltonian],
         noise_model: NoiseModel,
+        batched_expectations: Optional[Callable[..., ArrayLike]] = None,
     ):
         """
         Check if the mitigation map is reliable. If not, execute the
         error mitigation technique and recompute it.
+
+        Args:
+            batched_expectations (Callable, optional): if given, a callable taking
+                a list of circuits and returning their unmitigated expectation
+                values in a single backend round trip, used to measure the
+                training circuits all at once. See :meth:`data_regression`.
         """
         if not self.map_is_reliable(noisy_reference_value) or self._n_checks == 0:
             self.data_regression(
                 circuit=circuit,
                 observable=observable,
                 noise_model=noise_model,
+                batched_expectations=batched_expectations,
             )
             self._n_maps_computed += 1
         self._n_checks += 1
+
+    def _batched_cdr(
+        self,
+        circuit: Circuit,
+        observable: Union[ArrayLike, Hamiltonian],
+        batched_expectations: Callable[..., ArrayLike],
+    ):
+        """Clifford Data Regression with the noisy training values measured in one go.
+
+        The construction is the one of :func:`qibo.models.error_mitigation.CDR`
+        -- its sampler, its exact values, its fit -- with a single difference:
+        that function measures the noisy expectation value of each training
+        circuit in its own execution, whereas here they are all handed over
+        together. On hardware that is ``n_training_samples`` round trips against
+        one.
+
+        The exact values stay unbatched on purpose: they are computed on a
+        simulation backend, where an execution costs nothing.
+
+        Note that this also removes the need for the ``qubit_map`` argument of
+        :func:`qibo.models.error_mitigation.CDR`: the training circuits inherit
+        the ``wire_names`` of the circuit they are sampled from, instead of
+        having them reassigned at execution time.
+
+        Returns:
+            list: the fitted parameters of the mitigation map.
+        """
+        samples = self._mitigation_method_kwargs.get("n_training_samples", 100)
+        self.backend.set_seed(self._mitigation_method_kwargs.get("seed"))
+        training_circuits = [
+            error_mitigation.sample_training_circuit_cdr(circuit, backend=self.backend)
+            for _ in range(samples)
+        ]
+
+        original_backend = observable.backend
+        observable.backend = error_mitigation.SIMULATION_BACKEND()
+        noiseless = [
+            observable.expectation(circ, self._nshots) for circ in training_circuits
+        ]
+        observable.backend = original_backend
+
+        noisy = [float(value) for value in batched_expectations(training_circuits)]
+
+        self._training_data = {"noise-free": noiseless, "noisy": noisy}
+        nparams = self._mitigation_map.__code__.co_argcount - 1
+        return error_mitigation._curve_fit(
+            self.backend,
+            self._mitigation_map,
+            self.backend.random_sample(nparams),
+            self.backend.cast(noisy, dtype="double"),
+            self.backend.cast(noiseless, dtype="double"),
+        )
 
     def data_regression(
         self,
         circuit: Circuit,
         observable: Union[ArrayLike, Hamiltonian],
         noise_model: NoiseModel,
+        batched_expectations: Optional[Callable[..., ArrayLike]] = None,
     ):
         """
         Perform data regression on noisy and exact data.
+
+        Args:
+            batched_expectations (Callable, optional): if given, and the chosen
+                method is ``"CDR"``, the training circuits are measured in a
+                single backend round trip through this callable rather than one
+                execution each. See :meth:`_batched_cdr`.
         """
+
+        if self._mitigation_method == "CDR" and batched_expectations is not None:
+            popt = self._batched_cdr(
+                circuit=circuit,
+                observable=observable,
+                batched_expectations=batched_expectations,
+            )
+            self._mitigation_map.__defaults__ = tuple(popt)
+            self._mitigation_map_popt = self.backend.cast(popt, dtype="double")
+            log.info(f"Obtained noise map params: {self._mitigation_map_popt}.")
+            return
 
         if self._mitigation_method == "ICS":
             _, _, dep_param, dep_param_std, _, self._training_data = (
