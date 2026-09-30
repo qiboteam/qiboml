@@ -243,16 +243,24 @@ class QuantumCNN:
 
         Args:
             bit: the qubit to apply the one-qubit unitaries to
-            symbols: length 3 array containing the parameters
+            symbols: array containing the parameters
         Returns:
             Circuit containing the unitaries added to the specified qubit.
         """
+
         circuit = Circuit(self.nqubits)
-        circuit.add(gates.RX(bit, symbols[0]))
-        circuit.add(gates.RY(bit, symbols[1]))
-        circuit.add(gates.RZ(bit, symbols[2]))
+
+        if self.quantum_model == 'QCNNCOMPLEX':
+          circuit.add(gates.RX(bit, symbols[0]))
+          circuit.add(gates.RY(bit, symbols[1]))
+          circuit.add(gates.RZ(bit, symbols[2]))
+        elif self.quantum_model == 'QCNNREAL':
+          circuit.add(gates.RY(bit, symbols[0]))
+        elif self.quantum_model == 'QCNNRY':
+          circuit.add(gates.RY(bit, symbols[0]))
 
         return circuit
+
 
     def two_qubit_unitary(self, bits, symbols):
         """
@@ -260,26 +268,38 @@ class QuantumCNN:
 
         Args:
             bits: the two qubits to apply the unitaries to
-            symbols: length 15 array containing the parameters
+            symbols: array containing the parameters whose length is determined by quantum_model
         Returns:
             Circuit containing the unitaries added to the specified qubits.
         """
 
+
         circuit = Circuit(self.nqubits)
 
-        if self.twoqubitansatz is None:
-            circuit += self.one_qubit_unitary(bits[0], symbols[0:3])
-            circuit += self.one_qubit_unitary(bits[1], symbols[3:6])
-            circuit.add(gates.RZZ(bits[0], bits[1], symbols[6]))
-            circuit.add(gates.RYY(bits[0], bits[1], symbols[7]))
-            circuit.add(gates.RXX(bits[0], bits[1], symbols[8]))
+        if self.quantum_model == 'QCNNCOMPLEX':
 
-            circuit += self.one_qubit_unitary(bits[0], symbols[9:12])
-            circuit += self.one_qubit_unitary(bits[1], symbols[12:])
+          circuit += self.one_qubit_unitary(bits[0], symbols[0:3])
+          circuit += self.one_qubit_unitary(bits[1], symbols[3:6])
 
+          circuit.add(gates.RZZ(bits[0], bits[1], symbols[6]))
+          circuit.add(gates.RYY(bits[0], bits[1], symbols[7]))
+          circuit.add(gates.RXX(bits[0], bits[1], symbols[8]))
+
+          circuit += self.one_qubit_unitary(bits[0], symbols[9:12])
+          circuit += self.one_qubit_unitary(bits[1], symbols[12:15])
+
+        elif self.quantum_model == 'QCNNREAL':
+          circuit += self.one_qubit_unitary(bits[0], symbols[0:1])
+          circuit += self.one_qubit_unitary(bits[1], symbols[1:2])
+          circuit.add(gates.RYY(bits[0], bits[1], symbols[2]))
+          circuit += self.one_qubit_unitary(bits[0], symbols[3:4])
+          circuit += self.one_qubit_unitary(bits[1], symbols[4:5])
+
+        elif self.quantum_model == 'QCNNRY':
+          circuit.add(self.twoqubitansatz.on_qubits(bits[0], bits[1]))
+          circuit.set_parameters(symbols[0 : self.nparams_conv])
         else:
-            circuit.add(self.twoqubitansatz.on_qubits(bits[0], bits[1]))
-            circuit.set_parameters(symbols[0 : self.nparams_conv])
+          sys.exit('error: not supposed to enter here!')
 
         return circuit
 
@@ -291,13 +311,29 @@ class QuantumCNN:
         Args:
             source_qubit: the control qubit.
             sink_qubit: the target qubit for the controlled unitaries.
-            symbols: array with 6 elements containing the parameters.
+            symbols: array containing the parameters.
         Returns:
             Circuit containing the unitaries added to the specified qubits.
         """
+
         pool_circuit = Circuit(self.nqubits)
-        sink_basis_selector = self.one_qubit_unitary(sink_qubit, symbols[0:3])
-        source_basis_selector = self.one_qubit_unitary(source_qubit, symbols[3:6])
+
+        if self.quantum_model == 'QCNNCOMPLEX':
+          sink_basis_selector = self.one_qubit_unitary(sink_qubit, symbols[0:3])
+          source_basis_selector = self.one_qubit_unitary(source_qubit, symbols[3:6])
+        elif self.quantum_model == 'QCNNREAL':
+
+          sink_basis_selector = self.one_qubit_unitary(sink_qubit, symbols[0:1])
+          source_basis_selector = self.one_qubit_unitary(source_qubit, symbols[1:2])
+
+        elif self.quantum_model == 'QCNNRY':
+          sink_basis_selector = self.one_qubit_unitary(sink_qubit, symbols[0:1])
+          source_basis_selector = self.one_qubit_unitary(source_qubit, symbols[1:2])
+
+        else:
+          print('Error: general case for two_qubit_pool.')
+          sys.exit('We stop at two_qubit_pool')
+
         pool_circuit += sink_basis_selector
         pool_circuit += source_basis_selector
         pool_circuit.add(gates.CNOT(source_qubit, sink_qubit))
