@@ -213,6 +213,36 @@ class PyTorchBackend(Backend):
     ######## Methods related to array manipulation                                  ########
     ########################################################################################
 
+    def convolve(self, array_1: ArrayLike, array_2: ArrayLike, **kwargs) -> ArrayLike:
+        mode = kwargs.pop("mode", "full")
+        if kwargs or mode not in ("full", "same", "valid"):
+            raise_error(
+                ValueError,
+                "Only the ``mode`` option is supported, with values ``'full'``, "
+                + "``'same'`` or ``'valid'``.",
+            )
+
+        # as in ``numpy.convolve``, the longest array is the signal
+        if len(array_1) < len(array_2):
+            array_1, array_2 = array_2, array_1
+
+        size, length = len(array_2), len(array_1)
+        dtype = self.engine.promote_types(array_1.dtype, array_2.dtype)
+
+        # ``conv1d`` computes a cross-correlation, so the kernel has to be reversed
+        kernel = self.engine.flip(array_2.to(dtype), dims=(0,))
+        full = self.engine.nn.functional.conv1d(
+            array_1.to(dtype)[None, None], kernel[None, None], padding=size - 1
+        )[0, 0]
+
+        start, stop = {
+            "full": (0, None),
+            "same": ((size - 1) // 2, (size - 1) // 2 + length),
+            "valid": (size - 1, length),
+        }[mode]
+
+        return full[start:stop]
+
     def coo_matrix(self, array: ArrayLike, **kwargs) -> ArrayLike:  # pragma: no cover
         array = self.cast(array, dtype=array.dtype)
         return array.to_sparse_coo(**kwargs)
@@ -252,6 +282,20 @@ class PyTorchBackend(Backend):
 
     def nonzero(self, array: ArrayLike) -> ArrayLike:
         return self.engine.nonzero(array, as_tuple=True)
+
+    def poly(self, array: ArrayLike, **kwargs) -> ArrayLike:
+        if array.ndim == 2:
+            array = self.eigvals(array, **kwargs)
+
+        # multiply by (x - root) for every root
+        coefficients = self.engine.ones(1, dtype=array.dtype, device=array.device)
+        zero = self.engine.zeros(1, dtype=array.dtype, device=array.device)
+        for root in array:
+            coefficients = self.engine.cat(
+                (coefficients, zero)
+            ) - root * self.engine.cat((zero, coefficients))
+
+        return coefficients
 
     def random_choice(
         self,
@@ -351,6 +395,30 @@ class PyTorchBackend(Backend):
             return low + (high - low) * self.engine.rand(size, generator=local_state)
 
         return low + (high - low) * self.engine.rand(size)
+
+    def roots(self, array: ArrayLike, **kwargs) -> ArrayLike:
+        # leading zeros do not contribute to the roots
+        nonzero = self.flatnonzero(array)
+        array = array[nonzero[0] :] if len(nonzero) > 0 else array[:0]
+
+        degree = len(array) - 1
+        if degree < 1:
+            return array[:0]
+
+        if degree == 1:
+            return (-array[1] / array[0]).reshape(1)
+
+        # companion matrix, whose eigenvalues are the roots
+        companion = self.engine.cat(
+            (
+                (-array[1:] / array[0])[None],
+                self.engine.eye(
+                    degree - 1, degree, dtype=array.dtype, device=array.device
+                ),
+            )
+        )
+
+        return self.eigvals(companion, **kwargs)
 
     def round(self, array: ArrayLike, decimals: int = 0) -> ArrayLike:
         len_size = len(array.size())
