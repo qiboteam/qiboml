@@ -127,6 +127,42 @@ class TensorflowBackend(Backend):
     def conj(self, array: ArrayLike) -> ArrayLike:
         return self.engine.math.conj(array)
 
+    def convolve(self, array_1: ArrayLike, array_2: ArrayLike, **kwargs) -> ArrayLike:
+        mode = kwargs.pop("mode", "full")
+        if kwargs or mode not in ("full", "same", "valid"):
+            raise_error(
+                ValueError,
+                "Only the ``mode`` option is supported, with values ``'full'``, "
+                + "``'same'`` or ``'valid'``.",
+            )
+
+        # as in ``numpy.convolve``, the longest array is the signal
+        if array_1.shape[0] < array_2.shape[0]:
+            array_1, array_2 = array_2, array_1
+
+        size, length = array_2.shape[0], array_1.shape[0]
+        dtype = self.engine.experimental.numpy.promote_types(
+            array_1.dtype, array_2.dtype
+        )
+
+        # each frame is a window of the zero-padded signal, so its product with the
+        # reversed kernel is one element of the (full) convolution
+        signal = self.engine.pad(
+            self.engine.cast(array_1, dtype), [[size - 1, size - 1]]
+        )
+        frames = self.engine.signal.frame(signal, size, 1)
+        full = self.engine.linalg.matvec(
+            frames, self.engine.reverse(self.engine.cast(array_2, dtype), [0])
+        )
+
+        start, stop = {
+            "full": (0, None),
+            "same": ((size - 1) // 2, (size - 1) // 2 + length),
+            "valid": (size - 1, length),
+        }[mode]
+
+        return full[start:stop]
+
     def coo_matrix(self, array: ArrayLike, **kwargs) -> ArrayLike:  # pragma: no cover
         return self.engine.sparse.from_dense(array, **kwargs)
 
@@ -150,6 +186,14 @@ class TensorflowBackend(Backend):
     def expm(self, array: ArrayLike) -> ArrayLike:
         return self.engine.linalg.expm(array)
 
+    def fft(self, array: ArrayLike, **kwargs) -> ArrayLike:
+        # ``tf.signal.fft`` only accepts complex tensors
+        dtype = self.engine.experimental.numpy.result_type(
+            array.dtype, self.engine.complex64
+        )
+
+        return self.engine.signal.fft(self.engine.cast(array, dtype), **kwargs)
+
     def flatnonzero(self, array: ArrayLike) -> ArrayLike:
         return np.flatnonzero(array)
 
@@ -160,6 +204,14 @@ class TensorflowBackend(Backend):
         **kwargs,
     ) -> ArrayLike:
         return self.engine.fill(shape, fill_value, **kwargs)
+
+    def ifft(self, array: ArrayLike, **kwargs) -> ArrayLike:
+        # ``tf.signal.ifft`` only accepts complex tensors
+        dtype = self.engine.experimental.numpy.result_type(
+            array.dtype, self.engine.complex64
+        )
+
+        return self.engine.signal.ifft(self.engine.cast(array, dtype), **kwargs)
 
     def imag(self, array: ArrayLike) -> Union[int, float, ArrayLike]:
         return self.engine.math.imag(array)
@@ -208,6 +260,20 @@ class TensorflowBackend(Backend):
 
     def outer(self, array_1: ArrayLike, array_2: ArrayLike) -> ArrayLike:
         return self.tensordot(array_1, array_2, axes=0)
+
+    def poly(self, array: ArrayLike, **kwargs) -> ArrayLike:
+        if len(array.shape) == 2:
+            array = self.eigvals(array, **kwargs)
+
+        # multiply by (x - root) for every root
+        coefficients = self.engine.ones(1, dtype=array.dtype)
+        zero = self.engine.zeros(1, dtype=array.dtype)
+        for root in self.engine.unstack(array):
+            coefficients = self.engine.concat(
+                (coefficients, zero), axis=0
+            ) - root * self.engine.concat((zero, coefficients), axis=0)
+
+        return coefficients
 
     def prod(self, array: ArrayLike, **kwargs) -> ArrayLike:
         return self.engine.math.reduce_prod(array, **kwargs)
@@ -259,6 +325,31 @@ class TensorflowBackend(Backend):
 
     def real(self, array: ArrayLike) -> ArrayLike:
         return self.engine.math.real(array)
+
+    def roots(self, array: ArrayLike, **kwargs) -> ArrayLike:
+        array = self.engine.convert_to_tensor(array)
+
+        # leading zeros do not contribute to the roots
+        nonzero = self.flatnonzero(array)
+        array = array[nonzero[0] :] if len(nonzero) > 0 else array[:0]
+
+        degree = array.shape[0] - 1
+        if degree < 1:
+            return array[:0]
+
+        if degree == 1:
+            return self.engine.reshape(-array[1] / array[0], (1,))
+
+        # companion matrix, whose eigenvalues are the roots
+        companion = self.engine.concat(
+            (
+                (-array[1:] / array[0])[None],
+                self.engine.eye(degree - 1, degree, dtype=array.dtype),
+            ),
+            axis=0,
+        )
+
+        return self.eigvals(companion, **kwargs)
 
     def round(self, array: ArrayLike, decimals: int = 0) -> ArrayLike:
         return self.engine.experimental.numpy.around(array, decimals=decimals)
