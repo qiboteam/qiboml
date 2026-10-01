@@ -354,6 +354,12 @@ class JaxBackend(Backend):
     def logm(self, array: ArrayLike, **kwargs) -> ArrayLike:
         return logm(array, **kwargs)
 
+    def poly(self, array: ArrayLike, **kwargs) -> ArrayLike:
+        return self.engine.poly(array, **kwargs)
+
+    def roots(self, array: ArrayLike, **kwargs) -> ArrayLike:
+        return self.engine.roots(array, **kwargs)
+
     ########################################################################################
     ######## Helper methods for testing                                             ########
     ########################################################################################
