@@ -231,7 +231,7 @@ class PyTorchBackend(Backend):
 
         # ``conv1d`` computes a cross-correlation, so the kernel has to be reversed
         kernel = self.engine.flip(array_2.to(dtype), dims=(0,))
-        full = self.engine.nn.functional.conv1d(
+        full = self.engine.nn.functional.conv1d(  # pylint: disable=not-callable
             array_1.to(dtype)[None, None], kernel[None, None], padding=size - 1
         )[0, 0]
 
