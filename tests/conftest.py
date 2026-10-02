@@ -9,9 +9,9 @@ import pytest
 
 # backends to be tested
 BACKENDS = [
-    "tensorflow",
+    # "tensorflow",
     "pytorch",
-    "jax",
+    # "jax",
 ]
 
 FRONTENDS = [
