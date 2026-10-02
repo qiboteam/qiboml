@@ -1,4 +1,5 @@
 import importlib.metadata as im
+import sys
 from typing import Union
 
 from numpy.typing import ArrayLike
