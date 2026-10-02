@@ -7,6 +7,14 @@ from qiboml.backends.__init__ import MetaBackend
 
 __version__ = im.version(__package__)
 
+# ``triton``, a dependency of ``torch`` on Linux, segfaults when it is loaded after
+# ``tensorflow``, and ``torch.func`` imports it lazily. Load it before ``tensorflow``.
+if "tensorflow" not in sys.modules:
+    try:
+        import triton  # pylint: disable=import-error,unused-import
+    except ImportError:  # pragma: no cover
+        pass
+
 try:
     from tensorflow import Tensor as tf_tensor
 
