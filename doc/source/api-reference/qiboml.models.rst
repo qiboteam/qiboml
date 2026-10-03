@@ -43,3 +43,9 @@ qiboml.models.optimizers
    :members:
    :undoc-members:
    :show-inheritance:
+
+.. autoclass:: qiboml.models.optimizers.QuantumNaturalGradient
+   :members:
+   :undoc-members:
+   :special-members: __call__,
+   :show-inheritance:
