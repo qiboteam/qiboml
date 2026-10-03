@@ -2,7 +2,7 @@ import math
 from typing import Any, Callable, Optional, Tuple
 
 from numpy.typing import ArrayLike
-from qibo import Circuit
+from qibo import Circuit, gates
 from qibo.backends import Backend, HammingWeightBackend, _check_backend
 from qibo.config import log, raise_error
 from qibo.models._encodings import _ehrlich_algorithm, _generate_rbs_angles
@@ -10,6 +10,10 @@ from qibo.models.encodings import hamming_weight_encoder
 from qibo.quantum_info import random_statevector
 from scipy.sparse import issparse, isspmatrix_coo
 from scipy.special import comb
+
+from qiboml.differentiations.abstract import Differentiation
+from qiboml.differentiations.psr import PSR
+from qiboml.models.decoding import Expectation, Samples, State
 
 
 class ExactGeodesicTransportCG:
@@ -784,6 +788,371 @@ class ExactGeodesicTransportCG:
                 loss = self.loss(self.circuit, self.backend, **self.loss_kwargs)
             grad = tape.gradient(loss, params)
             return grad.reshape(-1)
+
+
+class QuantumNaturalGradient:
+    """Quantum natural gradient (QNG) optimizer.
+
+    Updates the trainable parameters :math:`\\boldsymbol{\\theta}` of a circuit with the rule
+    :math:`\\boldsymbol{\\theta} \\leftarrow \\boldsymbol{\\theta} - \\eta \\,
+    (g + \\lambda I)^{-1} \\, \\nabla \\mathcal{L}`, where :math:`\\eta` is the learning rate,
+    :math:`\\lambda` is a regularization strength, :math:`I` is the identity matrix,
+    :math:`\\nabla \\mathcal{L}` is the gradient of the loss and :math:`g` is the
+    Fubini-Study metric tensor of the circuit state :math:`\\ket{\\psi}`, with entries
+    :math:`g_{kl} = \\mathrm{Re}\\left[\\braket{\\partial_{k} \\psi | \\partial_{l} \\psi}
+    - \\braket{\\partial_{k} \\psi | \\psi} \\braket{\\psi | \\partial_{l} \\psi}\\right]`,
+    where :math:`\\partial_{k}` is the derivative with respect to the :math:`k`-th parameter.
+
+    The circuit is internally decomposed into fixed gates and single-parameter Pauli rotations,
+    whose angles are linear functions of the parameters of the original gates, e.g.
+    :math:`U_{3}(\\theta, \\phi, \\lambda) = R_{Z}(\\phi) R_{Y}(\\theta) R_{Z}(\\lambda)`,
+    where :math:`R_{Z}` and :math:`R_{Y}` are rotations around the :math:`Z` and :math:`Y` axes.
+    Derivatives are taken with respect to the angles of the rotations and mapped back to
+    the parameters of the circuit with the chain rule. The trainable gates that are supported
+    are :class:`qibo.gates.RX`, :class:`qibo.gates.RY`, :class:`qibo.gates.RZ`,
+    :class:`qibo.gates.U1`, :class:`qibo.gates.U2`, :class:`qibo.gates.U3` and all the gates
+    whose ``decompose`` method returns such rotations, e.g. :class:`qibo.gates.RBS`,
+    :class:`qibo.gates.GIVENS`, :class:`qibo.gates.RXX`, :class:`qibo.gates.RYY`,
+    :class:`qibo.gates.RZZ`, :class:`qibo.gates.RZX`, :class:`qibo.gates.CRX`,
+    :class:`qibo.gates.CRY` and :class:`qibo.gates.CRZ`.
+
+    Args:
+        circuit (:class:`qibo.models.circuit.Circuit`): circuit to be optimized.
+        decoding (:class:`qiboml.models.decoding.Expectation`): decoding that defines the loss,
+            i.e. the expectation value of its observable. It also sets the backend
+            used by the optimizer.
+        differentiation (type[:class:`qiboml.differentiations.abstract.Differentiation`], optional):
+            differentiation engine used to compute the gradient of the loss, e.g.
+            :class:`qiboml.differentiations.psr.PSR`,
+            :class:`qiboml.differentiations.adjoint.Adjoint` or
+            :class:`qiboml.differentiations.jax.Jax`. If it is a
+            :class:`qiboml.differentiations.jax.Jax` engine, it also computes the derivatives
+            of the state needed by the metric tensor. Otherwise, these are computed with the
+            parameter-shift rule applied to the state vector. Defaults to
+            :class:`qiboml.differentiations.psr.PSR`.
+        metric_nshots (int, optional): number of shots used to estimate each overlap needed
+            by the metric tensor. If ``None``, the metric tensor is computed exactly from the
+            state vector. Otherwise, it is estimated by sampling, with the parameter-shift rule
+            applied to the overlap :math:`|\\braket{\\psi(\\boldsymbol{\\theta}) |
+            \\psi(\\boldsymbol{\\theta}')}|^{2}` between the states prepared by the circuit at
+            two sets of parameters, which is the probability of measuring all qubits in
+            :math:`\\ket{0}` after running the circuit at :math:`\\boldsymbol{\\theta}'`
+            inverted, after the circuit at :math:`\\boldsymbol{\\theta}`. This costs
+            :math:`\\mathcal{O}(P^{2})` circuits for :math:`P` rotations, and the sampling
+            uses the transpiler, noise model and the other settings of ``decoding``.
+            The statistical error of the estimated metric tensor decreases as
+            :math:`1 / \\sqrt{\\mathtt{metric\\_nshots}}`, so ``regularization`` should be
+            larger than that. Defaults to ``None``.
+        learning_rate (float, optional): learning rate :math:`\\eta`. Defaults to :math:`0.1`.
+        regularization (float, optional): strength :math:`\\lambda` of the diagonal shift added
+            to the metric tensor before inversion, which stabilizes the update when the
+            metric is singular. Defaults to :math:`10^{-2}`.
+        callback (Callable, optional): callback function. Keyword arguments are
+            ``iter_num``, ``loss`` and ``parameters``. Defaults to ``None``.
+
+    References:
+        J. Stokes, J. Izaac, N. Killoran, and G. Carleo, *Quantum Natural Gradient*,
+        `Quantum 4, 269 (2020) <https://doi.org/10.22331/q-2020-05-25-269>`_.
+    """
+
+    def __init__(
+        self,
+        circuit: Circuit,
+        decoding: Expectation,
+        differentiation: type[Differentiation] = PSR,
+        metric_nshots: int | None = None,
+        learning_rate: float = 0.1,
+        regularization: float = 1e-2,
+        callback: Callable[..., None] | None = None,
+    ):
+        if not isinstance(decoding, Expectation):
+            raise_error(
+                TypeError,
+                f"``decoding`` must be an ``Expectation``. Passed {type(decoding)}.",
+            )
+        if not (
+            isinstance(differentiation, type)
+            and issubclass(differentiation, Differentiation)
+        ):
+            raise_error(
+                TypeError,
+                "``differentiation`` must be a ``Differentiation`` class. "
+                + f"Passed {differentiation}.",
+            )
+
+        if metric_nshots is not None and (
+            not isinstance(metric_nshots, int) or metric_nshots < 1
+        ):
+            raise_error(
+                ValueError,
+                f"``metric_nshots`` must be a positive integer. Passed {metric_nshots}.",
+            )
+
+        self.backend = decoding.backend
+        self.circuit = circuit
+        self.decoding = decoding
+        self.metric_nshots = metric_nshots
+        self.learning_rate = learning_rate
+        self.regularization = regularization
+        self.callback = callback
+        self.parameters = self.backend.cast(
+            [
+                parameter
+                for gate in self.circuit.trainable_gates
+                for parameter in gate.parameters
+            ],
+            dtype=self.backend.float64,
+        )
+        if len(self.parameters) == 0:
+            raise_error(ValueError, "The circuit has no trainable parameters.")
+
+        self._decomposed, self._map = self._decompose()
+        self._engine = differentiation(circuit=self._decomposed, decoding=decoding)
+        self._state_engine = None
+        self._samples_kwargs = None
+        if metric_nshots is not None:
+            self._samples_kwargs = {
+                "nqubits": decoding.nqubits,
+                "qubits": decoding.qubits,
+                "wire_names": decoding.wire_names,
+                "nshots": metric_nshots,
+                "backend": self.backend,
+                "transpiler": decoding.transpiler,
+                "noise_model": decoding.noise_model,
+                "density_matrix": decoding.density_matrix,
+            }
+        else:
+            try:
+                from qiboml.differentiations import Jax  # pylint: disable=C0415
+
+                if issubclass(differentiation, Jax):
+                    self._state_engine = differentiation(
+                        circuit=self._decomposed,
+                        decoding=State(nqubits=decoding.nqubits, backend=self.backend),
+                    )
+            except ImportError:  # pragma: no cover
+                pass
+
+    def __call__(
+        self, steps: int = 100, tolerance: float = 1e-8
+    ) -> tuple[float, ArrayLike, ArrayLike]:
+        """Run the QNG optimizer for a specified number of steps.
+
+        Args:
+            steps (int, optional): number of optimization iterations. Defaults to :math:`100`.
+            tolerance (float, optional): the optimization stops when the norm of the natural
+                gradient :math:`(g + \\lambda I)^{-1} \\nabla \\mathcal{L}` is below this value.
+                Defaults to :math:`10^{-8}`.
+
+        Returns:
+            tuple[float, ArrayLike, ArrayLike]: final loss, loss at each iteration
+            and final parameters.
+        """
+        losses = []
+        for iter_num in range(1, steps + 1):
+            loss = self.decoding(self.circuit)[0, 0]
+            losses.append(loss)
+
+            if self.callback is not None:
+                self.callback(iter_num=iter_num, loss=loss, parameters=self.parameters)
+
+            gradient, metric = self._gradient_and_metric()
+            metric = metric + self.regularization * self.backend.real(
+                self.backend.matrices.I(len(self.parameters))
+            )
+            natural_gradient = self.backend.einsum(
+                "ij,j->i", self.backend.inv(metric), gradient
+            )
+            if self.backend.vector_norm(natural_gradient) < tolerance:
+                break
+
+            self.parameters = self.parameters - self.learning_rate * natural_gradient
+            self.circuit.set_parameters(self.parameters)
+        else:
+            losses.append(self.decoding(self.circuit)[0, 0])
+
+        return (
+            losses[-1],
+            self.backend.cast(losses, dtype=self.backend.float64),
+            self.parameters,
+        )
+
+    def _decompose(self) -> tuple[Circuit, ArrayLike]:
+        """Decompose the circuit into fixed gates and single-parameter Pauli rotations.
+
+        Returns:
+            tuple[:class:`qibo.models.circuit.Circuit`, ArrayLike]: decomposed circuit and
+            matrix that maps the parameters of the circuit to the angles of the rotations.
+        """
+        decomposed = Circuit(self.circuit.nqubits)
+        rows = []
+        offset = 0
+        for gate in self.circuit.queue:
+            if not (isinstance(gate, gates.ParametrizedGate) and gate.trainable):
+                decomposed.add(gate)
+                continue
+
+            # each piece is a gate, the index of the parameter that its angle depends on
+            # (``None`` for a fixed gate) and the proportionality coefficient
+            qubit = gate.target_qubits[0]
+            if gate.name == "u1":
+                pieces = [(gates.RZ(qubit, 0.0), 0, 1.0)]
+            elif gate.name == "u2":
+                pieces = [
+                    (gates.RZ(qubit, 0.0), 1, 1.0),
+                    (gates.RY(qubit, math.pi / 2, trainable=False), None, 0.0),
+                    (gates.RZ(qubit, 0.0), 0, 1.0),
+                ]
+            elif gate.name == "u3":
+                pieces = [
+                    (gates.RZ(qubit, 0.0), 2, 1.0),
+                    (gates.RY(qubit, 0.0), 0, 1.0),
+                    (gates.RZ(qubit, 0.0), 1, 1.0),
+                ]
+            else:
+                pieces = []
+                if len(gate.parameters) != 1:
+                    raise_error(
+                        NotImplementedError,
+                        f"Gate ``{gate.name}`` cannot be decomposed into Pauli rotations.",
+                    )
+                # a decomposition at two angles tells whether each rotation is fixed
+                # or proportional to the angle of the gate
+                probes = [
+                    gate.__class__(*gate.init_args, angle).decompose()
+                    for angle in (1.0, 2.0)
+                ]
+                for first, second in zip(*probes):
+                    if not isinstance(first, gates.ParametrizedGate):
+                        pieces.append((first, None, 0.0))
+                        continue
+                    one, two = first.parameters[0], second.parameters[0]
+                    if first.name not in ("rx", "ry", "rz") or not (
+                        math.isclose(one, two) or math.isclose(2 * one, two)
+                    ):
+                        raise_error(
+                            NotImplementedError,
+                            f"Gate ``{gate.name}`` cannot be decomposed into Pauli rotations.",
+                        )
+                    if math.isclose(one, two):
+                        first = first.__class__(
+                            *first.target_qubits, one, trainable=False
+                        )
+                        pieces.append((first, None, 0.0))
+                    else:
+                        pieces.append((first, 0, one))
+
+            for piece, index, coefficient in pieces:
+                if index is None:
+                    decomposed.add(piece)
+                    continue
+                angle = coefficient * gate.parameters[index]
+                decomposed.add(piece.__class__(*piece.target_qubits, angle))
+                row = [0.0] * len(self.parameters)
+                row[offset + index] = coefficient
+                rows.append(row)
+            offset += len(gate.parameters)
+
+        return decomposed, self.backend.cast(rows, dtype=self.backend.float64)
+
+    def _gradient_and_metric(self) -> tuple[ArrayLike, ArrayLike]:
+        """Compute the loss gradient and the Fubini-Study metric tensor.
+
+        Returns:
+            tuple[ArrayLike, ArrayLike]: gradient of the loss and metric tensor.
+        """
+        angles = self.backend.einsum("ij,j->i", self._map, self.parameters)
+        self._decomposed.set_parameters(angles)
+        gradient = self.backend.reshape(self._engine.evaluate(angles), (-1,))
+
+        if self._samples_kwargs is not None:
+            # g_kl = -1/2 d^2 F / (d theta'_k d theta'_l), with F the overlap between the
+            # states at theta and theta', and where the derivatives are evaluated with
+            # the parameter-shift rule for functions with a single frequency
+            nangles = len(angles)
+            reference = self._decomposed.copy(deep=True)
+            entries = [[0.0] * nangles for _ in range(nangles)]
+            for k in range(nangles):
+                for l in range(k, nangles):
+                    if k == l:
+                        terms = [(0.0, 0.0, 0.25), (math.pi, 0.0, -0.25)]
+                    else:
+                        terms = [
+                            (s * math.pi / 2, t * math.pi / 2, -s * t / 8)
+                            for s in (1, -1)
+                            for t in (1, -1)
+                        ]
+                    for shift_k, shift_l, weight in terms:
+                        shifted_angles = PSR.shift_parameter(
+                            self.backend.cast(angles, copy=True),
+                            k,
+                            shift_k,
+                            self.backend,
+                        )
+                        shifted_angles = PSR.shift_parameter(
+                            shifted_angles, l, shift_l, self.backend
+                        )
+                        shifted = self._decomposed.copy(deep=True)
+                        shifted.set_parameters(shifted_angles)
+                        # a new decoding is needed for every circuit, since the measurement
+                        # gate of a decoding keeps the samples of its first execution
+                        samples = Samples(**self._samples_kwargs)(
+                            reference + shifted.invert()
+                        )
+                        zeros = self.backend.sum(
+                            self.backend.cast(
+                                self.backend.sum(samples, axis=1) == 0,
+                                dtype=self.backend.float64,
+                            )
+                        )
+                        entries[k][l] += weight * float(zeros) / self.metric_nshots
+                    entries[l][k] = entries[k][l]
+            metric = self.backend.cast(entries, dtype=self.backend.float64)
+        else:
+            if self._state_engine is None:
+                derivatives = []
+                for k in range(len(angles)):
+                    states = []
+                    for sign in (1, -1):
+                        self._decomposed.set_parameters(
+                            PSR.shift_parameter(
+                                self.backend.cast(angles, copy=True),
+                                k,
+                                sign * math.pi / 2,
+                                self.backend,
+                            )
+                        )
+                        states.append(
+                            self.backend.execute_circuit(self._decomposed).state()
+                        )
+                    derivatives.append((states[0] - states[1]) / 2**1.5)
+                derivatives = self.backend.cast(derivatives)
+            else:
+                jacobian = self._state_engine.evaluate(angles)
+                derivatives = jacobian[:, 0, 0] + 1j * jacobian[:, 1, 0]
+
+            self._decomposed.set_parameters(angles)
+            state = self.backend.execute_circuit(self._decomposed).state()
+            projections = self.backend.einsum(
+                "ij,j->i", self.backend.conj(derivatives), state
+            )
+            metric = self.backend.real(
+                self.backend.matmul(
+                    self.backend.conj(derivatives),
+                    self.backend.transpose(derivatives, (1, 0)),
+                )
+                - self.backend.outer(projections, self.backend.conj(projections))
+            )
+
+        map_transpose = self.backend.transpose(self._map, (1, 0))
+        return (
+            self.backend.einsum(
+                "ij,j->i",
+                map_transpose,
+                self.backend.cast(gradient, dtype=self.backend.float64),
+            ),
+            self.backend.matmul(map_transpose, self.backend.matmul(metric, self._map)),
+        )
 
 
 def _scipy_sparse_to_backend_coo(matrix, backend: Backend) -> ArrayLike:
