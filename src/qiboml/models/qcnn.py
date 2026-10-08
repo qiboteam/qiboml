@@ -244,8 +244,10 @@ class QuantumCNN:
           circuit.add(gates.RX(bit, symbols[0]))
           circuit.add(gates.RY(bit, symbols[1]))
           circuit.add(gates.RZ(bit, symbols[2]))
+
         elif self.quantum_model == 'QCNNREAL':
           circuit.add(gates.RY(bit, symbols[0]))
+
         elif self.quantum_model == 'QCNNRY':
           circuit.add(gates.RY(bit, symbols[0]))
         return circuit
@@ -285,8 +287,8 @@ class QuantumCNN:
           circuit += self.one_qubit_unitary(bits[1], symbols[4:5])
 
         elif self.quantum_model == 'QCNNRY':
-          circuit.add(self.twoqubitansatz.on_qubits(bits[0], bits[1]))
-          circuit.set_parameters(symbols[0 : self.nparams_conv])
+          circuit.add(gates.RY(bits[0], symbols[0]))
+          circuit.add(gates.RY(bits[1], symbols[1]))
 
         elif self.quantum_model == 'QCNNCUSTOM':
           circuit.add(self.twoqubitansatz.on_qubits(bits[0], bits[1]))
