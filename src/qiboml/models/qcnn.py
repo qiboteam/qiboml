@@ -75,7 +75,7 @@ class QuantumCNN:
         Initializes the QuantumCNN object.
 
         Args:
-            quantum_model: Either QCNNCOMPLEX,QCNNREAL,or QCNNRY
+            quantum_model: Either QCNNCOMPLEX, QCNNREAL, QCNNRY, or QCNNCUSTOM
             nqubits (int): The number of qubits in the QCNN.
             nlayers (int): The number of layers in the QCNN.
             nclasses (int, optional): The number of classes for the classification task. Defaults to 2.
@@ -96,12 +96,6 @@ class QuantumCNN:
         self.nclasses = nclasses
         self.nlayers = nlayers
 
-        if quantum_model == 'QCNNRY': # special handling
-          twoqubitansatz = Circuit(2)
-          twoqubitansatz.add( gates.RY(0,0))
-          twoqubitansatz.add( gates.RY(1,0))
-        self.twoqubitansatz = twoqubitansatz
-
         if copy_init_state is None:
             if "qibojit" in str(get_backend()):
                 self.copy_init_state = True
@@ -115,19 +109,15 @@ class QuantumCNN:
             self.nparams_conv = 5 # 4 Rotation of 1 angle and one RYY of 1 angle. Total: 5*1 = 5
             self.nparams_pool = 2 # 2 sets of rotation angles. Each rotation is just one RY. These two sets are with CNOT. 
         elif self.quantum_model == 'QCNNRY':
-            self.nparams_conv = len(self.twoqubitansatz.get_parameters())
-            assert self.nparams_conv == 2 # there is no rotation angles, but just one RY one qubit 1 and one RY on qubit 2.
+            self.nparams_conv = 2 # there is no rotation angles, but just one RY one qubit 1 and one RY on qubit 2.
             self.nparams_pool = 2 # 2 sets of rotation angles. Each rotation is just one RY. These two sets are with CNOT. 
+        elif self.quantum_model == 'QCNNCUSTOM':
+            assert twoqubitansatz is not None
+            self.twoqubitansatz = twoqubitansatz
+            self.nparams_conv = len(self.twoqubitansatz.get_parameters())
+            self.nparams_pool = 6 # this follows the QCNNCOMPLEX's default pool
         else:
             sys.exit('error: quantum_model is not known')
-
-        '''
-        if self.twoqubitansatz is None:
-            self.nparams_conv = 15
-        else:
-            self.nparams_conv = len(self.twoqubitansatz.get_parameters())
-        self.nparams_pool = 6
-        '''
 
         self.nparams_layer = self.nparams_conv + self.nparams_pool
         self.measured_qubits = int(np.ceil(np.log2(self.nclasses)))
@@ -250,7 +240,7 @@ class QuantumCNN:
 
         circuit = Circuit(self.nqubits)
 
-        if self.quantum_model == 'QCNNCOMPLEX':
+        if self.quantum_model in ['QCNNCOMPLEX', 'QCNNCUSTOM']:
           circuit.add(gates.RX(bit, symbols[0]))
           circuit.add(gates.RY(bit, symbols[1]))
           circuit.add(gates.RZ(bit, symbols[2]))
@@ -258,7 +248,6 @@ class QuantumCNN:
           circuit.add(gates.RY(bit, symbols[0]))
         elif self.quantum_model == 'QCNNRY':
           circuit.add(gates.RY(bit, symbols[0]))
-
         return circuit
 
 
@@ -298,6 +287,10 @@ class QuantumCNN:
         elif self.quantum_model == 'QCNNRY':
           circuit.add(self.twoqubitansatz.on_qubits(bits[0], bits[1]))
           circuit.set_parameters(symbols[0 : self.nparams_conv])
+
+        elif self.quantum_model == 'QCNNCUSTOM':
+          circuit.add(self.twoqubitansatz.on_qubits(bits[0], bits[1]))
+          circuit.set_parameters(symbols[0 : self.nparams_conv])
         else:
           sys.exit('error: not supposed to enter here!')
 
@@ -318,7 +311,7 @@ class QuantumCNN:
 
         pool_circuit = Circuit(self.nqubits)
 
-        if self.quantum_model == 'QCNNCOMPLEX':
+        if self.quantum_model in ['QCNNCOMPLEX', 'QCNNCUSTOM']:
           sink_basis_selector = self.one_qubit_unitary(sink_qubit, symbols[0:3])
           source_basis_selector = self.one_qubit_unitary(source_qubit, symbols[3:6])
         elif self.quantum_model == 'QCNNREAL':

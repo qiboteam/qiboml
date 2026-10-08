@@ -15,7 +15,7 @@ def test_two_qubit_ansatz():
     circuit.add(gates.H(0))
     circuit.add(gates.RX(0, 0))
     circuit.add(gates.CNOT(1, 0))
-    QuantumCNN('QCNNCOMPLEX',4, 2, 2, twoqubitansatz=circuit)
+    QuantumCNN('QCNNCUSTOM',4, 2, 2, twoqubitansatz=circuit)
 
 
 def test_two_qubit_ansatz_training():
@@ -27,7 +27,7 @@ def test_two_qubit_ansatz_training():
     circuit.add(gates.H(0))
     circuit.add(gates.RX(0, 0))
     circuit.add(gates.CNOT(1, 0))
-    test_qcnn = QuantumCNN('QCNNCOMPLEX',4, 2, 2, twoqubitansatz=circuit)
+    test_qcnn = QuantumCNN('QCNNCUSTOM',4, 2, 2, twoqubitansatz=circuit)
 
     data = np.zeros([2, 16])
     for i in range(2):
