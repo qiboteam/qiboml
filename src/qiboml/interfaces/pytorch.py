@@ -11,13 +11,13 @@ from qibo.backends import Backend
 from qibo.config import raise_error
 
 from qiboml.backends.pytorch import PyTorchBackend
+from qiboml.differentiations.abstract import Differentiation
+from qiboml.differentiations.jax import Jax
+from qiboml.differentiations.psr import PSR
 from qiboml.interfaces import utils
 from qiboml.interfaces.circuit_tracer import CircuitTracer
 from qiboml.models.decoding import QuantumDecoding
 from qiboml.models.encoding import QuantumEncoding
-from qiboml.differentiations.abstract import Differentiation
-from qiboml.differentiations.jax import Jax
-from qiboml.differentiations.psr import PSR
 
 DEFAULT_DIFFERENTIATION = {
     "qiboml-pytorch": None,

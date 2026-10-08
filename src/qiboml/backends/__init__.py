@@ -13,7 +13,7 @@ class MetaBackend:
 
         Args:
             platform (str): Name of the backend to load.
-        
+
         Returns:
             :class:`qibo.backends.abstract.Backend`: The loaded backend.
         """

@@ -1,9 +1,9 @@
 import pytest
 from qibo import Circuit, gates
 
-from qiboml.models.decoding import Expectation, Probabilities
 from qiboml.differentiations.jax import Jax
 from qiboml.differentiations.psr import PSR
+from qiboml.models.decoding import Expectation, Probabilities
 
 
 def test_PSR_decoder_error():
