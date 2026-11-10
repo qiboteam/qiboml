@@ -9,7 +9,7 @@ from numpy.typing import ArrayLike, DTypeLike
 from qibo import Circuit, __version__
 from qibo.backends import Backend
 from qibo.backends.npmatrices import NumpyMatrices
-from qibo.config import TF_LOG_LEVEL, log, raise_error
+from qibo.config import log, raise_error
 from qibo.gates.abstract import Gate
 from qibo.result import CircuitResult, MeasurementOutcomes, QuantumState
 
