@@ -5277,8 +5277,8 @@ qmatchatea = ["qiskit (>=1.4.0,<2.0.0) ; python_version < \"3.14\"", "qmatchatea
 [package.source]
 type = "git"
 url = "https://github.com/qiboteam/qibotn"
-reference = "python"
-resolved_reference = "dee9dd96a457e1e6c213c6eec88b72514f2f4399"
+reference = "HEAD"
+resolved_reference = "08a8ea302a4dcfff32654ea76734f926f09a39ca"
 
 [[package]]
 name = "quimb"
@@ -6643,4 +6643,4 @@ torch = ["torch"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.15"
-content-hash = "b0912caab1962ff153e304113fb2e9dbcb17dfc8fd61f42b1f3572408017d139"
+content-hash = "e9b69687a468e850b85437ac484d2481ba272a9b497f2e99fad635ccfc5c3386"
