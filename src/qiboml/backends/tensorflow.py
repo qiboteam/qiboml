@@ -34,6 +34,12 @@ class TensorflowMatrices(NumpyMatrices):
 class TensorflowBackend(Backend):
     def __init__(self):
         super().__init__()
+
+        # Logging level from 0 (all) to 3 (errors) for TensorFlow
+        TF_LOG_LEVEL = 3
+        if "TF_LOG_LEVEL" in os.environ:  # pragma: no cover
+            TF_LOG_LEVEL = int(os.environ.get("TF_LOG_LEVEL"))
+
         os.environ["TF_CPP_MIN_LOG_LEVEL"] = str(TF_LOG_LEVEL)
 
         import tensorflow as tf  # pylint: disable=import-error,C0415
