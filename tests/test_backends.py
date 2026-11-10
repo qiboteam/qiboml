@@ -1,4 +1,3 @@
-import platform
 import sys
 
 import pytest
@@ -17,7 +16,7 @@ def test_metabackend_load_error():
 
 
 def test_metabackend_list_available():
-    tensorflow = bool(platform.system() != "Windows" and sys.version_info < (3, 14))
+    tensorflow = bool(sys.version_info < (3, 14))
     available_backends = {
         "tensorflow": tensorflow,
         "pytorch": True,
