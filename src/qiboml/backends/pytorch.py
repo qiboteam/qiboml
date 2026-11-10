@@ -253,10 +253,13 @@ class PyTorchBackend(Backend):
             float or complex or ArrayLike: Array with the element-wise exponential
             of the elements in `array``.
         """
-        if isinstance(array, (int, float, complex)):
+        _array = (
             self.engine.tensor(array)
+            if isinstance(array, (int, float, complex))
+            else array
+        )
 
-        return self.engine.exp(array, **kwargs)
+        return self.engine.exp(_array, **kwargs)
 
     def expm(self, array: ArrayLike) -> ArrayLike:
         return self.engine.linalg.matrix_exp(array)  # pylint: disable=not-callable
