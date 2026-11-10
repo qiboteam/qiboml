@@ -254,7 +254,7 @@ class PyTorchBackend(Backend):
             of the elements in `array``.
         """
         _array = (
-            self.engine.tensor(array)
+            self.cast(array, dtype=type(array))
             if isinstance(array, (int, float, complex))
             else array
         )
