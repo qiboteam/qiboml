@@ -21,10 +21,8 @@ qibocal = { git = "https://github.com/qiboteam/qibocal", branch = "import" , opt
 jax = { version = "^0.12.0", optional = true }
 jaxlib = { version = "^0.12.0", optional = true }
 keras = { version = "^3.13.1", optional = true }
-# TODO: the platform marker is a temporary solution due to the lack of the tensorflow-io 0.32.0's
-# wheels for Windows, this package is one of the tensorflow requirements.
-# The stable releases of tensorflow do not support Python 3.14 yet.
-tensorflow = { version = "^2.21.0", markers = "python_version < '3.14' and (sys_platform == 'linux' or sys_platform == 'darwin')", optional = true }
+# The stable releases of tensorflow do not support Python 3.14 yet
+tensorflow = { version = "^2.21.0", markers = "python_version < '3.14'", optional = true }
 torch = { version = "^2.15.0", optional = true }
 
 [tool.poetry.group.docs]
@@ -42,7 +40,7 @@ setuptools = ">=78.1.1,<84.0.0"
 ipykernel = "^6.29.5"
 torchmetrics = "^1.9.0"
 keras = { version = "^3.13.1" }
-tensorflow = { version = "^2.21.0", markers = "python_version < '3.14' and (sys_platform == 'linux' or sys_platform == 'darwin')" }
+tensorflow = { version = "^2.21.0", markers = "python_version < '3.14'" }
 torch = { version = "^2.15.0" }
 
 [tool.poetry.group.dev]
@@ -65,7 +63,7 @@ qibolab = { git = "https://github.com/qiboteam/qibolab", extras = ["emulator"] }
 jax = "^0.12.0"
 jaxlib = "^0.12.0"
 keras = "^3.15.1"
-tensorflow = { version = "^2.21.0", markers = "python_version < '3.14' and (sys_platform == 'linux' or sys_platform == 'darwin')" }
+tensorflow = { version = "^2.21.0", markers = "python_version < '3.14'" }
 torch = { version = "^2.7.0" }
 qibotn = {git = "https://github.com/qiboteam/qibotn", branch = "python" , platform = "linux || darwin" }
 quimb = {version="^1.11.2", platform = "linux || darwin"}

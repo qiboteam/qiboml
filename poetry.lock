@@ -101,7 +101,7 @@ files = [
     {file = "astunparse-1.6.3-py2.py3-none-any.whl", hash = "sha256:c2652417f2c8b5bb325c885ae329bdf3f86424075c4fd1a128674bc6fba4b8e8"},
     {file = "astunparse-1.6.3.tar.gz", hash = "sha256:5ad93a8456f0d084c3456d059fd9a92cce667963232cbf763eac3bc5b7940872"},
 ]
-markers = {main = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\") and extra == \"keras\"", docs = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\")", tests = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\")"}
+markers = {main = "extra == \"keras\" and python_version < \"3.14\"", docs = "python_version < \"3.14\"", tests = "python_version < \"3.14\""}
 
 [package.dependencies]
 six = ">=1.6.1,<2.0"
@@ -860,7 +860,7 @@ files = [
     {file = "cuda_bindings-13.5.0-cp315-cp315t-win_amd64.whl", hash = "sha256:a290fb4db7382bb3cfbc4485e5aa2f631f3a2f838c5d15bc00be743456e47722"},
     {file = "cuda_bindings-13.5.0-cp315-cp315t-win_arm64.whl", hash = "sha256:f812952466b140cb13a756d2e38709b6f6cc32afcf9ec6d16708afd8b165ff98"},
 ]
-markers = {main = "platform_system == \"Linux\" and extra == \"torch\"", docs = "platform_system == \"Linux\"", tests = "platform_system == \"Linux\""}
+markers = {main = "extra == \"torch\" and platform_system == \"Linux\"", docs = "platform_system == \"Linux\"", tests = "platform_system == \"Linux\""}
 
 [package.dependencies]
 cuda-pathfinder = ">=1.4.2"
@@ -878,7 +878,7 @@ groups = ["main", "docs", "tests"]
 files = [
     {file = "cuda_pathfinder-1.8.6-py3-none-any.whl", hash = "sha256:bf6b3b06323cf95a11d671818392da5da23ddbbb4dfc4b77ca10622783c25980"},
 ]
-markers = {main = "platform_system == \"Linux\" and extra == \"torch\"", docs = "platform_system == \"Linux\"", tests = "platform_system == \"Linux\""}
+markers = {main = "extra == \"torch\" and platform_system == \"Linux\"", docs = "platform_system == \"Linux\"", tests = "platform_system == \"Linux\""}
 
 [[package]]
 name = "cuda-toolkit"
@@ -890,7 +890,7 @@ groups = ["main", "docs", "tests"]
 files = [
     {file = "cuda_toolkit-13.2.2-py2.py3-none-any.whl", hash = "sha256:d12edc1aad1356236a2ee10c0d794b1aff5d3e79bfeca54867c3bb8e5afd87b0"},
 ]
-markers = {main = "extra == \"torch\" and platform_system == \"Linux\"", docs = "platform_system == \"Linux\"", tests = "platform_system == \"Linux\""}
+markers = {main = "platform_system == \"Linux\" and extra == \"torch\"", docs = "platform_system == \"Linux\"", tests = "platform_system == \"Linux\""}
 
 [package.dependencies]
 nvidia-cublas = {version = "==13.4.1.3.*", optional = true, markers = "sys_platform == \"win32\" and platform_machine == \"AMD64\" and (extra == \"cublas\" or extra == \"cusolver\") or sys_platform == \"linux\" and (extra == \"cublas\" or extra == \"cusolver\") and (platform_machine == \"aarch64\" or platform_machine == \"x86_64\")"}
@@ -1416,7 +1416,7 @@ groups = ["main", "docs", "tests"]
 files = [
     {file = "flatbuffers-25.12.19-py2.py3-none-any.whl", hash = "sha256:7634f50c427838bb021c2d66a3d1168e9d199b0607e6329399f04846d42e20b4"},
 ]
-markers = {main = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\") and extra == \"keras\"", docs = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\")", tests = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\")"}
+markers = {main = "extra == \"keras\" and python_version < \"3.14\"", docs = "python_version < \"3.14\"", tests = "python_version < \"3.14\""}
 
 [[package]]
 name = "fonttools"
@@ -1576,7 +1576,7 @@ files = [
     {file = "gast-0.7.0-py3-none-any.whl", hash = "sha256:99cbf1365633a74099f69c59bd650476b96baa5ef196fec88032b00b31ba36f7"},
     {file = "gast-0.7.0.tar.gz", hash = "sha256:0bb14cd1b806722e91ddbab6fb86bba148c22b40e7ff11e248974e04c8adfdae"},
 ]
-markers = {main = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\") and extra == \"keras\"", docs = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\")", tests = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\")"}
+markers = {main = "extra == \"keras\" and python_version < \"3.14\"", docs = "python_version < \"3.14\"", tests = "python_version < \"3.14\""}
 
 [[package]]
 name = "google-pasta"
@@ -1590,7 +1590,7 @@ files = [
     {file = "google_pasta-0.2.0-py2-none-any.whl", hash = "sha256:4612951da876b1a10fe3960d7226f0c7682cf901e16ac06e473b267a5afa8954"},
     {file = "google_pasta-0.2.0-py3-none-any.whl", hash = "sha256:b32482794a366b5366a32c92a9a9201b107821889935a02b3e51f6b432ea84ed"},
 ]
-markers = {main = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\") and extra == \"keras\"", docs = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\")", tests = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\")"}
+markers = {main = "extra == \"keras\" and python_version < \"3.14\"", docs = "python_version < \"3.14\"", tests = "python_version < \"3.14\""}
 
 [package.dependencies]
 six = "*"
@@ -1665,7 +1665,7 @@ files = [
     {file = "grpcio-1.85.1-cp315-cp315-win_amd64.whl", hash = "sha256:b32f39c56d22d2e8722eececd4376074d94e01595a29f4f944ae0b6cea1caa70"},
     {file = "grpcio-1.85.1.tar.gz", hash = "sha256:5f530287d5de5f7f66089ead81de44f6787162944dab3922efa65dfdff108a1d"},
 ]
-markers = {main = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\") and extra == \"keras\"", docs = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\")", tests = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\")"}
+markers = {main = "extra == \"keras\" and python_version < \"3.14\"", docs = "python_version < \"3.14\"", tests = "python_version < \"3.14\""}
 
 [package.dependencies]
 typing-extensions = ">=4.12,<5.0"
@@ -1708,7 +1708,7 @@ files = [
     {file = "h5py-3.14.0-cp39-cp39-win_amd64.whl", hash = "sha256:4f025cf30ae738c4c4e38c7439a761a71ccfcce04c2b87b2a2ac64e8c5171d43"},
     {file = "h5py-3.14.0.tar.gz", hash = "sha256:2372116b2e0d5d3e5e705b7f663f7c8d96fa79a4052d250484ef91d24d6a08f4"},
 ]
-markers = {main = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\") and extra == \"keras\"", docs = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\")", tests = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\")"}
+markers = {main = "extra == \"keras\" and python_version < \"3.14\"", docs = "python_version < \"3.14\"", tests = "python_version < \"3.14\""}
 
 [package.dependencies]
 numpy = ">=1.19.3"
@@ -1770,7 +1770,7 @@ files = [
     {file = "h5py-3.16.0-cp314-cp314t-win_arm64.whl", hash = "sha256:faca8fb4e4319c09d83337adc80b2ca7d5c5a343c2d6f1b6388f32cfecca13c1"},
     {file = "h5py-3.16.0.tar.gz", hash = "sha256:a0dbaad796840ccaa67a4c144a0d0c8080073c34c76d5a6941d6818678ef2738"},
 ]
-markers = {main = "(python_version == \"3.14\" or sys_platform != \"linux\" and sys_platform != \"darwin\") and extra == \"keras\" and (python_version == \"3.14\" or sys_platform != \"linux\" and sys_platform != \"darwin\" and sys_platform != \"win32\" or sys_platform == \"emscripten\" or sys_platform == \"win32\" or platform_machine == \"AMD64\")", docs = "(python_version == \"3.14\" or sys_platform != \"linux\" and sys_platform != \"darwin\") and (python_version == \"3.14\" or sys_platform != \"linux\" and sys_platform != \"darwin\" and sys_platform != \"win32\" or sys_platform == \"emscripten\" or sys_platform == \"win32\" or platform_machine == \"AMD64\")", tests = "(python_version == \"3.14\" or sys_platform != \"linux\" and sys_platform != \"darwin\") and (python_version == \"3.14\" or sys_platform != \"linux\" and sys_platform != \"darwin\" and sys_platform != \"win32\" or sys_platform == \"emscripten\" or sys_platform == \"win32\" or platform_machine == \"AMD64\")"}
+markers = {main = "python_version == \"3.14\" and extra == \"keras\"", docs = "python_version == \"3.14\"", tests = "python_version == \"3.14\""}
 
 [package.dependencies]
 numpy = ">=1.21.2"
@@ -2459,7 +2459,7 @@ files = [
     {file = "libclang-18.1.1-py2.py3-none-win_arm64.whl", hash = "sha256:3f0e1f49f04d3cd198985fea0511576b0aee16f9ff0e0f0cad7f9c57ec3c20e8"},
     {file = "libclang-18.1.1.tar.gz", hash = "sha256:a1214966d08d73d971287fc3ead8dfaf82eb07fb197680d8b3859dbbbbf78250"},
 ]
-markers = {main = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\") and extra == \"keras\"", docs = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\")", tests = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\")"}
+markers = {main = "extra == \"keras\" and python_version < \"3.14\"", docs = "python_version < \"3.14\"", tests = "python_version < \"3.14\""}
 
 [[package]]
 name = "lightning-utilities"
@@ -3468,7 +3468,7 @@ files = [
     {file = "nvidia_cublas-13.4.1.3-py3-none-manylinux_2_27_x86_64.whl", hash = "sha256:a5917cb642cfb07f4a0231ee16aec7e2e0357d8cb8b1b78a0c9c68dba3e6afc7"},
     {file = "nvidia_cublas-13.4.1.3-py3-none-win_amd64.whl", hash = "sha256:7e7f780caf07bde7b36b0d25bdad29e8ccbacfc4b75066907bdb601af1e6d4aa"},
 ]
-markers = {main = "sys_platform == \"win32\" and extra == \"torch\" and platform_system == \"Linux\" and platform_machine == \"AMD64\" or (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and extra == \"torch\" and platform_system == \"Linux\" and sys_platform == \"linux\"", docs = "sys_platform == \"win32\" and platform_system == \"Linux\" and platform_machine == \"AMD64\" or (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\" and sys_platform == \"linux\"", tests = "sys_platform == \"win32\" and platform_system == \"Linux\" and platform_machine == \"AMD64\" or (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\" and sys_platform == \"linux\""}
+markers = {main = "sys_platform == \"linux\" and (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and extra == \"torch\" and platform_system == \"Linux\" or sys_platform == \"win32\" and extra == \"torch\" and platform_system == \"Linux\" and platform_machine == \"AMD64\"", docs = "sys_platform == \"linux\" and (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\" or sys_platform == \"win32\" and platform_system == \"Linux\" and platform_machine == \"AMD64\"", tests = "sys_platform == \"linux\" and (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\" or sys_platform == \"win32\" and platform_system == \"Linux\" and platform_machine == \"AMD64\""}
 
 [package.dependencies]
 nvidia-cuda-nvrtc = "*"
@@ -3486,7 +3486,7 @@ files = [
     {file = "nvidia_cublas-13.10.0.20-py3-none-win_amd64.whl", hash = "sha256:c310b749eea855b88fafb906de08d6819b87216c6711640771764fea5dcd8546"},
     {file = "nvidia_cublas-13.10.0.20-py3-none-win_arm64.whl", hash = "sha256:05929d6a64af9edce1951ff82a514d630fc1a2369bcfe1ab195f5e85266dbfed"},
 ]
-markers = {main = "extra == \"torch\" and platform_system == \"Linux\" and (sys_platform != \"win32\" or platform_machine != \"AMD64\") and (sys_platform != \"linux\" or platform_machine != \"aarch64\" and platform_machine != \"x86_64\")", docs = "platform_system == \"Linux\" and (sys_platform != \"win32\" or platform_machine != \"AMD64\") and (sys_platform != \"linux\" or platform_machine != \"aarch64\" and platform_machine != \"x86_64\")", tests = "platform_system == \"Linux\" and (sys_platform != \"win32\" or platform_machine != \"AMD64\") and (sys_platform != \"linux\" or platform_machine != \"aarch64\" and platform_machine != \"x86_64\")"}
+markers = {main = "(sys_platform != \"win32\" or platform_machine != \"AMD64\") and platform_system == \"Linux\" and extra == \"torch\" and (sys_platform != \"linux\" or platform_machine != \"aarch64\" and platform_machine != \"x86_64\")", docs = "(sys_platform != \"win32\" or platform_machine != \"AMD64\") and platform_system == \"Linux\" and (sys_platform != \"linux\" or platform_machine != \"aarch64\" and platform_machine != \"x86_64\")", tests = "(sys_platform != \"win32\" or platform_machine != \"AMD64\") and platform_system == \"Linux\" and (sys_platform != \"linux\" or platform_machine != \"aarch64\" and platform_machine != \"x86_64\")"}
 
 [package.dependencies]
 nvidia-cuda-nvrtc = "*"
@@ -3520,7 +3520,7 @@ files = [
     {file = "nvidia_cuda_cccl-13.3.5.0.6-py3-none-win_amd64.whl", hash = "sha256:6e1f96b71d582171cebd9ae1d7ffbfc726e112a0a41aef77b9ead500aad7e0a2"},
     {file = "nvidia_cuda_cccl-13.3.5.0.6-py3-none-win_arm64.whl", hash = "sha256:a729999ca75633c6e2c7f48804fa982e00d75e5416284d010fadf82646c1d854"},
 ]
-markers = {main = "extra == \"torch\" and platform_system == \"Linux\"", docs = "platform_system == \"Linux\"", tests = "platform_system == \"Linux\""}
+markers = {main = "platform_system == \"Linux\" and extra == \"torch\"", docs = "platform_system == \"Linux\"", tests = "platform_system == \"Linux\""}
 
 [[package]]
 name = "nvidia-cuda-cccl-cu12"
@@ -3548,7 +3548,7 @@ files = [
     {file = "nvidia_cuda_cupti-13.2.86-py3-none-manylinux_2_25_x86_64.whl", hash = "sha256:8fa29f15dd8336181f961764d9d95236fc6b931dd0c8fcf8cd70aab0c310b586"},
     {file = "nvidia_cuda_cupti-13.2.86-py3-none-win_amd64.whl", hash = "sha256:10837e2910753a7726c0243aa113e2bd65c0edee6f6f3e097db1757a8eac2c9e"},
 ]
-markers = {main = "sys_platform == \"win32\" and extra == \"torch\" and platform_system == \"Linux\" and platform_machine == \"AMD64\" or (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and extra == \"torch\" and platform_system == \"Linux\" and sys_platform == \"linux\"", docs = "sys_platform == \"win32\" and platform_system == \"Linux\" and platform_machine == \"AMD64\" or (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\" and sys_platform == \"linux\"", tests = "sys_platform == \"win32\" and platform_system == \"Linux\" and platform_machine == \"AMD64\" or (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\" and sys_platform == \"linux\""}
+markers = {main = "sys_platform == \"linux\" and (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and extra == \"torch\" and platform_system == \"Linux\" or sys_platform == \"win32\" and extra == \"torch\" and platform_system == \"Linux\" and platform_machine == \"AMD64\"", docs = "sys_platform == \"linux\" and (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\" or sys_platform == \"win32\" and platform_system == \"Linux\" and platform_machine == \"AMD64\"", tests = "sys_platform == \"linux\" and (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\" or sys_platform == \"win32\" and platform_system == \"Linux\" and platform_machine == \"AMD64\""}
 
 [[package]]
 name = "nvidia-cuda-cupti-cu12"
@@ -3590,7 +3590,7 @@ files = [
     {file = "nvidia_cuda_nvrtc-13.2.86-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:1e5d7b411a2eb83f5c71c98d58133a763fc9fa86a4241ee320c5c4782d9ad1fd"},
     {file = "nvidia_cuda_nvrtc-13.2.86-py3-none-win_amd64.whl", hash = "sha256:bf070582c2d8b03f681cea8d34a9de900d808607deb813a826ecb3a585606f9a"},
 ]
-markers = {main = "sys_platform == \"win32\" and extra == \"torch\" and platform_system == \"Linux\" and platform_machine == \"AMD64\" or (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and extra == \"torch\" and platform_system == \"Linux\" and sys_platform == \"linux\"", docs = "sys_platform == \"win32\" and platform_system == \"Linux\" and platform_machine == \"AMD64\" or (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\" and sys_platform == \"linux\"", tests = "sys_platform == \"win32\" and platform_system == \"Linux\" and platform_machine == \"AMD64\" or (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\" and sys_platform == \"linux\""}
+markers = {main = "sys_platform == \"linux\" and (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and extra == \"torch\" and platform_system == \"Linux\" or sys_platform == \"win32\" and extra == \"torch\" and platform_system == \"Linux\" and platform_machine == \"AMD64\"", docs = "sys_platform == \"linux\" and (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\" or sys_platform == \"win32\" and platform_system == \"Linux\" and platform_machine == \"AMD64\"", tests = "sys_platform == \"linux\" and (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\" or sys_platform == \"win32\" and platform_system == \"Linux\" and platform_machine == \"AMD64\""}
 
 [[package]]
 name = "nvidia-cuda-nvrtc"
@@ -3605,7 +3605,7 @@ files = [
     {file = "nvidia_cuda_nvrtc-13.5.37-py3-none-win_amd64.whl", hash = "sha256:e8e6c10b251385707ae3abd7b4ee118de6736fd7678d0f0f4eab4d759f679c21"},
     {file = "nvidia_cuda_nvrtc-13.5.37-py3-none-win_arm64.whl", hash = "sha256:d47388d9054a9f16c705d86e59d7e6c57e85beece36d23d1657833531fa913aa"},
 ]
-markers = {main = "extra == \"torch\" and platform_system == \"Linux\" and (sys_platform != \"win32\" or platform_machine != \"AMD64\") and (sys_platform != \"linux\" or platform_machine != \"aarch64\" and platform_machine != \"x86_64\")", docs = "platform_system == \"Linux\" and (sys_platform != \"win32\" or platform_machine != \"AMD64\") and (sys_platform != \"linux\" or platform_machine != \"aarch64\" and platform_machine != \"x86_64\")", tests = "platform_system == \"Linux\" and (sys_platform != \"win32\" or platform_machine != \"AMD64\") and (sys_platform != \"linux\" or platform_machine != \"aarch64\" and platform_machine != \"x86_64\")"}
+markers = {main = "(sys_platform != \"win32\" or platform_machine != \"AMD64\") and platform_system == \"Linux\" and extra == \"torch\" and (sys_platform != \"linux\" or platform_machine != \"aarch64\" and platform_machine != \"x86_64\")", docs = "(sys_platform != \"win32\" or platform_machine != \"AMD64\") and platform_system == \"Linux\" and (sys_platform != \"linux\" or platform_machine != \"aarch64\" and platform_machine != \"x86_64\")", tests = "(sys_platform != \"win32\" or platform_machine != \"AMD64\") and platform_system == \"Linux\" and (sys_platform != \"linux\" or platform_machine != \"aarch64\" and platform_machine != \"x86_64\")"}
 
 [[package]]
 name = "nvidia-cuda-nvrtc-cu12"
@@ -3633,7 +3633,7 @@ files = [
     {file = "nvidia_cuda_runtime-13.2.86-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:3498247680dfddce31bad102af7e3e26fc795342a3cac64722bb0fa95e7f60f0"},
     {file = "nvidia_cuda_runtime-13.2.86-py3-none-win_amd64.whl", hash = "sha256:b26f5dd86e67f0eb404ae679185e1c49fe546fa9a47b32dee31312f65ccfe764"},
 ]
-markers = {main = "sys_platform == \"win32\" and extra == \"torch\" and platform_system == \"Linux\" and platform_machine == \"AMD64\" or (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and extra == \"torch\" and platform_system == \"Linux\" and sys_platform == \"linux\"", docs = "sys_platform == \"win32\" and platform_system == \"Linux\" and platform_machine == \"AMD64\" or (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\" and sys_platform == \"linux\"", tests = "sys_platform == \"win32\" and platform_system == \"Linux\" and platform_machine == \"AMD64\" or (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\" and sys_platform == \"linux\""}
+markers = {main = "sys_platform == \"linux\" and (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and extra == \"torch\" and platform_system == \"Linux\" or sys_platform == \"win32\" and extra == \"torch\" and platform_system == \"Linux\" and platform_machine == \"AMD64\"", docs = "sys_platform == \"linux\" and (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\" or sys_platform == \"win32\" and platform_system == \"Linux\" and platform_machine == \"AMD64\"", tests = "sys_platform == \"linux\" and (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\" or sys_platform == \"win32\" and platform_system == \"Linux\" and platform_machine == \"AMD64\""}
 
 [[package]]
 name = "nvidia-cuda-runtime-cu12"
@@ -3678,7 +3678,7 @@ files = [
     {file = "nvidia_cudnn_cu13-9.26.0.51-py3-none-manylinux_2_27_x86_64.whl", hash = "sha256:9c976d539786698c71d6bcdbe2053b7485fae062ff7e1215d2f2ff67b1a2149a"},
     {file = "nvidia_cudnn_cu13-9.26.0.51-py3-none-win_amd64.whl", hash = "sha256:8e37a83d7dd7c2663afcae38b1c95c5e9e7c9754f313800da95ca81439fa37f9"},
 ]
-markers = {main = "extra == \"torch\" and platform_system == \"Linux\"", docs = "platform_system == \"Linux\"", tests = "platform_system == \"Linux\""}
+markers = {main = "platform_system == \"Linux\" and extra == \"torch\"", docs = "platform_system == \"Linux\"", tests = "platform_system == \"Linux\""}
 
 [package.dependencies]
 nvidia-cublas = "*"
@@ -3695,7 +3695,7 @@ files = [
     {file = "nvidia_cufft-12.2.0.57-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:34da27fadf3979b0b042c43823f0530be8408b86df31ee0108e1ca0b621d4ef6"},
     {file = "nvidia_cufft-12.2.0.57-py3-none-win_amd64.whl", hash = "sha256:89b78b2b60d6ca1fb7dab7d1a4af135d69d586d18a216ca84e51db5901cd41d0"},
 ]
-markers = {main = "sys_platform == \"win32\" and extra == \"torch\" and platform_system == \"Linux\" and platform_machine == \"AMD64\" or (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and extra == \"torch\" and platform_system == \"Linux\" and sys_platform == \"linux\"", docs = "sys_platform == \"win32\" and platform_system == \"Linux\" and platform_machine == \"AMD64\" or (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\" and sys_platform == \"linux\"", tests = "sys_platform == \"win32\" and platform_system == \"Linux\" and platform_machine == \"AMD64\" or (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\" and sys_platform == \"linux\""}
+markers = {main = "sys_platform == \"linux\" and (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and extra == \"torch\" and platform_system == \"Linux\" or sys_platform == \"win32\" and extra == \"torch\" and platform_system == \"Linux\" and platform_machine == \"AMD64\"", docs = "sys_platform == \"linux\" and (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\" or sys_platform == \"win32\" and platform_system == \"Linux\" and platform_machine == \"AMD64\"", tests = "sys_platform == \"linux\" and (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\" or sys_platform == \"win32\" and platform_system == \"Linux\" and platform_machine == \"AMD64\""}
 
 [package.dependencies]
 nvidia-nvjitlink = "*"
@@ -3728,7 +3728,7 @@ files = [
     {file = "nvidia_cufile-1.17.1.22-py3-none-manylinux_2_27_aarch64.whl", hash = "sha256:bec33d7f1f12691dce330275246587569c2ed90b1ce43b0f94b3e1ce9268744b"},
     {file = "nvidia_cufile-1.17.1.22-py3-none-manylinux_2_27_x86_64.whl", hash = "sha256:87feaf8c3ad20d3d03a01933181801ff6892bace5c8f0b1e4b48f319d3e62d36"},
 ]
-markers = {main = "sys_platform == \"linux\" and (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and extra == \"torch\" and platform_system == \"Linux\"", docs = "sys_platform == \"linux\" and (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\"", tests = "sys_platform == \"linux\" and (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\""}
+markers = {main = "sys_platform == \"linux\" and (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\" and extra == \"torch\"", docs = "sys_platform == \"linux\" and (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\"", tests = "sys_platform == \"linux\" and (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\""}
 
 [[package]]
 name = "nvidia-cusolver"
@@ -3742,7 +3742,7 @@ files = [
     {file = "nvidia_cusolver-12.2.0.11-py3-none-manylinux_2_27_x86_64.whl", hash = "sha256:fab5778f6769947389a1a6abc07e635576825a08c0ffc68c3ae7f1392c794b42"},
     {file = "nvidia_cusolver-12.2.0.11-py3-none-win_amd64.whl", hash = "sha256:364511c9974ef1fcde2ca197caebfe0994ece2cb33bc27117eeb88b8cee5c46d"},
 ]
-markers = {main = "sys_platform == \"win32\" and extra == \"torch\" and platform_system == \"Linux\" and platform_machine == \"AMD64\" or (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and extra == \"torch\" and platform_system == \"Linux\" and sys_platform == \"linux\"", docs = "sys_platform == \"win32\" and platform_system == \"Linux\" and platform_machine == \"AMD64\" or (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\" and sys_platform == \"linux\"", tests = "sys_platform == \"win32\" and platform_system == \"Linux\" and platform_machine == \"AMD64\" or (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\" and sys_platform == \"linux\""}
+markers = {main = "sys_platform == \"linux\" and (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and extra == \"torch\" and platform_system == \"Linux\" or sys_platform == \"win32\" and extra == \"torch\" and platform_system == \"Linux\" and platform_machine == \"AMD64\"", docs = "sys_platform == \"linux\" and (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\" or sys_platform == \"win32\" and platform_system == \"Linux\" and platform_machine == \"AMD64\"", tests = "sys_platform == \"linux\" and (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\" or sys_platform == \"win32\" and platform_system == \"Linux\" and platform_machine == \"AMD64\""}
 
 [package.dependencies]
 nvidia-cublas = "*"
@@ -3780,7 +3780,7 @@ files = [
     {file = "nvidia_cusparse-12.7.10.12-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:25907c75e4db1581685f06f61cc6cdecc04611765516a52373e0a18ebd69fa00"},
     {file = "nvidia_cusparse-12.7.10.12-py3-none-win_amd64.whl", hash = "sha256:6b1e82056a0865c5b4f5da6adbebb15244e9a2b8aeea0838a9cf725e16523c53"},
 ]
-markers = {main = "sys_platform == \"win32\" and extra == \"torch\" and platform_system == \"Linux\" and platform_machine == \"AMD64\" or (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and extra == \"torch\" and platform_system == \"Linux\" and sys_platform == \"linux\"", docs = "sys_platform == \"win32\" and platform_system == \"Linux\" and platform_machine == \"AMD64\" or (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\" and sys_platform == \"linux\"", tests = "sys_platform == \"win32\" and platform_system == \"Linux\" and platform_machine == \"AMD64\" or (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\" and sys_platform == \"linux\""}
+markers = {main = "sys_platform == \"linux\" and (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and extra == \"torch\" and platform_system == \"Linux\" or sys_platform == \"win32\" and extra == \"torch\" and platform_system == \"Linux\" and platform_machine == \"AMD64\"", docs = "sys_platform == \"linux\" and (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\" or sys_platform == \"win32\" and platform_system == \"Linux\" and platform_machine == \"AMD64\"", tests = "sys_platform == \"linux\" and (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\" or sys_platform == \"win32\" and platform_system == \"Linux\" and platform_machine == \"AMD64\""}
 
 [package.dependencies]
 nvidia-nvjitlink = "*"
@@ -3832,7 +3832,7 @@ files = [
     {file = "nvidia_cusparselt_cu13-0.8.1-py3-none-manylinux2014_x86_64.whl", hash = "sha256:786ce87568c303fadb5afcc7102d454cd3040d75f6f8626f5db460d1871f4dd0"},
     {file = "nvidia_cusparselt_cu13-0.8.1-py3-none-win_amd64.whl", hash = "sha256:dccbd362f91a7b9024d1f55ee9f548ac065027ff15d8c8b0db889ab3a8f31215"},
 ]
-markers = {main = "extra == \"torch\" and platform_system == \"Linux\"", docs = "platform_system == \"Linux\"", tests = "platform_system == \"Linux\""}
+markers = {main = "platform_system == \"Linux\" and extra == \"torch\"", docs = "platform_system == \"Linux\"", tests = "platform_system == \"Linux\""}
 
 [[package]]
 name = "nvidia-nccl-cu12"
@@ -3858,7 +3858,7 @@ files = [
     {file = "nvidia_nccl_cu13-2.30.7-py3-none-manylinux_2_18_aarch64.whl", hash = "sha256:ca786ffa5a647c75d4d1f5cc72a6c4f537947e2ba8823d7c8aaf768e7a7b9f77"},
     {file = "nvidia_nccl_cu13-2.30.7-py3-none-manylinux_2_18_x86_64.whl", hash = "sha256:cefa7fdb9710efd0f39c5f1be1d61ff6fc9a996c451265bd7fbdcf9455ed4b50"},
 ]
-markers = {main = "extra == \"torch\" and platform_system == \"Linux\"", docs = "platform_system == \"Linux\"", tests = "platform_system == \"Linux\""}
+markers = {main = "platform_system == \"Linux\" and extra == \"torch\"", docs = "platform_system == \"Linux\"", tests = "platform_system == \"Linux\""}
 
 [[package]]
 name = "nvidia-nvjitlink"
@@ -3873,7 +3873,7 @@ files = [
     {file = "nvidia_nvjitlink-13.5.37-py3-none-win_amd64.whl", hash = "sha256:4465d4e8f2212118220b580c82523c5654f93a62906bd51d29d79bdfc12376c1"},
     {file = "nvidia_nvjitlink-13.5.37-py3-none-win_arm64.whl", hash = "sha256:eb30348ae64c525180a280025dd12a089c3e2e1dc4e19cdd58f68c6edc622404"},
 ]
-markers = {main = "sys_platform == \"win32\" and extra == \"torch\" and platform_system == \"Linux\" and platform_machine == \"AMD64\" or (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and extra == \"torch\" and platform_system == \"Linux\" and sys_platform == \"linux\"", docs = "sys_platform == \"win32\" and platform_system == \"Linux\" and platform_machine == \"AMD64\" or (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\" and sys_platform == \"linux\"", tests = "sys_platform == \"win32\" and platform_system == \"Linux\" and platform_machine == \"AMD64\" or (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\" and sys_platform == \"linux\""}
+markers = {main = "sys_platform == \"linux\" and (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and extra == \"torch\" and platform_system == \"Linux\" or sys_platform == \"win32\" and extra == \"torch\" and platform_system == \"Linux\" and platform_machine == \"AMD64\"", docs = "sys_platform == \"linux\" and (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\" or sys_platform == \"win32\" and platform_system == \"Linux\" and platform_machine == \"AMD64\"", tests = "sys_platform == \"linux\" and (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\" or sys_platform == \"win32\" and platform_system == \"Linux\" and platform_machine == \"AMD64\""}
 
 [[package]]
 name = "nvidia-nvjitlink-cu12"
@@ -3916,7 +3916,7 @@ files = [
     {file = "nvidia_nvshmem_cu13-3.7.2-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:0e748308b9e0a8a8d81859353f3e6c98fbe85a85f652a915a2ba60149a0bd124"},
     {file = "nvidia_nvshmem_cu13-3.7.2-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:b9a4f843c62b5dded8ad33fd6d220e007dcd39f06cee549292f5ba14ce4c235c"},
 ]
-markers = {main = "extra == \"torch\" and platform_system == \"Linux\"", docs = "platform_system == \"Linux\"", tests = "platform_system == \"Linux\""}
+markers = {main = "platform_system == \"Linux\" and extra == \"torch\"", docs = "platform_system == \"Linux\"", tests = "platform_system == \"Linux\""}
 
 [package.dependencies]
 nvidia-cuda-cccl = "*"
@@ -3933,7 +3933,7 @@ files = [
     {file = "nvidia_nvtx-13.2.86-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:1c6ae1be92fba569dd271f7b9b3056f99f5642726dc6c53d1b93ae4110c398fb"},
     {file = "nvidia_nvtx-13.2.86-py3-none-win_amd64.whl", hash = "sha256:7f3f430a87bb1e2db3371832d21a5c1efcf77bef7cacfd772fd71649e121cd58"},
 ]
-markers = {main = "sys_platform == \"win32\" and extra == \"torch\" and platform_system == \"Linux\" and platform_machine == \"AMD64\" or (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and extra == \"torch\" and platform_system == \"Linux\" and sys_platform == \"linux\"", docs = "sys_platform == \"win32\" and platform_system == \"Linux\" and platform_machine == \"AMD64\" or (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\" and sys_platform == \"linux\"", tests = "sys_platform == \"win32\" and platform_system == \"Linux\" and platform_machine == \"AMD64\" or (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\" and sys_platform == \"linux\""}
+markers = {main = "sys_platform == \"linux\" and (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and extra == \"torch\" and platform_system == \"Linux\" or sys_platform == \"win32\" and extra == \"torch\" and platform_system == \"Linux\" and platform_machine == \"AMD64\"", docs = "sys_platform == \"linux\" and (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\" or sys_platform == \"win32\" and platform_system == \"Linux\" and platform_machine == \"AMD64\"", tests = "sys_platform == \"linux\" and (platform_machine == \"aarch64\" or platform_machine == \"x86_64\") and platform_system == \"Linux\" or sys_platform == \"win32\" and platform_system == \"Linux\" and platform_machine == \"AMD64\""}
 
 [[package]]
 name = "openqasm3"
@@ -3966,7 +3966,7 @@ files = [
     {file = "opt_einsum-3.4.0-py3-none-any.whl", hash = "sha256:69bb92469f86a1565195ece4ac0323943e83477171b91d24c35afe028a90d7cd"},
     {file = "opt_einsum-3.4.0.tar.gz", hash = "sha256:96ca72f1b886d148241348783498194c577fa30a8faac108586b14f1ba4473ac"},
 ]
-markers = {docs = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\")"}
+markers = {docs = "python_version < \"3.14\""}
 
 [[package]]
 name = "optimistix"
@@ -4314,7 +4314,7 @@ description = "Pexpect allows easy control of interactive console applications."
 optional = false
 python-versions = "*"
 groups = ["dev", "docs", "tests"]
-markers = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\") or python_version == \"3.14\" and sys_platform != \"win32\" and sys_platform != \"emscripten\" or sys_platform != \"linux\" and sys_platform != \"darwin\" and sys_platform != \"win32\" and sys_platform != \"emscripten\""
+markers = "sys_platform != \"win32\" and sys_platform != \"emscripten\""
 files = [
     {file = "pexpect-4.9.0-py2.py3-none-any.whl", hash = "sha256:7236d1e080e4936be2dc3e326cec0af72acf9212a7e1d060210e70a47e253523"},
     {file = "pexpect-4.9.0.tar.gz", hash = "sha256:ee7d41123f3c9911050ea2c2dac107568dc43b2d3b0c7557a33212c398ead30f"},
@@ -4526,7 +4526,7 @@ files = [
     {file = "protobuf-7.36.2-py3-none-any.whl", hash = "sha256:bdb3a345d48db958e6ce1f18e508beb0cc981d64f24088427549c866cd039f1e"},
     {file = "protobuf-7.36.2.tar.gz", hash = "sha256:497d0463ff3316681da6c0b9e8d06cb465d61abce00b613ab42226175644d1bb"},
 ]
-markers = {main = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\") and extra == \"keras\"", docs = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\")", tests = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\")"}
+markers = {main = "extra == \"keras\" and python_version < \"3.14\"", docs = "python_version < \"3.14\"", tests = "python_version < \"3.14\""}
 
 [[package]]
 name = "psutil"
@@ -4571,7 +4571,7 @@ description = "Run a subprocess in a pseudo terminal"
 optional = false
 python-versions = "*"
 groups = ["dev", "docs", "tests"]
-markers = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\") or python_version == \"3.14\" and sys_platform != \"win32\" and sys_platform != \"emscripten\" or sys_platform != \"linux\" and sys_platform != \"darwin\" and sys_platform != \"win32\" and sys_platform != \"emscripten\""
+markers = "sys_platform != \"win32\" and sys_platform != \"emscripten\""
 files = [
     {file = "ptyprocess-0.7.0-py2.py3-none-any.whl", hash = "sha256:4b41f3967fce3af57cc7e94b888626c18bf37a083e3651ca8feeb66d492fef35"},
     {file = "ptyprocess-0.7.0.tar.gz", hash = "sha256:5c5d0a3b48ceee0b48485e0c26037c0acd7d29765ca3fbb5cb3831d347423220"},
@@ -5723,7 +5723,7 @@ files = [
     {file = "setuptools-83.0.0-py3-none-any.whl", hash = "sha256:29b23c360f22f414dc7336bb39178cc7bcbf6021ed2733cde173f09dba19abb3"},
     {file = "setuptools-83.0.0.tar.gz", hash = "sha256:025bccbbf0fa05b6192bc64ae1e7b16e001fd6d6d4d5de03c97b1c1ade523bef"},
 ]
-markers = {main = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\") and (extra == \"keras\" or extra == \"torch\") or extra == \"torch\""}
+markers = {main = "(extra == \"keras\" or extra == \"torch\") and (python_version < \"3.14\" or extra == \"torch\")"}
 
 [package.extras]
 check = ["pytest-checkdocs (>=2.14)", "pytest-ruff (>=0.2.1) ; sys_platform != \"cygwin\"", "ruff (>=0.13.0) ; sys_platform != \"cygwin\""]
@@ -5745,7 +5745,7 @@ files = [
     {file = "six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274"},
     {file = "six-1.17.0.tar.gz", hash = "sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81"},
 ]
-markers = {docs = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\")"}
+markers = {docs = "python_version < \"3.14\""}
 
 [[package]]
 name = "skops"
@@ -6063,7 +6063,7 @@ files = [
     {file = "tensorflow-2.21.0-cp313-cp313-manylinux_2_27_x86_64.whl", hash = "sha256:e9d8da8dcab9650efb45f032ba70af2f016f907e6e0c6bda29dd101bba945406"},
     {file = "tensorflow-2.21.0-cp313-cp313-win_amd64.whl", hash = "sha256:76cccbe0a95d9392dee1ae501ae0656b6c73c1cac29a7f8f32d570e0670863f7"},
 ]
-markers = {main = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\") and extra == \"keras\"", docs = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\")", tests = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\")"}
+markers = {main = "extra == \"keras\" and python_version < \"3.14\"", docs = "python_version < \"3.14\"", tests = "python_version < \"3.14\""}
 
 [package.dependencies]
 absl-py = ">=1.0.0"
@@ -6102,7 +6102,7 @@ files = [
     {file = "termcolor-3.3.0-py3-none-any.whl", hash = "sha256:cf642efadaf0a8ebbbf4bc7a31cec2f9b5f21a9f726f4ccbb08192c9c26f43a5"},
     {file = "termcolor-3.3.0.tar.gz", hash = "sha256:348871ca648ec6a9a983a13ab626c0acce02f515b9e1983332b17af7979521c5"},
 ]
-markers = {main = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\") and extra == \"keras\"", docs = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\")", tests = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\")"}
+markers = {main = "extra == \"keras\" and python_version < \"3.14\"", docs = "python_version < \"3.14\"", tests = "python_version < \"3.14\""}
 
 [package.extras]
 tests = ["pytest", "pytest-cov"]
@@ -6361,7 +6361,7 @@ files = [
     {file = "triton-3.9.0-cp315-cp315t-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:990d43d967bbcc90f973fc17ad9cd7352e67940f41b31d94afd53b9867a3c1a1"},
     {file = "triton-3.9.0-cp315-cp315t-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:bac2ed42a2b7aa232aeec57c2f7b0d88b61a74a29b3bf358f4cec6b20be356f6"},
 ]
-markers = {main = "platform_system == \"Linux\" and extra == \"torch\"", docs = "platform_system == \"Linux\"", tests = "platform_system == \"Linux\""}
+markers = {main = "extra == \"torch\" and platform_system == \"Linux\"", docs = "platform_system == \"Linux\"", tests = "platform_system == \"Linux\""}
 
 [[package]]
 name = "typing-extensions"
@@ -6498,7 +6498,7 @@ files = [
     {file = "wheel-0.48.0-py3-none-any.whl", hash = "sha256:3217dcc807155e45db462d7ef2431f5ddda0d7273b700d05a67b271ceb1287ab"},
     {file = "wheel-0.48.0.tar.gz", hash = "sha256:94800765601e9171bf5d58d066e640662842bcedcbab982b2c90787a2c987322"},
 ]
-markers = {main = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\") and extra == \"keras\"", docs = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\")", tests = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\")"}
+markers = {main = "extra == \"keras\" and python_version < \"3.14\"", docs = "python_version < \"3.14\"", tests = "python_version < \"3.14\""}
 
 [package.dependencies]
 packaging = ">=24.0"
@@ -6631,7 +6631,7 @@ files = [
     {file = "wrapt-2.5.2-py3-none-any.whl", hash = "sha256:61eb54e9540ea522c2c4752a57549a83d3c67e6704ed708403d28e067aaf90f0"},
     {file = "wrapt-2.5.2.tar.gz", hash = "sha256:551cb49e88b3722faad780303833bc4fa70685fb1773270fb98b40d39d9fddbf"},
 ]
-markers = {main = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\") and extra == \"keras\"", docs = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\")", tests = "python_version < \"3.14\" and (sys_platform == \"linux\" or sys_platform == \"darwin\")"}
+markers = {main = "extra == \"keras\" and python_version < \"3.14\"", docs = "python_version < \"3.14\"", tests = "python_version < \"3.14\""}
 
 [package.extras]
 dev = ["pytest", "setuptools"]
@@ -6643,4 +6643,4 @@ torch = ["torch"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.15"
-content-hash = "631b5766a2f586317bf1c2ee07738fe7c721f11275f499b7cf1dcb17aaa51abd"
+content-hash = "b0912caab1962ff153e304113fb2e9dbcb17dfc8fd61f42b1f3572408017d139"
