@@ -141,6 +141,10 @@ class TensorflowBackend(Backend):
             self.nthreads = nthreads
 
     def to_numpy(self, array: ArrayLike) -> ArrayLike:
+        if hasattr(array, "detach"):
+            # e.g. pytorch tensors, which may require gradients
+            array = array.detach().cpu()
+
         return np.array(array)
 
     ########################################################################################

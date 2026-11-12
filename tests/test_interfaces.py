@@ -201,7 +201,9 @@ def train_model(frontend, model, data, target, max_epochs=5):
                     grads = train_step(None, None)
                     optimizer.apply_gradients(zip(grads, model.trainable_variables))
                 avg_grad = frontend.tf.norm(grads)
-                print(f"-> Loss: {float(model())}, Grad: {avg_grad}")
+                print(
+                    f"-> Loss: {float(frontend.tf.squeeze(model()))}, Grad: {avg_grad}"
+                )
                 if avg_grad < 1e-2:
                     break
             return avg_grad

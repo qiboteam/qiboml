@@ -50,3 +50,9 @@ def test_tensorflow_set_threads(backend, monkeypatch):
     backend.set_threads(2)
     assert backend.nthreads == 2
     assert calls == [2, 2]
+
+
+def test_to_numpy_requires_grad(backend):
+    torch = pytest.importorskip("torch")
+    tensor = torch.tensor([1.0, 2.0], requires_grad=True)
+    backend.assert_allclose(backend.to_numpy(tensor), [1.0, 2.0])
