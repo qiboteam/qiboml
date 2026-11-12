@@ -55,5 +55,5 @@ def test_tensorflow_set_threads(backend, monkeypatch):
 
 def test_to_numpy_requires_grad(backend):
     torch = pytest.importorskip("torch")
-    tensor = torch.tensor([1.0, 2.0], requires_grad=True)
-    backend.assert_allclose(tensor, backend.cast([1.0, 2.0]))
+    tensor = torch.tensor([1.0, 2.0], dtype=torch.float64, requires_grad=True)
+    backend.assert_allclose(backend.to_numpy(tensor), np.array([1.0, 2.0]))
