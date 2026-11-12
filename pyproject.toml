@@ -55,7 +55,7 @@ optional = true
 
 [tool.poetry.group.tests.dependencies]
 pytest = ">=7.2.1,<10.0.0"
-pylint = "3.1.0"
+pylint = "4.0.9"
 pytest-cov = "4.0.0"
 matplotlib = "^3.7.0"
 qibocal = { git = "https://github.com/qiboteam/qibocal" }
