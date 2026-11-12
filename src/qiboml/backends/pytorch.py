@@ -241,6 +241,26 @@ class PyTorchBackend(Backend):
     ) -> ArrayLike:
         return self.engine.unsqueeze(array, axis)
 
+    def exp(self, array: ArrayLike, **kwargs) -> float | complex | ArrayLike:
+        """Calculate the element-wise exponential of ``array``.
+
+        Args:
+            array (ArrayLike): input array.
+            kwargs (optional): additional options for this function.
+                For more details, see the corresponding engine's documentation.
+
+        Returns:
+            float or complex or ArrayLike: Array with the element-wise exponential
+            of the elements in `array``.
+        """
+        _array = (
+            self.cast(array, dtype=type(array))
+            if isinstance(array, (int, float, complex))
+            else array
+        )
+
+        return self.engine.exp(_array, **kwargs)
+
     def expm(self, array: ArrayLike) -> ArrayLike:
         return self.engine.linalg.matrix_exp(array)  # pylint: disable=not-callable
 

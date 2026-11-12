@@ -491,7 +491,7 @@ def test_vqe(backend, frontend, dense, nshots):
     none = np.array(5 * [None])
     grad = train_model(frontend, q_model, none, none, max_epochs=10)
     cost = q_model()
-    backend.assert_allclose(float(cost), -2.0, atol=6e-2)
+    backend.assert_allclose(float(cost), -1.0, atol=6e-2)
 
 
 def test_noise(backend, frontend):

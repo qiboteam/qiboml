@@ -1,4 +1,5 @@
 import importlib.metadata as im
+import sys
 from typing import Union
 
 from numpy.typing import ArrayLike
@@ -6,6 +7,14 @@ from numpy.typing import ArrayLike
 from qiboml.backends.__init__ import MetaBackend
 
 __version__ = im.version(__package__)
+
+# ``triton``, a dependency of ``torch`` on Linux, aborts the interpreter when it is loaded after
+# ``tensorflow``. Hence, ``triton`` must be loaded before ``tensorflow``.
+if "tensorflow" not in sys.modules:
+    try:
+        import triton  # pylint: disable=import-error,unused-import
+    except ImportError:  # pragma: no cover
+        pass
 
 try:
     from tensorflow import Tensor as tf_tensor
