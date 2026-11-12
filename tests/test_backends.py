@@ -23,3 +23,14 @@ def test_metabackend_list_available():
         "jax": True,
     }
     assert MetaBackend().list_available() == available_backends
+
+
+def test_tensorflow_set_threads(backend, caplog):
+    if backend.platform != "tensorflow":
+        pytest.skip("Only the tensorflow backend warns on ``set_threads``.")
+
+    backend.set_threads(backend.nthreads)
+    assert "set_threads" not in caplog.text
+
+    backend.set_threads(backend.nthreads + 1)
+    assert "set_threads" in caplog.text

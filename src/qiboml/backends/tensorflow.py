@@ -100,13 +100,16 @@ class TensorflowBackend(Backend):
         self.engine.random.set_seed(seed)
 
     def set_threads(self, nthreads: int) -> None:
-        log.warning(
-            "`set_threads` is not supported by the tensorflow "
-            "backend. Please use tensorflow's thread setters: "
-            "`tf.config.threading.set_inter_op_parallelism_threads` "
-            "or `tf.config.threading.set_intra_op_parallelism_threads` "
-            "to switch the number of threads."
-        )
+        # qibo's parallel executions call ``set_threads(backend.nthreads)`` for every
+        # circuit, which is a no-op request and should not trigger the warning.
+        if nthreads != self.nthreads:
+            log.warning(
+                "`set_threads` is not supported by the tensorflow "
+                "backend. Please use tensorflow's thread setters: "
+                "`tf.config.threading.set_inter_op_parallelism_threads` "
+                "or `tf.config.threading.set_intra_op_parallelism_threads` "
+                "to switch the number of threads."
+            )
 
     def to_numpy(self, array: ArrayLike) -> ArrayLike:
         return np.array(array)
