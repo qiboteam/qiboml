@@ -140,6 +140,10 @@ class JaxBackend(Backend):
         if isinstance(array, (list, tuple)):
             return np.asarray([self.to_numpy(elem) for elem in array])
 
+        if hasattr(array, "detach"):
+            # e.g. pytorch tensors, which may require gradients
+            array = array.detach().cpu()
+
         return np.asarray(array)
 
     # TODO: using numpy's rng for now. Shall we use Jax's?

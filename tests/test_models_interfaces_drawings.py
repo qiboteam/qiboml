@@ -23,7 +23,9 @@ def fig2array(fig):
 
 def match_figure_image(fig, arr_path):
     """Check whether the two image arrays match."""
-    return np.all(fig2array(fig) == np.load(arr_path))
+    array = fig2array(fig)
+    reference = np.load(arr_path)
+    return array.shape == reference.shape and np.all(array == reference)
 
 
 def trainable_circuit(nqubits, entanglement=True):

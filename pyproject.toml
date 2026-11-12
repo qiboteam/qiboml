@@ -17,7 +17,7 @@ packages = [{ include = "qiboml", from = "src" }]
 python = ">=3.12,<3.15"
 numpy = "^2.0.0"
 qibo = "^0.3.7"
-qibocal = { git = "https://github.com/qiboteam/qibocal", branch = "import" , optional = true }
+qibocal = { git = "https://github.com/qiboteam/qibocal", optional = true }
 jax = { version = "^0.12.0", optional = true }
 jaxlib = { version = "^0.12.0", optional = true }
 keras = { version = "^3.13.1", optional = true }
@@ -58,7 +58,7 @@ pytest = ">=7.2.1,<10.0.0"
 pylint = "4.0.9"
 pytest-cov = "4.0.0"
 matplotlib = "^3.7.0"
-qibocal = { git = "https://github.com/qiboteam/qibocal" , branch = "import" }
+qibocal = { git = "https://github.com/qiboteam/qibocal" }
 qibolab = { git = "https://github.com/qiboteam/qibolab", extras = ["emulator"] }
 jax = "^0.12.0"
 jaxlib = "^0.12.0"
@@ -86,7 +86,7 @@ jax = { extras = ["cuda12"], version = "^0.12.0" }
 optional = true
 
 [tool.poetry.group.qibocal.dependencies]
-qibocal = { git = "https://github.com/qiboteam/qibocal" , branch = "import" }
+qibocal = { git = "https://github.com/qiboteam/qibocal" }
 
 [tool.poe.tasks]
 test = "pytest"

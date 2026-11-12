@@ -201,7 +201,9 @@ def train_model(frontend, model, data, target, max_epochs=5):
                     grads = train_step(None, None)
                     optimizer.apply_gradients(zip(grads, model.trainable_variables))
                 avg_grad = frontend.tf.norm(grads)
-                print(f"-> Loss: {float(model())}, Grad: {avg_grad}")
+                print(
+                    f"-> Loss: {float(frontend.tf.squeeze(model()))}, Grad: {avg_grad}"
+                )
                 if avg_grad < 1e-2:
                     break
             return avg_grad
@@ -491,7 +493,7 @@ def test_vqe(backend, frontend, dense, nshots):
     none = np.array(5 * [None])
     grad = train_model(frontend, q_model, none, none, max_epochs=10)
     cost = q_model()
-    backend.assert_allclose(float(cost), -1.0, atol=6e-2)
+    backend.assert_allclose(np.asarray(backend.to_numpy(cost)).item(), -1.0, atol=6e-2)
 
 
 def test_noise(backend, frontend):
@@ -726,4 +728,4 @@ def test_equivariant(backend, frontend):
     )
     grad = train_model(frontend, model, none, none, max_epochs=10)
     cost = model()
-    backend.assert_allclose(float(cost), -2.0, atol=5e-2)
+    backend.assert_allclose(np.asarray(backend.to_numpy(cost)).item(), -2.0, atol=5e-2)

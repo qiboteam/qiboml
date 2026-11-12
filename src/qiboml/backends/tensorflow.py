@@ -9,7 +9,7 @@ from numpy.typing import ArrayLike, DTypeLike
 from qibo import Circuit, __version__
 from qibo.backends import Backend
 from qibo.backends.npmatrices import NumpyMatrices
-from qibo.config import log, raise_error
+from qibo.config import raise_error
 from qibo.gates.abstract import Gate
 from qibo.result import CircuitResult, MeasurementOutcomes, QuantumState
 
@@ -65,13 +65,9 @@ class TensorflowBackend(Backend):
             "tensorflow": tf.__version__,
         }
 
-        cpu_devices = self.engine.config.list_logical_devices("CPU")
-        gpu_devices = self.engine.config.list_logical_devices("GPU")
-        if gpu_devices:  # pragma: no cover
-            # CI does not use GPUs
-            self.device = gpu_devices[0].name
-        elif cpu_devices:
-            self.device = cpu_devices[0].name
+        # Devices are detected lazily, since listing them initializes the tensorflow
+        # runtime, after which the number of threads can no longer be changed.
+        self._device = None
 
     def cast(
         self, array: ArrayLike, dtype: Optional[DTypeLike] = None, copy: bool = False
@@ -89,6 +85,26 @@ class TensorflowBackend(Backend):
     def compile(self, func: callable):
         return self.engine.function(func)
 
+    @property
+    def device(self) -> str:
+        """Name of the device used for the simulation."""
+        if self._device is None:
+            cpu_devices = self.engine.config.list_logical_devices("CPU")
+            gpu_devices = self.engine.config.list_logical_devices("GPU")
+            if gpu_devices:  # pragma: no cover
+                # CI does not use GPUs
+                self._device = gpu_devices[0].name
+            elif cpu_devices:
+                self._device = cpu_devices[0].name
+            else:  # pragma: no cover
+                self._device = "/CPU:0"
+
+        return self._device
+
+    @device.setter
+    def device(self, device: str) -> None:
+        self._device = device
+
     def is_sparse(self, array: ArrayLike) -> bool:
         return isinstance(array, self.engine.sparse.SparseTensor)
 
@@ -100,15 +116,35 @@ class TensorflowBackend(Backend):
         self.engine.random.set_seed(seed)
 
     def set_threads(self, nthreads: int) -> None:
-        log.warning(
-            "`set_threads` is not supported by the tensorflow "
-            "backend. Please use tensorflow's thread setters: "
-            "`tf.config.threading.set_inter_op_parallelism_threads` "
-            "or `tf.config.threading.set_intra_op_parallelism_threads` "
-            "to switch the number of threads."
-        )
+        """Set the number of inter and intra operation threads. Works in-place.
+
+        Tensorflow only allows this before its runtime is initialized, *i.e.* before any
+        tensor is created or any device is listed.
+
+        Args:
+            nthreads (int): Number of threads.
+        """
+        # qibo's parallel executions call ``set_threads(backend.nthreads)`` for every
+        # circuit, which must be a no-op, since tensorflow rejects any change of
+        # threads after initialization.
+        if nthreads != self.nthreads:
+            try:
+                self.engine.config.threading.set_inter_op_parallelism_threads(nthreads)
+                self.engine.config.threading.set_intra_op_parallelism_threads(nthreads)
+            except RuntimeError:
+                raise_error(
+                    RuntimeError,
+                    "Tensorflow does not allow changing the number of threads after its "
+                    "runtime is initialized. Call ``set_threads`` before creating any tensor.",
+                )
+
+            self.nthreads = nthreads
 
     def to_numpy(self, array: ArrayLike) -> ArrayLike:
+        if hasattr(array, "detach"):
+            # e.g. pytorch tensors, which may require gradients
+            array = array.detach().cpu()
+
         return np.array(array)
 
     ########################################################################################
