@@ -25,12 +25,28 @@ def test_metabackend_list_available():
     assert MetaBackend().list_available() == available_backends
 
 
-def test_tensorflow_set_threads(backend, caplog):
+def test_tensorflow_set_threads(backend, monkeypatch):
     if backend.platform != "tensorflow":
-        pytest.skip("Only the tensorflow backend warns on ``set_threads``.")
+        pytest.skip(
+            "Only the tensorflow backend relies on tensorflow's thread setters."
+        )
 
+    # same number of threads is a no-op, as used by qibo's parallel executions
     backend.set_threads(backend.nthreads)
-    assert "set_threads" not in caplog.text
 
-    backend.set_threads(backend.nthreads + 1)
-    assert "set_threads" in caplog.text
+    # tensorflow rejects changes after its runtime is initialized
+    backend.cast([1.0])
+    with pytest.raises(RuntimeError):
+        backend.set_threads(backend.nthreads + 1)
+
+    calls = []
+    threading = backend.engine.config.threading
+    monkeypatch.setattr(
+        threading, "set_inter_op_parallelism_threads", lambda n: calls.append(n)
+    )
+    monkeypatch.setattr(
+        threading, "set_intra_op_parallelism_threads", lambda n: calls.append(n)
+    )
+    backend.set_threads(2)
+    assert backend.nthreads == 2
+    assert calls == [2, 2]
